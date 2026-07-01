@@ -1,0 +1,7 @@
+node_modules/
+coverage/
+*.log
+.DS_Store
+site/.next/
+site/out/
+site/node_modules/

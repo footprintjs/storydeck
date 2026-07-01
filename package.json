@@ -1,0 +1,37 @@
+{
+  "name": "storydeck",
+  "version": "0.1.0",
+  "description": "One source, many lenses — render structured content as a Read article, a Scroll (scrollytelling) story, or a Watch deck.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Sanjay Krishna Anbalagan",
+  "repository": { "type": "git", "url": "https://github.com/footprintjs/storydeck" },
+  "sideEffects": ["*.css"],
+  "exports": {
+    ".": "./index.js",
+    "./storydeck.css": "./storydeck.css"
+  },
+  "files": ["*.js", "*.jsx", "*.css", "content", "README.md"],
+  "scripts": {
+    "test": "vitest run",
+    "test:cov": "vitest run --coverage"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "dependencies": {
+    "markdown-it": "^14.1.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@vitejs/plugin-react": "^5.0.4",
+    "@vitest/coverage-v8": "^4.1.9",
+    "jsdom": "^29.1.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "vitest": "^4.1.9"
+  }
+}
