@@ -1,0 +1,15 @@
+{
+  "slug": "storydeck",
+  "title": "storydeck",
+  "description": "One source, many lenses — render structured content as a Read article, a Scroll story, or a Watch deck.",
+  "date": "2026-07-01",
+  "author": "Sanjay Krishna Anbalagan",
+  "tags": ["library", "react"],
+  "sections": [
+    { "key": "write-once", "label": "Write once", "heading": "Write it once. Show it three ways.", "slides": ["Write once"] },
+    { "key": "read",       "label": "Read",        "heading": "A calm, detailed article",           "slides": ["Read"] },
+    { "key": "scroll",     "label": "Scroll",      "heading": "The figure pins, the story scrolls",  "slides": ["Scroll"] },
+    { "key": "watch",      "label": "Watch",       "heading": "Press play",                          "slides": ["Watch"] },
+    { "key": "how",        "label": "How",         "heading": "One model, yours to theme",           "slides": ["How"] }
+  ]
+}
