@@ -40,3 +40,24 @@ describe('assemblePost', () => {
     expect(p.sections[0].body).toBe('');
   });
 });
+
+describe('assemblePost — additive builds', () => {
+  const additiveDeck = [
+    { label: 'Base', html: '<section>base</section>' },
+    { label: 'Add', html: '<section data-build="add">layer</section>' },
+  ];
+  const p = assemblePost({
+    meta,
+    sections: [{ key: 'g', slides: ['Base', 'Add'] }],
+    bodyMd: '',
+    deckSlides: additiveDeck,
+  });
+
+  it('Read/Scrolly steps get the pre-stacked composite', () => {
+    expect(p.sections[0].steps[1]).toBe('<section>base</section>\n<section data-build="add">layer</section>');
+  });
+
+  it('Watch deckSteps stay RAW — the deck engine layers live', () => {
+    expect(p.deckSteps).toEqual(['<section>base</section>', '<section data-build="add">layer</section>']);
+  });
+});

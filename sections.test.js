@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildSections, parseGroup, finalStep, allSteps } from './sections';
+import { buildSections, parseGroup, finalStep, allSteps, isAdditiveSlide, compositeSlides } from './sections';
 
 describe('parseGroup', () => {
   it('reads a data-group attribute', () => {
@@ -63,5 +63,65 @@ describe('buildSections — the grouping feature', () => {
     const s = buildSections([{ label: 'Solo', html: '<section>x</section>' }]);
     expect(s[0].heading).toBe('Solo');
     expect(s[0].body).toBe('');
+  });
+});
+
+describe('additive builds — isAdditiveSlide', () => {
+  it('detects data-build="add" in the opening section tag', () => {
+    expect(isAdditiveSlide('<section data-label="X" data-build="add">x</section>')).toBe(true);
+  });
+  it('ignores slides without the attribute, and empty input', () => {
+    expect(isAdditiveSlide('<section data-label="X">x</section>')).toBe(false);
+    expect(isAdditiveSlide('')).toBe(false);
+    expect(isAdditiveSlide(undefined)).toBe(false);
+  });
+  it('does NOT trip on data-build appearing only in body content', () => {
+    expect(isAdditiveSlide('<section data-label="X"><code>data-build="add"</code></section>')).toBe(false);
+  });
+});
+
+describe('additive builds — compositeSlides', () => {
+  it('is the identity on a deck with no data-build attributes', () => {
+    const slides = [
+      { label: 'A', html: '<section>a</section>' },
+      { label: 'B', html: '<section>b</section>' },
+    ];
+    expect(compositeSlides(slides)).toEqual(slides);
+  });
+
+  it('accumulates a chain: each additive slide = base + every layer up to it', () => {
+    const slides = [
+      { label: 'Base', html: '<section>base</section>' },
+      { label: 'Add1', html: '<section data-build="add">one</section>' },
+      { label: 'Add2', html: '<section data-build="add">two</section>' },
+    ];
+    const out = compositeSlides(slides);
+    expect(out[0].html).toBe('<section>base</section>');
+    expect(out[1].html).toBe('<section>base</section>\n<section data-build="add">one</section>');
+    expect(out[2].html).toBe(
+      '<section>base</section>\n<section data-build="add">one</section>\n<section data-build="add">two</section>',
+    );
+  });
+
+  it('a normal slide resets the canvas (starts a fresh chain)', () => {
+    const out = compositeSlides([
+      { label: 'Base', html: '<section>base</section>' },
+      { label: 'Add', html: '<section data-build="add">one</section>' },
+      { label: 'Reset', html: '<section>fresh</section>' },
+      { label: 'Add2', html: '<section data-build="add">next</section>' },
+    ]);
+    expect(out[2].html).toBe('<section>fresh</section>');
+    expect(out[3].html).toBe('<section>fresh</section>\n<section data-build="add">next</section>');
+  });
+
+  it('an additive FIRST slide degrades to its own base', () => {
+    const out = compositeSlides([{ label: 'A', html: '<section data-build="add">solo</section>' }]);
+    expect(out[0].html).toBe('<section data-build="add">solo</section>');
+  });
+
+  it('preserves the label and every other slide field', () => {
+    const out = compositeSlides([{ label: 'A', html: '<section>a</section>', extra: 1 }]);
+    expect(out[0].label).toBe('A');
+    expect(out[0].extra).toBe(1);
   });
 });

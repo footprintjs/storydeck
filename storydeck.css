@@ -65,6 +65,12 @@
 /* static figure: reveal the deck's progressive-build elements at their final state */
 .slide-figure-canvas [class*="fp-"] { opacity: 1 !important; transform: none !important; animation: none !important; }
 .slide-figure-canvas svg [style*="stroke-dashoffset"] { stroke-dashoffset: 0 !important; }
+/* additive-build composites (sections.js compositeSlides): a figure may stack a whole
+   chain of sections. Additive layers drop their authored background so the chain base
+   shows through, and every layer under the final one hides its per-slide [data-chrome]
+   furniture — mirroring what the Watch engine shows on that slide. */
+.slide-figure-canvas > section[data-build="add"] { background: transparent !important; }
+.slide-figure-canvas > section:not(:last-child) [data-chrome] { visibility: hidden !important; }
 
 /* prose — reading typography (Medium/Substack feel) */
 .prose { margin-top: 1.4rem; font-size: 1.125rem; line-height: 1.75; color: var(--fg); max-width: 42rem; }

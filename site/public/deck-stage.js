@@ -49,6 +49,23 @@
  *      NOT touch the DOM: the host applies the op and re-renders;
  *      structural rail input is locked until the host posts
  *      {__dc_op_ack: true, applied}.
+ *  (h) additive builds — a slide with data-build="add" layers ON TOP of the
+ *      previous slide instead of replacing it: the earlier slides of its
+ *      chain stay visible underneath (the engine stamps data-deck-under on
+ *      them), with their [data-chrome] elements (headings, kickers,
+ *      captions — per-slide furniture) hidden so only the shared canvas
+ *      carries over. Consecutive additive slides chain back to the nearest
+ *      normal slide (the chain base). Forward navigation animates only the
+ *      arriving slide's own content — carried-over layers have no
+ *      [data-deck-active], so their entrance animations never re-run.
+ *      Stepping back, deep-linking, or jumping into a chain shows the
+ *      composite instantly: the arriving slide gets data-deck-static,
+ *      which zeroes animation durations (a link is a destination, not a
+ *      performance). Additive slides are forced background:transparent on
+ *      screen so the base's background shows through — author them without
+ *      an opaque background of their own. Decks without data-build behave
+ *      exactly as before. Rail thumbnails and print show each slide's own
+ *      authored content (not the composite).
  *
  * Slides are HIDDEN, not unmounted. Non-active slides stay in the DOM with
  * `visibility: hidden` + `opacity: 0`, so their state (videos, iframes,
@@ -622,6 +639,7 @@
       this._render();
       this._loadNotes();
       this._syncPrintPageRule();
+      this._syncBuildStyleRule();
       window.addEventListener('keydown', this._onKey);
       window.addEventListener('resize', this._onResize);
       window.addEventListener('mousemove', this._onMouseMove, { passive: true });
@@ -640,7 +658,13 @@
         this._freezeStyle = document.createElement('style');
         this._freezeStyle.textContent = '*,*::before,*::after{transition-duration:0s !important}';
         document.head.appendChild(this._freezeStyle);
-        this._slides.forEach((s) => s.setAttribute('data-deck-active', ''));
+        this._slides.forEach((s) => {
+          s.setAttribute('data-deck-active', '');
+          // Print pages each slide standalone — no additive layering, and
+          // the under-layer chrome-hide rule must not leak into print.
+          s.removeAttribute('data-deck-under');
+          s.removeAttribute('data-deck-static');
+        });
       };
       this._onAfterPrint = () => {
         this._applyIndex({ showOverlay: false, broadcast: false });
@@ -1086,6 +1110,43 @@
         'animation-play-state: running !important; transition-duration: 0s !important; } }';
     }
 
+    /** Additive-build support styles. Like the print-page rule, this must
+     *  live in the DOCUMENT stylesheet: the layered slides are light-DOM
+     *  children, and the ::slotted() selector can't reach their
+     *  descendants (the [data-chrome] elements). Every selector is scoped
+     *  under `deck-stage` so Read/Scrolly figures and rail thumbnails
+     *  (which render the same HTML outside a deck-stage ancestor) are
+     *  untouched. Cascade note: these are NORMAL document declarations,
+     *  which by the shadow-scoping rules beat the component's normal
+     *  ::slotted() baseline (visibility:hidden/opacity:0 on non-active
+     *  slides) — exactly the override we need for data-deck-under. */
+    _syncBuildStyleRule() {
+      const id = 'deck-stage-build-css';
+      let tag = document.getElementById(id);
+      if (!tag) {
+        tag = document.createElement('style');
+        tag.id = id;
+      }
+      (document.body || document.head).appendChild(tag);
+      tag.textContent =
+        // Screen only: in print each slide pages standalone and keeps its
+        // authored background (light text on a bare sheet would be
+        // unreadable).
+        '@media screen { deck-stage [data-build="add"] { background: transparent !important; } }\n' +
+        // A chain slide layered below the active one: visible and opaque
+        // (beats the ::slotted non-active baseline), never interactive.
+        'deck-stage [data-deck-under] { visibility: visible; opacity: 1; pointer-events: none; }\n' +
+        // …but its per-slide furniture does not carry over.
+        'deck-stage [data-deck-under] [data-chrome] { visibility: hidden !important; }\n' +
+        // Instant arrival (back-step / deep link / jump): entrance
+        // animations complete in 0s — fill-mode lands them on their end
+        // state, so the composite appears fully built.
+        'deck-stage [data-deck-static], deck-stage [data-deck-static] * { animation-duration: 0s !important; animation-delay: 0s !important; }\n' +
+        // Belt for a print snapshot taken without beforeprint having
+        // cleared the attributes.
+        '@media print { deck-stage [data-deck-under] [data-chrome] { visibility: visible !important; } }';
+    }
+
     _onSlotChange() {
       // Self-mutate path already reconciled synchronously and emitted
       // slidechange; skip the async slotchange it caused.
@@ -1119,6 +1180,18 @@
 
         slide.setAttribute('data-deck-slide', String(i));
       });
+
+      // Additive-build chains: data-build="add" layers over the previous
+      // slide's composite; consecutive additive slides share one chain
+      // whose base is the nearest earlier NON-additive slide. A normal
+      // slide is its own base (chainBase[i] === i ⇔ not additive), so a
+      // deck with no data-build attributes resolves to the identity map
+      // and every branch below is a no-op.
+      const bases = [];
+      this._slides.forEach((s, i) => {
+        bases[i] = (i > 0 && s.getAttribute('data-build') === 'add') ? bases[i - 1] : i;
+      });
+      this._chainBase = bases;
 
       if (this._totalEl) this._totalEl.textContent = String(this._slides.length || 1);
       if (this._index >= this._slides.length) this._index = Math.max(0, this._slides.length - 1);
@@ -1181,6 +1254,7 @@
         if (i === curr) s.setAttribute('data-deck-active', '');
         else s.removeAttribute('data-deck-active');
       });
+      this._applyChainState(prev, curr);
       if (this._countEl) this._countEl.textContent = String(curr + 1);
       // Follow-scroll on every navigation (init deep-link, keyboard, click,
       // tap, external goTo) — the only time we *don't* want the rail to
@@ -1215,6 +1289,49 @@
 
       this._prevIndex = curr;
       if (showOverlay) this._flashOverlay();
+    }
+
+    /** Nearest non-skipped slide before i, or -1 — the index _advance(+1)
+     *  would have come from. */
+    _prevPlayable(i) {
+      for (let j = i - 1; j >= 0; j--) {
+        if (!this._slides[j].hasAttribute('data-deck-skip')) return j;
+      }
+      return -1;
+    }
+
+    /** Additive-build layering for the slide at `curr` (see USAGE (h)).
+     *  data-deck-under goes on the current chain's earlier slides so they
+     *  paint (statically — they have no data-deck-active, so entrance
+     *  animations never re-run) below the active slide. data-deck-static
+     *  goes on the active slide itself whenever its arrival should be
+     *  instant: any arrival at an additive slide EXCEPT a forward step
+     *  from its immediate predecessor (the one build transition that
+     *  animates), and a backward arrival at a chain base from its own
+     *  chain (so stepping back only removes the newest addition).
+     *  Pure function of (prev, curr, chains, skips) — jumps, deep links,
+     *  Home/End, thumbnails and api goTo all resolve the same way. */
+    _applyChainState(prev, curr) {
+      const bases = this._chainBase || [];
+      const base = bases[curr] != null ? bases[curr] : curr;
+      const additive = base !== curr;
+      const sameChain = prev >= 0 && prev < this._slides.length
+        && bases[prev] === bases[curr];
+      let instant = false;
+      if (additive) {
+        instant = !(prev === this._prevPlayable(curr) && prev >= base);
+      } else if (sameChain && prev > curr) {
+        instant = true;
+      }
+      this._slides.forEach((s, i) => {
+        if (i !== curr && i >= base && i < curr && !s.hasAttribute('data-deck-skip')) {
+          s.setAttribute('data-deck-under', '');
+        } else {
+          s.removeAttribute('data-deck-under');
+        }
+        if (i === curr && instant) s.setAttribute('data-deck-static', '');
+        else s.removeAttribute('data-deck-static');
+      });
     }
 
     _flashOverlay() {
@@ -1611,6 +1728,12 @@
       let clone = entry.slide.cloneNode(true);
       clone.removeAttribute('id');
       clone.removeAttribute('data-deck-active');
+      // Additive-build state is a live-deck concern; the thumb shows the
+      // slide's own authored content (the doc-level build CSS is scoped
+      // under `deck-stage` and can't match inside the thumb's shadow tree,
+      // but don't let stale nav attributes ride along either).
+      clone.removeAttribute('data-deck-under');
+      clone.removeAttribute('data-deck-static');
       clone.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
       // Neuter heavy media; replace <video> with its poster so the box
       // keeps a visual. <iframe>/<audio> become empty placeholders.

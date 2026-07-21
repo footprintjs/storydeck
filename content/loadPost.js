@@ -1,4 +1,5 @@
 import { renderMarkdown, splitBodyByMarkers } from './markdown';
+import { compositeSlides } from '../sections';
 
 // Assemble a normalized Post from the authoring inputs:
 //   meta        — post.json minus `sections` (slug, title, description, date, author, tags)
@@ -10,7 +11,10 @@ import { renderMarkdown, splitBodyByMarkers } from './markdown';
 // Watch view = `deckSteps` (every deck slide in order — includes bookends like Title/Close that the
 // article may omit). This is the "JSON structure + Markdown prose" model.
 export function assemblePost({ meta, sections, bodyMd, deckSlides }) {
-  const byLabel = new Map(deckSlides.map((s) => [s.label, s.html]));
+  // Read/Scrolly figures show each slide's full composite (additive chains
+  // pre-stacked — see sections.js); Watch gets the RAW slides, because the
+  // deck engine layers additive slides live during navigation.
+  const byLabel = new Map(compositeSlides(deckSlides).map((s) => [s.label, s.html]));
   const bodies = splitBodyByMarkers(bodyMd || '');
 
   const builtSections = sections.map((s) => {
