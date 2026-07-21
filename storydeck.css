@@ -97,6 +97,39 @@
 }
 
 /* watch view */
+/* deck-stage's shadow :host is `position:fixed;inset:0` (it owns the whole viewport for slide
+   chrome), which paints over the page header the instant Watch mounts — so .view-toggle up there
+   becomes physically unclickable. This dock is a plain fixed sibling with an explicit z-index,
+   which always paints above the deck's default (z-index:auto) stacking layer regardless of DOM
+   order — the only way back to Read/Scroll while Watch is active, besides Esc.
+   Bottom-right, not top-right: storydeck doesn't know the consumer's header height (a top
+   placement can collide with consumer chrome living in that same corner — e.g. a theme toggle),
+   and bottom-right is already clear of deck-stage's own chrome (bottom-CENTER flash overlay,
+   left-docked thumbnail rail). */
+.watch-lens-dock {
+  position: fixed; bottom: 16px; right: 14px; z-index: 2147483647;
+  display: inline-flex; align-items: center; gap: 2px; padding: 4px;
+  border-radius: 999px; background: rgba(10, 10, 10, 0.72); backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  opacity: 1; transition: opacity 320ms ease;
+}
+.watch-lens-dock.is-idle:not(:hover):not(:focus-within) { opacity: 0.32; }
+.watch-lens-dock button {
+  font: inherit; font-size: 0.75rem; font-family: var(--mono); cursor: pointer;
+  border: 0; border-radius: 999px; padding: 0.4rem 0.85rem;
+  background: transparent; color: rgba(255, 255, 255, 0.82);
+}
+.watch-lens-dock button:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
+.watch-lens-dock button:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
+.watch-lens-dock .watch-lens-hint {
+  font-family: var(--mono); font-size: 0.65rem; color: rgba(255, 255, 255, 0.42);
+  padding: 0 0.55rem 0 0.2rem; user-select: none;
+}
+@media (max-width: 640px) {
+  .watch-lens-dock { bottom: 10px; right: 8px; }
+  .watch-lens-dock .watch-lens-hint { display: none; } /* no physical Esc key on touch */
+}
+
 .deck-shell { position: relative; width: 100%; height: min(76vh, 620px); border: 1px solid var(--line2); border-radius: 14px; overflow: hidden; background: var(--bg); }
 .deck-shell deck-stage { display: block; width: 100%; height: 100%; }
 .deck-actions { display: flex; align-items: center; justify-content: center; gap: 0.9rem; margin-top: 0.75rem; flex-wrap: wrap; }

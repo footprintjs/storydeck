@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import PostView from './PostView';
 
@@ -42,5 +42,46 @@ describe('PostView', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Read it' }));
     expect(window.location.search).toBe('');
     window.history.replaceState({}, '', '/');
+  });
+
+  // Watch mounts <deck-stage>, whose shadow :host is position:fixed;inset:0 — it covers the whole
+  // viewport, including the header .view-toggle. Without an escape route inside the deck's own
+  // stacking layer, Watch is a trap. These guard the two ways back out.
+  describe('Watch mode escape routes (the mode-navigation trap)', () => {
+    it('shows a floating lens dock with Read/Scroll while in Watch, and it switches lenses', async () => {
+      render(<PostView post={post} />);
+      await userEvent.click(screen.getByRole('button', { name: 'Watch it' }));
+
+      const dock = screen.getByRole('group', { name: 'Switch view' });
+      expect(dock).toBeTruthy();
+      const readInDock = within(dock).getByRole('button', { name: 'Read' });
+      await userEvent.click(readInDock);
+
+      expect(screen.getByRole('button', { name: 'Read it' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.queryByRole('group', { name: 'Switch view' })).not.toBeInTheDocument();
+    });
+
+    it('does not render the dock in Read or Scroll modes', () => {
+      render(<PostView post={post} />);
+      expect(screen.queryByRole('group', { name: 'Switch view' })).not.toBeInTheDocument();
+    });
+
+    it('Esc returns to Read from Watch', async () => {
+      render(<PostView post={post} />);
+      await userEvent.click(screen.getByRole('button', { name: 'Watch it' }));
+      expect(screen.getByRole('button', { name: 'Watch it' })).toHaveAttribute('aria-pressed', 'true');
+
+      await userEvent.keyboard('{Escape}');
+
+      expect(screen.getByRole('button', { name: 'Read it' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.queryByRole('group', { name: 'Switch view' })).not.toBeInTheDocument();
+    });
+
+    it('does not react to Esc outside Watch mode', async () => {
+      render(<PostView post={post} />);
+      await userEvent.click(screen.getByRole('button', { name: 'Scroll it' }));
+      await userEvent.keyboard('{Escape}');
+      expect(screen.getByRole('button', { name: 'Scroll it' })).toHaveAttribute('aria-pressed', 'true');
+    });
   });
 });
