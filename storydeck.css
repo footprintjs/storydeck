@@ -131,9 +131,34 @@
   font-family: var(--mono); font-size: 0.65rem; color: rgba(255, 255, 255, 0.42);
   padding: 0 0.55rem 0 0.2rem; user-select: none;
 }
+.watch-lens-dock .watch-lens-fs {
+  font-size: 0.9rem; line-height: 1; padding: 0.35rem 0.6rem;
+}
+@media (max-width: 700px) {
+  /* narrow Watch auto-manages fullscreen (enter = fullscreen, any exit = back to Read),
+     so a manual toggle would only fight the state machine */
+  .watch-lens-dock .watch-lens-fs { display: none; }
+}
 @media (max-width: 640px) {
-  .watch-lens-dock { bottom: 10px; right: 8px; }
+  /* safe-area: keep the dock above the home indicator / rounded corners in fullscreen */
+  .watch-lens-dock {
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    right: calc(8px + env(safe-area-inset-right, 0px));
+  }
   .watch-lens-dock .watch-lens-hint { display: none; } /* no physical Esc key on touch */
+}
+
+/* Watch fullscreen (mobile): the .watch-stage wrapper is what gets fullscreened, so the deck
+   AND the lens dock (its children) render inside. Native fullscreen paints it black edge to
+   edge; deck-stage's own fixed :host then letterboxes the 16:9 canvas within it. */
+.watch-stage:fullscreen { background: #000; }
+.watch-stage:-webkit-full-screen { background: #000; }
+/* iPhone Safari has no element-fullscreen API — .is-takeover is the CSS fallback: a fixed
+   maximized layer sized with dvh (tracks the collapsing browser chrome) so nothing of the page
+   peeks through behind the letterboxed stage. */
+.watch-stage.is-takeover {
+  position: fixed; inset: 0; z-index: 2147483000;
+  width: 100vw; height: 100dvh; background: #000;
 }
 
 .deck-shell { position: relative; width: 100%; height: min(76vh, 620px); border: 1px solid var(--line2); border-radius: 14px; overflow: hidden; background: var(--bg); }
