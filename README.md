@@ -28,6 +28,36 @@ Post    = { …meta, sections: [Section, …], deckSteps: [slideHtml, …] }
 A section with several steps is a **group** — a progressive build collapses to one figure in Read,
 plays in full in Watch/Scroll. One data model, three behaviours.
 
+### A live figure, in Scroll
+
+A section may carry a **`figure(beat)`** render function beside its `steps`. When it does, Scroll's
+pinned stage renders `figure(beat)` instead of the slide canvas:
+
+```jsx
+const sections = assemblePost({ meta, sections: meta.sections, bodyMd, deckSlides }).sections
+  .map((s) => ({ ...s, figure: (beat) => <MyChart beat={beat} /> }));
+
+<ScrollyView sections={sections} />
+```
+
+Three things are true of it, and each is a decision:
+
+- **It is hosted outside the scaled canvas.** `SlideFigure` fits a fixed 1920×1080 box to the column
+  with a CSS transform; a live chart under a transform hit-tests in the transformed space while it
+  measures in its own, so a brush lands in the wrong place. The live figure gets a plain block.
+- **It is mounted once for the whole scroll.** The stage renders it without a key, so moving a beat
+  re-renders the same subtree rather than tearing it down — a live figure is usually bound to
+  something that persists, and remounting it every beat would throw that away and flash. The HTML
+  path keeps its per-beat key: a new string is a new figure and has nothing to preserve.
+- **Read and Watch are untouched.** A live figure cannot be joined as markup — `SlideDeck`
+  concatenates every step into one canvas and `BlogView` shows the last — so those lenses go on
+  showing the slide HTML, which is the snapshot of the same beat. One data model, one additive
+  field, two lenses that never learn about it.
+
+A function cannot come from JSON, so `figure` is not part of the authoring model: `assemblePost`
+builds sections from post.json + Markdown, and the consumer attaches `figure` to them. The beat a
+figure is handed carries `sectionKey`, `step` and `index` — which beat it is being asked to draw.
+
 ## Quick start
 
 ```jsx
@@ -95,6 +125,9 @@ const { theme, toggle, setTheme } = useTheme();   // flips an html class + persi
 | `renderMarkdown` · `splitBodyByMarkers` | the Markdown adapter pieces |
 | `buildSections` · `finalStep` · `allSteps` · `parseGroup` | grouping helpers |
 | `slugify` · `scopeDeckCss` | utilities |
+
+Types ship beside the source in `index.d.ts` — hand-kept (there is no build to generate them from),
+and here rather than in a consumer's shim, because a package's shape belongs in the package.
 
 ## Tests
 

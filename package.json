@@ -7,11 +7,12 @@
   "author": "Sanjay Krishna Anbalagan",
   "repository": { "type": "git", "url": "https://github.com/footprintjs/storydeck" },
   "sideEffects": ["*.css"],
+  "types": "./index.d.ts",
   "exports": {
-    ".": "./index.js",
+    ".": { "types": "./index.d.ts", "default": "./index.js" },
     "./storydeck.css": "./storydeck.css"
   },
-  "files": ["*.js", "*.jsx", "*.css", "content", "README.md"],
+  "files": ["*.js", "*.jsx", "*.d.ts", "*.css", "content", "README.md"],
   "scripts": {
     "test": "vitest run",
     "test:cov": "vitest run --coverage"
