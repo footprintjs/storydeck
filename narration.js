@@ -29,7 +29,9 @@ const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
  * The notes (a string, or one string per note) as the voice should read them: [draft] marks dropped, the
- * `spell` words spelled, numbers as words, a separator (— – · →) as a pause, white space collapsed.
+ * `spell` words spelled, numbers as words, a lone & or + said ("and", "plus"), a lone separator (— – · → - /
+ * ... …) as a pause, white space collapsed. A voice aligner needs letters in every word, so no word is left
+ * without one.
  */
 export function narrationText(notes, { spell = SPELL } = {}) {
   let text = (Array.isArray(notes) ? notes : [notes ?? '']).join(' ').replace(/\[draft\]\s*/g, '');
@@ -37,15 +39,16 @@ export function narrationText(notes, { spell = SPELL } = {}) {
   return text
     .replace(/\bp(\d+)\b/g, (_, d) => `p ${numberWords(Number(d))}`)
     .replace(/\b\d+\b/g, (d) => numberWords(Number(d)))
-    .replace(/\s+[—–·→]\s+/g, ', ')
+    .replace(/(^|\s)&(?=\s|$)/g, '$1and').replace(/(^|\s)\+(?=\s|$)/g, '$1plus')
+    .replace(/\s+(?:[—–·→/-]|\.\.\.|…)(?=\s)/g, ',')
     .replace(/\s+/g, ' ').trim();
 }
 
 /** The notes as written, for captions: [draft] marks dropped, white space collapsed. */
 export const writtenText = (notes) => (Array.isArray(notes) ? notes : [notes ?? '']).join(' ').replace(/\[draft\]\s*/g, '').replace(/\s+/g, ' ').trim();
 
-/** Sentences as a voice script splits them: after . ? or ! and a space. */
-export const sentences = (text) => String(text ?? '').trim().split(/(?<=[.?!])\s+/).filter(Boolean);
+/** Sentences as a voice script splits them: after . ? or ! and a space (no lookbehind: older Safari can't parse one). */
+export const sentences = (text) => String(text ?? '').trim().replace(/([.?!])\s+/g, '$1\u0000').split('\u0000').filter(Boolean);
 
 /**
  * Subtitles by sentence. Each step: `start` (s, in the whole video), `lead` (s of silence before its clip),
@@ -75,11 +78,14 @@ export function stamp(seconds, sep = ',') {
   return `${pad(Math.floor(ms / 3600000))}:${pad(Math.floor(ms / 60000) % 60)}:${pad(Math.floor(ms / 1000) % 60)}${sep}${pad(ms % 1000, 3)}`;
 }
 
-/** Cues as an .srt file. */
-export const toSrt = (cues) => cues.map((q, i) => `${i + 1}\n${stamp(q.start)} --> ${stamp(q.end)}\n${q.text}\n`).join('\n');
+/** A caption's text can never hold a cue's arrow (a player would read it as a new timing line). */
+const noArrow = (t) => t.replace(/-->/g, '→');
 
-/** Cues as a WebVTT file. */
-export const toVtt = (cues) => `WEBVTT\n\n${cues.map((q) => `${stamp(q.start, '.')} --> ${stamp(q.end, '.')}\n${q.text}\n`).join('\n')}`;
+/** Cues as an .srt file. */
+export const toSrt = (cues) => cues.map((q, i) => `${i + 1}\n${stamp(q.start)} --> ${stamp(q.end)}\n${noArrow(q.text)}\n`).join('\n');
+
+/** Cues as a WebVTT file: & < > escaped, since WebVTT reads them as markup. */
+export const toVtt = (cues) => `WEBVTT\n\n${cues.map((q) => `${stamp(q.start, '.')} --> ${stamp(q.end, '.')}\n${noArrow(q.text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}\n`).join('\n')}`;
 
 /** 95 → "1:35"; 3725 → "1:02:05" — a chapter's time, as YouTube reads it. */
 export function clock(seconds) {

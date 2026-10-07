@@ -22,7 +22,8 @@ export function clipFor(text: string, options: { cache: string; profile: VoicePr
 export function sentenceStarts(text: string, words: readonly { start: number }[]): number[];
 /** "1-3,7" → Set {1, 2, 3, 7} (1-based clicks); null for all. */
 export function pickSteps(spec?: string | null): Set<number> | null;
-/** Voices every click whose clip is not cached, in batches, each cached as soon as it is done. */
+/** Voices every click whose clip is not cached, in batches, each cached as soon as it is done. `work` (emptied before each
+ *  batch) defaults to a temporary folder, removed afterwards; `batch` is a whole number, 1 or more. Paths may be relative. */
 export function voiceClips(texts: readonly string[], options: {
   cache: string; profile: VoiceProfile; engine: VoiceEngine; only?: Set<number> | null; batch?: number; work?: string; log?: (line: string) => void;
 }): Promise<{ wanted: number; todo: number; voiced: number }>;

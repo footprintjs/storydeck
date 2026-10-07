@@ -29,17 +29,20 @@ export function notesRuntime() {
   const para = (s) => s.split('\n').map((l) => `<p>${esc(l)}</p>`).join('');
   const show = (i) => {
     const n = notes[i] ?? {}, next = notes[i + 1];
-    const clock = new Date(Date.now() - started).toISOString().slice(14, 19);
-    panel.innerHTML = `<header><b>${esc(n.slide ?? '')}</b><span>${n.steps ? `step ${n.step} of ${n.steps}` : ''}</span><span class="clock">${clock}</span></header>`
+    const ms = Date.now() - started, clock = new Date(ms).toISOString().slice(ms >= 36e6 ? 11 : ms >= 3.6e6 ? 12 : 14, 19);
+    panel.innerHTML = `<header><b>${esc(n.slide ?? '')}</b><span>${n.steps ? `step ${esc(String(n.step))} of ${esc(String(n.steps))}` : ''}</span><span class="clock">${clock}</span></header>`
       + `<div class="now">${n.now?.length ? n.now.map(para).join('') : '<p class="none">(no note for this click)</p>'}</div>`
       + (n.earlier?.length ? `<div class="earlier">${n.earlier.map(para).join('')}</div>` : '')
-      + `<footer>${next ? `next: ${esc(next.slide ?? '')}${next.step ? ` · step ${next.step}` : ''}` : 'last slide'} · ${i + 1} / ${notes.length}</footer>`;
+      + `<footer>${next ? `next: ${esc(next.slide ?? '')}${next.step ? ` · step ${esc(String(next.step))}` : ''}` : 'last slide'} · ${i + 1} / ${notes.length}</footer>`;
   };
   const send = (i) => { try { (presenter ? window.opener : other)?.postMessage({ deckSync: i }, '*'); } catch { /* the other window is gone */ } };
-  stage.addEventListener('slidechange', (e) => { show(e.detail.index); send(e.detail.index); });
-  window.addEventListener('message', (e) => { const i = e.data?.deckSync; if (Number.isInteger(i) && i !== stage.index) stage.goTo(i); });
+  // a move that came from the other window is not sent back to it (two quick moves would bounce between them)
+  let echo = null;
+  stage.addEventListener('slidechange', (e) => { show(e.detail.index); if (e.detail.index === echo) echo = null; else send(e.detail.index); });
+  window.addEventListener('message', (e) => { const i = e.data?.deckSync; if (Number.isInteger(i) && i !== stage.index) { echo = i; stage.goTo(i); } });
   window.addEventListener('keydown', (e) => {
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = e.target;   // keys typed into a field on a slide are the field's
+    if (e.metaKey || e.ctrlKey || e.altKey || (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)))) return;
     if ((e.key === 'n' || e.key === 'N') && !presenter) { e.preventDefault(); e.stopImmediatePropagation(); document.body.classList.toggle('practice'); }
     if ((e.key === 'p' || e.key === 'P') && !presenter) {
       e.preventDefault(); e.stopImmediatePropagation();
@@ -71,7 +74,7 @@ export function listenRuntime() {
     let draft = false;
     return note.split(/(\[draft\])/).flatMap((part) => {
       if (part === '[draft]') { draft = true; return []; }
-      return part.trim().split(/(?<=[.?!])\s+/).map((t) => t.trim()).filter(Boolean).map((t) => ({ t, draft }));
+      return part.trim().replace(/([.?!])\s+/g, '$1\u0000').split('\u0000').map((t) => t.trim()).filter(Boolean).map((t) => ({ t, draft }));
     });
   });
   // the speaker's own voice: one clip per click, carried in the page (storydeck/voice · embedClips); else the browser's
@@ -112,7 +115,8 @@ export function listenRuntime() {
   const stop = () => { on = false; paused = false; token++; synth.cancel(); audio.pause(); clearTimeout(timer); document.body.classList.remove('train'); };
   stage.addEventListener('slidechange', (e) => { if (on) { paused = false; speak(e.detail.index); } });
   window.addEventListener('keydown', (e) => {
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = e.target;   // keys typed into a field on a slide are the field's
+    if (e.metaKey || e.ctrlKey || e.altKey || (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)))) return;
     const k = e.key;
     if (k === 'l' || k === 'L') { e.preventDefault(); e.stopImmediatePropagation(); on ? stop() : start(); return; }
     if (!on) return;

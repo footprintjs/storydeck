@@ -11,12 +11,17 @@
 // stays `noclip` seconds. The browser is a port — { open(url), step(n), freeze() → ms the entrances last,
 // seek(ms), shot(file), close() } — and `deckStageDriver` drives storydeck's own <deck-stage> with Playwright
 // (pass its `chromium`). ffmpeg runs through `run` (spawnSync's shape), so both can be faked.
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { captionCues, toSrt, toVtt, chapterList } from './narration.js';
 
 const NUM = (n) => String(n).padStart(3, '0');
+/** A file in an ffconcat list: absolute (ffmpeg reads a relative one from the list's folder), its quotes escaped. */
+const entry = (file) => `file '${path.resolve(file).replace(/'/g, "'\\''")}'`;
+/** Why a spawned process failed, or null when it ran and exited 0 (a missing binary or a signal is a failure). */
+const failure = (done) => (done?.error ? done.error.message : done?.signal ? `signal ${done.signal}` : done?.status !== 0 ? `exit ${done?.status}` : null);
 
 /**
  * The timeline: each step (`{ label, written, spoken, clip }`, clip as storydeck/voice's clipFor gives it) as a
@@ -44,15 +49,17 @@ function timed(plan) {
 /**
  * The picture as an ffconcat list: each frame of a click's entrance for 1/fps s, its last frame held until the
  * click ends (a clip shorter than its entrance makes the click wait for it). Updates the plan's lengths/starts.
+ * Each picture is read at the video's frame rate (an image's own timebase is 1/25 s: at 30 fps it would drop
+ * one frame in six and double another).
  */
 export function framesConcat(plan, shots, { fps = 30 } = {}) {
-  const lines = ['ffconcat version 1.0'];
+  const lines = ['ffconcat version 1.0'], picture = (f) => [entry(f), `option framerate ${fps}`];
   plan.forEach((c, i) => {
     const files = shots[i], animated = (files.length - 1) / fps;
     c.length = Math.max(c.length, animated + 1 / fps + 0.3);
-    files.forEach((f, k) => lines.push(`file '${f}'`, `duration ${k < files.length - 1 ? (1 / fps).toFixed(6) : (c.length - animated).toFixed(6)}`));
+    files.forEach((f, k) => lines.push(...picture(f), `duration ${k < files.length - 1 ? (1 / fps).toFixed(6) : (c.length - animated).toFixed(6)}`));
   });
-  lines.push(`file '${shots.at(-1).at(-1)}'`);   // the concat demuxer needs the last picture again to keep its duration
+  lines.push(...picture(shots.at(-1).at(-1)));   // the concat demuxer needs the last picture again to keep its duration
   timed(plan);
   return `${lines.join('\n')}\n`;
 }
@@ -74,18 +81,18 @@ export function encodeArgs({ frames, narration, out, length, fps = 30, crf = 18 
     '-movflags', '+faststart', '-t', length.toFixed(3), out];
 }
 
-/** Runs ffmpeg (or a fake with spawnSync's shape) and throws on failure. */
+/** Runs ffmpeg (or a fake with spawnSync's shape) and throws on failure — a missing ffmpeg included. */
 function ffmpeg(run, args, what) {
-  const done = run('ffmpeg', args, { stdio: 'inherit' });
-  if (done?.status) throw new Error(`ffmpeg failed: ${what}`);
+  const why = failure(run('ffmpeg', args, { stdio: 'inherit' }));
+  if (why) throw new Error(`ffmpeg failed: ${what} (${why})`);
 }
 
 /** The frames of every click, through the driver: entrance stepped at `fps`, then one held frame. */
 async function frames(driver, url, plan, dir, { fps, maxEntrance, log }) {
   rmSync(dir, { recursive: true, force: true }); mkdirSync(dir, { recursive: true });
-  await driver.open(url);
   const shots = [];
   try {
+    await driver.open(url);   // inside the try: a page that fails to open still closes its browser
     for (const c of plan) {
       await driver.step(c.n);
       const end = Math.min(maxEntrance, await driver.freeze()), count = Math.max(1, Math.ceil(end / (1000 / fps)) + 1);
@@ -106,33 +113,47 @@ async function frames(driver, url, plan, dir, { fps, maxEntrance, log }) {
 }
 
 /** The narration track: each click's sound, then all of them in order. */
-function narration(run, plan, out) {
-  const dir = path.join(out, 'audio');
+function narration(run, plan, work) {
+  const dir = path.join(work, 'audio');
   rmSync(dir, { recursive: true, force: true }); mkdirSync(dir, { recursive: true });
   const list = plan.map((c) => {
     const file = path.join(dir, `c${NUM(c.n)}.wav`);
     ffmpeg(run, audioArgs(c, file), `the sound of click ${c.n}`);
-    return `file '${file}'`;
+    return entry(file);
   });
-  const concat = path.join(out, 'audio.ffconcat'), wav = path.join(out, 'narration.wav');
+  const concat = path.join(work, 'audio.ffconcat'), wav = path.join(work, 'narration.wav');
   writeFileSync(concat, ['ffconcat version 1.0', ...list].join('\n') + '\n');
   ffmpeg(run, ['-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', concat, '-c', 'copy', wav], 'the narration');
   return wav;
 }
 
 /**
- * Renders the video. `chapters(click)` names the clicks where a chapter starts (a title, or null; the first
- * chapter at 0:00 defaults to `intro`); `thumbnail(click)` picks the click whose settled frame is the thumbnail.
- * Returns { video, length, cues, chapters: { text, problems }, plan }.
+ * Renders the video into `out`: <name>.mp4, captions.srt/.vtt, chapters.txt, thumbnail.jpg, timeline.json.
+ * `chapters(click)` names the clicks where a chapter starts (a title, or null; the first chapter at 0:00
+ * defaults to `intro`); `thumbnail(click)` picks the click whose settled frame is the thumbnail. The frames and
+ * sounds are made in `work` (its frames/ and audio/ are replaced) — by default a temporary folder, removed
+ * afterwards; name one to keep them. Returns { video, length, cues, chapters: { text, problems }, plan }.
  */
 export async function renderVideo({ url, steps, out, name = 'deck', driver, run = spawnSync, fps = 30, gap, lead, noclip, only, maxEntrance = 4000,
-  chapters = () => null, intro = 'Intro', thumbnail = () => false, log = () => {} }) {
-  mkdirSync(out, { recursive: true });
+  chapters = () => null, intro = 'Intro', thumbnail = () => false, work, log = () => {} }) {
   const plan = planVideo(steps, { gap, lead, noclip, only });
-  const shots = await frames(driver, url, plan, path.join(out, 'frames'), { fps, maxEntrance, log });
-  const concat = path.join(out, 'frames.ffconcat');
+  if (!plan.length) throw new Error(`nothing to render: no click in ${only ? `[${only.join(', ')}]` : 'the deck'} (it has ${steps.length})`);
+  out = path.resolve(out);
+  mkdirSync(out, { recursive: true });
+  const own = !work, dir = own ? mkdtempSync(path.join(tmpdir(), 'storydeck-video-')) : path.resolve(work);
+  try {
+    mkdirSync(dir, { recursive: true });
+    return await render({ url, plan, out, name, driver, run, fps, maxEntrance, chapters, intro, thumbnail, work: dir, log });
+  } finally {
+    if (own) rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+async function render({ url, plan, out, name, driver, run, fps, maxEntrance, chapters, intro, thumbnail, work, log }) {
+  const shots = await frames(driver, url, plan, path.join(work, 'frames'), { fps, maxEntrance, log });
+  const concat = path.join(work, 'frames.ffconcat');
   writeFileSync(concat, framesConcat(plan, shots, { fps }));
-  const wav = narration(run, plan, out), length = plan.reduce((s, c) => s + c.length, 0), video = path.join(out, `${name}.mp4`);
+  const wav = narration(run, plan, work), length = plan.reduce((s, c) => s + c.length, 0), video = path.join(out, `${name}.mp4`);
   ffmpeg(run, encodeArgs({ frames: concat, narration: wav, out: video, length, fps }), 'the video');
   const cues = captionCues(plan);
   writeFileSync(path.join(out, 'captions.srt'), toSrt(cues));

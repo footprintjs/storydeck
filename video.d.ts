@@ -26,11 +26,13 @@ export function framesConcat(plan: PlannedClick[], shots: readonly string[][], o
 export function audioArgs(click: PlannedClick, file: string): string[];
 /** ffmpeg's arguments for the video (fades in and out, H.264 + AAC, trimmed to `length`). */
 export function encodeArgs(options: { frames: string; narration: string; out: string; length: number; fps?: number; crf?: number }): string[];
-/** Renders the video with captions, chapters, a thumbnail and the timeline beside it. */
+/** Renders the video into `out` with captions, chapters, a thumbnail and the timeline beside it (paths may be relative). */
 export function renderVideo(options: {
   url: string; steps: readonly VideoStep[]; out: string; name?: string; driver: VideoDriver; run?: Run;
   fps?: number; gap?: number; lead?: number; noclip?: number; only?: [number, number] | null; maxEntrance?: number;
-  chapters?: (click: PlannedClick) => string | null; intro?: string; thumbnail?: (click: PlannedClick) => boolean; log?: (line: string) => void;
+  chapters?: (click: PlannedClick) => string | null; intro?: string; thumbnail?: (click: PlannedClick) => boolean;
+  /** where frames and sounds are made (its frames/ and audio/ are replaced); by default a temporary folder, removed afterwards */
+  work?: string; log?: (line: string) => void;
 }): Promise<{ video: string; length: number; cues: number; chapters: { text: string; problems: string[] }; plan: PlannedClick[] }>;
 /** The driver for storydeck's <deck-stage> pages, with Playwright's `chromium`. */
 export function deckStageDriver(options: { chromium: unknown; executablePath?: string; viewport?: { width: number; height: number }; hide?: string[] }): VideoDriver;

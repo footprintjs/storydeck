@@ -11,10 +11,14 @@
 // { id, text }, results { id, audio (a file), duration (s), words: [{ start }] }. `chatterboxKit` is one
 // adapter; bring another (a cloud voice, a test fake) with the same shape.
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, mkdtempSync, copyFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { sentences } from './narration.js';
+
+/** Why a spawned process failed, or null when it ran and exited 0 (a missing binary or a signal is a failure). */
+const failure = (done) => (done?.error ? done.error.message : done?.signal ? `signal ${done.signal}` : done?.status !== 0 ? `exit ${done?.status}` : null);
 
 /** The cache key of a clip: what the voice says and the settings it says it with. Stable across versions. */
 export function clipKey(text, profile) {
@@ -25,6 +29,7 @@ export function clipKey(text, profile) {
 /** The cached clip for a text, or null: its key, its audio file (.wav, else .m4a), its length and sentence starts. */
 export function clipFor(text, { cache, profile }) {
   if (!text) return null;
+  cache = path.resolve(cache);
   const key = clipKey(text, profile), meta = path.join(cache, `${key}.json`);
   if (!existsSync(meta)) return null;
   const wav = path.join(cache, `${key}.wav`);
@@ -47,9 +52,12 @@ export function pickSteps(spec) {
 /**
  * Voices every click whose clip is not cached: `texts` (one per click, '' for none) → cache/<key>.wav + .json
  * ({ text, duration, sentences }). In batches, each cached as soon as it is done. `only` (a Set of 1-based
- * clicks) narrows it. Returns { wanted, todo, voiced }.
+ * clicks) narrows it. The engine works in `work` — a folder of its own, emptied before each batch (by default a
+ * new temporary folder, removed afterwards). Returns { wanted, todo, voiced }.
  */
 export async function voiceClips(texts, { cache, profile, engine, only = null, batch = 4, work, log = () => {} }) {
+  if (!Number.isInteger(batch) || batch < 1) throw new RangeError(`batch must be a whole number of clips, 1 or more (got ${batch})`);
+  cache = path.resolve(cache);
   mkdirSync(cache, { recursive: true });
   const todo = new Map();
   texts.forEach((text, i) => {
@@ -60,19 +68,25 @@ export async function voiceClips(texts, { cache, profile, engine, only = null, b
   const wanted = texts.filter(Boolean).length, keys = [...todo.keys()];
   log(`${wanted} clicks with words · ${todo.size} to voice · the rest are cached`);
   let voiced = 0;
-  const dir = work ?? path.join(cache, '..', 'work');
-  for (let b = 0; b < keys.length; b += batch) {
-    const part = keys.slice(b, b + batch).filter((key) => !existsSync(path.join(cache, `${key}.json`)));   // another run may have voiced it
-    if (!part.length) continue;
-    rmSync(dir, { recursive: true, force: true }); mkdirSync(dir, { recursive: true });
-    const results = await engine.synthesize(part.map((key) => ({ id: `k${key}`, text: todo.get(key) })), { work: dir });
-    for (const r of results) {
-      const key = r.id.slice(1), text = todo.get(key);
-      copyFileSync(r.audio, path.join(cache, `${key}.wav`));
-      writeFileSync(path.join(cache, `${key}.json`), JSON.stringify({ text, duration: r.duration, sentences: sentenceStarts(text, r.words ?? []) }));
+  if (!keys.length) return { wanted, todo: 0, voiced };
+  const own = !work, dir = own ? mkdtempSync(path.join(tmpdir(), 'storydeck-voice-')) : path.resolve(work);
+  try {
+    for (let b = 0; b < keys.length; b += batch) {
+      const part = keys.slice(b, b + batch).filter((key) => !existsSync(path.join(cache, `${key}.json`)));   // another run may have voiced it
+      if (!part.length) continue;
+      rmSync(dir, { recursive: true, force: true }); mkdirSync(dir, { recursive: true });
+      const results = await engine.synthesize(part.map((key) => ({ id: `k${key}`, text: todo.get(key) })), { work: dir });
+      for (const r of results) {
+        const key = r.id.slice(1), text = todo.get(key);
+        copyFileSync(r.audio, path.join(cache, `${key}.wav`));
+        rmSync(path.join(cache, `${key}.m4a`), { force: true });   // a page's copy of the old take would carry the new timings
+        writeFileSync(path.join(cache, `${key}.json`), JSON.stringify({ text, duration: r.duration, sentences: sentenceStarts(text, r.words ?? []) }));
+      }
+      voiced += results.length;
+      log(`clips cached: ${voiced}/${keys.length}`);
     }
-    voiced += results.length;
-    log(`clips cached: ${voiced}/${keys.length}`);
+  } finally {
+    if (own) rmSync(dir, { recursive: true, force: true });
   }
   return { wanted, todo: keys.length, voiced };
 }
@@ -84,16 +98,18 @@ export async function voiceClips(texts, { cache, profile, engine, only = null, b
  * profile's reference recording.
  */
 export function chatterboxKit({ kit, python = '.venv-voice/bin/python', script = 'scripts/voice/tts_chatterbox.py', profile = 'voices/me.voice.json', device = 'mps', env = process.env, run = spawnSync }) {
+  kit = path.resolve(kit);   // the kit runs in its own folder: every path it is handed is absolute
   return {
     name: 'chatterbox',
     synthesize(scenes, { work }) {
-      const board = path.join(work, 'storyboard.json');
+      const dir = path.resolve(work), board = path.join(dir, 'storyboard.json');
       writeFileSync(board, JSON.stringify({ scenes: scenes.map((s) => ({ id: s.id, narration: s.text })) }, null, 1));
-      const done = run(path.join(kit, python), [script, '--storyboard', board, '--profile', profile, '--device', device, '--out', work],
+      const done = run(path.join(kit, python), [script, '--storyboard', board, '--profile', profile, '--device', device, '--out', dir],
         { cwd: kit, stdio: 'inherit', env: { ...env, HF_HUB_OFFLINE: env.HF_HUB_OFFLINE ?? '1' } });
-      if (done.status) throw new Error(`the voice kit failed (exit ${done.status}) in ${kit}`);
-      const timings = JSON.parse(readFileSync(path.join(work, 'timings.json'), 'utf8'));
-      return timings.scenes.map((s) => ({ id: s.id, audio: path.join(work, s.audio), duration: s.duration, words: s.words ?? [] }));
+      const why = failure(done);
+      if (why) throw new Error(`the voice kit failed (${why}) in ${kit}`);
+      const timings = JSON.parse(readFileSync(path.join(dir, 'timings.json'), 'utf8'));
+      return timings.scenes.map((s) => ({ id: s.id, audio: path.join(dir, s.audio), duration: s.duration, words: s.words ?? [] }));
     },
   };
 }
@@ -105,6 +121,7 @@ export function chatterboxKit({ kit, python = '.venv-voice/bin/python', script =
  * Returns { tags, have, wanted } (tags is '' when no click has a clip).
  */
 export function embedClips(texts, { cache, profile, run = spawnSync }) {
+  cache = path.resolve(cache);
   const steps = [], clips = {}, tags = [];
   for (const text of texts) {
     const clip = clipFor(text, { cache, profile });
@@ -112,7 +129,7 @@ export function embedClips(texts, { cache, profile, run = spawnSync }) {
     const m4a = path.join(cache, `${clip.key}.m4a`);
     if (!existsSync(m4a)) {
       const done = run('ffmpeg', ['-y', '-loglevel', 'error', '-i', path.join(cache, `${clip.key}.wav`), '-c:a', 'aac', '-b:a', '48k', '-ac', '1', m4a]);
-      if (done.status) { steps.push(null); continue; }
+      if (failure(done) || !existsSync(m4a)) { steps.push(null); continue; }   // no ffmpeg, or it failed: the browser's voice there
     }
     if (!clips[clip.key]) {
       clips[clip.key] = { d: clip.duration, s: clip.sentences };
@@ -121,5 +138,5 @@ export function embedClips(texts, { cache, profile, run = spawnSync }) {
     steps.push(clip.key);
   }
   const have = steps.filter(Boolean).length, wanted = texts.filter(Boolean).length;
-  return { tags: have ? `<script type="application/json" id="deck-voice">${JSON.stringify({ steps, clips })}</script>\n${tags.join('\n')}` : '', have, wanted };
+  return { tags: have ? `<script type="application/json" id="deck-voice">${JSON.stringify({ steps, clips }).replace(/</g, '\\u003c')}</script>\n${tags.join('\n')}` : '', have, wanted };
 }

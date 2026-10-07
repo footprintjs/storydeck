@@ -71,6 +71,28 @@ describe('narrationHtml · notes runtime (N, P)', () => {
     expect(panel.querySelector('.clock').textContent).toBe('00:01');
   });
 
+  it('leaves keys typed into a field on a slide to the field', () => {
+    mountDeck();
+    const open = vi.spyOn(window, 'open');
+    notesRuntime();
+    const input = document.createElement('input');
+    document.body.append(input);
+    for (const key of ['n', 'p']) input.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+    expect(document.body.classList.contains('practice')).toBe(false);
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it('keeps the hours on the clock, and shows a step number as text', () => {
+    mountDeck([{ slide: 'S', step: '<b>1</b>', steps: 2, now: ['x'] }]);
+    notesRuntime();
+    vi.advanceTimersByTime(3725000);
+    const panel = document.querySelector('.notes-panel');
+    expect(panel.querySelector('.clock').textContent).toBe('1:02:05');
+    expect(panel.querySelector('header b + span').textContent).toBe('step <b>1</b> of 2');
+    vi.advanceTimersByTime(36000000);
+    expect(panel.querySelector('.clock').textContent).toBe('11:02:05');
+  });
+
   it('P opens a presenter window; the windows keep each other on the same click', () => {
     const stage = mountDeck();
     const other = { postMessage: vi.fn() };
@@ -82,8 +104,11 @@ describe('narrationHtml · notes runtime (N, P)', () => {
     expect(other.postMessage).toHaveBeenCalledWith({ deckSync: 1 }, '*');
     window.dispatchEvent(new MessageEvent('message', { data: { deckSync: 2 } }));
     expect(stage.goTo).toHaveBeenLastCalledWith(2);
+    expect(other.postMessage).toHaveBeenCalledTimes(1);   // a move that came from the other window is not sent back
+    stage.goTo(0);                                        // the next move of this window's own is sent again
+    expect(other.postMessage).toHaveBeenLastCalledWith({ deckSync: 0 }, '*');
     window.dispatchEvent(new MessageEvent('message', { data: { deckSync: 'x' } }));
-    expect(stage.goTo).toHaveBeenCalledTimes(2);
+    expect(stage.goTo).toHaveBeenCalledTimes(3);
     open.mockRestore();
   });
 
@@ -120,6 +145,23 @@ function fakeAudio() {
 describe('narrationHtml · listen runtime (L)', () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); delete window.speechSynthesis; });
+
+  it('leaves keys typed into a field to the field, even while listening', () => {
+    const { synth } = fakeSpeech(); fakeAudio();
+    mountDeck();
+    listenRuntime();
+    const area = document.createElement('textarea');
+    document.body.append(area);
+    area.dispatchEvent(new KeyboardEvent('keydown', { key: 'l', bubbles: true, cancelable: true }));
+    expect(document.body.classList.contains('train')).toBe(false);
+    press('l');
+    const editable = document.createElement('div');
+    editable.contentEditable = 'true';
+    document.body.append(editable);
+    Object.defineProperty(editable, 'isContentEditable', { value: true });
+    editable.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
+    expect(synth.pause).not.toHaveBeenCalled();
+  });
 
   it('does nothing where the browser cannot speak', () => {
     mountDeck();

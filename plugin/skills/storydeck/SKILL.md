@@ -98,6 +98,9 @@ const done = await renderVideo({ url: `file://${deckHtml}#1`, steps, out: 'out/v
 - **Video frames are deterministic**: each click is made forward, every animation paused and stepped. Looping
   motion stops when the entrance ends. Compare two renders by `timeline.json` and `captions.srt` (equal) and
   frames (byte-equal, or within a hair where the GPU blends a backdrop filter).
+- **Paths may be relative; scratch folders are temporary.** `voiceClips` and `renderVideo` resolve every path and
+  work in a temporary folder of their own unless you name a `work` folder (which they empty before use) — never
+  point `work` at a folder holding anything else, such as a voice kit's reference recording.
 - **One source, several builds**: what only works in the room (a live demo, the speaker's voice) is a build
   switch over the same parts, never a second copy of the deck.
 

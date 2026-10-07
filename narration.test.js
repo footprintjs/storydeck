@@ -26,6 +26,12 @@ describe('narration · what the voice says', () => {
       'one thousand', 'two thousand twenty-six', 'twelve thousand three hundred forty-five']);
   });
 
+  it('leaves no word without a letter: a lone & or + is said, a lone - / ... … is a pause (an aligner needs letters)', () => {
+    expect(narrationText('The web - then apps / tools ... and R&D + Q & A … done.')).toBe('The web, then apps, tools, and R&D plus Q and A, done.');
+    expect(narrationText('& then +')).toBe('and then plus');
+    expect(narrationText('a-b and/or c...d')).toBe('a-b and/or c...d');   // only lone ones: inside a word they stay
+  });
+
   it('drops [draft] marks, turns a separator into a pause, and joins notes', () => {
     expect(narrationText(['First.', '[draft] A bridge — then on · and → on.'])).toBe('First. A bridge, then on, and, on.');
     expect(narrationText(['  spaced\n\nout  '])).toBe('spaced out');
@@ -58,6 +64,12 @@ describe('narration · captions', () => {
     expect(captionCues([{ start: 0, written: 'x', spoken: 'x', clip: null }, { start: 1, written: 'y', spoken: 'y' }])).toEqual([]);
     // more sentences than the clip has starts: only the timed ones; an empty span is dropped
     expect(captionCues([{ start: 0, written: 'A. B. C.', spoken: 'A. B. C.', clip: { duration: 2, sentences: [0, 2] } }]).map((c) => c.text)).toEqual(['A.']);
+  });
+
+  it('keeps a caption\'s words as words: no cue arrow inside, and WebVTT\'s markup characters escaped', () => {
+    const cues = [{ start: 0, end: 1, text: 'Keep the list < 10 items & mount <deck-stage> --> first.' }];
+    expect(toVtt(cues)).toContain('\nKeep the list &lt; 10 items &amp; mount &lt;deck-stage&gt; → first.\n');
+    expect(toSrt(cues)).toContain('\nKeep the list < 10 items & mount <deck-stage> → first.\n');
   });
 
   it('writes SRT and WebVTT', () => {

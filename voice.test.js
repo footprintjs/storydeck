@@ -95,12 +95,39 @@ describe('voice · voicing a deck', () => {
     expect(engine.calls.at(-1)).toEqual(['Four, edited.']);
   });
 
-  it('works on the picked clicks only, and by default in a work folder beside the cache', async () => {
-    const cache = path.join(dir, 'cache'), engine = fakeEngine();
-    const done = await voiceClips(['A.', 'B.', 'C.'], { cache, profile: PROFILE, engine, only: new Set([2]) });
+  it('works on the picked clicks only, by default in a temporary folder of its own, removed afterwards', async () => {
+    const cache = path.join(dir, 'cache'), engine = fakeEngine(), works = [];
+    const spy = { name: 'spy', synthesize: (scenes, opts) => { works.push(opts.work); return engine.synthesize(scenes, opts); } };
+    const done = await voiceClips(['A.', 'B.', 'C.'], { cache, profile: PROFILE, engine: spy, only: new Set([2]) });
     expect(done).toEqual({ wanted: 3, todo: 1, voiced: 1 });
     expect(engine.calls).toEqual([['B.']]);
-    expect(existsSync(path.join(dir, 'work'))).toBe(true);
+    expect(works[0].startsWith(tmpdir())).toBe(true);
+    expect(existsSync(works[0])).toBe(false);                     // gone: never a folder beside the cache (a kit's reference recording lives there)
+    expect(existsSync(path.join(dir, 'work'))).toBe(false);
+    expect(await voiceClips(['B.'], { cache, profile: PROFILE, engine: spy })).toEqual({ wanted: 1, todo: 0, voiced: 0 });   // nothing to do: no folder at all
+    expect(works).toHaveLength(1);
+  });
+
+  it('takes the cache and work folders relative to where it runs, and refuses a batch that is not a whole number of clips', async () => {
+    const was = process.cwd();
+    process.chdir(dir);
+    try {
+      const engine = fakeEngine();
+      await voiceClips(['A.'], { cache: 'rel/cache', profile: PROFILE, engine, work: 'rel/work' });
+      expect(existsSync(path.join(dir, 'rel', 'cache', `${clipKey('A.', PROFILE)}.json`))).toBe(true);
+      expect(existsSync(path.join(dir, 'rel', 'work'))).toBe(true);   // a folder you name is yours to keep
+    } finally {
+      process.chdir(was);
+    }
+    for (const batch of [0, -1, 1.5, NaN]) await expect(voiceClips(['A.'], { cache: dir, profile: PROFILE, engine: fakeEngine(), batch })).rejects.toThrow(RangeError);
+  });
+
+  it('drops a page\'s copy of the old take when a clip is voiced again', async () => {
+    const cache = path.join(dir, 'cache'), key = clipKey('A.', PROFILE);
+    mkdirSync(cache, { recursive: true });
+    writeFileSync(path.join(cache, `${key}.m4a`), 'the old take');   // left from a run whose .json was removed
+    await voiceClips(['A.'], { cache, profile: PROFILE, engine: fakeEngine() });
+    expect(existsSync(path.join(cache, `${key}.m4a`))).toBe(false);
   });
 
   it('skips a batch another run already voiced', async () => {
@@ -126,7 +153,7 @@ describe('voice · the Chatterbox kit adapter', () => {
       writeFileSync(path.join(work, 'timings.json'), JSON.stringify({ scenes: [{ id: 'kabc', audio: 'kabc.wav', duration: 2.5, words: [{ start: 0.1 }] }] }));
       return { status: 0 };
     };
-    const engine = chatterboxKit({ kit: '/kit', run, env: {} });
+    const engine = chatterboxKit({ kit: '/kit', run, env: {} });   // an absolute kit, an absolute work folder
     const out = engine.synthesize([{ id: 'kabc', text: 'Hello there.' }], { work });
     expect(engine.name).toBe('chatterbox');
     expect(out).toEqual([{ id: 'kabc', audio: path.join(work, 'kabc.wav'), duration: 2.5, words: [{ start: 0.1 }] }]);
@@ -134,10 +161,29 @@ describe('voice · the Chatterbox kit adapter', () => {
     expect(JSON.parse(readFileSync(path.join(work, 'storyboard.json'), 'utf8'))).toEqual({ scenes: [{ id: 'kabc', narration: 'Hello there.' }] });
   });
 
-  it('says so when the kit fails, and keeps a scene without words', () => {
+  it('hands the kit absolute paths only: it runs in its own folder', () => {
+    const was = process.cwd();
+    process.chdir(dir);
+    try {
+      mkdirSync('rel/work', { recursive: true });
+      let seen;
+      const run = (cmd, args, opts) => { seen = { cmd, args, cwd: opts.cwd }; writeFileSync(path.join(dir, 'rel', 'work', 'timings.json'), JSON.stringify({ scenes: [] })); return { status: 0 }; };
+      chatterboxKit({ kit: 'kits/voice', run }).synthesize([{ id: 'k1', text: 'x' }], { work: 'rel/work' });
+      expect(seen.cwd).toBe(path.join(process.cwd(), 'kits', 'voice'));
+      expect(seen.cmd).toBe(path.join(process.cwd(), 'kits', 'voice', '.venv-voice', 'bin', 'python'));
+      expect(seen.args[seen.args.indexOf('--storyboard') + 1]).toBe(path.join(process.cwd(), 'rel', 'work', 'storyboard.json'));
+      expect(seen.args.at(-1)).toBe(path.join(process.cwd(), 'rel', 'work'));
+    } finally {
+      process.chdir(was);
+    }
+  });
+
+  it('says so when the kit fails — an exit code, a missing Python, a kill — and keeps a scene without words', () => {
     const work = path.join(dir, 'work');
     mkdirSync(work, { recursive: true });
     expect(() => chatterboxKit({ kit: '/kit', run: () => ({ status: 2 }), env: { HF_HUB_OFFLINE: '0' } }).synthesize([], { work })).toThrow(/voice kit failed \(exit 2\)/);
+    expect(() => chatterboxKit({ kit: '/kit', run: () => ({ status: null, error: new Error('spawnSync python ENOENT') }) }).synthesize([], { work })).toThrow('the voice kit failed (spawnSync python ENOENT) in /kit');
+    expect(() => chatterboxKit({ kit: '/kit', run: () => ({ status: null, signal: 'SIGKILL' }) }).synthesize([], { work })).toThrow('(signal SIGKILL)');
     const run = () => { writeFileSync(path.join(work, 'timings.json'), JSON.stringify({ scenes: [{ id: 'k1', audio: 'a.wav', duration: 1 }] })); return { status: 0 }; };
     expect(chatterboxKit({ kit: '/kit', run }).synthesize([{ id: 'k1', text: 'x' }], { work })[0].words).toEqual([]);
   });
@@ -161,10 +207,12 @@ describe('voice · clips inside one page', () => {
     expect(tags.match(/id="vc-/g)).toHaveLength(2);
   });
 
-  it('gives no tags when no click has a clip, and none for a clip it cannot make an .m4a of', () => {
+  it('gives no tags when no click has a clip, and none for a clip it cannot make an .m4a of (ffmpeg failing, or missing)', () => {
     const k = clipKey('One.', PROFILE);
     writeFileSync(path.join(dir, `${k}.json`), JSON.stringify({ text: 'One.', duration: 1, sentences: [0] }));
     expect(embedClips(['One.'], { cache: dir, profile: PROFILE, run: () => ({ status: 1 }) })).toEqual({ tags: '', have: 0, wanted: 1 });
+    expect(embedClips(['One.'], { cache: dir, profile: PROFILE, run: () => ({ status: null, error: new Error('spawnSync ffmpeg ENOENT') }) })).toEqual({ tags: '', have: 0, wanted: 1 });
+    expect(embedClips(['One.'], { cache: dir, profile: PROFILE, run: () => ({ status: 0 }) })).toEqual({ tags: '', have: 0, wanted: 1 });   // it said yes, wrote nothing
     expect(embedClips(['', ''], { cache: dir, profile: PROFILE })).toEqual({ tags: '', have: 0, wanted: 0 });
   });
 });

@@ -121,8 +121,9 @@ timing — the same words, three uses:
 
 - **what the voice says** — `narrationText(notes)`: the notes as a voice reads them. An acronym stays as written
   (a cloned voice says LLM, HCI, MCP as quick letters; spaced out, "L L M" came out slow and odd), only the words
-  a voice misreads as a word are spelled (`SPELL`: UI, API — pass your own `spell`), numbers become words (a forced
-  aligner knows letters only), and a line after `[draft]` (a bridge you wrote for the deck) is said, and shown apart;
+  a voice misreads as a word are spelled (`SPELL`: UI, API — pass your own `spell`), numbers become words and a lone
+  `&` or `+` is said (a forced aligner needs letters in every word), and a line after `[draft]` (a bridge you wrote for
+  the deck) is said, and shown apart;
 - **a clip per click, cached by what it says** — `storydeck/voice` (Node). A clip's key is a hash of the voice
   settings and the exact words, so editing one note re-voices that click and nothing else, and an interrupted run
   keeps every batch it finished. The voice is a port (`{ name, synthesize(scenes, { work }) }`); `chatterboxKit`
@@ -154,7 +155,9 @@ animation on the page is paused and **stepped frame by frame** — the same deck
 the last entrance ends, and that frame is held for the rest of the clip. Beside the video come what an upload
 asks for: `captions.srt` / `.vtt` (by sentence, timed by the clips' aligned starts, the words as written),
 `chapters.txt` (YouTube's rules checked: first at 0:00, three or more, 10 s each), a `thumbnail.jpg` and a
-`timeline.json`.
+`timeline.json`. The frames and sounds are made in a temporary folder and removed (name a `work` folder to keep
+them); `out` gets the finished files only. Each picture is read at the video's frame rate — an image's own 1/25 s
+would drop one entrance frame in six at 30 fps, and a test with the real ffmpeg holds that line.
 
 ```js
 import { chromium } from 'playwright-core';

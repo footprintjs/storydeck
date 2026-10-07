@@ -2,8 +2,6 @@
 
 ## 0.2.0 — the deck tells itself, and becomes a video
 
-The first version on npm.
-
 - **Narration** (`storydeck/narration`): what each click says, from its speaker notes — `narrationText` (an
   acronym stays as written; only the words a voice misreads as a word are spelled, `SPELL`: UI, API; numbers as
   words; `[draft]` bridge lines), `sentences`, `captionCues` → `toSrt` / `toVtt`, `chapterList` (YouTube's rules
@@ -18,11 +16,12 @@ The first version on npm.
   is a port; `deckStageDriver` drives `<deck-stage>` with Playwright.
 - **`storydeck/deck-stage.js`**: the slide runtime Watch plays on, now in the package.
 - **An agent skill** ships in the package: `plugin/skills/storydeck/SKILL.md`.
-- **Focus** (`storydeck/focus`, `storydeck/focus-html`, `storydeck/focus.css`; built before this release, first
-  published here): per click, what the click is about and what happens to the rest — looks `grey` · `hide` ·
-  `keep`, movers `zoom` · `left` · `right` · `up` · `down` · `place`, overlay `blur`; only a forward click animates.
+- **The package holds the library only**: no tests, no demo-site files (0.1.0 carried both).
 
 ## 0.1.0 — one source, many lenses
 
-Not published. Read · Scroll · Watch from one source (`PostView`, `BlogView`, `ScrollyView`, `SlideDeck`),
-additive builds in `<deck-stage>`, a live figure in Scroll, mobile Watch in full screen.
+The first version on npm. Read · Scroll · Watch from one source (`PostView`, `BlogView`, `ScrollyView`,
+`SlideDeck`), additive builds in `<deck-stage>`, a live figure in Scroll, mobile Watch in full screen, and
+**focus** (`storydeck/focus`, `storydeck/focus-html`, `storydeck/focus.css`): per click, what the click is about and
+what happens to the rest — looks `grey` · `hide` · `keep`, movers `zoom` · `left` · `right` · `up` · `down` ·
+`place`, overlay `blur`; only a forward click animates.
