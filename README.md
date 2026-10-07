@@ -71,7 +71,8 @@ decision every click makes again, so it is data on the click, and the library do
 |---|---|---|
 | look | `grey` (default) · `hide` · `keep` | how the context looks: greyed in place, hidden, or left as it is |
 | mover | `zoom` | the view closes in on the subject (`share`, `most`) |
-| mover | `left` · `right` · `up` · `down` | the context steps aside that way, smaller (`scale`), and the subject grows into the room it leaves (`grow`, `fill`, `gap`, `align`) |
+| mover | `left` · `right` · `up` · `down` | the context steps aside that way, smaller (`scale`), and the subject grows into the room it leaves (`grow`, `fill`, `gap`, `align`; `move: 'aside'` keeps the subject where it is) |
+| mover | `place` | named groups moved by the amounts you give (`groups: 'page floor: -90 -200 0.5 \| tl: 0 -230 1.1 @ 960 968'`): a layout you art-direct, still animated from wherever the last click left it |
 | overlay | `blur` | everything outside the subject's frame is blurred; a frame (and a `label`) on it, or on the `rect`s you give |
 
 `'left blur'` reads: the context steps aside to the left, greyed, under a blur, and the subject grows on
@@ -180,7 +181,7 @@ const { theme, toggle, setTheme } = useTheme();   // flips an html class + persi
 | `buildSections` · `finalStep` · `allSteps` · `parseGroup` | grouping helpers |
 | `slugify` · `scopeDeckCss` | utilities |
 | `planFocus` · `focusStep` · `readFocus` · `FOCUS` | focus: per click, what it is about and what happens to the rest (also `storydeck/focus`) |
-| `readPieces` · `drawFocus` · `wrapStage` · `focusOverlay` · `focusRuntime` | focus, written into slide HTML (also `storydeck/focus-html`; styles in `storydeck/focus.css`) |
+| `readPieces` · `readStep` · `drawFocus` · `wrapStage` · `slideClass` · `focusOverlay` · `focusRuntime` | focus, written into slide HTML (also `storydeck/focus-html`; styles in `storydeck/focus.css`) |
 
 Types ship beside the source in `index.d.ts` — hand-kept (there is no build to generate them from),
 and here rather than in a consumer's shim, because a package's shape belongs in the package.

@@ -148,13 +148,13 @@ describe('focus · strategies', () => {
 
   it('a click takes one strategy of each kind, from the built-ins or the deck\'s own', () => {
     expect(() => focusStep(null, { ...lit, focus: 'zoom left' }, deck)).toThrow(/one mover at most.*"zoom" and "left"/);
-    expect(() => focusStep(null, { ...lit, focus: 'spin' }, deck)).toThrow(/no focus strategy "spin" \(there are grey, hide, keep, zoom, left, right, up, down, blur\)/);
+    expect(() => focusStep(null, { ...lit, focus: 'spin' }, deck)).toThrow(/no focus strategy "spin" \(there are grey, hide, keep, zoom, left, right, up, down, place, blur\)/);
     const tilt = { kind: 'mover', place: ({ subject }) => ({ subject: { o: [subject.x, subject.y], s: 2, t: [0, 0] } }) };
     const look = focusStep(null, { ...lit, focus: 'tilt' }, { ...deck, strategies: { tilt } }).look;
     expect(look.strategies).toEqual(['tilt']);
     expect(look.pieces[1].move.s).toBe(2);
     expect(() => focusStep(null, { ...lit, focus: 'odd' }, { ...deck, strategies: { odd: { kind: 'paint' } } })).toThrow(/a look, a mover or an overlay/);
-    expect(Object.keys(FOCUS)).toEqual(['grey', 'hide', 'keep', 'zoom', 'left', 'right', 'up', 'down', 'blur']);
+    expect(Object.keys(FOCUS)).toEqual(['grey', 'hide', 'keep', 'zoom', 'left', 'right', 'up', 'down', 'place', 'blur']);
   });
 });
 
@@ -196,6 +196,36 @@ describe('focus · a piece that leaves, and a look that changes', () => {
     expect(hideThenGrey).toMatchObject({ change: 'relook', look: 'grey', fromLook: 'hide' });
     const litThenKept = planFocus([{ in: ['page', 'code'] }, { on: ['code'], focus: 'keep' }], deck).looks[1].pieces[0];
     expect(litThenKept.change).toBe(null);
+  });
+});
+
+describe('focus · place: a layout you art-direct', () => {
+  const all = { in: ['*'] };
+  it('moves named groups by the amounts given, around their own centre or a point you name', () => {
+    const look = focusStep(null, { ...all, focus: { strategy: 'place', groups: 'page: -100 50 0.5 | code: 10 0 2 @ 1000 300' } }, deck).look;
+    expect(look.pieces[0].move).toEqual({ dx: -100, dy: 50, s: 0.5, origin: 'center' });                  // around its own centre
+    // the code box, scaled 2 around its top-left corner (1000, 300), moved 10 right: its centre (1250, 425) goes to (1510, 550)
+    expect(look.pieces[1].move).toMatchObject({ dx: 260, dy: 125, s: 2 });
+    expect(look.pieces[2].move).toBe(null);                                                                  // in no group: still
+  });
+
+  it('reads its amounts in slide px whatever the view, and a later group wins a piece named in two', () => {
+    const view = { s: 0.5, x: 0, y: 0 };
+    const look = focusStep(null, { ...all, focus: { strategy: 'place', groups: 'page code: 0 0 1 | page: 40 0' } }, { ...deck, view }).look;
+    expect(look.pieces[0].move).toMatchObject({ dx: 80, dy: 0, s: 1 });   // 40 slide px = 80 map px
+    expect(look.pieces[1].move).toBe(null);
+  });
+
+  it('refuses groups it cannot read, or names that are no piece', () => {
+    expect(() => focusStep(null, { ...all, focus: 'place' }, deck)).toThrow(/give groups/);
+    expect(() => focusStep(null, { ...all, focus: { strategy: 'place', groups: 'page -1 2' } }, deck)).toThrow(/a group is 'names: dx dy scale/);
+    expect(() => focusStep(null, { ...all, focus: { strategy: 'place', groups: 'pager: 1 2' } }, deck)).toThrow(/focus group: no piece "pager"/);
+  });
+
+  it('an aside can move only the context, leaving the subject where it is', () => {
+    const look = focusStep(null, { in: ['page', 'code'], on: ['code'], quiet: true, focus: { strategy: 'left', move: 'aside' } }, deck).look;
+    expect(look.pieces[0].move).not.toBe(null);
+    expect(look.pieces[1].move).toBe(null);
   });
 });
 

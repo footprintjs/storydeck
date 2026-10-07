@@ -46,6 +46,19 @@ export function readPieces(html, {attr = 'data-k'} = {}) {
   return {html: out, pieces};
 }
 
+/**
+ * A click written as attributes on an element (a <step>): data-in, data-out, data-on, data-hot, data-quiet,
+ * data-focus (the strategies) and data-focus-* (their options, camelCased: data-focus-aside-by → asideBy).
+ */
+export function readStep(attrs) {
+  const list = name => { const v = attrOf(attrs, `data-${name}`); return v === null ? null : v.trim().split(/\s+/).filter(Boolean); };
+  const focus = attrOf(attrs, 'data-focus') ?? '';
+  if (/^[\d\s.,-]+$/.test(focus.trim()) && focus.trim()) throw new Error(`data-focus names strategies ("blur"), not a rectangle: put "${focus.trim()}" in data-focus-rect`);
+  const options = {};
+  for (const m of attrs.matchAll(/\sdata-focus-([\w-]+)=(["'])(.*?)\2/g)) options[m[1].replace(/-(\w)/g, (_, c) => c.toUpperCase())] = m[3];
+  return {in: list('in') ?? [], out: list('out') ?? [], on: list('on'), hot: list('hot') ?? [], quiet: /\sdata-quiet(?![\w-])/.test(attrs), focus, options};
+}
+
 /** The classes and style a piece gets for its look. */
 function pieceLook(p) {
   const cls = ['sd', `sd-${p.state}`];

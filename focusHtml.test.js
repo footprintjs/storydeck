@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { readPieces, drawFocus, wrapStage, focusOverlay, focusRuntime, slideClass } from './focusHtml';
+import { readPieces, readStep, drawFocus, wrapStage, focusOverlay, focusRuntime, slideClass } from './focusHtml';
 import { planFocus } from './focus';
 
 /** The veil's rectangles, from its clip path, as [x0, y0, x1, y1]; and how much of the slide they blur. */
@@ -35,6 +35,17 @@ describe('focusHtml · reading pieces', () => {
     expect(pieces[0]).toEqual({ keys: ['x'], box: { x: 0, y: 0, w: 0, h: 0 } });
     const { looks } = planFocus([{ in: ['x'] }], { pieces });
     expect(drawFocus(html, looks[0])).toBe(`<div class='box sd sd-on sd-enter' data-k='x' style='left:0;top:0'>x</div>`);
+  });
+});
+
+describe('focusHtml · reading a click', () => {
+  it('reads a step\'s attributes, its focus and its options (camelCased)', () => {
+    expect(readStep(` data-in="a b" data-on='c' data-quiet data-focus="left blur" data-focus-aside-by="1 2" data-focus-label='the form'`)).toEqual({
+      in: ['a', 'b'], out: [], on: ['c'], hot: [], quiet: true, focus: 'left blur', options: { asideBy: '1 2', label: 'the form' },
+    });
+    expect(readStep(' data-out="x"')).toEqual({ in: [], out: ['x'], on: null, hot: [], quiet: false, focus: '', options: {} });
+    expect(readStep(' data-quiet-ish="1"').quiet).toBe(false);
+    expect(() => readStep(' data-focus="10 20 30 40"')).toThrow(/put "10 20 30 40" in data-focus-rect/);
   });
 });
 
