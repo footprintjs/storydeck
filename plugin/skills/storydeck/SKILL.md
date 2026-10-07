@@ -21,7 +21,7 @@ plain data and string builders; only `storydeck/voice` and `storydeck/video` tou
 | what each click says, captions, chapters | `storydeck/narration` | anywhere |
 | notes (N), presenter (P), listen mode (L) in the page | `storydeck/narration-html` + `storydeck/narration.css` | build + page |
 | a clip per click in a voice, cached | `storydeck/voice` | **Node only** |
-| the deck as a narrated video | `storydeck/video` (+ ffmpeg on the path, Playwright's `chromium` passed in) | **Node only** |
+| the deck as a narrated video | `storydeck/video` (+ ffmpeg 5.0 or newer on the path, Playwright's `chromium` passed in) | **Node only** |
 
 Never import `storydeck/voice` or `storydeck/video` into browser code: they use `node:fs` and child processes.
 The main entry (`storydeck`) re-exports only what runs anywhere.

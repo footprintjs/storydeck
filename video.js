@@ -1,4 +1,4 @@
-// video — a narrated deck as a video: every click on screen while its clip plays. Node, with ffmpeg on the path.
+// video — a narrated deck as a video: every click on screen while its clip plays. Node, with ffmpeg 5.0+ on the path.
 //
 //   const steps = notes.map((n, i) => ({ label: labels[i], written: writtenText(n), spoken, clip: clipFor(spoken, …) }));
 //   await renderVideo({ url: 'file:///…/deck.html', steps, out: 'out/video', driver: deckStageDriver({ chromium }) });
@@ -81,6 +81,17 @@ export function encodeArgs({ frames, narration, out, length, fps = 30, crf = 18 
     '-movflags', '+faststart', '-t', length.toFixed(3), out];
 }
 
+/**
+ * ffmpeg's major version, from `ffmpeg -version` (null when it does not say, as a build from git does). Throws
+ * when ffmpeg cannot run at all.
+ */
+export function ffmpegMajor(run = spawnSync) {
+  const done = run('ffmpeg', ['-version'], { encoding: 'utf8' }), why = failure(done);
+  if (why) throw new Error(`ffmpeg failed: is it installed? (${why})`);
+  const m = /ffmpeg version n?(\d+)\./i.exec(String(done.stdout ?? ''));
+  return m ? Number(m[1]) : null;
+}
+
 /** Runs ffmpeg (or a fake with spawnSync's shape) and throws on failure — a missing ffmpeg included. */
 function ffmpeg(run, args, what) {
   const why = failure(run('ffmpeg', args, { stdio: 'inherit' }));
@@ -138,6 +149,9 @@ export async function renderVideo({ url, steps, out, name = 'deck', driver, run 
   chapters = () => null, intro = 'Intro', thumbnail = () => false, work, log = () => {} }) {
   const plan = planVideo(steps, { gap, lead, noclip, only });
   if (!plan.length) throw new Error(`nothing to render: no click in ${only ? `[${only.join(', ')}]` : 'the deck'} (it has ${steps.length})`);
+  // the concat lists read each picture at the video's frame rate (`option framerate`), which ffmpeg 4 cannot parse
+  const major = ffmpegMajor(run);
+  if (major !== null && major < 5) throw new Error(`renderVideo needs ffmpeg 5.0 or newer (found ${major}.x)`);
   out = path.resolve(out);
   mkdirSync(out, { recursive: true });
   const own = !work, dir = own ? mkdtempSync(path.join(tmpdir(), 'storydeck-video-')) : path.resolve(work);

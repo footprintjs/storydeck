@@ -30,6 +30,15 @@ describe('narration · what the voice says', () => {
     expect(narrationText('The web - then apps / tools ... and R&D + Q & A … done.')).toBe('The web, then apps, tools, and R&D plus Q and A, done.');
     expect(narrationText('& then +')).toBe('and then plus');
     expect(narrationText('a-b and/or c...d')).toBe('a-b and/or c...d');   // only lone ones: inside a word they stay
+    // anywhere, any word without a letter: a comma on the word before, nothing at the start
+    expect(narrationText('- a bullet')).toBe('a bullet');
+    expect(narrationText(['[draft] - a bridge.'])).toBe('a bridge.');
+    expect(narrationText('And then ...')).toBe('And then,');
+    expect(narrationText('Next →')).toBe('Next,');
+    expect(narrationText('a -- b -> c => d')).toBe('a, b, c, d');
+    expect(narrationText('x = y * z | w % 😀 done.')).toBe('x, y, z, w, done.');
+    expect(narrationText('Done. — Then')).toBe('Done. Then');   // after a full stop, no comma
+    expect(narrationText('  ')).toBe('');
   });
 
   it('drops [draft] marks, turns a separator into a pause, and joins notes', () => {

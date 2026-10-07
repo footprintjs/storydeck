@@ -83,7 +83,7 @@ export function listenRuntime() {
   const urlOf = (key) => urls[key] ??= URL.createObjectURL(new Blob([Uint8Array.from(atob(document.getElementById(`vc-${key}`).textContent.trim()), (c) => c.charCodeAt(0))], { type: 'audio/mp4' }));
   const render = (i, k) => {
     const n = notes[i] ?? {}, ss = sentences(i), done = notes.slice(0, i).reduce((a, _, j) => a + wordsOf(j), 0), min = (w) => (w / 150 / rate).toFixed(1);
-    panel.innerHTML = `<header><b>${esc(n.slide ?? '')}</b><span>${n.steps ? `click ${n.step} of ${n.steps}` : 'slide'}</span><span>#${i + 1} of ${notes.length}</span>`
+    panel.innerHTML = `<header><b>${esc(n.slide ?? '')}</b><span>${n.steps ? `click ${esc(String(n.step))} of ${esc(String(n.steps))}` : 'slide'}</span><span>#${i + 1} of ${notes.length}</span>`
       + `<span class="time">${min(done)} of ${min(total)} min</span><span class="who">${clipOf(i) ? 'your voice' : 'browser voice'}</span><span class="keys">${paused ? 'paused · Space resumes' : 'Space pause'} · ← → move · [ ] speed ${rate.toFixed(1)}× · L stop</span></header>`
       + `<div class="say">${ss.length ? ss.map((x, j) => `<span class="${x.draft ? 'draft ' : ''}${j < k ? 'past' : j === k ? 'now' : 'next'}">${esc(x.t)}</span>`).join(' ') : '<span class="none">(no narration on this click)</span>'}</div>`
       + '<footer><i class="d"></i> amber = a [draft] bridge line · white = your own words</footer>';

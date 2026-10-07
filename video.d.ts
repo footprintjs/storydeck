@@ -1,5 +1,5 @@
 /**
- * storydeck · video (video.js) — a narrated deck as a video: every click on screen while its clip plays. Node + ffmpeg.
+ * storydeck · video (video.js) — a narrated deck as a video: every click on screen while its clip plays. Node + ffmpeg 5.0+.
  */
 import type { Clip } from './voice';
 
@@ -22,6 +22,8 @@ type Run = (cmd: string, args: string[], options?: object) => { status: number |
 export function planVideo(steps: readonly VideoStep[], options?: { gap?: number; lead?: number; noclip?: number; only?: [number, number] | null }): PlannedClick[];
 /** The picture as an ffconcat list (entrance frames, then the held frame); updates the plan's lengths and starts. */
 export function framesConcat(plan: PlannedClick[], shots: readonly string[][], options?: { fps?: number }): string;
+/** ffmpeg's major version from `ffmpeg -version` (null when it does not say); throws when ffmpeg cannot run. */
+export function ffmpegMajor(run?: Run): number | null;
 /** ffmpeg's arguments for one click's sound. */
 export function audioArgs(click: PlannedClick, file: string): string[];
 /** ffmpeg's arguments for the video (fades in and out, H.264 + AAC, trimmed to `length`). */

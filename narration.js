@@ -29,9 +29,9 @@ const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
  * The notes (a string, or one string per note) as the voice should read them: [draft] marks dropped, the
- * `spell` words spelled, numbers as words, a lone & or + said ("and", "plus"), a lone separator (— – · → - /
- * ... …) as a pause, white space collapsed. A voice aligner needs letters in every word, so no word is left
- * without one.
+ * `spell` words spelled, numbers as words, a lone & or + said ("and", "plus"), and any other word without a
+ * letter (— – · → - / ... … = * an emoji) a pause — a comma on the word before it, nothing at the start. A
+ * voice aligner needs letters in every word, so no word is left without one.
  */
 export function narrationText(notes, { spell = SPELL } = {}) {
   let text = (Array.isArray(notes) ? notes : [notes ?? '']).join(' ').replace(/\[draft\]\s*/g, '');
@@ -40,8 +40,14 @@ export function narrationText(notes, { spell = SPELL } = {}) {
     .replace(/\bp(\d+)\b/g, (_, d) => `p ${numberWords(Number(d))}`)
     .replace(/\b\d+\b/g, (d) => numberWords(Number(d)))
     .replace(/(^|\s)&(?=\s|$)/g, '$1and').replace(/(^|\s)\+(?=\s|$)/g, '$1plus')
-    .replace(/\s+(?:[—–·→/-]|\.\.\.|…)(?=\s)/g, ',')
-    .replace(/\s+/g, ' ').trim();
+    .split(/\s+/).filter(Boolean).reduce(pause, []).join(' ');
+}
+
+/** A word without a letter becomes a pause: a comma on the word before (unless it ends in one), dropped at the start. */
+function pause(words, word) {
+  if (/\p{L}/u.test(word)) words.push(word);
+  else if (words.length && !/[,.;:!?]$/.test(words[words.length - 1])) words[words.length - 1] += ',';
+  return words;
 }
 
 /** The notes as written, for captions: [draft] marks dropped, white space collapsed. */

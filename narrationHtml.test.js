@@ -166,6 +166,15 @@ describe('narrationHtml · listen runtime (L)', () => {
     expect(synth.pause).not.toHaveBeenCalled();
   });
 
+  it('shows a step number as text in the listen panel too', () => {
+    fakeSpeech(); fakeAudio();
+    mountDeck([{ slide: 'S', step: '<b>1</b>', steps: 2, now: ['x.'] }]);
+    listenRuntime();
+    press('l');
+    expect(document.querySelector('.train-panel header b + span').textContent).toBe('click <b>1</b> of 2');
+    press('l');
+  });
+
   it('does nothing where the browser cannot speak', () => {
     mountDeck();
     delete window.speechSynthesis;

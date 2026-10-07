@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync, readdirSy
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { planVideo, framesConcat, audioArgs, encodeArgs, renderVideo, deckStageDriver } from './video';
+import { planVideo, framesConcat, audioArgs, encodeArgs, renderVideo, deckStageDriver, ffmpegMajor } from './video';
 
 const clip = (key, duration, sentences = [0]) => ({ key, audio: `/cache/${key}.wav`, duration, sentences });
 const STEPS = [
@@ -78,9 +78,12 @@ function fakeDriver(ends = {}) {
   };
 }
 /** ffmpeg stand-in: records its arguments and writes the file each call would. */
-function fakeRun(fail) {
+function fakeRun(fail, version = 'ffmpeg version 7.1 Copyright (c) 2000-2024 the FFmpeg developers') {
   const calls = [];
-  const run = (cmd, args) => { calls.push(args); writeFileSync(args.at(-1), 'out'); return { status: fail?.(args) ? 1 : 0 }; };
+  const run = (cmd, args) => {
+    if (args[0] === '-version') return { status: 0, stdout: version };
+    calls.push(args); writeFileSync(args.at(-1), 'out'); return { status: fail?.(args) ? 1 : 0 };
+  };
   return { run, calls };
 }
 
@@ -164,10 +167,24 @@ describe('video · what can go wrong', () => {
 
   it('fails when ffmpeg cannot run at all (missing, or killed) — never a video that is not there', async () => {
     const missing = () => ({ status: null, error: new Error('spawnSync ffmpeg ENOENT') });
-    await expect(renderVideo({ url: 'u', steps: STEPS.slice(0, 1), out: dir, driver: fakeDriver(), run: missing }))
-      .rejects.toThrow('ffmpeg failed: the sound of click 1 (spawnSync ffmpeg ENOENT)');
+    const idle = fakeDriver();
+    await expect(renderVideo({ url: 'u', steps: STEPS.slice(0, 1), out: dir, driver: idle, run: missing }))
+      .rejects.toThrow('ffmpeg failed: is it installed? (spawnSync ffmpeg ENOENT)');
+    expect(idle.open).not.toHaveBeenCalled();                                       // found out before a browser opens
     const killed = () => ({ status: null, signal: 'SIGKILL' });
     await expect(renderVideo({ url: 'u', steps: STEPS.slice(0, 1), out: dir, driver: fakeDriver(), run: killed })).rejects.toThrow('(signal SIGKILL)');
+    // ffmpeg runs, then one step fails
+    const later = (cmd, args) => (args[0] === '-version' ? { status: 0, stdout: 'ffmpeg version 6.1.1' } : { status: null, error: new Error('spawnSync ffmpeg ENOENT') });
+    await expect(renderVideo({ url: 'u', steps: STEPS.slice(0, 1), out: dir, driver: fakeDriver(), run: later }))
+      .rejects.toThrow('ffmpeg failed: the sound of click 1 (spawnSync ffmpeg ENOENT)');
+  });
+
+  it('needs ffmpeg 5.0 or newer (its concat lists read each picture at a frame rate ffmpeg 4 cannot parse)', async () => {
+    const old = fakeRun(null, 'ffmpeg version 4.4.2-0ubuntu0.22.04.1 Copyright (c) 2000-2021');
+    await expect(renderVideo({ url: 'u', steps: STEPS.slice(0, 1), out: dir, driver: fakeDriver(), run: old.run })).rejects.toThrow('renderVideo needs ffmpeg 5.0 or newer (found 4.x)');
+    expect(ffmpegMajor(fakeRun(null, 'ffmpeg version n6.1 Copyright').run)).toBe(6);
+    expect(ffmpegMajor(fakeRun(null, 'ffmpeg version N-112345-gabcdef Copyright').run)).toBe(null);   // a build from git: no version to read
+    await expect(renderVideo({ url: 'u', steps: STEPS.slice(0, 1), out: dir, driver: fakeDriver(), run: fakeRun(null, 'ffmpeg version N-1-g2').run })).resolves.toBeTruthy();
   });
 
   it('closes the browser when the deck does not open, and opens none for an empty range', async () => {
@@ -182,8 +199,13 @@ describe('video · what can go wrong', () => {
   });
 });
 
+// on CI (which installs ffmpeg) this never skips: a missing ffmpeg there is a failure, not a pass
 const hasFfmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
-describe.skipIf(!hasFfmpeg)('video · with the real ffmpeg', () => {
+describe.skipIf(!hasFfmpeg && !process.env.CI)('video · with the real ffmpeg', () => {
+  it('is ffmpeg 5.0 or newer', () => {
+    expect(ffmpegMajor() ?? 5).toBeGreaterThanOrEqual(5);
+  });
+
   it('keeps every entrance frame at 30 fps, in order (an image read at its own 1/25 s would drop and double them)', () => {
     const frames = path.join(dir, "it's frames");                                   // a quote in the path, too
     mkdirSync(frames);

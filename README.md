@@ -149,7 +149,7 @@ without them (the listen mode falls back to the browser's voice).
 
 ## Video: the deck as a narrated video
 
-`storydeck/video` (Node, with ffmpeg) renders a deck with its clips into a video for YouTube: every click on
+`storydeck/video` (Node, with ffmpeg 5.0 or newer) renders a deck with its clips into a video for YouTube: every click on
 screen while its clip plays. Each click is made forward, so its entrance plays as in the room; then every
 animation on the page is paused and **stepped frame by frame** — the same deck renders the same frames — until
 the last entrance ends, and that frame is held for the rest of the clip. Beside the video come what an upload
@@ -269,7 +269,7 @@ const { theme, toggle, setTheme } = useTheme();   // flips an html class + persi
 | `narrationText` · `writtenText` · `sentences` · `SPELL` · `captionCues` · `toSrt` · `toVtt` · `chapterList` · `clock` | narration: what a click says, captions and chapters (also `storydeck/narration`) |
 | `notesData` · `notesRuntime` · `listenRuntime` | narration in the page: notes, presenter window, listen mode (also `storydeck/narration-html`; styles in `storydeck/narration.css`) |
 | `clipKey` · `clipFor` · `voiceClips` · `chatterboxKit` · `embedClips` | `storydeck/voice` (Node only): clips cached by what they say, a voice port and its local-kit adapter |
-| `renderVideo` · `planVideo` · `deckStageDriver` | `storydeck/video` (Node only, ffmpeg): the deck as a narrated video, with captions and chapters |
+| `renderVideo` · `planVideo` · `deckStageDriver` · `ffmpegMajor` | `storydeck/video` (Node only, ffmpeg 5.0+): the deck as a narrated video, with captions and chapters |
 
 Types ship beside the source in `index.d.ts` — hand-kept (there is no build to generate them from),
 and here rather than in a consumer's shim, because a package's shape belongs in the package.
