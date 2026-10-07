@@ -1,6 +1,6 @@
 {
   "name": "storydeck",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "One source, many lenses — render structured content as a Read article, a Scroll (scrollytelling) story, or a Watch deck.",
   "type": "module",
   "license": "MIT",
@@ -9,7 +9,7 @@
   "homepage": "https://github.com/footprintjs/storydeck#readme",
   "bugs": "https://github.com/footprintjs/storydeck/issues",
   "keywords": ["slides", "deck", "presentation", "scrollytelling", "react", "narration", "captions", "voice", "video", "talk", "focus", "footprintjs"],
-  "engines": { "node": ">=18" },
+  "engines": { "node": ">=22" },
   "sideEffects": ["*.css"],
   "types": "./index.d.ts",
   "exports": {
@@ -35,6 +35,7 @@
     "react-dom": ">=18"
   },
   "dependencies": {
+    "footprint-narration": "file:../footprint-narration",
     "markdown-it": "^14.1.0"
   },
   "devDependencies": {

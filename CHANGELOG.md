@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.3.0 — the narration rules move into footprint-narration
+
+The rules a voice reads by, the sentences, the captions, YouTube's chapter rule and the clip cache now live in
+[footprint-narration](https://github.com/footprintjs/footprint-narration) — one package that StoryDeck and
+footprint-storyreel both use, so the two stop keeping copies that drift. StoryDeck keeps what is the deck's own.
+**What each note says is unchanged**: the four clip-key goldens and a real deck's 198 clips still match.
+
+- **`storydeck/narration`** keeps `narrationText` (now footprint-narration's automatic rules over `writtenText`) and
+  `writtenText`. Removed, now imported from `footprint-narration`: `numberWords`, `SPELL`, `SAY`, `sentences`,
+  `saidSentences`, `captionCues`, `stamp`; `toSrt` / `toVtt` → `captionFile(cues, 'srt' | 'vtt')`; `clock` →
+  `clockText`; `chapterList` → `youtubeChapters`. The main `storydeck` door re-exports only `narrationText` and
+  `writtenText`.
+- **`storydeck/voice`** keeps `embedClips`. Removed, now imported from `footprint-narration/voice`: `clipKey`,
+  `clipFor`, `voiceClips`, `chatterboxKit`, `pickSteps`; `sentenceStarts` is `footprint-narration`'s. A clip
+  voiced from now on keeps its timed words (`clipFor(…).words`); a clip voiced before keeps working.
+- **`narrationText(notes, { spell, say })`**: what a rule says is final (a custom list no longer chains `A → B → C`),
+  and a list that cannot be said is refused — a key must be one word; a value must be words, a letter in every
+  word and no digits (`{ Win: 'Windows 11' }`: write `'Windows eleven'`). A number from a million is said in
+  millions. Every default-list note says what it said.
+- **`renderVideo`**: `chapters.txt` holds the chapters YouTube will show, by its rule — a chapter shorter than 10 s
+  merges into the one before, an opening shorter than 10 s yields 0:00 to the next, and fewer than three is no
+  chapters (an empty file) — and `done.chapters` is `{ lines, text, kept, changes, problems }` (it was
+  `{ text, problems }`). `captions.vtt` numbers its cues, and a caption longer than 42 characters breaks onto two
+  lines at the space nearest its middle (both files; a long sentence still makes long lines — nothing is cut).
+- **Node 22 or newer** (`engines`): Node 18 and 20 have reached their end of life.
+
 ## 0.2.0 — the deck tells itself, and becomes a video
 
 - **Narration** (`storydeck/narration`): what each click says, from its speaker notes — `narrationText` (an

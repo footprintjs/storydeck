@@ -1,6 +1,6 @@
 // video — a narrated deck as a video: every click on screen while its clip plays. Node, with ffmpeg 5.0+ on the path.
 //
-//   const steps = notes.map((n, i) => ({ label: labels[i], written: writtenText(n), spoken, clip: clipFor(spoken, …) }));
+//   const steps = notes.map((n, i) => ({ label: labels[i], written: writtenText(n), spoken, clip: clipFor(spoken, …) }));   // clipFor: footprint-narration/voice
 //   await renderVideo({ url: 'file:///…/deck.html', steps, out: 'out/video', driver: deckStageDriver({ chromium }) });
 //   // → out/video/deck.mp4 · captions.srt · captions.vtt · chapters.txt · thumbnail.jpg · timeline.json
 //
@@ -15,7 +15,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-import { captionCues, toSrt, toVtt, chapterList } from './narration.js';
+import { captionCues, captionFile, youtubeChapters } from 'footprint-narration';
 
 const NUM = (n) => String(n).padStart(3, '0');
 /** A file in an ffconcat list: absolute (ffmpeg reads a relative one from the list's folder), its quotes escaped. */
@@ -24,7 +24,7 @@ const entry = (file) => `file '${path.resolve(file).replace(/'/g, "'\\''")}'`;
 const failure = (done) => (done?.error ? done.error.message : done?.signal ? `signal ${done.signal}` : done?.status !== 0 ? `exit ${done?.status}` : null);
 
 /**
- * The timeline: each step (`{ label, written, spoken, clip }`, clip as storydeck/voice's clipFor gives it) as a
+ * The timeline: each step (`{ label, written, spoken, clip }`, clip as footprint-narration/voice's clipFor gives it) as a
  * click with its number n (1-based), lead and length (s). `only` ([first, last], 1-based) renders a strip.
  */
 export function planVideo(steps, { gap = 0.6, lead = 0.6, noclip = 2.5, only = null } = {}) {
@@ -143,7 +143,9 @@ function narration(run, plan, work) {
  * `chapters(click)` names the clicks where a chapter starts (a title, or null; the first chapter at 0:00
  * defaults to `intro`); `thumbnail(click)` picks the click whose settled frame is the thumbnail. The frames and
  * sounds are made in `work` (its frames/ and audio/ are replaced) — by default a temporary folder, removed
- * afterwards; name one to keep them. Returns { video, length, cues, chapters: { text, problems }, plan }.
+ * afterwards; name one to keep them. The chapters go by YouTube's rule (footprint-narration · youtubeChapters):
+ * chapters.txt holds the list YouTube will show — empty when fewer than three would stand — and `chapters` says
+ * what the rule changed. Returns { video, length, cues, chapters: { lines, text, kept, changes, problems }, plan }.
  */
 export async function renderVideo({ url, steps, out, name = 'deck', driver, run = spawnSync, fps = 30, gap, lead, noclip, only, maxEntrance = 4000,
   chapters = () => null, intro = 'Intro', thumbnail = () => false, work, log = () => {} }) {
@@ -170,12 +172,12 @@ async function render({ url, plan, out, name, driver, run, fps, maxEntrance, cha
   const wav = narration(run, plan, work), length = plan.reduce((s, c) => s + c.length, 0), video = path.join(out, `${name}.mp4`);
   ffmpeg(run, encodeArgs({ frames: concat, narration: wav, out: video, length, fps }), 'the video');
   const cues = captionCues(plan);
-  writeFileSync(path.join(out, 'captions.srt'), toSrt(cues));
-  writeFileSync(path.join(out, 'captions.vtt'), toVtt(cues));
+  writeFileSync(path.join(out, 'captions.srt'), captionFile(cues, 'srt'));
+  writeFileSync(path.join(out, 'captions.vtt'), captionFile(cues, 'vtt'));
   const marks = plan.map((c) => ({ at: c.start, title: chapters(c) })).filter((m) => m.title);
   if (!marks.length || marks[0].at > 0) marks.unshift({ at: 0, title: intro });
-  const list = chapterList(marks, { length });
-  writeFileSync(path.join(out, 'chapters.txt'), `${list.text}\n`);
+  const list = youtubeChapters(marks, { length });
+  writeFileSync(path.join(out, 'chapters.txt'), list.lines.length ? `${list.text}\n` : '');
   const cover = plan.findIndex((c) => thumbnail(c));
   if (cover >= 0) ffmpeg(run, ['-y', '-loglevel', 'error', '-i', shots[cover].at(-1), '-vf', 'scale=1280:720', '-q:v', '2', path.join(out, 'thumbnail.jpg')], 'the thumbnail');
   writeFileSync(path.join(out, 'timeline.json'), JSON.stringify(plan.map(({ n, label, start, length: l, clip }) => ({ n, label, start: +start.toFixed(3), length: +l.toFixed(3), clip: clip?.key ?? null })), null, 1));

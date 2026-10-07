@@ -117,7 +117,9 @@ new; overlapping holes stay clear, and nothing outside the `area` is blurred.
 
 A talk lives on after the room: someone opens the deck alone, or it becomes a video. The words were in the
 speaker notes all along, so narration is data on each click, and the library turns it into speech, captions and
-timing — the same words, three uses:
+timing — the same words, three uses. The rules underneath — what a voice says for a number or a symbol, the clip
+cache, the captions and YouTube's chapter rule — are [footprint-narration](https://github.com/footprintjs/footprint-narration)'s,
+shared with footprint-storyreel; StoryDeck adds what is the deck's own:
 
 - **what the voice says** — `narrationText(notes)`: the notes as a voice reads them. An acronym stays as written
   (a cloned voice says LLM, HCI, MCP as quick letters; spaced out, "L L M" came out slow and odd), only the words
@@ -125,17 +127,19 @@ timing — the same words, three uses:
   another script its reading), numbers become words, a lone symbol that means something is said (`SAY`: & + = < > ×
   % and Greek letters), any other word without a letter is a pause that keeps its sentence end (a forced aligner
   needs letters in every word), and a line after `[draft]` (a bridge you wrote for the deck) is said, and shown apart;
-- **a clip per click, cached by what it says** — `storydeck/voice` (Node). A clip's key is a hash of the voice
-  settings and the exact words, so editing one note re-voices that click and nothing else, and an interrupted run
-  keeps every batch it finished. The voice is a port (`{ name, synthesize(scenes, { work }) }`); `chatterboxKit`
-  is one adapter — a local voice kit (Chatterbox, words aligned with MMS_FA; nothing is uploaded);
+- **a clip per click, cached by what it says** — `footprint-narration/voice` (Node). A clip's key is a hash of the
+  voice settings and the exact words, so editing one note re-voices that click and nothing else, and an interrupted
+  run keeps every batch it finished. The voice is a port (`{ name, synthesize(scenes, { work }) }`); `chatterboxKit`
+  is one adapter — a local voice kit (Chatterbox, words aligned with MMS_FA; nothing is uploaded). `storydeck/voice`
+  carries the clips inside one page (`embedClips`);
 - **in the page** — `storydeck/narration-html`: N shows this click's notes, P opens a presenter window that
   stays in step, and L plays the deck by itself — each click in your voice (the clips carried in the page), or
   the browser's where a click has none — captions lighting sentence by sentence (styles: `storydeck/narration.css`).
 
 ```js
+import { voiceClips, chatterboxKit } from 'footprint-narration/voice';
 import { narrationText } from 'storydeck/narration';
-import { voiceClips, chatterboxKit, embedClips } from 'storydeck/voice';
+import { embedClips } from 'storydeck/voice';
 import { notesData, notesRuntime, listenRuntime } from 'storydeck/narration-html';
 
 const texts = clicks.map(c => narrationText(c.notes.now));   // one per click; '' where a click says nothing
@@ -155,7 +159,8 @@ screen while its clip plays. Each click is made forward, so its entrance plays a
 animation on the page is paused and **stepped frame by frame** — the same deck renders the same frames — until
 the last entrance ends, and that frame is held for the rest of the clip. Beside the video come what an upload
 asks for: `captions.srt` / `.vtt` (by sentence, timed by the clips' aligned starts, the words as written),
-`chapters.txt` (YouTube's rules checked: first at 0:00, three or more, 10 s each), a `thumbnail.jpg` and a
+`chapters.txt` (the chapters YouTube will show, by its rule — the first at 0:00, three or more, 10 s each: a chapter
+too short is merged into the one before, and `chapters.changes` says what moved), a `thumbnail.jpg` and a
 `timeline.json`. The frames and sounds are made in a temporary folder and removed (name a `work` folder to keep
 them); `out` gets the finished files only. Each picture is read at the video's frame rate — an image's own 1/25 s
 would drop one entrance frame in six at 30 fps, and a test with the real ffmpeg holds that line.
@@ -163,7 +168,7 @@ would drop one entrance frame in six at 30 fps, and a test with the real ffmpeg 
 ```js
 import { chromium } from 'playwright-core';
 import { renderVideo, deckStageDriver } from 'storydeck/video';
-import { clipFor } from 'storydeck/voice';
+import { clipFor } from 'footprint-narration/voice';
 import { narrationText, writtenText } from 'storydeck/narration';
 
 const steps = clicks.map(c => {
@@ -267,9 +272,9 @@ const { theme, toggle, setTheme } = useTheme();   // flips an html class + persi
 | `slugify` · `scopeDeckCss` | utilities |
 | `planFocus` · `focusStep` · `readFocus` · `FOCUS` | focus: per click, what it is about and what happens to the rest (also `storydeck/focus`) |
 | `readPieces` · `readStep` · `drawFocus` · `wrapStage` · `slideClass` · `focusOverlay` · `focusRuntime` | focus, written into slide HTML (also `storydeck/focus-html`; styles in `storydeck/focus.css`) |
-| `narrationText` · `writtenText` · `sentences` · `SPELL` · `SAY` · `captionCues` · `toSrt` · `toVtt` · `chapterList` · `clock` | narration: what a click says, captions and chapters (also `storydeck/narration`) |
+| `narrationText` · `writtenText` | narration: what a click says (also `storydeck/narration`); the rules beneath, sentences, captions and chapters are `footprint-narration`'s |
 | `notesData` · `notesRuntime` · `listenRuntime` | narration in the page: notes, presenter window, listen mode (also `storydeck/narration-html`; styles in `storydeck/narration.css`) |
-| `clipKey` · `clipFor` · `voiceClips` · `chatterboxKit` · `embedClips` | `storydeck/voice` (Node only): clips cached by what they say, a voice port and its local-kit adapter |
+| `embedClips` | `storydeck/voice` (Node only): a deck's clips inside one page; the clip cache, the voice port and its local-kit adapter are `footprint-narration/voice`'s |
 | `renderVideo` · `planVideo` · `deckStageDriver` · `ffmpegMajor` | `storydeck/video` (Node only, ffmpeg 5.0+): the deck as a narrated video, with captions and chapters |
 
 Types ship beside the source in `index.d.ts` — hand-kept (there is no build to generate them from),
@@ -282,7 +287,7 @@ npm test        # vitest
 npm run test:cov
 ```
 
-179 tests · ~99% lines · coverage thresholds enforced (90% statements, 85% branches, 90% functions, 95% lines).
+183 tests · ~99% lines · coverage thresholds enforced (90% statements, 85% branches, 90% functions, 95% lines).
 
 ## License
 

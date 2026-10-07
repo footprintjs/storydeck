@@ -53,7 +53,11 @@ export function notesRuntime() {
   show(stage.index ?? 0);
 }
 
-/** Runs in the page: L plays the deck by itself, in the speaker's voice (clips) or the browser's, with captions. */
+/**
+ * Runs in the page: L plays the deck by itself, in the speaker's voice (clips) or the browser's, with captions.
+ * It is serialised into the page and cannot import, so it keeps its own copy of footprint-narration's sentence
+ * split (saidSentences) — the one accepted copy, pinned to it by narrationHtml.test.js.
+ */
 export function listenRuntime() {
   const stage = document.querySelector('deck-stage'), data = document.getElementById('deck-notes');
   if (!stage || !data || !('speechSynthesis' in window)) return;

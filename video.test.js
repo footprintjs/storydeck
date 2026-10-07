@@ -104,11 +104,14 @@ describe('video · rendering', () => {
     expect(readdirSync(out).sort()).toEqual(['captions.srt', 'captions.vtt', 'chapters.txt', 'talk.mp4', 'thumbnail.jpg', 'timeline.json']);
     expect(done.length).toBeCloseTo(4.2 + 3.1 + 2.6 + 12.6);
     expect(done.cues).toBe(4);                                                    // 2 + 0 + 1 + 1
-    expect(done.chapters.text).toBe('0:00 Intro\n0:04 Part 1 · Two ways in\n0:09 The title');
-    expect(readFileSync(path.join(out, 'chapters.txt'), 'utf8')).toBe(`${done.chapters.text}\n`);
+    // YouTube's rule: chapters 4–5 s apart are not chapters; the title, inside the first 10 s, takes 0:00 — and fewer than three is none
+    expect(done.chapters.kept).toEqual([{ at: 0, title: 'The title' }]);
+    expect(done.chapters.changes.map((c) => c.kind)).toEqual(['replaced', 'replaced', 'moved']);
+    expect(done.chapters.problems).toEqual(['YouTube shows chapters only when there are at least three']);
+    expect(readFileSync(path.join(out, 'chapters.txt'), 'utf8')).toBe('');
     expect(readFileSync(path.join(out, 'captions.srt'), 'utf8')).toContain('00:00:00,600 --> 00:00:02,100\nHello.');
     expect(readFileSync(path.join(out, 'captions.srt'), 'utf8')).toContain('On 2000.');   // as written: one sentence, one start
-    expect(readFileSync(path.join(out, 'captions.vtt'), 'utf8')).toMatch(/^WEBVTT/);
+    expect(readFileSync(path.join(out, 'captions.vtt'), 'utf8')).toMatch(/^WEBVTT\n\n1\n00:00:00\.600 --> 00:00:02\.100\nHello\.\n/);
     expect(JSON.parse(readFileSync(path.join(out, 'timeline.json'), 'utf8'))[3]).toEqual({ n: 4, label: 'Title', start: 9.9, length: 12.6, clip: 'k3' });
     expect(readFileSync(path.join(work, 'frames.ffconcat'), 'utf8')).toContain(`file '${path.join(work, 'frames', 'c001-002.png')}'`);
     // ffmpeg: four sounds, the narration, the video, the thumbnail (from the title's settled frame)
@@ -122,9 +125,19 @@ describe('video · rendering', () => {
     const driver = fakeDriver({ 1: 99999 }), { run } = fakeRun();
     const done = await renderVideo({ url: 'u', steps: STEPS.slice(0, 1), out: dir, driver, run, fps: 1, maxEntrance: 2000, intro: 'Start' });
     expect(driver.seek.mock.calls.map(([ms]) => ms)).toEqual([0, 1000, 2000]);
-    expect(done.chapters.text).toBe('0:00 Start');
+    expect(done.chapters.changes).toEqual([{ kind: 'dropped', title: 'Start', at: 0 }]);   // a 4.2 s video: no chapter lasts 10 s
+    expect(done.chapters.text).toBe('');
     expect(done.chapters.problems).toContain('YouTube shows chapters only when there are at least three');
     expect(existsSync(path.join(dir, 'thumbnail.jpg'))).toBe(false);
+  });
+
+  it('writes the chapters YouTube will show: the first at 0:00, each 10 s or more', async () => {
+    const long = (label, key) => ({ label, written: 'A line.', spoken: 'A line.', clip: clip(key, 12) });
+    const steps = [long('Title', 'a'), long('Part 1', 'b'), long('Part 1 · aside', 'c'), long('Part 2', 'd')];
+    const done = await renderVideo({ url: 'u', steps, out: dir, driver: fakeDriver(), run: fakeRun().run, chapters: (c) => (/^Part \d$/.test(c.label) ? c.label : null) });
+    expect(done.chapters.lines).toEqual(['0:00 Intro', '0:13 Part 1', '0:38 Part 2']);
+    expect(readFileSync(path.join(dir, 'chapters.txt'), 'utf8')).toBe('0:00 Intro\n0:13 Part 1\n0:38 Part 2\n');
+    expect(done.chapters.changes).toEqual([]);
   });
 
   it('closes the browser and says which step failed when ffmpeg or a click fails', async () => {
