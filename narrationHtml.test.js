@@ -84,12 +84,15 @@ describe('narrationHtml · notes runtime (N, P)', () => {
 
   it('keeps the hours on the clock, and shows a step number as text', () => {
     mountDeck([{ slide: 'S', step: '<b>1</b>', steps: 2, now: ['x'] }]);
+    const t0 = Date.now();
     notesRuntime();
-    vi.advanceTimersByTime(3725000);
+    // jump the clock, then one tick (running every second of an hour through the panel takes far too long)
+    const at = (ms) => { vi.setSystemTime(t0 + ms - 1000); vi.advanceTimersByTime(1000); };
+    at(3725000);
     const panel = document.querySelector('.notes-panel');
     expect(panel.querySelector('.clock').textContent).toBe('1:02:05');
     expect(panel.querySelector('header b + span').textContent).toBe('step <b>1</b> of 2');
-    vi.advanceTimersByTime(36000000);
+    at(39725000);
     expect(panel.querySelector('.clock').textContent).toBe('11:02:05');
   });
 
