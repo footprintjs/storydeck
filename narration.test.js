@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { numberWords, SPELL, narrationText, writtenText, sentences, captionCues, stamp, toSrt, toVtt, clock, chapterList } from './narration';
+import { numberWords, SPELL, SAY, narrationText, writtenText, sentences, captionCues, stamp, toSrt, toVtt, clock, chapterList } from './narration';
 
 describe('narration · what the voice says', () => {
   it('spells the words a voice misreads as a word (UI, API, APIs) and leaves every other acronym as written', () => {
@@ -14,7 +14,7 @@ describe('narration · what the voice says', () => {
 
   it('takes its own spelling list, so a deck tunes what its voice misreads', () => {
     expect(narrationText('An LLM and a UI.', { spell: { LLM: 'L L M' } })).toBe('An L L M and a UI.');
-    expect(narrationText('A C++ build.', { spell: { 'C++': 'C plus plus' } })).toBe('A C++ build.');   // \b cannot end after +: left as is
+    expect(narrationText('A C++ build.', { spell: { 'C++': 'C plus plus' } })).toBe('A C plus plus build.');   // word edges, not \b: a word may end in a symbol
     expect(narrationText('An a.b case.', { spell: { 'a.b': 'A B' } })).toBe('An A B case.');           // regex characters are escaped
   });
 
@@ -27,18 +27,40 @@ describe('narration · what the voice says', () => {
   });
 
   it('leaves no word without a letter: a lone & or + is said, a lone - / ... … is a pause (an aligner needs letters)', () => {
-    expect(narrationText('The web - then apps / tools ... and R&D + Q & A … done.')).toBe('The web, then apps, tools, and R&D plus Q and A, done.');
+    expect(narrationText('The web - then apps / tools ... and R&D + Q & A … done.')).toBe('The web, then apps, tools... and R&D plus Q and A, done.');
     expect(narrationText('& then +')).toBe('and then plus');
     expect(narrationText('a-b and/or c...d')).toBe('a-b and/or c...d');   // only lone ones: inside a word they stay
     // anywhere, any word without a letter: a comma on the word before, nothing at the start
     expect(narrationText('- a bullet')).toBe('a bullet');
     expect(narrationText(['[draft] - a bridge.'])).toBe('a bridge.');
-    expect(narrationText('And then ...')).toBe('And then,');
+    expect(narrationText('And then ...')).toBe('And then...');
     expect(narrationText('Next →')).toBe('Next,');
     expect(narrationText('a -- b -> c => d')).toBe('a, b, c, d');
-    expect(narrationText('x = y * z | w % 😀 done.')).toBe('x, y, z, w, done.');
+    expect(narrationText('x = y * z | w % 😀 done.')).toBe('x equals y, z, w percent, done.');   // = and % said; * | and the emoji a pause
     expect(narrationText('Done. — Then')).toBe('Done. Then');   // after a full stop, no comma
     expect(narrationText('  ')).toBe('');
+  });
+
+  it('keeps a sentence end a dropped word carried, so the voice and the captions still end the sentence there', () => {
+    expect(narrationText('Ship it 🚀. Then we rest.')).toBe('Ship it. Then we rest.');
+    expect(narrationText('Why? — Because.')).toBe('Why? Because.');
+    expect(narrationText('Wait, 🤔? Yes.')).toBe('Wait? Yes.');
+    expect(sentences(narrationText('Ship it 🚀. Then we rest.'))).toHaveLength(sentences('Ship it 🚀. Then we rest.').length);
+  });
+
+  it('says a lone symbol that means something, and the Greek letters people write; a deck can change the list', () => {
+    expect(narrationText('Errors fell 90 %. Then we shipped the fix.')).toBe('Errors fell ninety percent. Then we shipped the fix.');
+    expect(narrationText('Keep latency < 10 ms, not > 20.')).toBe('Keep latency less than ten ms, not more than twenty.');
+    expect(narrationText('Set x = 3 first; it costs 3 × less.')).toBe('Set x equals three first; it costs three times less.');
+    expect(narrationText('Pass a λ function; Δ is small, π is not.')).toBe('Pass a lambda function; delta is small, pi is not.');
+    expect(narrationText('x = 1', { say: { '=': 'is' } })).toBe('x is one');
+    expect(narrationText('x = 1', { say: {} })).toBe('x, one');
+    expect(Object.isFrozen(SAY)).toBe(true);
+  });
+
+  it('spells at Unicode word edges, so a word in another script gets the reading you give it', () => {
+    expect(narrationText('日本 rocks; the UI’s look', { spell: { ...SPELL, 日本: 'Japan' } })).toBe('Japan rocks; the U I’s look');
+    expect(narrationText('éUI stays', {})).toBe('éUI stays');   // inside a word: not a word of its own
   });
 
   it('drops [draft] marks, turns a separator into a pause, and joins notes', () => {

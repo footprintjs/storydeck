@@ -88,6 +88,9 @@ const done = await renderVideo({ url: `file://${deckHtml}#1`, steps, out: 'out/v
 - **A clip's key is its recipe**: the voice profile's settings and the exact spoken text. Change the words a
   voice reads — a note, or the `spell` list — and those clicks are voiced again; everything else stays cached.
   `spell` replaces the default list: extend it with `{ ...SPELL, K8s: 'K eight s' }`.
+- **Every word needs letters.** A lone symbol that means something is said (`SAY`: & + = < > × % and Greek
+  letters; pass `say` to change it); any other (— → ... an emoji) is a pause that keeps its sentence end. The local
+  kit's aligner knows Latin letters only: give a word in another script a reading with `spell` (`{ 日本: 'Japan' }`).
 - **Acronyms stay as written** unless a voice misreads them as a word. Spelled with spaces ("L L M"), a cloned
   voice said them slowly; written as one word it says quick letters. Measure before and after (forced alignment
   gives a word's length) rather than guess.

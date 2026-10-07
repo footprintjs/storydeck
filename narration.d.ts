@@ -6,8 +6,11 @@
 export function numberWords(n: number): string;
 /** Words a voice misreads as a word, and how to say them (UI, API, APIs). Every other acronym stays as written. */
 export const SPELL: Readonly<Record<string, string>>;
-/** The notes as the voice should read them: [draft] marks dropped, `spell` words spelled, numbers as words. */
-export function narrationText(notes: string | readonly string[], options?: { spell?: Readonly<Record<string, string>> }): string;
+/** A symbol standing alone, said as the word it means (& and, + plus, = equals, < less than, > more than, × times, % percent, Greek letters). */
+export const SAY: Readonly<Record<string, string>>;
+/** The notes as the voice should read them: [draft] marks dropped, `spell` words spelled (at Unicode word edges), numbers as words,
+ *  a lone `say` symbol said, any other word without a letter a pause (its sentence end kept). */
+export function narrationText(notes: string | readonly string[], options?: { spell?: Readonly<Record<string, string>>; say?: Readonly<Record<string, string>> }): string;
 /** The notes as written, for captions: [draft] marks dropped, white space collapsed. */
 export function writtenText(notes: string | readonly string[]): string;
 /** Sentences as a voice script splits them: after . ? or ! and a space. */

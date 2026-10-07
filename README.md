@@ -121,9 +121,10 @@ timing — the same words, three uses:
 
 - **what the voice says** — `narrationText(notes)`: the notes as a voice reads them. An acronym stays as written
   (a cloned voice says LLM, HCI, MCP as quick letters; spaced out, "L L M" came out slow and odd), only the words
-  a voice misreads as a word are spelled (`SPELL`: UI, API — pass your own `spell`), numbers become words and a lone
-  `&` or `+` is said (a forced aligner needs letters in every word), and a line after `[draft]` (a bridge you wrote for
-  the deck) is said, and shown apart;
+  a voice misreads as a word are spelled (`SPELL`: UI, API — pass your own `spell`, which also gives a word in
+  another script its reading), numbers become words, a lone symbol that means something is said (`SAY`: & + = < > ×
+  % and Greek letters), any other word without a letter is a pause that keeps its sentence end (a forced aligner
+  needs letters in every word), and a line after `[draft]` (a bridge you wrote for the deck) is said, and shown apart;
 - **a clip per click, cached by what it says** — `storydeck/voice` (Node). A clip's key is a hash of the voice
   settings and the exact words, so editing one note re-voices that click and nothing else, and an interrupted run
   keeps every batch it finished. The voice is a port (`{ name, synthesize(scenes, { work }) }`); `chatterboxKit`
@@ -266,7 +267,7 @@ const { theme, toggle, setTheme } = useTheme();   // flips an html class + persi
 | `slugify` · `scopeDeckCss` | utilities |
 | `planFocus` · `focusStep` · `readFocus` · `FOCUS` | focus: per click, what it is about and what happens to the rest (also `storydeck/focus`) |
 | `readPieces` · `readStep` · `drawFocus` · `wrapStage` · `slideClass` · `focusOverlay` · `focusRuntime` | focus, written into slide HTML (also `storydeck/focus-html`; styles in `storydeck/focus.css`) |
-| `narrationText` · `writtenText` · `sentences` · `SPELL` · `captionCues` · `toSrt` · `toVtt` · `chapterList` · `clock` | narration: what a click says, captions and chapters (also `storydeck/narration`) |
+| `narrationText` · `writtenText` · `sentences` · `SPELL` · `SAY` · `captionCues` · `toSrt` · `toVtt` · `chapterList` · `clock` | narration: what a click says, captions and chapters (also `storydeck/narration`) |
 | `notesData` · `notesRuntime` · `listenRuntime` | narration in the page: notes, presenter window, listen mode (also `storydeck/narration-html`; styles in `storydeck/narration.css`) |
 | `clipKey` · `clipFor` · `voiceClips` · `chatterboxKit` · `embedClips` | `storydeck/voice` (Node only): clips cached by what they say, a voice port and its local-kit adapter |
 | `renderVideo` · `planVideo` · `deckStageDriver` · `ffmpegMajor` | `storydeck/video` (Node only, ffmpeg 5.0+): the deck as a narrated video, with captions and chapters |

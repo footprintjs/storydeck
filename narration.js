@@ -25,28 +25,49 @@ export function numberWords(n) {
 /** Words a voice misreads as a word, and how to say them: spelled. Every other acronym stays as written. */
 export const SPELL = Object.freeze({ UI: 'U I', API: 'A P I', APIs: 'A P Is' });
 
+/**
+ * A symbol standing alone, said as the word it means (a trailing . , ; : ! ? stays): & and, + plus, = equals,
+ * < less than, > more than, × times, % percent, and the Greek letters people write in talks.
+ */
+export const SAY = Object.freeze({
+  '&': 'and', '+': 'plus', '=': 'equals', '<': 'less than', '>': 'more than', '×': 'times', '%': 'percent',
+  α: 'alpha', β: 'beta', γ: 'gamma', δ: 'delta', Δ: 'delta', ε: 'epsilon', θ: 'theta', λ: 'lambda', μ: 'mu',
+  π: 'pi', σ: 'sigma', Σ: 'sigma', φ: 'phi', ω: 'omega', Ω: 'omega',
+});
+
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// a word's edge, Unicode-aware (\b only knows A–Z, 0–9 and _), written without lookbehind (older Safari)
+const EDGE = '[^\\p{L}\\p{N}_]';
 
 /**
  * The notes (a string, or one string per note) as the voice should read them: [draft] marks dropped, the
- * `spell` words spelled, numbers as words, a lone & or + said ("and", "plus"), and any other word without a
- * letter (— – · → - / ... … = * an emoji) a pause — a comma on the word before it, nothing at the start. A
- * voice aligner needs letters in every word, so no word is left without one.
+ * `spell` words spelled, numbers as words, a lone symbol of `say` said, and any other word without a letter
+ * (— – · → - / ... … -- -> * | an emoji) a pause: a comma on the word before it (or its sentence end, when it
+ * carried one), nothing at the start. A voice aligner needs letters in every word. The local voice kit's
+ * aligner knows Latin letters only: give a word in another script its reading with `spell` (`{ 日本: 'Japan' }`).
  */
-export function narrationText(notes, { spell = SPELL } = {}) {
+export function narrationText(notes, { spell = SPELL, say = SAY } = {}) {
   let text = (Array.isArray(notes) ? notes : [notes ?? '']).join(' ').replace(/\[draft\]\s*/g, '');
-  for (const [word, said] of Object.entries(spell)) text = text.replace(new RegExp(`\\b${escapeRe(word)}\\b`, 'g'), said);
-  return text
+  for (const [word, said] of Object.entries(spell)) text = text.replace(new RegExp(`(^|${EDGE})${escapeRe(word)}(?=${EDGE}|$)`, 'gu'), (_, edge) => edge + said);
+  const symbols = Object.keys(say).map(escapeRe).join('|');
+  text = text
     .replace(/\bp(\d+)\b/g, (_, d) => `p ${numberWords(Number(d))}`)
-    .replace(/\b\d+\b/g, (d) => numberWords(Number(d)))
-    .replace(/(^|\s)&(?=\s|$)/g, '$1and').replace(/(^|\s)\+(?=\s|$)/g, '$1plus')
-    .split(/\s+/).filter(Boolean).reduce(pause, []).join(' ');
+    .replace(/\b\d+\b/g, (d) => numberWords(Number(d)));
+  if (symbols) text = text.replace(new RegExp(`(^|\\s)(${symbols})([.,;:!?]*)(?=\\s|$)`, 'gu'), (_, edge, sym, end) => edge + say[sym] + end);
+  return text.split(/\s+/).filter(Boolean).reduce(pause, []).join(' ');
 }
 
-/** A word without a letter becomes a pause: a comma on the word before (unless it ends in one), dropped at the start. */
+/**
+ * A word without a letter becomes a pause, dropped at the start: its sentence end (. ? !) moves onto the word
+ * before it, so the voice still ends the sentence there; otherwise that word gets a comma (unless it ends in a
+ * stop already).
+ */
 function pause(words, word) {
-  if (/\p{L}/u.test(word)) words.push(word);
-  else if (words.length && !/[,.;:!?]$/.test(words[words.length - 1])) words[words.length - 1] += ',';
+  if (/\p{L}/u.test(word)) { words.push(word); return words; }
+  if (!words.length) return words;
+  const last = words.length - 1, end = /[.?!]+$/.exec(word)?.[0];
+  if (end) { if (!/[.?!]$/.test(words[last])) words[last] = words[last].replace(/[,;:]$/, '') + end; }
+  else if (!/[,.;:!?]$/.test(words[last])) words[last] += ',';
   return words;
 }
 
