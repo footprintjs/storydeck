@@ -58,6 +58,60 @@ A function cannot come from JSON, so `figure` is not part of the authoring model
 builds sections from post.json + Markdown, and the consumer attaches `figure` to them. The beat a
 figure is handed carries `sectionKey`, `step` and `index` — which beat it is being asked to draw.
 
+## Focus: what a click is about, and what happens to the rest
+
+A talk often tells its story on **one picture** — a diagram, a page, a timeline — click by click. Each
+click is *about* something, and the audience must see what, without losing where they are. That is a
+decision every click makes again, so it is data on the click, and the library does the rest:
+
+- the click names its **subject** (the pieces it lights); everything else shown is the **context**;
+- it picks a **strategy** for showing the two — one of each kind at most:
+
+| Kind | Strategies | What happens |
+|---|---|---|
+| look | `grey` (default) · `hide` · `keep` | how the context looks: greyed in place, hidden, or left as it is |
+| mover | `zoom` | the view closes in on the subject (`share`, `most`) |
+| mover | `left` · `right` · `up` · `down` | the context steps aside that way, smaller (`scale`), and the subject grows into the room it leaves (`grow`, `fill`, `gap`, `align`) |
+| overlay | `blur` | everything outside the subject's frame is blurred; a frame (and a `label`) on it, or on the `rect`s you give |
+
+`'left blur'` reads: the context steps aside to the left, greyed, under a blur, and the subject grows on
+the right, framed. Bring your own strategy of any kind (`strategies: { name: { kind, … } }`).
+
+The plan is plain data (each piece's state, what changed since the last click, how far it moved), so a
+renderer only draws it. `storydeck/focus-html` writes it into slide HTML at build time and
+`storydeck/focus.css` animates **only what changed, only on a forward click** — a jump or a step back
+lands at once (inline `focusRuntime` in the page), and print shows every click as it lands.
+
+```js
+import { planFocus } from 'storydeck/focus';
+import { readPieces, drawFocus, wrapStage, slideClass, focusOverlay, focusRuntime } from 'storydeck/focus-html';
+
+// Every element with data-k="name …" and an inline left/top (width/height) is a piece.
+const { html, pieces } = readPieces(`
+  <div data-k="page" style="left:120px;top:370px;width:700px;height:460px">…</div>
+  <div data-k="code" style="left:930px;top:260px;width:500px;height:250px">…</div>`);
+
+const area = [0, 230, 1920, 1000];   // below the headline, above the footer
+const { looks } = planFocus([
+  { in: ['page', 'code'] },                                        // both come in, lit
+  { on: ['code'], focus: 'left blur', options: { label: 'the click' } },
+  { on: ['code'] },                                                // the page glides back, greyed
+], { pieces, area });
+
+// The stage (a zoom) goes inside the map's own box; the blur, in slide pixels, outside it.
+const slides = looks.map(look => `<section class="${slideClass(look)}">`
+  + `<div class="map">${wrapStage(drawFocus(html, look), look)}</div>${focusOverlay(look, { area })}</section>`);
+// …and once in the page (inline it in a built page: `(${focusRuntime})()`), so only a forward click animates.
+```
+
+Pieces don't nest, so each one greys and moves on its own; a mover keeps every group's shape (the
+pieces of the subject move together, around the subject's centre) and composes with a piece's own
+transform (it uses CSS `translate`/`scale`, not `transform`). A mover's `aside` and `subject` options
+name its two groups when they are not simply the greyed and the lit pieces, and `data-twin="name"` makes
+a piece (a dashed wire under a solid one) step aside while its twin is lit. A piece that leaves fades out
+from how it looked and where it stood; a blur that moves to another subject stays, and only its frame is
+new; overlapping holes stay clear, and nothing outside the `area` is blurred.
+
 ## Quick start
 
 ```jsx
@@ -125,6 +179,8 @@ const { theme, toggle, setTheme } = useTheme();   // flips an html class + persi
 | `renderMarkdown` · `splitBodyByMarkers` | the Markdown adapter pieces |
 | `buildSections` · `finalStep` · `allSteps` · `parseGroup` | grouping helpers |
 | `slugify` · `scopeDeckCss` | utilities |
+| `planFocus` · `focusStep` · `readFocus` · `FOCUS` | focus: per click, what it is about and what happens to the rest (also `storydeck/focus`) |
+| `readPieces` · `drawFocus` · `wrapStage` · `focusOverlay` · `focusRuntime` | focus, written into slide HTML (also `storydeck/focus-html`; styles in `storydeck/focus.css`) |
 
 Types ship beside the source in `index.d.ts` — hand-kept (there is no build to generate them from),
 and here rather than in a consumer's shim, because a package's shape belongs in the package.

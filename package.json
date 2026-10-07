@@ -10,6 +10,9 @@
   "types": "./index.d.ts",
   "exports": {
     ".": { "types": "./index.d.ts", "default": "./index.js" },
+    "./focus": { "types": "./focus.d.ts", "default": "./focus.js" },
+    "./focus-html": { "types": "./focusHtml.d.ts", "default": "./focusHtml.js" },
+    "./focus.css": "./focus.css",
     "./storydeck.css": "./storydeck.css"
   },
   "files": ["*.js", "*.jsx", "*.d.ts", "*.css", "content", "README.md"],

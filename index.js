@@ -14,3 +14,5 @@ export { StoryDeckProvider, useBasePath } from './context';
 export { useTheme } from './useTheme';
 export { assemblePost } from './content/loadPost';
 export { renderMarkdown, splitBodyByMarkers } from './content/markdown';
+export { FOCUS, readFocus, focusStep, planFocus } from './focus';
+export { readPieces, drawFocus, wrapStage, slideClass, focusOverlay, focusRuntime } from './focusHtml';
