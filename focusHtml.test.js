@@ -115,6 +115,12 @@ describe('focusHtml · drawing a click', () => {
     expect(drawFocus(html, relook)).toContain('class="box sd sd-dim sd-relook sd-from-hide"');
   });
 
+  it('keeps its motion rules weak, so a deck's own rule for a piece wins', () => {
+    const css = readFileSync(path.join(process.cwd(), 'focus.css'), 'utf8');
+    expect(css).not.toMatch(/^\s*\[data-deck-active\]/m);
+    expect(css.match(/:where\(\[data-deck-active\]:not\(\[data-sd-instant\]\):not\(\[data-deck-static\]\)\)/g).length).toBe(5);
+  });
+
   it('ships a stylesheet for every class it writes', () => {
     const css = readFileSync(path.join(process.cwd(), 'focus.css'), 'utf8');
     for (const c of ['sd-dim', 'sd-gone', 'sd-hide', 'sd-keep', 'sd-hot', 'sd-hot-in', 'sd-enter', 'sd-arrive', 'sd-light', 'sd-fade', 'sd-leave',
