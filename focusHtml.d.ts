@@ -1,10 +1,12 @@
 /**
  * storydeck · focus, written into slide HTML (focusHtml.js) — for decks built as HTML strings.
  */
-import type { FocusLook, FocusPiece } from './focus';
+import type { FocusClick, FocusLook, FocusPiece } from './focus';
 
 /** Every element carrying `attr` (data-k) becomes a piece: the HTML with each one numbered, and the pieces. */
 export function readPieces(html: string, options?: { attr?: string }): { html: string; pieces: FocusPiece[] };
+/** A click written as attributes (data-in, data-out, data-on, data-hot, data-quiet, data-focus, data-focus-* → camelCased options). */
+export function readStep(attrs: string): FocusClick;
 /** That HTML, each piece dressed for this click's look (classes from focus.css, its move as CSS variables). */
 export function drawFocus(html: string, look: FocusLook): string;
 /** The pieces inside the stage the view moves (a zoom); unchanged when nothing moves the view. Put it in the map's own box. */

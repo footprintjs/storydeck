@@ -48,13 +48,15 @@ export interface FocusContext {
   /** How the map sits on the slide (slide px = s · map px + [x, y]). */
   readonly view: { readonly s: number; readonly x: number; readonly y: number };
   readonly canvas: { readonly w: number; readonly h: number };
+  /** The box around the shown pieces of those names (map px), or null. */
+  boxOf(names: string | readonly string[]): FocusBox | null;
   readonly options: Readonly<Record<string, unknown>>;
 }
 
 /** A focus strategy: a look (how the context looks), a mover (where things go) or an overlay (what lies over the slide). */
 export type FocusStrategy =
   | { readonly name?: string; readonly kind: 'look'; readonly look: 'grey' | 'hide' | 'keep' }
-  | { readonly name?: string; readonly kind: 'mover'; place(ctx: FocusContext): { stage?: FocusGroup; subject?: FocusGroup; context?: FocusGroup } }
+  | { readonly name?: string; readonly kind: 'mover'; place(ctx: FocusContext): { stage?: FocusGroup; subject?: FocusGroup; context?: FocusGroup; groups?: { names: readonly string[]; g: FocusGroup | null }[] } }
   | { readonly name?: string; readonly kind: 'overlay'; cover(ctx: { subjectOnSlide: FocusBox | null; canvas: { w: number; h: number }; options: Readonly<Record<string, unknown>> }): { rects: number[][]; label?: string; out?: number[][] } | null };
 
 export interface FocusDeck {
@@ -103,7 +105,7 @@ export interface FocusLook {
 /** The state a click leaves, to start the next from. Opaque. */
 export type FocusState = { readonly __focusState: true } & Record<string, unknown>;
 
-export const FOCUS: Readonly<Record<'grey' | 'hide' | 'keep' | 'zoom' | 'left' | 'right' | 'up' | 'down' | 'blur', FocusStrategy>>;
+export const FOCUS: Readonly<Record<'grey' | 'hide' | 'keep' | 'zoom' | 'left' | 'right' | 'up' | 'down' | 'place' | 'blur', FocusStrategy>>;
 export function readFocus(spec: FocusSpec | undefined | null, shared?: Readonly<Record<string, unknown>>): { strategy: string; options: Record<string, unknown> }[];
 export function focusStep(prev: FocusState | null, click: FocusClick, deck: FocusDeck): { state: FocusState; look: FocusLook };
 /** `end` is null only when there are no clicks and no `start`. */

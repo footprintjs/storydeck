@@ -8,7 +8,9 @@
 //   look     how the context looks     grey (greyed in place — the default) · hide · keep
 //   mover    where things go           zoom (the view closes in on the subject) ·
 //                                      left · right · up · down (the context steps aside that way, smaller,
-//                                      and the subject grows into the room it leaves)
+//                                      and the subject grows into the room it leaves) ·
+//                                      place (named groups moved by the amounts you give — a layout you
+//                                      art-direct, still animated from wherever the last click left it)
 //   overlay  what lies over the slide  blur (everything outside the subject's frame is blurred; a frame,
 //                                      and a label if given, on the subject)
 //
@@ -52,7 +54,7 @@ function areaOnMap([x0, y0, x1, y1], v) {
  * The context steps aside towards `side`, scaled by `scale`, and the subject grows (up to `grow`) into the
  * room it leaves. Options: scale (0.6), gap (40 slide px), grow (1.4), fill (0.9 of the room), least (0.5),
  * align ('center' · 'start' · 'end' across the side); subject and aside name the two groups (default: what
- * the click lights, and the rest shown).
+ * the click lights, and the rest shown); move: 'aside' moves only the context (the subject stays put).
  */
 function aside(side) {
   return Object.freeze({name: side, kind: 'mover', place({subject, context, area, view, options}) {
@@ -65,8 +67,18 @@ function aside(side) {
     const room = {left: {x: a.x + 2 * gap + w, y: a.y, w: a.w - 2 * gap - w, h: a.h}, right: {x: a.x, y: a.y, w: a.w - 2 * gap - w, h: a.h},
       up: {x: a.x, y: a.y + 2 * gap + h, w: a.w, h: a.h - 2 * gap - h}, down: {x: a.x, y: a.y, w: a.w, h: a.h - 2 * gap - h}}[side];
     const fit = Math.min(Math.max(room.w, 1) / Math.max(subject.w, 1), Math.max(room.h, 1) / Math.max(subject.h, 1)) * fill;
-    return {context: toCentre(context, s, at), subject: toCentre(subject, clamp(fit, num(options.least, .5), grow), centre(room))};
+    return {context: toCentre(context, s, at), ...(options.move === 'aside' ? {} : {subject: toCentre(subject, clamp(fit, num(options.least, .5), grow), centre(room))})};
   }});
+}
+
+/** place's groups: 'names: dx dy scale [@ ox oy] | …' (or a list of such strings). */
+function readGroups(v) {
+  if (v === undefined || v === null || v === '') throw new Error('focus "place": give groups, \'names: dx dy scale [@ ox oy] | …\'');
+  return [].concat(v).flatMap(x => String(x).split('|')).map(g => g.trim()).filter(Boolean).map(g => {
+    const m = /^([^:]+):\s*(-?[\d.]+)\s+(-?[\d.]+)(?:\s+(-?[\d.]+))?(?:\s*@\s*(-?[\d.]+)\s+(-?[\d.]+))?$/.exec(g);
+    if (!m) throw new Error(`focus "place": a group is 'names: dx dy scale [@ ox oy]', not "${g}"`);
+    return {names: m[1].trim().split(/\s+/), dx: Number(m[2]), dy: Number(m[3]), s: m[4] === undefined ? 1 : Number(m[4]), origin: m[5] === undefined ? null : [Number(m[5]), Number(m[6])]};
+  });
 }
 
 /** Rectangles x y w h from an option: numbers, a string of them, or a list of either. */
@@ -88,6 +100,17 @@ export const FOCUS = Object.freeze({
     return {stage: toCentre(subject, k, centre(area))};
   }}),
   left: aside('left'), right: aside('right'), up: aside('up'), down: aside('down'),
+  /**
+   * Named groups moved by the amounts you give: `groups` is 'names: dx dy scale [@ ox oy] | names: …' — each group
+   * moves by dx, dy (slide px) and scales around its own centre, or around the point ox oy (map px) when given.
+   */
+  place: Object.freeze({name: 'place', kind: 'mover', place({boxOf, view, options}) {
+    return {groups: readGroups(options.groups).map(({names, dx, dy, s, origin}) => {
+      const box = boxOf(names); if (!box && !origin) return {names, g: null};
+      const o = origin ?? centre(box);
+      return {names, g: {o, s, t: [dx / view.s, dy / view.s]}};
+    })};
+  }}),
   /**
    * Everything outside the frame is blurred. The frame is `rect` (slide px, x y w h; several are fine — the
    * first gets the frame and the label, the others are clear holes too) or, without one, the subject where it
@@ -187,9 +210,14 @@ export function focusStep(prev, step, deck) {
   const contextIdx = (asides ? all.filter(i => states[i] !== 'gone' && has(i, asides)) : all.filter(i => states[i] === 'dim')).filter(i => !subjectIdx.includes(i));
   const inGroup = new Map([...contextIdx.map(i => [i, 'context']), ...subjectIdx.map(i => [i, 'subject'])]);
   const subject = union(subjectIdx.map(i => pieces[i].box)), context = union(contextIdx.map(i => pieces[i].box)), area = areaOnMap(areaSlide, view);
-  const placed = chosen.mover ? chosen.mover.s.place({subject, context, area, view, canvas, options: chosen.mover.options}) ?? {} : {};
+  // boxOf(names): the box around the shown pieces of those names, for a mover that moves named groups (place).
+  const boxOf = l => union(all.filter(i => states[i] !== 'gone' && has(i, known(names([].concat(l)), 'focus group: '))).map(i => pieces[i].box));
+  const placed = chosen.mover ? chosen.mover.s.place({subject, context, area, view, canvas, boxOf, options: chosen.mover.options}) ?? {} : {};
+  // Named groups (later ones win a piece in two of them) take their pieces out of the subject and context groups.
+  for (const {names: l, g} of placed.groups ?? []) for (const i of all) if (states[i] !== 'gone' && has(i, l)) inGroup.set(i, g ? {g} : 'still');
   const stage = placed.stage ? {s: round(placed.stage.s, 4), x: round(placed.stage.o[0] * (1 - placed.stage.s) + placed.stage.t[0]), y: round(placed.stage.o[1] * (1 - placed.stage.s) + placed.stage.t[1])} : null;
-  const moves = pieces.map((p, i) => states[i] === 'gone' ? null : inGroup.get(i) === 'subject' ? placePiece(placed.subject, p.box) : inGroup.get(i) === 'context' ? placePiece(placed.context, p.box) : null);
+  const groupOf = i => { const k = inGroup.get(i); return k === 'subject' ? placed.subject : k === 'context' ? placed.context : k?.g ?? null; };
+  const moves = pieces.map((p, i) => states[i] === 'gone' ? null : placePiece(groupOf(i), p.box));
   const ends = subject && (placed.stage ?? placed.subject) ? moveBox(placed.stage ?? placed.subject, subject) : subject;
   const subjectOnSlide = ends ? {x: ends.x * view.s + view.x, y: ends.y * view.s + view.y, w: ends.w * view.s, h: ends.h * view.s} : null;
   const cover = chosen.overlay ? chosen.overlay.s.cover({subjectOnSlide, canvas, options: chosen.overlay.options}) : null;
