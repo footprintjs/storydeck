@@ -1,11 +1,15 @@
 {
   "name": "storydeck",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "One source, many lenses — render structured content as a Read article, a Scroll (scrollytelling) story, or a Watch deck.",
   "type": "module",
   "license": "MIT",
   "author": "Sanjay Krishna Anbalagan",
-  "repository": { "type": "git", "url": "https://github.com/footprintjs/storydeck" },
+  "repository": { "type": "git", "url": "git+https://github.com/footprintjs/storydeck.git" },
+  "homepage": "https://github.com/footprintjs/storydeck#readme",
+  "bugs": "https://github.com/footprintjs/storydeck/issues",
+  "keywords": ["slides", "deck", "presentation", "scrollytelling", "react", "narration", "captions", "voice", "video", "talk", "focus", "footprintjs"],
+  "engines": { "node": ">=18" },
   "sideEffects": ["*.css"],
   "types": "./index.d.ts",
   "exports": {
@@ -18,9 +22,10 @@
     "./narration.css": "./narration.css",
     "./voice": { "types": "./voice.d.ts", "default": "./voice.js" },
     "./video": { "types": "./video.d.ts", "default": "./video.js" },
-    "./storydeck.css": "./storydeck.css"
+    "./storydeck.css": "./storydeck.css",
+    "./deck-stage.js": "./site/public/deck-stage.js"
   },
-  "files": ["*.js", "*.jsx", "*.d.ts", "*.css", "content", "README.md"],
+  "files": ["/*.js", "/*.jsx", "/*.d.ts", "/*.css", "content", "site/public/deck-stage.js", "plugin", "README.md", "CHANGELOG.md", "LICENSE", "!*.test.js", "!*.test.jsx", "!vitest.config.js", "!vitest.setup.js"],
   "scripts": {
     "test": "vitest run",
     "test:cov": "vitest run --coverage"

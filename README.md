@@ -188,6 +188,10 @@ await renderVideo({
 
 ## Quick start
 
+```bash
+npm install storydeck
+```
+
 ```jsx
 import { PostView, StoryDeckProvider } from 'storydeck';
 import 'storydeck/storydeck.css';
@@ -203,7 +207,11 @@ export default function App({ post }) {
 
 `PostView` renders the Read · Scroll · Watch toggle and each lens. Bring your own `post` (see
 **Authoring**). Requires `react`/`react-dom` (peer) and a slide runtime for Watch (a
-`deck-stage.js` web component served at `${basePath}/deck-stage.js`).
+`deck-stage.js` web component served at `${basePath}/deck-stage.js` — it ships as `storydeck/deck-stage.js`).
+
+**For agents:** a skill ships in the package — `plugin/skills/storydeck/SKILL.md` (which door for which job,
+three recipes, the rules that bite, how to verify). Point a coding agent at it, or install the folder as a
+Claude Code skill.
 
 ## Authoring (JSON structure + Markdown prose)
 
