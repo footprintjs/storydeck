@@ -5,6 +5,9 @@
  * arrives by a forward click (deck-stage's [data-deck-active], without [data-sd-instant] — focusRuntime —
  * or [data-deck-static]). A piece that leaves fades out from how it looked and where it stood.
  *
+ * Every rule is as weak as it can be (the motion gate is a :where()), so a deck's own rule for a piece —
+ * its own entrance, say — wins without !important.
+ *
  * Tokens (set them in your theme; each has a fallback): --sd-dim-opacity · --sd-hot · --sd-blur ·
  * --sd-veil · --sd-accent (falls back to storydeck's --yellow) · --sd-ease · --sd-move-time.
  */
@@ -61,10 +64,10 @@
   .sd-move { --sd-a-move: sdMove var(--sd-move-time, 1s) var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) both; }
   .sd-hot-in { --sd-a-hot: sdRing .6s var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) .3s both; }
   .sd-focus-new .sd-enter { --sd-delay: .4s; }   /* what a click adds waits for its blur */
-  [data-deck-active]:not([data-sd-instant]):not([data-deck-static]) :is(.sd-enter, .sd-arrive, .sd-light, .sd-fade, .sd-leave, .sd-relook, .sd-move, .sd-hot-in) {
+  :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) :is(.sd-enter, .sd-arrive, .sd-light, .sd-fade, .sd-leave, .sd-relook, .sd-move, .sd-hot-in) {
     animation: var(--sd-a-state, sdNone 0s), var(--sd-a-move, sdNone 0s), var(--sd-a-hot, sdNone 0s); }
-  [data-deck-active]:not([data-sd-instant]):not([data-deck-static]) .sd-stage.sd-move { animation: sdStage var(--sd-move-time, 1s) var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) both; }
-  [data-deck-active]:not([data-sd-instant]):not([data-deck-static]) .sd-veil-in-new { animation: sdVeilIn .7s cubic-bezier(.4, 0, .2, 1) both; }
-  [data-deck-active]:not([data-sd-instant]):not([data-deck-static]) .sd-frame.sd-new { animation: sdArrive .5s ease .35s both; }
-  [data-deck-active]:not([data-sd-instant]):not([data-deck-static]) .sd-veil-out { animation: sdVeilOut .7s cubic-bezier(.4, 0, .2, 1) .15s both; }
+  :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-stage.sd-move { animation: sdStage var(--sd-move-time, 1s) var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) both; }
+  :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-veil-in-new { animation: sdVeilIn .7s cubic-bezier(.4, 0, .2, 1) both; }
+  :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-frame.sd-new { animation: sdArrive .5s ease .35s both; }
+  :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-veil-out { animation: sdVeilOut .7s cubic-bezier(.4, 0, .2, 1) .15s both; }
 }
