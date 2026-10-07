@@ -11,7 +11,7 @@
   "exports": {
     ".": { "types": "./index.d.ts", "default": "./index.js" },
     "./focus": { "types": "./focus.d.ts", "default": "./focus.js" },
-    "./focus-html": { "types": "./focus.d.ts", "default": "./focusHtml.js" },
+    "./focus-html": { "types": "./focusHtml.d.ts", "default": "./focusHtml.js" },
     "./focus.css": "./focus.css",
     "./storydeck.css": "./storydeck.css"
   },

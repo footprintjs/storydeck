@@ -116,7 +116,7 @@ describe('focus · strategies', () => {
 
   it('blur frames the subject where it ends up, or the rects it is given, with a label', () => {
     const plain = focusStep(null, { ...lit, focus: { strategy: 'blur', pad: 10 } }, deck).look.overlay;
-    expect(plain).toEqual({ rects: [[990, 290, 520, 320]], label: '', phase: 'in-new' });
+    expect(plain).toEqual({ rects: [[990, 290, 520, 320]], label: '', phase: 'in-new', frameNew: true });
     const moved = focusStep(null, { ...lit, focus: 'left blur' }, deck).look;
     expect(moved.overlay.rects[0][0]).toBeGreaterThan(380);   // around the subject on the right, after the move
     const given = focusStep(null, { ...lit, focus: 'blur', options: { rect: '10 20 30 40 50 60 70 80', label: 'the form' } }, deck).look.overlay;
@@ -129,7 +129,21 @@ describe('focus · strategies', () => {
     const same = { on: ['code', 'label'] };
     const { looks } = planFocus([{ ...lit, focus: 'blur' }, { ...same, focus: 'blur' }, same, same], deck);
     expect(looks.map((l) => l.overlay?.phase ?? null)).toEqual(['in-new', 'in', 'out', null]);
-    expect(looks[2].overlay.rects).toEqual(looks[1].overlay.rects.slice(0, 1));
+    expect(looks.map((l) => l.overlay?.frameNew ?? null)).toEqual([true, false, false, null]);
+    expect(looks[2].overlay.rects).toEqual(looks[1].overlay.rects);
+  });
+
+  it('a blur that moves to another subject stays (no flash), and only its frame is new', () => {
+    const { looks } = planFocus([{ ...lit, focus: 'blur' }, { on: ['page'], focus: 'blur' }], deck);
+    expect(looks[1].overlay).toMatchObject({ phase: 'in', frameNew: true });
+  });
+
+  it('on the way out the blur keeps every hole clear, or only the frame with out: first', () => {
+    const rect = '10 20 30 40 50 60 70 80';
+    const all = planFocus([{ ...lit, focus: 'blur', options: { rect } }, {}], deck).looks[1].overlay.rects;
+    const first = planFocus([{ ...lit, focus: 'blur', options: { rect, out: 'first' } }, {}], deck).looks[1].overlay.rects;
+    expect(all).toEqual([[10, 20, 30, 40], [50, 60, 70, 80]]);
+    expect(first).toEqual([[10, 20, 30, 40]]);
   });
 
   it('a click takes one strategy of each kind, from the built-ins or the deck\'s own', () => {
@@ -141,6 +155,47 @@ describe('focus · strategies', () => {
     expect(look.pieces[1].move.s).toBe(2);
     expect(() => focusStep(null, { ...lit, focus: 'odd' }, { ...deck, strategies: { odd: { kind: 'paint' } } })).toThrow(/a look, a mover or an overlay/);
     expect(Object.keys(FOCUS)).toEqual(['grey', 'hide', 'keep', 'zoom', 'left', 'right', 'up', 'down', 'blur']);
+  });
+});
+
+describe('focus · twins', () => {
+  it('a piece steps aside while its twin is lit, and comes back after', () => {
+    const twins = [{ keys: ['solid'], box: null }, { keys: ['dashed'], box: null, twin: ['solid'] }, { keys: ['other'], box: null }];
+    const { looks } = planFocus([{ in: ['*'], on: ['other'], quiet: true }, { on: ['solid'] }, { on: ['other'] }], { pieces: twins });
+    expect(looks[0].pieces[1]).toMatchObject({ state: 'dim', twinOff: false });
+    expect(looks[1].pieces[1]).toMatchObject({ state: 'gone', change: 'leave', twinOff: true });
+    expect(looks[2].pieces[1]).toMatchObject({ state: 'dim', change: 'enter', twinOff: false });
+  });
+});
+
+describe('focus · naming the groups a mover moves', () => {
+  it('a lit piece can step aside for the piece it holds, and a piece in neither group stays put', () => {
+    const step = { in: ['*'], focus: { strategy: 'up', aside: 'page', subject: 'code' } };   // everything lit
+    const look = focusStep(null, step, deck).look;
+    expect(look.pieces[0].move.s).toBe(0.6);            // the page steps aside (up), though it is lit
+    expect(look.pieces[0].move.dy).toBeLessThan(0);
+    expect(look.pieces[1].move).not.toBe(null);          // the code grows
+    expect(look.pieces[2].move).toBe(null);              // the label is in neither group
+    expect(() => focusStep(null, { in: ['*'], focus: { strategy: 'up', aside: 'pager' } }, deck)).toThrow(/focus aside: no piece "pager"/);
+  });
+});
+
+describe('focus · a piece that leaves, and a look that changes', () => {
+  it('a piece that leaves keeps how it looked and where it stood, so it fades out from there', () => {
+    const { looks } = planFocus([{ in: ['page', 'code'] }, { on: ['code'], focus: 'left' }, { out: ['page'], on: ['code'], focus: 'left' }], deck);
+    expect(looks[2].pieces[0]).toMatchObject({ state: 'gone', was: 'dim', change: 'leave', look: 'grey', move: looks[1].pieces[0].move });
+  });
+
+  it('a piece kept in colour that is lit again does not change; one hidden comes in; a changed look changes from the old one', () => {
+    const base = { in: ['page', 'code'], on: ['code'], quiet: true };
+    const keepThenLit = planFocus([{ ...base, focus: 'keep' }, { on: ['page'] }], deck).looks[1].pieces[0];
+    expect(keepThenLit.change).toBe(null);
+    const hideThenLit = planFocus([{ ...base, focus: 'hide' }, { on: ['page'] }], deck).looks[1].pieces[0];
+    expect(hideThenLit.change).toBe('enter');
+    const hideThenGrey = planFocus([{ ...base, focus: 'hide' }, { on: ['code'] }], deck).looks[1].pieces[0];
+    expect(hideThenGrey).toMatchObject({ change: 'relook', look: 'grey', fromLook: 'hide' });
+    const litThenKept = planFocus([{ in: ['page', 'code'] }, { on: ['code'], focus: 'keep' }], deck).looks[1].pieces[0];
+    expect(litThenKept.change).toBe(null);
   });
 });
 
@@ -159,6 +214,18 @@ describe('focus · moves between clicks', () => {
     const { looks } = planFocus([lit, { ...code, focus: 'zoom' }, code], deck);
     expect(looks[1].stage.from).toEqual({ s: 1, x: 0, y: 0 });
     expect(looks[2].stage).toEqual({ move: null, from: looks[1].stage.move });
+  });
+
+  it('measures an aside\'s gap in slide px, whatever the view', () => {
+    const view = { s: 0.5, x: 0, y: 0 };
+    const look = focusStep(null, { ...lit, focus: { strategy: 'left', scale: 0.5, gap: 40 } }, { ...deck, view }).look;
+    const page = look.pieces[0].move;
+    // the page (600 × 400 on the map) shrinks to 300 × 200; its left edge sits 40 slide px = 80 map px from the area's left (0)
+    expect((400 + page.dx - 150) * view.s).toBeCloseTo(40, 1);
+  });
+
+  it('plans no clicks to no end', () => {
+    expect(planFocus([], deck)).toEqual({ looks: [], end: null });
   });
 
   it('works on a map drawn scaled: the area is read through the view', () => {

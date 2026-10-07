@@ -84,7 +84,7 @@ lands at once (inline `focusRuntime` in the page), and print shows every click a
 
 ```js
 import { planFocus } from 'storydeck/focus';
-import { readPieces, drawFocus, wrapStage, focusOverlay } from 'storydeck/focus-html';
+import { readPieces, drawFocus, wrapStage, slideClass, focusOverlay, focusRuntime } from 'storydeck/focus-html';
 
 // Every element with data-k="name …" and an inline left/top (width/height) is a piece.
 const { html, pieces } = readPieces(`
@@ -98,12 +98,19 @@ const { looks } = planFocus([
   { on: ['code'] },                                                // the page glides back, greyed
 ], { pieces, area });
 
-const slides = looks.map(look => wrapStage(drawFocus(html, look), look) + focusOverlay(look, { area }));
+// The stage (a zoom) goes inside the map's own box; the blur, in slide pixels, outside it.
+const slides = looks.map(look => `<section class="${slideClass(look)}">`
+  + `<div class="map">${wrapStage(drawFocus(html, look), look)}</div>${focusOverlay(look, { area })}</section>`);
+// …and once in the page (inline it in a built page: `(${focusRuntime})()`), so only a forward click animates.
 ```
 
 Pieces don't nest, so each one greys and moves on its own; a mover keeps every group's shape (the
 pieces of the subject move together, around the subject's centre) and composes with a piece's own
-transform (it uses CSS `translate`/`scale`, not `transform`).
+transform (it uses CSS `translate`/`scale`, not `transform`). A mover's `aside` and `subject` options
+name its two groups when they are not simply the greyed and the lit pieces, and `data-twin="name"` makes
+a piece (a dashed wire under a solid one) step aside while its twin is lit. A piece that leaves fades out
+from how it looked and where it stood; a blur that moves to another subject stays, and only its frame is
+new; overlapping holes stay clear, and nothing outside the `area` is blurred.
 
 ## Quick start
 

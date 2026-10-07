@@ -1,13 +1,18 @@
 /**
  * storydeck · focus — what a click is about, and what happens to everything else on the slide.
- * See focus.js (the strategies) and focusHtml.js (writing a plan into slide HTML).
+ * See focus.js (the strategies); writing a plan into slide HTML is focusHtml.d.ts.
  */
 
 /** A box on the map, in px. A piece with no size has w = h = 0. */
 export interface FocusBox { readonly x: number; readonly y: number; readonly w: number; readonly h: number }
 
 /** A named thing on a slide: its names (a click refers to any of them) and its box, when it has a place. */
-export interface FocusPiece { readonly keys: readonly string[]; readonly box: FocusBox | null }
+export interface FocusPiece {
+  readonly keys: readonly string[];
+  readonly box: FocusBox | null;
+  /** Names of its twin: while a twin is lit, this piece steps aside (a dashed wire under a solid one). */
+  readonly twin?: readonly string[];
+}
 
 /** A focus as written on a click: a strategy name ('left'), several ('left blur'), or {strategy, …options}. */
 export type FocusSpec = string | { readonly strategy: string; readonly [option: string]: unknown } | readonly (string | { readonly strategy: string; readonly [option: string]: unknown })[];
@@ -40,6 +45,8 @@ export interface FocusContext {
   readonly context: FocusBox | null;
   /** The area moved things may use, in map px. */
   readonly area: FocusBox;
+  /** How the map sits on the slide (slide px = s · map px + [x, y]). */
+  readonly view: { readonly s: number; readonly x: number; readonly y: number };
   readonly canvas: { readonly w: number; readonly h: number };
   readonly options: Readonly<Record<string, unknown>>;
 }
@@ -48,7 +55,7 @@ export interface FocusContext {
 export type FocusStrategy =
   | { readonly name?: string; readonly kind: 'look'; readonly look: 'grey' | 'hide' | 'keep' }
   | { readonly name?: string; readonly kind: 'mover'; place(ctx: FocusContext): { stage?: FocusGroup; subject?: FocusGroup; context?: FocusGroup } }
-  | { readonly name?: string; readonly kind: 'overlay'; cover(ctx: { subjectOnSlide: FocusBox | null; canvas: { w: number; h: number }; options: Readonly<Record<string, unknown>> }): { rects: number[][]; label?: string } | null };
+  | { readonly name?: string; readonly kind: 'overlay'; cover(ctx: { subjectOnSlide: FocusBox | null; canvas: { w: number; h: number }; options: Readonly<Record<string, unknown>> }): { rects: number[][]; label?: string; out?: number[][] } | null };
 
 export interface FocusDeck {
   readonly pieces: readonly FocusPiece[];
@@ -68,21 +75,26 @@ export interface FocusPieceLook {
   readonly state: 'on' | 'dim' | 'gone';
   readonly was: 'on' | 'dim' | 'gone';
   /** What changed since the last click (only that animates). */
-  readonly change: 'enter' | 'arrive' | 'light' | 'fade' | 'leave' | null;
-  /** How a greyed piece looks; null when it is not greyed. */
+  readonly change: 'enter' | 'arrive' | 'light' | 'fade' | 'leave' | 'relook' | null;
+  /** How a greyed piece looks (a leaving one: how it looked); null when it is not greyed. */
   readonly look: 'grey' | 'hide' | 'keep' | null;
+  /** A greyed piece whose look changed: the look it had. */
+  readonly fromLook: 'grey' | 'hide' | 'keep' | null;
   readonly hot: boolean;
   readonly hotIn: boolean;
   readonly move: FocusMove | null;
-  /** Where it moved from, when it moved since the last click. */
+  /** Where it moved from, when it moved since the last click. (A leaving piece's `move` is where it stood.) */
   readonly from: FocusMove | null;
+  /** It stepped aside for its lit twin. */
+  readonly twinOff: boolean;
 }
 
 export interface FocusLook {
   readonly pieces: readonly FocusPieceLook[];
   /** The view's move (a zoom), and where it came from. */
   readonly stage: { readonly move: { s: number; x: number; y: number } | null; readonly from: { s: number; x: number; y: number } | null } | null;
-  readonly overlay: { readonly rects: readonly (readonly number[])[]; readonly label: string; readonly phase: 'in-new' | 'in' | 'out' } | null;
+  /** The blur: 'in-new' when the last click had none, 'in' while it stays, 'out' as it melts away; frameNew when its frame moved or appeared. */
+  readonly overlay: { readonly rects: readonly (readonly number[])[]; readonly label: string; readonly phase: 'in-new' | 'in' | 'out'; readonly frameNew: boolean } | null;
   readonly strategies: readonly string[];
   /** The subject where it ends up, on the slide. */
   readonly subject: FocusBox | null;
@@ -94,15 +106,5 @@ export type FocusState = { readonly __focusState: true } & Record<string, unknow
 export const FOCUS: Readonly<Record<'grey' | 'hide' | 'keep' | 'zoom' | 'left' | 'right' | 'up' | 'down' | 'blur', FocusStrategy>>;
 export function readFocus(spec: FocusSpec | undefined | null, shared?: Readonly<Record<string, unknown>>): { strategy: string; options: Record<string, unknown> }[];
 export function focusStep(prev: FocusState | null, click: FocusClick, deck: FocusDeck): { state: FocusState; look: FocusLook };
-export function planFocus(clicks: readonly FocusClick[], deck: FocusDeck, start?: FocusState | null): { looks: FocusLook[]; end: FocusState };
-
-/** Every element carrying `attr` (data-k) becomes a piece: the HTML with each one numbered, and the pieces. */
-export function readPieces(html: string, options?: { attr?: string }): { html: string; pieces: FocusPiece[] };
-/** That HTML, each piece dressed for this click's look (classes from focus.css, its move as CSS variables). */
-export function drawFocus(html: string, look: FocusLook): string;
-/** The pieces inside the stage the view moves (a zoom); unchanged when nothing moves the view. */
-export function wrapStage(inner: string, look: FocusLook): string;
-/** The click's blur, holes and labelled frame, in slide px (empty when it has none). */
-export function focusOverlay(look: FocusLook, options?: { canvas?: { w: number; h: number }; area?: readonly [number, number, number, number] }): string;
-/** Runs in the page (inline it): only a forward click animates; a jump or a step back lands at once. */
-export function focusRuntime(): void;
+/** `end` is null only when there are no clicks and no `start`. */
+export function planFocus(clicks: readonly FocusClick[], deck: FocusDeck, start?: FocusState | null): { looks: FocusLook[]; end: FocusState | null };

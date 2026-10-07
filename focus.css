@@ -3,7 +3,7 @@
  * The end state of every change is the plain style: print, a jump, a step back and reduced motion all
  * show where a click lands; the animations are only the way there, and they run only on a slide that
  * arrives by a forward click (deck-stage's [data-deck-active], without [data-sd-instant] — focusRuntime —
- * or [data-deck-static]).
+ * or [data-deck-static]). A piece that leaves fades out from how it looked and where it stood.
  *
  * Tokens (set them in your theme; each has a fallback): --sd-dim-opacity · --sd-hot · --sd-blur ·
  * --sd-veil · --sd-accent (falls back to storydeck's --yellow) · --sd-ease · --sd-move-time.
@@ -14,6 +14,7 @@
 .sd-dim.sd-hide { opacity: 0; }
 .sd-dim.sd-keep { opacity: 1; filter: none; }
 .sd-gone { visibility: hidden; }
+.sd-twin-off { visibility: hidden; }   /* stepped aside for its lit twin (a dashed wire under a solid one) */
 .sd-hot { outline: 5px solid var(--sd-hot, #ef4444); outline-offset: 8px; }
 
 /* a mover's result: a piece moved and scaled around its centre (or its top-left corner), on top of
@@ -38,11 +39,11 @@
 @property --sd-a-move { syntax: '*'; inherits: false; }
 @property --sd-a-hot { syntax: '*'; inherits: false; }
 @keyframes sdNone {}
-@keyframes sdEnter { from { opacity: 0; scale: .92; } }
+@keyframes sdEnter { from { opacity: 0; scale: calc(var(--sd-s, 1) * .92); } }
 @keyframes sdArrive { from { opacity: 0; } }
 @keyframes sdLight { from { opacity: var(--sd-dim-opacity, .32); filter: grayscale(1); } }
 @keyframes sdFade { from { opacity: 1; filter: none; } }
-@keyframes sdLeave { from { visibility: visible; opacity: 1; } to { visibility: hidden; opacity: 0; } }
+@keyframes sdLeave { from { visibility: visible; } to { visibility: hidden; opacity: 0; } }
 @keyframes sdRing { 0% { outline-color: transparent; outline-offset: 26px; } 60% { outline-offset: 4px; } }
 @keyframes sdMove { from { translate: var(--sd-dx0, 0px) var(--sd-dy0, 0px); scale: var(--sd-s0, 1); } }
 @keyframes sdStage { from { translate: var(--sd-tx0, 0px) var(--sd-ty0, 0px); scale: var(--sd-ts0, 1); } }
@@ -54,10 +55,13 @@
   .sd-light { --sd-a-state: sdLight .7s ease both; }
   .sd-fade { --sd-a-state: sdFade .7s ease both; }
   .sd-leave { --sd-a-state: sdLeave .45s ease both; }
+  .sd-relook.sd-from-grey { --sd-a-state: sdLight .7s ease both; }   /* a greyed piece whose look changed, from its old look */
+  .sd-relook.sd-from-hide { --sd-a-state: sdArrive .6s ease both; }
+  .sd-relook.sd-from-keep { --sd-a-state: sdFade .7s ease both; }
   .sd-move { --sd-a-move: sdMove var(--sd-move-time, 1s) var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) both; }
   .sd-hot-in { --sd-a-hot: sdRing .6s var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) .3s both; }
   .sd-focus-new .sd-enter { --sd-delay: .4s; }   /* what a click adds waits for its blur */
-  [data-deck-active]:not([data-sd-instant]):not([data-deck-static]) :is(.sd-enter, .sd-arrive, .sd-light, .sd-fade, .sd-leave, .sd-move, .sd-hot-in) {
+  [data-deck-active]:not([data-sd-instant]):not([data-deck-static]) :is(.sd-enter, .sd-arrive, .sd-light, .sd-fade, .sd-leave, .sd-relook, .sd-move, .sd-hot-in) {
     animation: var(--sd-a-state, sdNone 0s), var(--sd-a-move, sdNone 0s), var(--sd-a-hot, sdNone 0s); }
   [data-deck-active]:not([data-sd-instant]):not([data-deck-static]) .sd-stage.sd-move { animation: sdStage var(--sd-move-time, 1s) var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) both; }
   [data-deck-active]:not([data-sd-instant]):not([data-deck-static]) .sd-veil-in-new { animation: sdVeilIn .7s cubic-bezier(.4, 0, .2, 1) both; }

@@ -133,5 +133,6 @@ export function slugify(s: string): string;
 /** Scope a deck's CSS to `.deck-scope` so its `:root`/`html,body` rules never reach the host page. */
 export function scopeDeckCss(css: string): string;
 
-// Focus — per click, what the click is about and what happens to the rest (focus.d.ts).
+// Focus — per click, what the click is about and what happens to the rest (focus.d.ts), written into slide HTML (focusHtml.d.ts).
 export * from './focus';
+export * from './focusHtml';
