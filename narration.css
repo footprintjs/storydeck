@@ -1,0 +1,28 @@
+/* storydeck · narration in the page (narrationHtml.js): the speaker's notes, the presenter window, listen mode.
+   Never seen by the audience: N shows the notes in this window (practice), P opens a presenter window, L plays
+   the deck in the speaker's voice with a caption. Fixed colours, so the panels read the same on any slide theme. */
+
+/* speaker notes: hidden; N shows them at the bottom of this window, P lays them beside a smaller slide */
+.notes-panel{display:none;position:fixed;z-index:2147483001;box-sizing:border-box;color:#e8ebf2;font:400 22px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:rgba(14,17,24,.95);border-top:2px solid #34405a;overflow:auto}
+.notes-panel header{display:flex;gap:18px;align-items:baseline;font:600 14px/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#9aa6bd;margin-bottom:12px}
+.notes-panel header b{color:#e8ebf2}.notes-panel .clock{margin-left:auto;color:#b79cff}
+.notes-panel .now p{margin:0 0 .5em}.notes-panel .none{color:#6b7689}
+.notes-panel .earlier{margin-top:14px;padding-top:10px;border-top:1px solid #283145;color:#6b7689;font-size:17px}.notes-panel .earlier p{margin:0 0 .35em}
+.notes-panel footer{margin-top:14px;font:600 13px/1 ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#6b7689}
+body.practice .notes-panel{display:block;left:0;right:0;bottom:0;max-height:34vh;padding:18px 28px}
+body.presenter{background:#05070b}
+body.presenter deck-stage{position:fixed;left:0;top:0;width:100vw;height:100vh;transform:scale(.6);transform-origin:0 0}
+body.presenter .notes-panel{display:block;left:61vw;top:0;bottom:0;right:0;padding:26px 30px;border-top:0;border-left:2px solid #34405a;font-size:26px}
+@media print{.notes-panel{display:none!important}}
+
+/* listen mode (L): the deck reads its narration aloud; the caption shows the sentence being said */
+.train-panel{display:none;position:fixed;z-index:2147483002;left:0;right:0;bottom:0;box-sizing:border-box;padding:16px 34px 14px;background:rgba(9,11,16,.94);border-top:2px solid #b79cff;color:#8e99ad;font:500 30px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-height:38vh;overflow:auto}
+body.train .train-panel{display:block} body.train .notes-panel{display:none!important}
+.train-panel header{display:flex;gap:20px;align-items:baseline;font:600 14px/1 ui-monospace,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#9aa6bd;margin-bottom:12px}
+.train-panel header b{color:#e8ebf2}.train-panel .time{color:#b79cff}.train-panel .who{color:#fcd34d}.train-panel .keys{margin-left:auto;color:#6b7689}
+.train-panel .say .past{color:#6b7689}.train-panel .say .now{color:#fff}.train-panel .say .next{color:#aab3c4}
+.train-panel .say .draft{font-style:italic}.train-panel .say .draft.now{color:#fcd34d}.train-panel .say .draft.next{color:#c9a54a}.train-panel .say .draft.past{color:#7a6a3c}
+.train-panel .none{color:#6b7689}
+.train-panel footer{margin-top:10px;font:600 13px/1 ui-monospace,Menlo,monospace;letter-spacing:.06em;color:#6b7689}
+.train-panel footer .d{display:inline-block;width:10px;height:10px;border-radius:2px;background:#fcd34d;margin-right:6px}
+@media print{.train-panel{display:none!important}}

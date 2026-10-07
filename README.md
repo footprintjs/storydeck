@@ -113,6 +113,79 @@ a piece (a dashed wire under a solid one) step aside while its twin is lit. A pi
 from how it looked and where it stood; a blur that moves to another subject stays, and only its frame is
 new; overlapping holes stay clear, and nothing outside the `area` is blurred.
 
+## Narration: the deck tells itself, in your voice
+
+A talk lives on after the room: someone opens the deck alone, or it becomes a video. The words were in the
+speaker notes all along, so narration is data on each click, and the library turns it into speech, captions and
+timing — the same words, three uses:
+
+- **what the voice says** — `narrationText(notes)`: the notes as a voice reads them. An acronym stays as written
+  (a cloned voice says LLM, HCI, MCP as quick letters; spaced out, "L L M" came out slow and odd), only the words
+  a voice misreads as a word are spelled (`SPELL`: UI, API — pass your own `spell`), numbers become words (a forced
+  aligner knows letters only), and a line after `[draft]` (a bridge you wrote for the deck) is said, and shown apart;
+- **a clip per click, cached by what it says** — `storydeck/voice` (Node). A clip's key is a hash of the voice
+  settings and the exact words, so editing one note re-voices that click and nothing else, and an interrupted run
+  keeps every batch it finished. The voice is a port (`{ name, synthesize(scenes, { work }) }`); `chatterboxKit`
+  is one adapter — a local voice kit (Chatterbox, words aligned with MMS_FA; nothing is uploaded);
+- **in the page** — `storydeck/narration-html`: N shows this click's notes, P opens a presenter window that
+  stays in step, and L plays the deck by itself — each click in your voice (the clips carried in the page), or
+  the browser's where a click has none — captions lighting sentence by sentence (styles: `storydeck/narration.css`).
+
+```js
+import { narrationText } from 'storydeck/narration';
+import { voiceClips, chatterboxKit, embedClips } from 'storydeck/voice';
+import { notesData, notesRuntime, listenRuntime } from 'storydeck/narration-html';
+
+const texts = clicks.map(c => narrationText(c.notes.now));   // one per click; '' where a click says nothing
+await voiceClips(texts, { cache: 'voice/cache', profile, engine: chatterboxKit({ kit: '../voice-kit' }) });
+const voice = embedClips(texts, { cache: 'voice/cache', profile });   // { tags, have, wanted }: "voiced 198 of 198"
+page += notesData(clicks.map(c => c.notes)) + voice.tags
+  + `<script>(${notesRuntime})();(${listenRuntime})();</script>`;
+```
+
+A cloned voice is the speaker's own: keep a page that carries the clips internal, and build the public one
+without them (the listen mode falls back to the browser's voice).
+
+## Video: the deck as a narrated video
+
+`storydeck/video` (Node, with ffmpeg) renders a deck with its clips into a video for YouTube: every click on
+screen while its clip plays. Each click is made forward, so its entrance plays as in the room; then every
+animation on the page is paused and **stepped frame by frame** — the same deck renders the same frames — until
+the last entrance ends, and that frame is held for the rest of the clip. Beside the video come what an upload
+asks for: `captions.srt` / `.vtt` (by sentence, timed by the clips' aligned starts, the words as written),
+`chapters.txt` (YouTube's rules checked: first at 0:00, three or more, 10 s each), a `thumbnail.jpg` and a
+`timeline.json`.
+
+```js
+import { chromium } from 'playwright-core';
+import { renderVideo, deckStageDriver } from 'storydeck/video';
+import { clipFor } from 'storydeck/voice';
+import { narrationText, writtenText } from 'storydeck/narration';
+
+const steps = clicks.map(c => {
+  const spoken = narrationText(c.notes.now);
+  return { label: c.label, written: writtenText(c.notes.now), spoken, clip: clipFor(spoken, { cache: 'voice/cache', profile }) };
+});
+await renderVideo({
+  url: 'file:///…/deck.html', steps, out: 'out/video', name: 'my-talk',
+  driver: deckStageDriver({ chromium }),            // the browser is a port; this drives storydeck's <deck-stage>
+  chapters: c => (/^Part \d+ · /.test(c.label) && !/ · \d+$/.test(c.label) ? c.label : null),
+  thumbnail: c => c.label === 'Title',
+  only: [1, 14],                                    // a test strip first: a minute, not half an hour
+});
+```
+
+## Faster edits — what making one talk taught us
+
+- **Cache by content, not by position.** A clip is keyed by its words and settings: inserting or removing a
+  click moves nothing, and a re-voiced note costs one clip. Do the same for anything slow (a film, a render).
+- **A strip before the whole.** `only` (video) and `only` (voice, a set of clicks) work on a few clicks: check
+  a minute before rendering half an hour.
+- **Measure what you hear.** "LLM is said slowly" became a number: forced alignment gave the word's length
+  (0.48–0.70 s spaced out, 0.24–0.28 s as written) — fix, re-voice those clips, measure again.
+- **One source, several builds.** The room's build carries the presenter's voice and a live demo; the public
+  one (slides page, video) leaves both out — a build switch over the same parts, never a second copy.
+
 ## Quick start
 
 ```jsx
@@ -182,6 +255,10 @@ const { theme, toggle, setTheme } = useTheme();   // flips an html class + persi
 | `slugify` · `scopeDeckCss` | utilities |
 | `planFocus` · `focusStep` · `readFocus` · `FOCUS` | focus: per click, what it is about and what happens to the rest (also `storydeck/focus`) |
 | `readPieces` · `readStep` · `drawFocus` · `wrapStage` · `slideClass` · `focusOverlay` · `focusRuntime` | focus, written into slide HTML (also `storydeck/focus-html`; styles in `storydeck/focus.css`) |
+| `narrationText` · `writtenText` · `sentences` · `SPELL` · `captionCues` · `toSrt` · `toVtt` · `chapterList` · `clock` | narration: what a click says, captions and chapters (also `storydeck/narration`) |
+| `notesData` · `notesRuntime` · `listenRuntime` | narration in the page: notes, presenter window, listen mode (also `storydeck/narration-html`; styles in `storydeck/narration.css`) |
+| `clipKey` · `clipFor` · `voiceClips` · `chatterboxKit` · `embedClips` | `storydeck/voice` (Node only): clips cached by what they say, a voice port and its local-kit adapter |
+| `renderVideo` · `planVideo` · `deckStageDriver` | `storydeck/video` (Node only, ffmpeg): the deck as a narrated video, with captions and chapters |
 
 Types ship beside the source in `index.d.ts` — hand-kept (there is no build to generate them from),
 and here rather than in a consumer's shim, because a package's shape belongs in the package.
@@ -193,7 +270,7 @@ npm test        # vitest
 npm run test:cov
 ```
 
-47 tests · ~98% lines · 100% on pure logic · coverage thresholds enforced.
+179 tests · ~99% lines · coverage thresholds enforced (90% statements, 85% branches, 90% functions, 95% lines).
 
 ## License
 

@@ -13,6 +13,11 @@
     "./focus": { "types": "./focus.d.ts", "default": "./focus.js" },
     "./focus-html": { "types": "./focusHtml.d.ts", "default": "./focusHtml.js" },
     "./focus.css": "./focus.css",
+    "./narration": { "types": "./narration.d.ts", "default": "./narration.js" },
+    "./narration-html": { "types": "./narrationHtml.d.ts", "default": "./narrationHtml.js" },
+    "./narration.css": "./narration.css",
+    "./voice": { "types": "./voice.d.ts", "default": "./voice.js" },
+    "./video": { "types": "./video.d.ts", "default": "./video.js" },
     "./storydeck.css": "./storydeck.css"
   },
   "files": ["*.js", "*.jsx", "*.d.ts", "*.css", "content", "README.md"],

@@ -16,3 +16,6 @@ export { assemblePost } from './content/loadPost';
 export { renderMarkdown, splitBodyByMarkers } from './content/markdown';
 export { FOCUS, readFocus, focusStep, planFocus } from './focus';
 export { readPieces, readStep, drawFocus, wrapStage, slideClass, focusOverlay, focusRuntime } from './focusHtml';
+export { SPELL, numberWords, narrationText, writtenText, sentences, captionCues, stamp, toSrt, toVtt, clock, chapterList } from './narration';
+export { notesData, notesRuntime, listenRuntime } from './narrationHtml';
+// storydeck/voice and storydeck/video are Node-only (files, a voice kit, ffmpeg): their own doors, never this one.
