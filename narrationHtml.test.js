@@ -166,6 +166,15 @@ describe('narrationHtml · listen runtime (L)', () => {
     expect(synth.pause).not.toHaveBeenCalled();
   });
 
+  it('reads a lone "..." with its neighbour, as the voice\'s split does', () => {
+    const { queue } = fakeSpeech(); fakeAudio();
+    mountDeck([{ slide: 'S', now: ['... which brings us on. Done. ... Next.'] }]);
+    listenRuntime();
+    press('l');
+    expect(queue.map((u) => u.text)).toEqual(['... which brings us on.', 'Done. ...', 'Next.']);
+    press('l');
+  });
+
   it('shows a step number as text in the listen panel too', () => {
     fakeSpeech(); fakeAudio();
     mountDeck([{ slide: 'S', step: '<b>1</b>', steps: 2, now: ['x.'] }]);

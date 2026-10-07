@@ -70,13 +70,23 @@ export function listenRuntime() {
   const wordsOf = (i) => count((notes[i]?.now ?? []).join(' '));
   const total = notes.reduce((n, _, i) => n + wordsOf(i), 0);
   // a click's narration as sentences; in each note, what follows [draft] is the deck's bridge
-  const sentences = (i) => (notes[i]?.now ?? []).flatMap((note) => {
-    let draft = false;
-    return note.split(/(\[draft\])/).flatMap((part) => {
-      if (part === '[draft]') { draft = true; return []; }
-      return part.trim().replace(/([.?!])\s+/g, '$1\u0000').split('\u0000').map((t) => t.trim()).filter(Boolean).map((t) => ({ t, draft }));
-    });
-  });
+  const sentences = (i) => {
+    const out = [];
+    let lead = '';
+    for (const note of notes[i]?.now ?? []) {
+      let draft = false;
+      for (const part of note.split(/(\[draft\])/)) {
+        if (part === '[draft]') { draft = true; continue; }
+        for (const t of part.trim().replace(/([.?!])\s+/g, '$1\u0000').split('\u0000').map((x) => x.trim()).filter(Boolean)) {
+          // a sentence with no letter and no digit (a lone "...") is never said: it joins its neighbour, as the voice's split does
+          if (/[\p{L}\p{N}]/u.test(t)) { out.push({ t: lead + t, draft }); lead = ''; }
+          else if (out.length) out[out.length - 1].t += ` ${t}`;
+          else lead += `${t} `;
+        }
+      }
+    }
+    return out;
+  };
   // the speaker's own voice: one clip per click, carried in the page (storydeck/voice · embedClips); else the browser's
   const vdata = JSON.parse(document.getElementById('deck-voice')?.textContent ?? 'null'), urls = {}, audio = new Audio();
   const clipOf = (i) => { const key = vdata?.steps?.[i]; return key ? { key, ...vdata.clips[key] } : null; };

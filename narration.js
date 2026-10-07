@@ -27,7 +27,8 @@ export const SPELL = Object.freeze({ UI: 'U I', API: 'A P I', APIs: 'A P Is' });
 
 /**
  * A symbol standing alone, said as the word it means (a trailing . , ; : ! ? stays): & and, + plus, = equals,
- * < less than, > more than, × times, % percent, and the Greek letters people write in talks.
+ * < less than and > more than (before a number only: "File > Save As" is a menu path, a pause), × times,
+ * % percent, and the Greek letters people write in talks.
  */
 export const SAY = Object.freeze({
   '&': 'and', '+': 'plus', '=': 'equals', '<': 'less than', '>': 'more than', '×': 'times', '%': 'percent',
@@ -38,6 +39,9 @@ export const SAY = Object.freeze({
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // a word's edge, Unicode-aware (\b only knows A–Z, 0–9 and _), written without lookbehind (older Safari)
 const EDGE = '[^\\p{L}\\p{N}_]';
+// symbols said only before a number: a comparison then, a menu path's arrow otherwise
+const BEFORE_A_NUMBER = new Set(['<', '>']);
+const lone = (keys) => new RegExp(`(^|\\s)(${keys.map(escapeRe).join('|')})`, 'gu');
 
 /**
  * The notes (a string, or one string per note) as the voice should read them: [draft] marks dropped, the
@@ -49,11 +53,12 @@ const EDGE = '[^\\p{L}\\p{N}_]';
 export function narrationText(notes, { spell = SPELL, say = SAY } = {}) {
   let text = (Array.isArray(notes) ? notes : [notes ?? '']).join(' ').replace(/\[draft\]\s*/g, '');
   for (const [word, said] of Object.entries(spell)) text = text.replace(new RegExp(`(^|${EDGE})${escapeRe(word)}(?=${EDGE}|$)`, 'gu'), (_, edge) => edge + said);
-  const symbols = Object.keys(say).map(escapeRe).join('|');
+  const compare = Object.keys(say).filter((k) => BEFORE_A_NUMBER.has(k)), symbols = Object.keys(say).filter((k) => !BEFORE_A_NUMBER.has(k));
+  if (compare.length) text = text.replace(new RegExp(`${lone(compare).source}(?=\\s+[-+]?\\d)`, 'gu'), (_, edge, sym) => edge + say[sym]);
   text = text
     .replace(/\bp(\d+)\b/g, (_, d) => `p ${numberWords(Number(d))}`)
     .replace(/\b\d+\b/g, (d) => numberWords(Number(d)));
-  if (symbols) text = text.replace(new RegExp(`(^|\\s)(${symbols})([.,;:!?]*)(?=\\s|$)`, 'gu'), (_, edge, sym, end) => edge + say[sym] + end);
+  if (symbols.length) text = text.replace(new RegExp(`${lone(symbols).source}([.,;:!?]*)(?=\\s|$)`, 'gu'), (_, edge, sym, end) => edge + say[sym] + end);
   return text.split(/\s+/).filter(Boolean).reduce(pause, []).join(' ');
 }
 
@@ -78,6 +83,22 @@ export const writtenText = (notes) => (Array.isArray(notes) ? notes : [notes ?? 
 export const sentences = (text) => String(text ?? '').trim().replace(/([.?!])\s+/g, '$1\u0000').split('\u0000').filter(Boolean);
 
 /**
+ * The written sentences the voice says: one with no letter and no digit (a lone "...") is never said, so it
+ * joins the sentence before it (or, at the start, the one after) — the written and the spoken text then
+ * split alike.
+ */
+export function saidSentences(text) {
+  const out = [];
+  let lead = '';
+  for (const s of sentences(text)) {
+    if (/[\p{L}\p{N}]/u.test(s)) { out.push(lead + s); lead = ''; }
+    else if (out.length) out[out.length - 1] += ` ${s}`;
+    else lead += `${s} `;
+  }
+  return out;
+}
+
+/**
  * Subtitles by sentence. Each step: `start` (s, in the whole video), `lead` (s of silence before its clip),
  * `written` and `spoken` text, and its `clip` ({ duration, sentences: each sentence's start in the clip }).
  * A caption shows the text as written when it splits into as many sentences as the clip has; else as spoken.
@@ -87,7 +108,7 @@ export function captionCues(steps) {
   for (const step of steps) {
     const clip = step.clip;
     if (!clip?.sentences?.length) continue;
-    const written = sentences(step.written), said = sentences(step.spoken);
+    const written = saidSentences(step.written), said = sentences(step.spoken);
     const text = written.length === clip.sentences.length ? written : said;
     const t0 = step.start + (step.lead ?? 0);
     text.slice(0, clip.sentences.length).forEach((t, j) => {

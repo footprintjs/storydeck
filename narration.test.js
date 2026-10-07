@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { numberWords, SPELL, SAY, narrationText, writtenText, sentences, captionCues, stamp, toSrt, toVtt, clock, chapterList } from './narration';
+import { numberWords, SPELL, SAY, narrationText, writtenText, sentences, saidSentences, captionCues, stamp, toSrt, toVtt, clock, chapterList } from './narration';
 
 describe('narration · what the voice says', () => {
   it('spells the words a voice misreads as a word (UI, API, APIs) and leaves every other acronym as written', () => {
@@ -58,6 +58,12 @@ describe('narration · what the voice says', () => {
     expect(Object.isFrozen(SAY)).toBe(true);
   });
 
+  it('says < and > as a comparison only before a number: a menu path\'s arrow is a pause', () => {
+    expect(narrationText('Open File > Save As.')).toBe('Open File, Save As.');
+    expect(narrationText('Go to Settings > Privacy > Cookies.')).toBe('Go to Settings, Privacy, Cookies.');
+    expect(narrationText('Keep it > 20 ms, and < 5 % lost.')).toBe('Keep it more than twenty ms, and less than five percent lost.');
+  });
+
   it('spells at Unicode word edges, so a word in another script gets the reading you give it', () => {
     expect(narrationText('日本 rocks; the UI’s look', { spell: { ...SPELL, 日本: 'Japan' } })).toBe('Japan rocks; the U I’s look');
     expect(narrationText('éUI stays', {})).toBe('éUI stays');   // inside a word: not a word of its own
@@ -101,6 +107,14 @@ describe('narration · captions', () => {
     const cues = [{ start: 0, end: 1, text: 'Keep the list < 10 items & mount <deck-stage> --> first.' }];
     expect(toVtt(cues)).toContain('\nKeep the list &lt; 10 items &amp; mount &lt;deck-stage&gt; → first.\n');
     expect(toSrt(cues)).toContain('\nKeep the list < 10 items & mount <deck-stage> → first.\n');
+  });
+
+  it('joins a written sentence the voice never says (a lone "...") to its neighbour, so the captions stay as written', () => {
+    expect(saidSentences('... which brings us to part two.')).toEqual(['... which brings us to part two.']);
+    expect(saidSentences('Done. ... Next.')).toEqual(['Done. ...', 'Next.']);
+    expect(saidSentences('...')).toEqual([]);
+    const cues = captionCues([{ start: 0, written: 'Done. ... Next.', spoken: narrationText('Done. ... Next.'), clip: { duration: 2, sentences: [0, 1] } }]);
+    expect(cues.map((c) => c.text)).toEqual(['Done. ...', 'Next.']);
   });
 
   it('writes SRT and WebVTT', () => {

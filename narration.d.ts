@@ -15,6 +15,8 @@ export function narrationText(notes: string | readonly string[], options?: { spe
 export function writtenText(notes: string | readonly string[]): string;
 /** Sentences as a voice script splits them: after . ? or ! and a space. */
 export function sentences(text: string): string[];
+/** The written sentences the voice says: one with no letter and no digit (a lone "...") joins its neighbour. */
+export function saidSentences(text: string): string[];
 
 /** A clip's timing: its length and each sentence's start in it (s). */
 export interface ClipTiming { duration: number; sentences: readonly number[] }
