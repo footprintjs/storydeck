@@ -72,7 +72,9 @@ function pieceLook(p) {
   const vars = [];
   if (p.move) { cls.push('sd-moved'); vars.push(`--sd-dx:${p.move.dx}px`, `--sd-dy:${p.move.dy}px`, `--sd-s:${p.move.s}`); }
   if (p.from) { cls.push('sd-move'); vars.push(`--sd-dx0:${p.from.dx}px`, `--sd-dy0:${p.from.dy}px`, `--sd-s0:${p.from.s}`); }
-  if ((p.move ?? p.from)?.origin === 'top-left') cls.push('sd-origin-tl');
+  // The point it scales around, inline, so no stylesheet's transform-origin can move it off the planned place.
+  const ref = p.move ?? p.from;
+  if (ref) { if (ref.origin === 'top-left') cls.push('sd-origin-tl'); vars.push(`transform-origin:${ref.origin === 'top-left' ? '0 0' : '50% 50%'}`); }
   return {cls: cls.join(' '), style: vars.join(';')};
 }
 

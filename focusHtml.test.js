@@ -70,10 +70,12 @@ describe('focusHtml · drawing a click', () => {
   it('writes where a piece moved to and where it came from, so the move can be animated', () => {
     const out = drawFocus(html, looks[1]);
     const page = looks[1].pieces[0].move;
-    expect(out).toContain(`class="box sd sd-dim sd-fade sd-moved sd-move" data-k="page" style="left:100px;top:300px;width:600px;height:400px;--sd-dx:${page.dx}px;--sd-dy:${page.dy}px;--sd-s:${page.s};--sd-dx0:0px;--sd-dy0:0px;--sd-s0:1"`);
-    expect(out).toMatch(/<b data-k="label" style="left:1000px;top:600px;--sd-dx:[^"]*" class="sd sd-on sd-moved sd-move sd-origin-tl">/);
+    expect(out).toContain(`class="box sd sd-dim sd-fade sd-moved sd-move" data-k="page" style="left:100px;top:300px;width:600px;height:400px;--sd-dx:${page.dx}px;--sd-dy:${page.dy}px;--sd-s:${page.s};--sd-dx0:0px;--sd-dy0:0px;--sd-s0:1;transform-origin:50% 50%"`);
+    expect(out).toMatch(/<b data-k="label" style="left:1000px;top:600px;--sd-dx:[^"]*;transform-origin:0 0" class="sd sd-on sd-moved sd-move sd-origin-tl">/);
+    // the origin is inline, so a stylesheet's transform-origin on the piece cannot move it off its planned place
+    expect(out).toMatch(/data-k="code box" class="m sd sd-on sd-moved sd-move" style="[^"]*;transform-origin:50% 50%"/);
     const back = drawFocus(html, looks[2]);   // the focus drops: back in place, gliding from where it stood
-    expect(back).toContain(`class="box sd sd-dim sd-move" data-k="page" style="left:100px;top:300px;width:600px;height:400px;--sd-dx0:${page.dx}px;--sd-dy0:${page.dy}px;--sd-s0:${page.s}"`);
+    expect(back).toContain(`class="box sd sd-dim sd-move" data-k="page" style="left:100px;top:300px;width:600px;height:400px;--sd-dx0:${page.dx}px;--sd-dy0:${page.dy}px;--sd-s0:${page.s};transform-origin:50% 50%"`);
   });
 
   it('marks a piece that stepped aside for its twin', () => {
@@ -121,7 +123,7 @@ describe('focusHtml · drawing a click', () => {
     expect(focusOverlay(moved)).toContain('class="sd-frame sd-new"');
     const plan = planFocus([{ in: ['*'] }, { on: ['code'], focus: 'left' }, { out: ['page'], on: ['code'], focus: 'left' }], { pieces, area }).looks;
     const leaving = plan[2].pieces[0].move;
-    expect(drawFocus(html, plan[2])).toContain(`class="box sd sd-gone sd-dim sd-leave sd-moved" data-k="page" style="left:100px;top:300px;width:600px;height:400px;--sd-dx:${leaving.dx}px;--sd-dy:${leaving.dy}px;--sd-s:${leaving.s}"`);
+    expect(drawFocus(html, plan[2])).toContain(`class="box sd sd-gone sd-dim sd-leave sd-moved" data-k="page" style="left:100px;top:300px;width:600px;height:400px;--sd-dx:${leaving.dx}px;--sd-dy:${leaving.dy}px;--sd-s:${leaving.s};transform-origin:50% 50%"`);
     const relook = planFocus([{ in: ['*'], on: ['code'], quiet: true, focus: 'hide' }, { on: ['code'] }], { pieces }).looks[1];
     expect(drawFocus(html, relook)).toContain('class="box sd sd-dim sd-relook sd-from-hide"');
   });
