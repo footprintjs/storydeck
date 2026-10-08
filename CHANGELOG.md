@@ -19,15 +19,20 @@ footprint-storyreel both use, so the two stop keeping copies that drift. StoryDe
   `clockText`; `chapterList` → `youtubeChapters`. The main door re-exports only `narrationText` and `writtenText`.
 - **`footprint-storydeck/voice`** keeps `embedClips`. Removed, now imported from `footprint-narration/voice`: `clipKey`,
   `clipFor`, `voiceClips`, `chatterboxKit`, `pickSteps`; `sentenceStarts` is `footprint-narration`'s. A clip
-  voiced from now on keeps its timed words (`clipFor(…).words`); a clip voiced before keeps working.
+  voiced from now on keeps its timed words (`clipFor(…).words`); a clip voiced before keeps working. The types
+  `Clip`, `VoiceProfile`, `VoiceEngine` (voice) and `Cue`, `CaptionStep`, `ClipTiming` (narration) are
+  footprint-narration's too. From its CHANGELOG: `pickSteps` refuses anything but steps and ranges, `voiceClips`
+  logs "N clips wanted · M to voice · the rest are cached", and a caption file leaves out a cue under 0.05 s.
 - **`narrationText(notes, { spell, say })`**: what a rule says is final (a custom list no longer chains `A → B → C`),
   and a list that cannot be said is refused — a key must be one word; a value must be words, a letter in every
-  word and no digits (`{ Win: 'Windows 11' }`: write `'Windows eleven'`). A number from a million is said in
-  millions. Every default-list note says what it said.
+  word, no digits and no comma, semicolon or colon at its end (`{ Win: 'Windows 11' }`: write `'Windows eleven'`).
+  Every other note says what it said, except a number: from a million it is said in millions, and a run of more
+  than fifteen significant digits digit by digit — a click with one is voiced again.
 - **`renderVideo`**: `chapters.txt` holds the chapters YouTube will show, by its rule — a chapter shorter than 10 s
   merges into the one before, an opening shorter than 10 s yields 0:00 to the next, and fewer than three is no
   chapters (an empty file) — and `done.chapters` is `{ lines, text, kept, changes, problems }` (it was
-  `{ text, problems }`). `captions.vtt` numbers its cues, and a caption longer than 42 characters breaks onto two
+  `{ text, problems }`). A chapter title is words: a blank one (or `null`) names no chapter, a number is its digits,
+  and a blank `intro` is "Intro" (0.2.0 wrote them as given). `done.cues` counts the cues the caption files hold. `captions.vtt` numbers its cues, and a caption longer than 42 characters breaks onto two
   lines at the space nearest its middle (both files; a long sentence still makes long lines — nothing is cut).
 - **Node 22 or newer** (`engines`): Node 18 and 20 have reached their end of life.
 

@@ -140,6 +140,15 @@ describe('video · rendering', () => {
     expect(done.chapters.changes).toEqual([]);
   });
 
+  it('reads a chapter title as words: a number is its digits, a blank or a non-title names no chapter, a blank intro is "Intro"', async () => {
+    const long = (label, key) => ({ label, written: 'A line.', spoken: 'A line.', clip: clip(key, 12) });
+    const steps = [long('a', 'a'), long('b', 'b'), long('c', 'c'), long('d', 'd')];
+    const titles = { a: null, b: 2026, c: '  ', d: '  Last part ' };
+    const done = await renderVideo({ url: 'u', steps, out: dir, driver: fakeDriver(), run: fakeRun().run, chapters: (c) => titles[c.label], intro: '' });
+    expect(done.chapters.lines).toEqual(['0:00 Intro', '0:13 2026', '0:38 Last part']);
+    expect(done.cues).toBe(4);   // the cues the caption files hold
+  });
+
   it('closes the browser and says which step failed when ffmpeg or a click fails', async () => {
     const { run } = fakeRun((args) => args.at(-1).endsWith('.mp4'));
     await expect(renderVideo({ url: 'u', steps: STEPS.slice(0, 1), out: dir, driver: fakeDriver(), run })).rejects.toThrow('ffmpeg failed: the video');

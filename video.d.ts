@@ -4,10 +4,12 @@
 import type { Clip } from 'footprint-narration/voice';
 import type { Chapters } from 'footprint-narration';
 
+/** A cached clip as the video uses it (`words` is not read: a clip from before footprint-narration has none). */
+export type VideoClip = Omit<Clip, 'words'> & { words?: Clip['words'] };
 /** A click to render: its label, its words as written and as spoken, and its clip (or null). */
-export interface VideoStep { label?: string; written?: string; spoken?: string; clip?: Clip | null }
+export interface VideoStep { label?: string; written?: string; spoken?: string; clip?: VideoClip | null }
 /** A click on the timeline (s). */
-export interface PlannedClick { n: number; label?: string; written: string; spoken: string; clip: Clip | null; lead: number; length: number; start: number }
+export interface PlannedClick { n: number; label?: string; written: string; spoken: string; clip: VideoClip | null; lead: number; length: number; start: number }
 /** The browser port: makes click n current (forward), pauses its animations, steps them, takes a frame. */
 export interface VideoDriver {
   open(url: string): Promise<void>;
