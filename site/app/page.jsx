@@ -1,5 +1,5 @@
 import { post } from '../content/registry';
-import { PostView } from 'storydeck';
+import { PostView } from 'footprint-storydeck';
 
 // The storydeck landing IS a storydeck post — the library telling its own story via Read/Scroll/Watch.
 export default function Home() {

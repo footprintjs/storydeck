@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.3.0 — `footprint-storydeck`; the narration rules move into footprint-narration
+
+- **The package is renamed `footprint-storydeck`** — the footprintjs family's name, as footprint-storyreel and
+  footprint-narration. Install `footprint-storydeck` and import from it: every door keeps its path under the new
+  name (`footprint-storydeck/focus`, `/focus-html`, `/narration`, `/narration-html`, `/voice`, `/video`,
+  `/deck-stage.js`, the CSS files). `storydeck` (0.1.0, 0.2.0) is deprecated and points here; the repository stays
+  `footprintjs/storydeck`.
+
+The rules a voice reads by, the sentences, the captions, YouTube's chapter rule and the clip cache now live in
+[footprint-narration](https://github.com/footprintjs/footprint-narration) — one package that StoryDeck and
+footprint-storyreel both use, so the two stop keeping copies that drift. StoryDeck keeps what is the deck's own.
+**What each note says is unchanged**: the four clip-key goldens and a real deck's 198 clips still match.
+
+- **`footprint-storydeck/narration`** keeps `narrationText` (now footprint-narration's automatic rules over `writtenText`) and
+  `writtenText`. Removed, now imported from `footprint-narration`: `numberWords`, `SPELL`, `SAY`, `sentences`,
+  `saidSentences`, `captionCues`, `stamp`; `toSrt` / `toVtt` → `captionFile(cues, 'srt' | 'vtt')`; `clock` →
+  `clockText`; `chapterList` → `youtubeChapters`. The main door re-exports only `narrationText` and `writtenText`.
+- **`footprint-storydeck/voice`** keeps `embedClips`. Removed, now imported from `footprint-narration/voice`: `clipKey`,
+  `clipFor`, `voiceClips`, `chatterboxKit`, `pickSteps`; `sentenceStarts` is `footprint-narration`'s. A clip
+  voiced from now on keeps its timed words (`clipFor(…).words`); a clip voiced before keeps working. The types
+  `Clip`, `VoiceProfile`, `VoiceEngine` (voice) and `Cue`, `CaptionStep`, `ClipTiming` (narration) are
+  footprint-narration's too. From its CHANGELOG: `pickSteps` refuses anything but steps and ranges, `voiceClips`
+  logs "N clips wanted · M to voice · the rest are cached", and a caption file leaves out a cue under 0.05 s.
+- **`narrationText(notes, { spell, say })`**: what a rule says is final (a custom list no longer chains `A → B → C`),
+  and a list that cannot be said is refused — a key must be one word; a value must be words, a letter in every
+  word, no digits and no comma, semicolon or colon at its end (`{ Win: 'Windows 11' }`: write `'Windows eleven'`).
+  Every other note says what it said, except a number: from a million it is said in millions, and a run of more
+  than fifteen significant digits digit by digit — a click with one is voiced again.
+- **`renderVideo`**: `chapters.txt` holds the chapters YouTube will show, by its rule — a chapter shorter than 10 s
+  merges into the one before, an opening shorter than 10 s yields 0:00 to the next, and fewer than three is no
+  chapters (an empty file) — and `done.chapters` is `{ lines, text, kept, changes, problems }` (it was
+  `{ text, problems }`). A chapter title is words: a blank one (or `null`) names no chapter, a number is its digits,
+  and a blank `intro` is "Intro" (0.2.0 wrote them as given). `done.cues` counts the cues the caption files hold. `captions.vtt` numbers its cues, and a caption longer than 42 characters breaks onto two
+  lines at the space nearest its middle (both files; a long sentence still makes long lines — nothing is cut).
+- **Node 22 or newer** (`engines`): Node 18 and 20 have reached their end of life.
+
 ## 0.2.0 — the deck tells itself, and becomes a video
 
 - **Narration** (`storydeck/narration`): what each click says, from its speaker notes — `narrationText` (an

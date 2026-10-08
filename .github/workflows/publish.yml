@@ -6,7 +6,8 @@ on:
 
 # Least privilege: publish power (OIDC) only in the `publish` job, which takes the tarball packed and tested
 # in `build` and resolves no dependencies of its own. The first version goes up by hand (npm publish), then
-# npmjs.com → storydeck → Settings → Trusted publishing: GitHub Actions, footprintjs/storydeck, publish.yml.
+# npmjs.com → footprint-storydeck → Settings → Trusted publishing: GitHub Actions, footprintjs/storydeck, publish.yml.
+# (0.1.0 and 0.2.0 were published as `storydeck`; the package is `footprint-storydeck` from 0.3.0.)
 permissions:
   contents: read
 

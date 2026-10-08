@@ -1,12 +1,15 @@
 /**
  * storydeck · video (video.js) — a narrated deck as a video: every click on screen while its clip plays. Node + ffmpeg 5.0+.
  */
-import type { Clip } from './voice';
+import type { Clip } from 'footprint-narration/voice';
+import type { Chapters } from 'footprint-narration';
 
+/** A cached clip as the video uses it (`words` is not read: a clip from before footprint-narration has none). */
+export type VideoClip = Omit<Clip, 'words'> & { words?: Clip['words'] };
 /** A click to render: its label, its words as written and as spoken, and its clip (or null). */
-export interface VideoStep { label?: string; written?: string; spoken?: string; clip?: Clip | null }
+export interface VideoStep { label?: string; written?: string; spoken?: string; clip?: VideoClip | null }
 /** A click on the timeline (s). */
-export interface PlannedClick { n: number; label?: string; written: string; spoken: string; clip: Clip | null; lead: number; length: number; start: number }
+export interface PlannedClick { n: number; label?: string; written: string; spoken: string; clip: VideoClip | null; lead: number; length: number; start: number }
 /** The browser port: makes click n current (forward), pauses its animations, steps them, takes a frame. */
 export interface VideoDriver {
   open(url: string): Promise<void>;
@@ -35,6 +38,6 @@ export function renderVideo(options: {
   chapters?: (click: PlannedClick) => string | null; intro?: string; thumbnail?: (click: PlannedClick) => boolean;
   /** where frames and sounds are made (its frames/ and audio/ are replaced); by default a temporary folder, removed afterwards */
   work?: string; log?: (line: string) => void;
-}): Promise<{ video: string; length: number; cues: number; chapters: { text: string; problems: string[] }; plan: PlannedClick[] }>;
+}): Promise<{ video: string; length: number; cues: number; chapters: Chapters; plan: PlannedClick[] }>;
 /** The driver for storydeck's <deck-stage> pages, with Playwright's `chromium`. */
 export function deckStageDriver(options: { chromium: unknown; executablePath?: string; viewport?: { width: number; height: number }; hide?: string[] }): VideoDriver;

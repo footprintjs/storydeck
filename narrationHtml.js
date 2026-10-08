@@ -2,12 +2,12 @@
 // that plays the deck by itself, in the speaker's voice. For decks built as HTML strings, on <deck-stage>.
 //
 //   page += notesData(steps.map(s => s.notes));     // each click's notes: { slide, step, steps, now: [], earlier: [] }
-//   page += embedClips(texts, …).tags;              // the clips (storydeck/voice), when there are any
-//   page += `<script>(${notesRuntime})();(${listenRuntime})();</script>`;   // and storydeck/narration.css
+//   page += embedClips(texts, …).tags;              // the clips (voice.js · embedClips), when there are any
+//   page += `<script>(${notesRuntime})();(${listenRuntime})();</script>`;   // and narration.css
 //
 // N shows this click's notes in this window (practice); P opens a presenter window (a smaller slide, the notes,
 // the next click, a clock) that moves with this one. L plays the deck: each click's narration in the speaker's
-// voice (a clip from storydeck/voice) or, without one, the browser's; captions light sentence by sentence, and
+// voice (a clip carried by voice.js · embedClips) or, without one, the browser's; captions light sentence by sentence, and
 // the deck moves on when a click's narration ends. Space pauses, ← → move (and keep reading), [ ] slower /
 // faster, L or Esc stops. A line after [draft] — a bridge written for the deck — shows in amber.
 // The runtimes are self-contained, so they can be inlined with `(${fn})()`.
@@ -53,7 +53,14 @@ export function notesRuntime() {
   show(stage.index ?? 0);
 }
 
-/** Runs in the page: L plays the deck by itself, in the speaker's voice (clips) or the browser's, with captions. */
+/**
+ * Runs in the page: L plays the deck by itself, in the speaker's voice (clips) or the browser's, with captions.
+ * It is serialised into the page and cannot import, so it keeps its own copy of footprint-narration's sentence
+ * split (saidSentences), applied to each note and each [draft] part — the one accepted copy. It splits as
+ * saidSentences(writtenText(notes)) does whenever every note and every [draft] part ends its own sentences and a
+ * [draft] mark has white space before it (pinned by narrationHtml.test.js); a sentence that runs across a note or
+ * a [draft] mark is split there.
+ */
 export function listenRuntime() {
   const stage = document.querySelector('deck-stage'), data = document.getElementById('deck-notes');
   if (!stage || !data || !('speechSynthesis' in window)) return;
@@ -87,7 +94,7 @@ export function listenRuntime() {
     }
     return out;
   };
-  // the speaker's own voice: one clip per click, carried in the page (storydeck/voice · embedClips); else the browser's
+  // the speaker's own voice: one clip per click, carried in the page (voice.js · embedClips); else the browser's
   const vdata = JSON.parse(document.getElementById('deck-voice')?.textContent ?? 'null'), urls = {}, audio = new Audio();
   const clipOf = (i) => { const key = vdata?.steps?.[i]; return key ? { key, ...vdata.clips[key] } : null; };
   const urlOf = (key) => urls[key] ??= URL.createObjectURL(new Blob([Uint8Array.from(atob(document.getElementById(`vc-${key}`).textContent.trim()), (c) => c.charCodeAt(0))], { type: 'audio/mp4' }));

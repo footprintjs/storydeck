@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { saidSentences } from 'footprint-narration';
 import { notesData, notesRuntime, listenRuntime } from './narrationHtml';
+import { writtenText } from './narration';
 
 const NOTES = [
   { slide: 'Intro', step: 0, steps: 1, now: ['Hello there. Second line.'], earlier: [] },
@@ -174,6 +176,34 @@ describe('narrationHtml · listen runtime (L)', () => {
     expect(queue.map((u) => u.text)).toEqual(['... which brings us on.', 'Done. ...', 'Next.']);
     press('l');
   });
+
+  // The runtime is serialised into the page and cannot import: it keeps its own copy of the split, pinned here.
+  const corpus = ['One. Two? Three! four', '... which brings us on. Done. ... Next.', 'Version 3.5 is out. Yes.', '“Quoted.” Then — a dash. …',
+    'Wait, 🤔? Yes.', 'Errors fell 90 %. Then we shipped.', 'A. B. C.', 'Done!!! Really?! Ok.'];
+  // A sentence that runs across a note or a [draft] mark is split there (per note, per part); the voice's split joins it.
+  const across = [[['So, three steps:', '[draft] First, the web.'], ['So, three steps:', 'First, the web.'], ['So, three steps: First, the web.']],
+    [['We start [draft] and then go on.'], ['We start', 'and then go on.'], ['We start and then go on.']]];
+  for (const [now, runtime, voice] of across) {
+    it(`splits at a note or a [draft] mark, where the voice joins: ${JSON.stringify(now)}`, () => {
+      const { queue } = fakeSpeech(); fakeAudio();
+      mountDeck([{ slide: 'S', now }]);
+      listenRuntime();
+      press('l');
+      expect(queue.map((u) => u.text)).toEqual(runtime);
+      expect(saidSentences(writtenText(now))).toEqual(voice);
+      press('l');
+    });
+  }
+  for (const note of corpus) {
+    it(`splits a click into sentences as footprint-narration does: ${note}`, () => {
+      const { queue } = fakeSpeech(); fakeAudio();
+      mountDeck([{ slide: 'S', now: [note] }]);
+      listenRuntime();
+      press('l');
+      expect(queue.map((u) => u.text.replace(/\s+/g, ' '))).toEqual(saidSentences(writtenText(note)));
+      press('l');
+    });
+  }
 
   it('shows a step number as text in the listen panel too', () => {
     fakeSpeech(); fakeAudio();
