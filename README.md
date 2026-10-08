@@ -74,11 +74,12 @@ decision every click makes again, so it is data on the click, and the library do
 | mover | `left` · `right` · `up` · `down` | the context steps aside that way, smaller (`scale`), and the subject grows into the room it leaves (`grow`, `fill`, `gap`, `align`; `move: 'aside'` keeps the subject where it is) |
 | mover | `place` | named groups moved by the amounts you give (`groups: 'page floor: -90 -200 0.5 \| tl: 0 -230 1.1 @ 960 968'`): a layout you art-direct, still animated from wherever the last click left it |
 | overlay | `blur` | everything outside the subject's frame is blurred; a frame (and a `label`) on it, or on the `rect`s you give |
-| order | `path` | the subject comes on piece after piece along a route, as a request travels it — node, wire, node — each lighting at its turn (`step` seconds apart, 0.35) and glowing as it is reached; `route` names the order (default: the click's `on`), and a `line` ("agent → MCP → gateway") names the route once it is done |
+| order | `path` | the subject comes on piece after piece along a route, as a request travels it — node, wire, node: each lit piece on it lights at its turn (`step` seconds apart, 0.35) and glows as it is reached; `route` names the order (default — and for an empty `route` — the click's `on`, or its `in`); a greyed piece on it takes no turn, and a route with no order at all (`on: ['*']`) is refused; a `line` ("agent → MCP → gateway") names the route once it is done |
 
 `'left blur'` reads: the context steps aside to the left, greyed, under a blur, and the subject grows on
 the right, framed. `'path grey'` lights a route in turn and greys the rest. Bring your own strategy of any kind
-(`strategies: { name: { kind, … } }`).
+(`strategies: { name: { kind, … } }`); what your own order's `route()` gives is checked like the built-in's — piece
+names, a `step` of 0–5 s, a text `line`, a `lineAt` of `'x y'` — and refused with the fix when it is not.
 
 **A path, on a diagram of an app.** An architecture slide is a route more often than a picture: who calls whom.
 Write the click's `on` in the order a request travels it, wires included, and the path lights it that way:
@@ -86,6 +87,11 @@ Write the click's `on` in the order a request travels it, wires included, and th
 ```html
 <step data-on="agent link-mcp mcp link-gw gw" data-focus="path" data-focus-line="agent → MCP → gateway"></step>
 ```
+
+Everything on a path keeps its turn: a piece lit from grey glides into colour and the glow in one animation (two
+on one `filter` would flash), its ring (`hot`) comes .3 s after its turn, and a dashed twin stays until its solid
+twin's turn and only then steps aside, so the wire is never missing. Under a new blur the whole path, line included,
+waits .4 s for it, as what a click adds does.
 
 The plan is plain data (each piece's state, what changed since the last click, how far it moved), so a
 renderer only draws it. `footprint-storydeck/focus-html` writes it into slide HTML at build time and

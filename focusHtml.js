@@ -8,7 +8,8 @@
 //
 // Pieces are read from their inline style (left/top/width/height in px, or 0; an <svg>'s width/height
 // attributes too): a piece without left/top keeps its place whatever the strategy, and one without a
-// size moves by its top-left corner. data-twin="name …" makes a piece step aside while its twin is lit.
+// size moves by its top-left corner. data-twin="name …" makes a piece step aside while its twin is lit (on a
+// path, at that twin's turn).
 // focus.css draws the classes; call focusRuntime() once in the page, so only a forward click animates.
 
 const PIECE = attr => new RegExp(`<([a-zA-Z][\\w-]*)\\b([^>]*?)\\s${attr}=(["'])(.*?)\\3([^>]*)>`, 'g');
@@ -69,11 +70,13 @@ function pieceLook(p) {
   if (p.hot) cls.push('sd-hot');
   if (p.hotIn) cls.push('sd-hot-in');
   if (p.twinOff) cls.push('sd-twin-off');
-  if (p.path !== null && p.path !== undefined) cls.push('sd-path');
+  const onPath = p.path !== null && p.path !== undefined, twinTurn = p.twinTurn !== null && p.twinTurn !== undefined;
+  if (twinTurn) cls.push('sd-twin-turn');   // it steps aside at its lit twin's turn on the route
+  if (onPath) cls.push('sd-path');
   const vars = [];
   if (p.move) { cls.push('sd-moved'); vars.push(`--sd-dx:${p.move.dx}px`, `--sd-dy:${p.move.dy}px`, `--sd-s:${p.move.s}`); }
   if (p.from) { cls.push('sd-move'); vars.push(`--sd-dx0:${p.from.dx}px`, `--sd-dy0:${p.from.dy}px`, `--sd-s0:${p.from.s}`); }
-  if (p.path !== null && p.path !== undefined) vars.push(`--sd-path-delay:${p.path}s`);   // its turn on the route
+  if (onPath || twinTurn) vars.push(`--sd-path-delay:${onPath ? p.path : p.twinTurn}s`);   // its moment on the route: its turn, or its twin's
   // The point it scales around, inline, so no stylesheet's transform-origin can move it off the planned place.
   const ref = p.move ?? p.from;
   if (ref) { if (ref.origin === 'top-left') cls.push('sd-origin-tl'); vars.push(`transform-origin:${ref.origin === 'top-left' ? '0 0' : '50% 50%'}`); }
@@ -126,13 +129,13 @@ function veilPath([x0, y0, x1, y1], rects) {
   return runs.join(' ');
 }
 
-/** A path's line — the text naming its route — in slide pixels, shown once the route is done. */
+/** A path's line — the text naming its route — in slide pixels, shown once the route is done (its moment is `done`). */
 function pathLine(look, [x0, , , y1]) {
   const p = look.path;
   if (!p?.line) return '';
   const at = p.lineAt ? String(p.lineAt).trim().split(/[\s,]+/).map(Number) : [x0 + 24, y1 - 56];
   if (at.length !== 2 || at.some(n => !Number.isFinite(n))) throw new Error(`focus "path": lineAt is x y in slide px, not "${p.lineAt}"`);
-  return `<div class="sd-path-line" style="left:${at[0]}px;top:${at[1]}px;--sd-path-done:${p.done}s">${esc(p.line)}</div>`;
+  return `<div class="sd-path-line" style="left:${at[0]}px;top:${at[1]}px;--sd-path-delay:${p.done}s">${esc(p.line)}</div>`;
 }
 
 /**

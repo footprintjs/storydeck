@@ -3,15 +3,26 @@
 ## 0.4.0 — a path: the subject piece after piece along a route
 
 - **A fourth kind of focus strategy, the order — how the subject comes on — and its first strategy, `path`.**
-  A click lights its subject piece after piece along a route, as a request travels it (node, wire, node): each
-  lights at its turn, `step` seconds apart (0.35), and glows as it is reached — on every forward click, so the
-  request travels again; `route` names the order (default: the click's `on`), a name shared by several pieces is
-  one turn, and a lit piece off the route lights at once. A `line` names the route once it is done (`lineAt`
-  places it; default the area's bottom left). Borrowed from the isometric figures where a request lights its path.
-- `focusStep` gives each piece its `path` (its turn's delay, or null) and the look its `path`
-  ({turns, step, done, line, lineAt}); `focusOverlay` writes the line; `focus.css` animates it — only on a forward
-  click, never under reduced motion (`--sd-glow` colours the pulse). Entering, lighting and arriving now wait for
-  `--sd-delay` (a path's turn) too.
+  A click lights its subject piece after piece along a route, as a request travels it (node, wire, node): each lit
+  piece on it lights at its turn, `step` seconds apart (0.35), and glows as it is reached — on every forward click,
+  so the request travels again; `route` names the order (default, and for an empty `route`: the click's `on`, or its
+  `in`), a name shared by several pieces is one turn, a name with nothing lit takes none (a greyed piece never waits
+  or glows grey), and a lit piece off the route lights at once. A click that asks for a path with no order at all
+  (`on: ['*']`) is refused, naming the fix: write the pieces in the order they light. A `line` names the route once
+  it is done (`lineAt` places it; default the area's bottom left). Borrowed from the isometric figures where a
+  request lights its path.
+- Everything on a path keeps its turn. A piece lit from grey plays one animation, `sdLightPulse`, whose filter lists
+  the same functions at every keyframe, so it glides into colour and the glow (a light and a pulse on one filter
+  would flash); a ring (`hot`) comes .3 s after its piece's turn; a dashed twin stays until its solid twin's turn,
+  then steps aside, so the wire is never missing; and under a new blur the whole path, line included, waits .4 s for
+  it, as what a click adds does. One variable carries a piece's moment, `--sd-turn`.
+- `focusStep` gives each piece its `path` (its turn's delay, or null) and `twinTurn` (stepping aside for a lit twin
+  on the route: that twin's turn, or null), and the look its `path` ({turns, step, done, line, lineAt}; `line` '' and
+  `lineAt` null when none is given). What an order's `route()` gives — a deck's own too — is checked (names, a
+  `step` of 0–5 s, a text `line`, a `lineAt` of 'x y' or null) and refused with the strategy's name and the fix,
+  and is only read, never written to (a frozen result is fine). `focusOverlay` writes the line; `focus.css` animates
+  the path only on a forward click, never under reduced motion (`--sd-glow` colours the pulse). A click without a
+  path is drawn byte for byte as 0.3.0 drew it.
 
 ## 0.3.0 — `footprint-storydeck`; the narration rules move into footprint-narration
 

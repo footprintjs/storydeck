@@ -115,22 +115,26 @@ export const FOCUS = Object.freeze({
     })};
   }}),
   /**
+   * The subject comes on piece after piece along a route, as a request travels it: `route` names the pieces in
+   * order (default — and for an empty `route` too — the click's `on`, or its `in`, in the order written), each lit
+   * one lights `step` (0.35) s after the one before and glows as it is reached; `line` is text that names the route
+   * ("agent → MCP → gateway"), shown when the route is done, at `lineAt` (x y, slide px; default the area's bottom
+   * left). A lit piece not on the route lights at once. A route still empty (`on: ['*']` names no order) is refused.
+   */
+  path: Object.freeze({name: 'path', kind: 'order', route({names, options}) {
+    const step = num(options.step, .35);
+    if (!(step >= 0 && step <= 5)) throw new Error(`focus "path": step is the seconds between two pieces of the route (0–5), not "${options.step}"`);
+    const route = options.route === undefined || options.route === null ? [] : [].concat(options.route).flatMap(x => String(x).trim().split(/\s+/)).filter(x => x && x !== '*');
+    const order = route.length ? route : names;
+    if (!order.length) throw new Error('focus "path": the route is empty — write the pieces in the order they light, in `on` or `route` (\'*\' names no order)');
+    return {names: order, step, line: options.line ?? '', lineAt: options.lineAt ?? null};
+  }}),
+  /**
    * Everything outside the frame is blurred. The frame is `rect` (slide px, x y w h; several are fine — the
    * first gets the frame and the label, the others are clear holes too) or, without one, the subject where it
    * ends up, `pad` (24) px around it. `out: 'first'` keeps only the frame clear while the blur leaves (what sat
    * beside it melts into the blur).
    */
-  /**
-   * The subject comes on piece after piece along a route, as a request travels it: `route` names the pieces in
-   * order (default: the click's `on`, in the order written), each lights `step` (0.35) s after the one before and
-   * glows as it is reached; `line` is text that names the route ("agent → MCP → gateway"), shown when the route
-   * is done, at `lineAt` (x y, slide px; default the area's bottom left). A lit piece not on the route lights at once.
-   */
-  path: Object.freeze({name: 'path', kind: 'order', route({names, options}) {
-    const step = num(options.step, .35);
-    if (!(step >= 0 && step <= 5)) throw new Error(`focus "path": step is the seconds between two pieces of the route (0–5), not "${options.step}"`);
-    return {names: options.route !== undefined && options.route !== '' ? [].concat(options.route).flatMap(x => String(x).trim().split(/\s+/)).filter(Boolean) : names, step, line: options.line ?? '', lineAt: options.lineAt ?? null};
-  }}),
   blur: Object.freeze({name: 'blur', kind: 'overlay', cover({subjectOnSlide, options}) {
     const pad = num(options.pad, 24), b = subjectOnSlide;
     const rects = options.rect !== undefined && options.rect !== '' ? readRects(options.rect) : b ? [[b.x - pad, b.y - pad, b.w + 2 * pad, b.h + 2 * pad]] : [];
@@ -166,6 +170,22 @@ function pick(focus, strategies) {
   return byKind;
 }
 
+/**
+ * What an order's `route()` gave, checked like its kind — a deck's own order is held to what the built-in gives —
+ * and read into a new object (the strategy's own is never written to): line '' and lineAt null when it gives none.
+ */
+function readRoute(r, strategy) {
+  const shown = v => (typeof v === 'number' || v === undefined ? String(v) : JSON.stringify(v));
+  const refuse = fix => { throw new Error(`focus "${strategy}": ${fix}`); };
+  if (!r || typeof r !== 'object') refuse(`route() gives {names, step, line?, lineAt?}, not ${shown(r)}`);
+  const {names, step, line, lineAt} = r;
+  if (!Array.isArray(names) || names.some(n => typeof n !== 'string')) refuse(`a route's names are a list of piece names, in the order they light — not ${shown(names)}`);
+  if (typeof step !== 'number' || !Number.isFinite(step) || step < 0 || step > 5) refuse(`a route's step is the seconds between two turns, a number from 0 to 5 — not ${shown(step)}`);
+  if (line !== undefined && typeof line !== 'string') refuse(`a route's line is text that names it, or left out — not ${shown(line)}`);
+  if (lineAt !== undefined && lineAt !== null && typeof lineAt !== 'string') refuse(`a route's lineAt is 'x y' in slide px, null, or left out — not ${shown(lineAt)}`);
+  return {names: [...names], step, line: line ?? '', lineAt: lineAt ?? null};
+}
+
 /** Where a group move puts one piece: its reference point (the centre, or the top-left when it has no size) moves by [dx, dy], and it scales by s around it. */
 function placePiece(g, box) {
   if (!g || !box) return null;
@@ -196,7 +216,8 @@ function changeOf(st, was, look, wasLook, entering, before) {
  * One click. `prev` is the state the last click left (null on a slide's first click when the map arrives
  * fresh). `deck`: {pieces: [{keys, box, twin?}], strategies?, area?, view?, canvas?}. Returns {state, look}:
  * the state to hand the next click, and the look to draw — per piece {state, was, change, look, fromLook, hot,
- * hotIn, move, from, twinOff, path (its turn's delay in seconds, on a route; else null)}, the stage's move, the
+ * hotIn, move, from, twinOff, twinTurn (stepping aside for a lit twin on a route: the seconds until that twin's
+ * turn; else null), path (a lit piece on a route: the seconds until its turn; else null)}, the stage's move, the
  * overlay, the path ({turns, step, done, line, lineAt}, or null) and which strategies were used.
  */
 export function focusStep(prev, step, deck) {
@@ -211,7 +232,8 @@ export function focusStep(prev, step, deck) {
   pieces.forEach((_, i) => { if (has(i, ins)) vis.add(i); if (has(i, outs)) vis.delete(i); });
   const states = pieces.map((_, i) => !vis.has(i) ? 'gone' : !on || has(i, on) || (!step.quiet && has(i, ins)) ? 'on' : 'dim');
   // A piece with a twin (a dashed wire under a solid one) steps aside while its twin is lit, so the two never show at once.
-  const twinOff = new Set(pieces.map((_, i) => i).filter(i => pieces[i].twin?.length && states[i] !== 'gone' && pieces.some((q, j) => states[j] === 'on' && j !== i && pieces[i].twin.some(t => q.keys.includes(t)))));
+  const litTwins = pieces.map((p, i) => p.twin?.length ? pieces.map((_, j) => j).filter(j => j !== i && states[j] === 'on' && p.twin.some(t => pieces[j].keys.includes(t))) : []);
+  const twinOff = new Set(pieces.map((_, i) => i).filter(i => states[i] !== 'gone' && litTwins[i].length));
   twinOff.forEach(i => { states[i] = 'gone'; });
   const chosen = pick(readFocus(step.focus, step.options), strategies);
   const look = chosen.look?.s.look ?? 'grey';
@@ -237,19 +259,21 @@ export function focusStep(prev, step, deck) {
   const subjectOnSlide = ends ? {x: ends.x * view.s + view.x, y: ends.y * view.s + view.y, w: ends.w * view.s, h: ends.h * view.s} : null;
   const cover = chosen.overlay ? chosen.overlay.s.cover({subjectOnSlide, canvas, options: chosen.overlay.options}) : null;
   const looks = pieces.map((_, i) => states[i] === 'dim' ? look : null);
-  // An order: the subject piece after piece along a route. The pieces of each name on it, as shown, take the next
-  // turn together (a name with nothing shown takes none); a piece named twice keeps its first turn.
-  const order = chosen.order ? chosen.order.s.route({names: (on ?? ins).filter(x => x !== '*'), options: chosen.order.options}) : null;
-  const turns = new Map();
-  if (order) {
-    let turn = 0;
-    for (const name of known(order.names, 'focus route: ')) {
-      const reached = all.filter(i => states[i] !== 'gone' && pieces[i].keys.includes(name) && !turns.has(i));
-      reached.forEach(i => turns.set(i, turn));
-      if (reached.length) turn += 1;
-    }
-    order.turns = turn;
+  // An order: the subject piece after piece along a route. The LIT pieces of each name on it take the next turn
+  // together — a name with nothing lit takes none, so a greyed piece never waits or glows grey; a piece named twice
+  // keeps its first turn.
+  const order = chosen.order ? readRoute(chosen.order.s.route({names: (on ?? ins).filter(x => x !== '*'), options: chosen.order.options}), chosen.order.name) : null;
+  const turnOf = new Map();
+  let turns = 0;
+  for (const name of order ? known(order.names, 'focus route: ') : []) {
+    const reached = all.filter(i => states[i] === 'on' && pieces[i].keys.includes(name) && !turnOf.has(i));
+    reached.forEach(i => turnOf.set(i, turns));
+    if (reached.length) turns += 1;
   }
+  const delayOf = i => (turnOf.has(i) ? round(turnOf.get(i) * order.step, 3) : null);
+  // A piece stepping aside for a lit twin on the route stays until that twin's turn (the first of them to come), then
+  // goes — so the wire never goes missing while its twin waits; a lit twin off the route lights at once, and so it goes.
+  const twinTurn = i => (litTwins[i].length && litTwins[i].every(j => turnOf.has(j)) ? Math.min(...litTwins[i].map(delayOf)) : null);
   // What changed since the last click: only that moves. A piece that leaves keeps how it looked and where it
   // stood, so it fades out from there instead of jumping home in colour first.
   const before = prev && !step.fresh ? prev : null;
@@ -262,7 +286,7 @@ export function focusStep(prev, step, deck) {
     return {state: st, was, change, look: leaving ? wasLook : looks[i], fromLook: change === 'relook' ? wasLook : null,
       hot: hotNow.has(i), hotIn: hotNow.has(i) && (!before || !before.hot.has(i)),
       move: leaving ? stood : st === 'gone' ? null : moves[i], from: moved ? from ?? {dx: 0, dy: 0, s: 1} : null, twinOff: twinOff.has(i),
-      path: turns.has(i) ? round(turns.get(i) * order.step, 3) : null};
+      twinTurn: leaving && twinOff.has(i) ? twinTurn(i) : null, path: delayOf(i)};
   });
   const stageMoved = !!before && !sameStage(before.stage, stage);
   // The blur: new only when the last click had none (a blur that moves to another subject stays, and only its
@@ -272,7 +296,7 @@ export function focusStep(prev, step, deck) {
   return {
     state: {vis, states, moves, stage, hot: hotNow, cover, looks},
     look: {pieces: out, stage: stage || stageMoved ? {move: stage, from: stageMoved ? before.stage ?? {s: 1, x: 0, y: 0} : null} : null, overlay,
-      path: order && order.turns ? {turns: order.turns, step: order.step, done: round((order.turns - 1) * order.step, 3), line: order.line, lineAt: order.lineAt} : null,
+      path: turns ? {turns, step: order.step, done: round((turns - 1) * order.step, 3), line: order.line, lineAt: order.lineAt} : null,
       strategies: Object.values(chosen).map(c => c.name), subject: subjectOnSlide},
   };
 }

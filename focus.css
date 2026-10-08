@@ -47,6 +47,7 @@
 @property --sd-a-move { syntax: '*'; inherits: false; }
 @property --sd-a-hot { syntax: '*'; inherits: false; }
 @property --sd-a-path { syntax: '*'; inherits: false; }
+@property --sd-turn { syntax: '*'; inherits: false; }   /* a piece's moment on a path; never inherited, so 0 off the route */
 @keyframes sdNone {}
 @keyframes sdEnter { from { opacity: 0; scale: calc(var(--sd-s, 1) * .92); } }
 @keyframes sdArrive { from { opacity: 0; } }
@@ -59,23 +60,36 @@
 @keyframes sdVeilIn { from { opacity: 0; } }
 @keyframes sdVeilOut { from { opacity: 1; } to { opacity: 0; } }
 @keyframes sdPulse { 40% { filter: drop-shadow(0 0 14px var(--sd-glow, var(--sd-accent, var(--yellow, #facc15)))) brightness(1.2); } }
+/* a piece that lights from grey at its turn: sdLight and sdPulse as ONE animation. Two on one filter swap their lists
+   (grayscale ↔ drop-shadow brightness) at a jump — a flash; here every keyframe lists the same functions in the same
+   order, so the filter glides from grey into colour and the glow, and back to the plain style (the implicit end) */
+@keyframes sdLightPulse { from { opacity: var(--sd-dim-opacity, .32); filter: grayscale(1) drop-shadow(0 0 0 transparent) brightness(1); }
+  40% { filter: grayscale(0) drop-shadow(0 0 14px var(--sd-glow, var(--sd-accent, var(--yellow, #facc15)))) brightness(1.2); } }
 @media screen and (prefers-reduced-motion: no-preference) {
   .sd-enter { --sd-a-state: sdEnter .6s var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) var(--sd-delay, 0s) both; }
-  .sd-light { --sd-a-state: sdLight .7s ease var(--sd-delay, 0s) both; }
-  .sd-arrive { --sd-a-state: sdArrive .6s ease var(--sd-delay, 0s) both; }
+  .sd-arrive { --sd-a-state: sdArrive .6s ease both; }
+  .sd-light { --sd-a-state: sdLight .7s ease both; }
   .sd-fade { --sd-a-state: sdFade .7s ease both; }
   .sd-leave { --sd-a-state: sdLeave .45s ease both; }
   .sd-relook.sd-from-grey { --sd-a-state: sdLight .7s ease both; }   /* a greyed piece whose look changed, from its old look */
   .sd-relook.sd-from-hide { --sd-a-state: sdArrive .6s ease both; }
   .sd-relook.sd-from-keep { --sd-a-state: sdFade .7s ease both; }
   .sd-move { --sd-a-move: sdMove var(--sd-move-time, 1s) var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) both; }
-  .sd-hot-in { --sd-a-hot: sdRing .6s var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) .3s both; }
+  .sd-hot-in { --sd-a-hot: sdRing .6s var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) calc(.3s + var(--sd-turn, 0s)) both; }   /* on a path, .3s after its turn */
   .sd-focus-new .sd-enter { --sd-delay: .4s; }   /* what a click adds waits for its blur */
-  /* a path: each piece on the route lights at its turn, and glows as the route reaches it (every forward click) */
-  .sd.sd-path { --sd-delay: var(--sd-path-delay, 0s); --sd-a-path: sdPulse .9s ease var(--sd-path-delay, 0s); }
+  /* a path: everything on it has one moment, --sd-turn — its delay, and .4s more under a new blur, so the whole path
+     waits for the blur and then runs. A piece on the route enters, arrives or lights then, and glows as the route
+     reaches it (on every forward click); a piece stepping aside for its lit twin goes then; the line shows then. */
+  :is(.sd-path, .sd-twin-turn, .sd-path-line) { --sd-turn: var(--sd-path-delay, 0s); }
+  .sd-focus-new :is(.sd-path, .sd-twin-turn, .sd-path-line) { --sd-turn: calc(var(--sd-path-delay, 0s) + .4s); }
+  .sd-path { --sd-a-path: sdPulse .9s ease var(--sd-turn); }
+  .sd-path.sd-enter { --sd-a-state: sdEnter .6s var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) var(--sd-turn) both; }
+  .sd-path.sd-arrive { --sd-a-state: sdArrive .6s ease var(--sd-turn) both; }
+  .sd-path.sd-light { --sd-a-state: sdLightPulse .9s ease var(--sd-turn) backwards; --sd-a-path: sdNone 0s; }   /* grey until its turn */
+  .sd-twin-turn.sd-leave { --sd-a-state: sdLeave .45s ease var(--sd-turn) both; }
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) :is(.sd-enter, .sd-arrive, .sd-light, .sd-fade, .sd-leave, .sd-relook, .sd-move, .sd-hot-in, .sd-path) {
     animation: var(--sd-a-state, sdNone 0s), var(--sd-a-move, sdNone 0s), var(--sd-a-hot, sdNone 0s), var(--sd-a-path, sdNone 0s); }
-  :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-path-line { animation: sdArrive .5s ease var(--sd-path-done, 0s) both; }
+  :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-path-line { animation: sdArrive .5s ease var(--sd-turn) both; }
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-stage.sd-move { animation: sdStage var(--sd-move-time, 1s) var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) both; }
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-veil-in-new { animation: sdVeilIn .7s cubic-bezier(.4, 0, .2, 1) both; }
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-frame.sd-new { animation: sdArrive .5s ease .35s both; }
