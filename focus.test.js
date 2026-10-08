@@ -340,6 +340,9 @@ describe('focus · path: the subject piece after piece along a route', () => {
     expect(delays(looks[0])).toEqual([0.2, null, 0, null, null, null]);
     expect(looks[0].path).toEqual({ turns: 2, step: 0.2, done: 0.2, line: '', lineAt: null });
     expect(given).toEqual({ names: ['gw', 'agent'], step: 0.2 });
+    // A blank lineAt (an empty data-focus-line-at) is none, as left out.
+    const blank = planFocus([{ in: ['*'], on: ['agent', 'gw'], focus: 'path', options: { line: 'a → b', lineAt: '  ' } }], d);
+    expect(blank.looks[0].path.lineAt).toBe(null);
   });
 
   it('refuses a route a deck\'s own order gives that it cannot use, naming the strategy and the fix', () => {

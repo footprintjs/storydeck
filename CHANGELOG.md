@@ -8,8 +8,8 @@
   so the request travels again; `route` names the order (default, and for an empty `route`: the click's `on`, or its
   `in`), a name shared by several pieces is one turn, a name with nothing lit takes none (a greyed piece never waits
   or glows grey), and a lit piece off the route lights at once. A click that asks for a path with no order at all
-  (`on: ['*']`) is refused, naming the fix: write the pieces in the order they light. A `line` names the route once
-  it is done (`lineAt` places it; default the area's bottom left). Borrowed from the isometric figures where a
+  (`on: ['*']`) is refused, naming the fix: write the pieces in the order they light. A `line` names the route, shown
+  as the last turn starts (`lineAt` places it; default the area's bottom left; a blank one is none). Borrowed from the isometric figures where a
   request lights its path.
 - Everything on a path keeps its turn. A piece lit from grey plays one animation, `sdLightPulse`, whose filter lists
   the same functions at every keyframe, so it glides into colour and the glow (a light and a pulse on one filter

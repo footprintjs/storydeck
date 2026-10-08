@@ -183,7 +183,7 @@ function readRoute(r, strategy) {
   if (typeof step !== 'number' || !Number.isFinite(step) || step < 0 || step > 5) refuse(`a route's step is the seconds between two turns, a number from 0 to 5 — not ${shown(step)}`);
   if (line !== undefined && typeof line !== 'string') refuse(`a route's line is text that names it, or left out — not ${shown(line)}`);
   if (lineAt !== undefined && lineAt !== null && typeof lineAt !== 'string') refuse(`a route's lineAt is 'x y' in slide px, null, or left out — not ${shown(lineAt)}`);
-  return {names: [...names], step, line: line ?? '', lineAt: lineAt ?? null};
+  return {names: [...names], step, line: line ?? '', lineAt: lineAt?.trim() ? lineAt : null};   // (a blank lineAt, an empty data-focus-line-at, is none)
 }
 
 /** Where a group move puts one piece: its reference point (the centre, or the top-left when it has no size) moves by [dx, dy], and it scales by s around it. */
