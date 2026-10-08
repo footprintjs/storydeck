@@ -148,13 +148,13 @@ describe('focus · strategies', () => {
 
   it('a click takes one strategy of each kind, from the built-ins or the deck\'s own', () => {
     expect(() => focusStep(null, { ...lit, focus: 'zoom left' }, deck)).toThrow(/one mover at most.*"zoom" and "left"/);
-    expect(() => focusStep(null, { ...lit, focus: 'spin' }, deck)).toThrow(/no focus strategy "spin" \(there are grey, hide, keep, zoom, left, right, up, down, place, blur\)/);
+    expect(() => focusStep(null, { ...lit, focus: 'spin' }, deck)).toThrow(/no focus strategy "spin" \(there are grey, hide, keep, zoom, left, right, up, down, place, path, blur\)/);
     const tilt = { kind: 'mover', place: ({ subject }) => ({ subject: { o: [subject.x, subject.y], s: 2, t: [0, 0] } }) };
     const look = focusStep(null, { ...lit, focus: 'tilt' }, { ...deck, strategies: { tilt } }).look;
     expect(look.strategies).toEqual(['tilt']);
     expect(look.pieces[1].move.s).toBe(2);
-    expect(() => focusStep(null, { ...lit, focus: 'odd' }, { ...deck, strategies: { odd: { kind: 'paint' } } })).toThrow(/a look, a mover or an overlay/);
-    expect(Object.keys(FOCUS)).toEqual(['grey', 'hide', 'keep', 'zoom', 'left', 'right', 'up', 'down', 'place', 'blur']);
+    expect(() => focusStep(null, { ...lit, focus: 'odd' }, { ...deck, strategies: { odd: { kind: 'paint' } } })).toThrow(/a look, a mover, an overlay or an order/);
+    expect(Object.keys(FOCUS)).toEqual(['grey', 'hide', 'keep', 'zoom', 'left', 'right', 'up', 'down', 'place', 'path', 'blur']);
   });
 });
 
@@ -265,5 +265,51 @@ describe('focus · moves between clicks', () => {
     const [mx, my] = [stage.move.s * 1250 + stage.move.x, stage.move.s * 425 + stage.move.y];
     expect(mx * 0.5 + 100).toBeCloseTo(960, 1);
     expect(my * 0.5 + 50).toBeCloseTo(600, 1);
+  });
+});
+
+describe('focus · path: the subject piece after piece along a route', () => {
+  // a request's route: agent → wire → gateway → wire → app, and a note beside it
+  const route = [
+    { keys: ['agent'], box: { x: 100, y: 300, w: 200, h: 100 } },
+    { keys: ['wire', 'link-a'], box: { x: 300, y: 340, w: 200, h: 20 } },
+    { keys: ['gw'], box: { x: 500, y: 300, w: 200, h: 100 } },
+    { keys: ['wire', 'link-b'], box: { x: 700, y: 340, w: 200, h: 20 } },
+    { keys: ['app'], box: { x: 900, y: 300, w: 200, h: 100 } },
+    { keys: ['note'], box: { x: 100, y: 600, w: 300, h: 60 } },
+  ];
+  const d = { pieces: route, area: [0, 200, 1920, 1000] };
+  const delays = (look) => look.pieces.map((p) => p.path);
+
+  it('lights the route in the order the click names it, a turn per name, `step` seconds apart', () => {
+    const { looks } = planFocus([{ in: ['*'], on: ['agent', 'link-a', 'gw', 'link-b', 'app'], focus: 'path' }], d);
+    expect(delays(looks[0])).toEqual([0, 0.35, 0.7, 1.05, 1.4, null]);   // the note is not on the route
+    expect(looks[0].path).toEqual({ turns: 5, step: 0.35, done: 1.4, line: '', lineAt: null });
+    expect(looks[0].strategies).toEqual(['path']);
+  });
+
+  it('takes its own route and step: a name shared by several pieces is one turn, a lit piece off the route lights at once', () => {
+    const { looks } = planFocus([{ in: ['*'], on: ['agent', 'wire', 'gw', 'note'], focus: { strategy: 'path', route: 'agent wire gw', step: '0.5' } }], d);
+    expect(delays(looks[0])).toEqual([0, 0.5, 1, 0.5, null, null]);
+    expect(looks[0].pieces[5].state).toBe('on');
+  });
+
+  it('goes with a look, a mover and an overlay, and names its route with a line', () => {
+    const { looks } = planFocus([{ in: ['*'], on: ['agent', 'gw'], focus: 'path grey blur', options: { line: 'agent → gateway' } }], d);
+    expect(looks[0].strategies.sort()).toEqual(['blur', 'grey', 'path']);
+    expect(looks[0].path.line).toBe('agent → gateway');
+  });
+
+  it('refuses a route that names no piece, a step it cannot use, and two orders in one click', () => {
+    expect(() => planFocus([{ in: ['*'], focus: { strategy: 'path', route: 'agent ghost' } }], d)).toThrow(/focus route: no piece "ghost"/);
+    expect(() => planFocus([{ in: ['*'], focus: { strategy: 'path', step: '9' } }], d)).toThrow(/step is the seconds between two pieces of the route \(0–5\)/);
+    const strategies = { wave: { kind: 'order', route: () => ({ names: [], step: 0 }) } };
+    expect(() => planFocus([{ in: ['*'], focus: 'path wave' }], { ...d, strategies })).toThrow(/a click takes one order at most: "path" and "wave" are both orders/);
+  });
+
+  it('a route with nothing shown on it is no path', () => {
+    const { looks } = planFocus([{ in: ['agent'], focus: { strategy: 'path', route: 'gw app' } }], d);
+    expect(looks[0].path).toBe(null);
+    expect(delays(looks[0]).every((x) => x === null)).toBe(true);
   });
 });

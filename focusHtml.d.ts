@@ -13,7 +13,7 @@ export function drawFocus(html: string, look: FocusLook): string;
 export function wrapStage(inner: string, look: FocusLook): string;
 /** Classes for the slide around a click: 'sd-focus-new' while its blur comes in, else ''. */
 export function slideClass(look: FocusLook): string;
-/** The click's blur, holes and labelled frame, in slide px — outside the map's box (empty when it has none). */
+/** The overlay of a click in slide px — the blur, its frame and label, and a path's line (once its route is done) — put outside the map's box; '' when the click has none. */
 export function focusOverlay(look: FocusLook, options?: { canvas?: { w: number; h: number }; area?: readonly [number, number, number, number] }): string;
 /** Runs in the page; call it once, at any time: only a forward click animates; a jump or a step back lands at once. */
 export function focusRuntime(): void;

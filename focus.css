@@ -9,7 +9,8 @@
  * its own entrance, say — wins without !important.
  *
  * Tokens (set them in your theme; each has a fallback): --sd-dim-opacity · --sd-hot · --sd-blur ·
- * --sd-veil · --sd-accent (falls back to storydeck's --yellow) · --sd-ease · --sd-move-time.
+ * --sd-veil · --sd-accent (falls back to storydeck's --yellow) · --sd-ease · --sd-move-time · --sd-glow (a path's
+ * pulse, falls back to the accent).
  */
 
 /* a piece's state: on (in colour), dim (the context: greyed in place, or hidden, or kept), gone */
@@ -37,10 +38,15 @@
   color: var(--sd-accent, var(--yellow, #facc15)); }
 @media print { .sd-veil { display: none; } }
 
+/* a path: its line, naming the route, in slide px (it shows once the route is done) */
+.sd-path-line { position: absolute; pointer-events: none; white-space: nowrap; font: 600 22px/1 var(--mono, ui-monospace, monospace);
+  letter-spacing: .04em; color: var(--sd-accent, var(--yellow, #facc15)); }
+
 /* motion: each change fills its own slot, so a piece that moves AND lights does both */
 @property --sd-a-state { syntax: '*'; inherits: false; }
 @property --sd-a-move { syntax: '*'; inherits: false; }
 @property --sd-a-hot { syntax: '*'; inherits: false; }
+@property --sd-a-path { syntax: '*'; inherits: false; }
 @keyframes sdNone {}
 @keyframes sdEnter { from { opacity: 0; scale: calc(var(--sd-s, 1) * .92); } }
 @keyframes sdArrive { from { opacity: 0; } }
@@ -52,10 +58,11 @@
 @keyframes sdStage { from { translate: var(--sd-tx0, 0px) var(--sd-ty0, 0px); scale: var(--sd-ts0, 1); } }
 @keyframes sdVeilIn { from { opacity: 0; } }
 @keyframes sdVeilOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes sdPulse { 40% { filter: drop-shadow(0 0 14px var(--sd-glow, var(--sd-accent, var(--yellow, #facc15)))) brightness(1.2); } }
 @media screen and (prefers-reduced-motion: no-preference) {
   .sd-enter { --sd-a-state: sdEnter .6s var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) var(--sd-delay, 0s) both; }
-  .sd-arrive { --sd-a-state: sdArrive .6s ease both; }
-  .sd-light { --sd-a-state: sdLight .7s ease both; }
+  .sd-light { --sd-a-state: sdLight .7s ease var(--sd-delay, 0s) both; }
+  .sd-arrive { --sd-a-state: sdArrive .6s ease var(--sd-delay, 0s) both; }
   .sd-fade { --sd-a-state: sdFade .7s ease both; }
   .sd-leave { --sd-a-state: sdLeave .45s ease both; }
   .sd-relook.sd-from-grey { --sd-a-state: sdLight .7s ease both; }   /* a greyed piece whose look changed, from its old look */
@@ -64,8 +71,11 @@
   .sd-move { --sd-a-move: sdMove var(--sd-move-time, 1s) var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) both; }
   .sd-hot-in { --sd-a-hot: sdRing .6s var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) .3s both; }
   .sd-focus-new .sd-enter { --sd-delay: .4s; }   /* what a click adds waits for its blur */
-  :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) :is(.sd-enter, .sd-arrive, .sd-light, .sd-fade, .sd-leave, .sd-relook, .sd-move, .sd-hot-in) {
-    animation: var(--sd-a-state, sdNone 0s), var(--sd-a-move, sdNone 0s), var(--sd-a-hot, sdNone 0s); }
+  /* a path: each piece on the route lights at its turn, and glows as the route reaches it (every forward click) */
+  .sd.sd-path { --sd-delay: var(--sd-path-delay, 0s); --sd-a-path: sdPulse .9s ease var(--sd-path-delay, 0s); }
+  :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) :is(.sd-enter, .sd-arrive, .sd-light, .sd-fade, .sd-leave, .sd-relook, .sd-move, .sd-hot-in, .sd-path) {
+    animation: var(--sd-a-state, sdNone 0s), var(--sd-a-move, sdNone 0s), var(--sd-a-hot, sdNone 0s), var(--sd-a-path, sdNone 0s); }
+  :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-path-line { animation: sdArrive .5s ease var(--sd-path-done, 0s) both; }
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-stage.sd-move { animation: sdStage var(--sd-move-time, 1s) var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) both; }
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-veil-in-new { animation: sdVeilIn .7s cubic-bezier(.4, 0, .2, 1) both; }
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-frame.sd-new { animation: sdArrive .5s ease .35s both; }

@@ -74,9 +74,18 @@ decision every click makes again, so it is data on the click, and the library do
 | mover | `left` · `right` · `up` · `down` | the context steps aside that way, smaller (`scale`), and the subject grows into the room it leaves (`grow`, `fill`, `gap`, `align`; `move: 'aside'` keeps the subject where it is) |
 | mover | `place` | named groups moved by the amounts you give (`groups: 'page floor: -90 -200 0.5 \| tl: 0 -230 1.1 @ 960 968'`): a layout you art-direct, still animated from wherever the last click left it |
 | overlay | `blur` | everything outside the subject's frame is blurred; a frame (and a `label`) on it, or on the `rect`s you give |
+| order | `path` | the subject comes on piece after piece along a route, as a request travels it — node, wire, node — each lighting at its turn (`step` seconds apart, 0.35) and glowing as it is reached; `route` names the order (default: the click's `on`), and a `line` ("agent → MCP → gateway") names the route once it is done |
 
 `'left blur'` reads: the context steps aside to the left, greyed, under a blur, and the subject grows on
-the right, framed. Bring your own strategy of any kind (`strategies: { name: { kind, … } }`).
+the right, framed. `'path grey'` lights a route in turn and greys the rest. Bring your own strategy of any kind
+(`strategies: { name: { kind, … } }`).
+
+**A path, on a diagram of an app.** An architecture slide is a route more often than a picture: who calls whom.
+Write the click's `on` in the order a request travels it, wires included, and the path lights it that way:
+
+```html
+<step data-on="agent link-mcp mcp link-gw gw" data-focus="path" data-focus-line="agent → MCP → gateway"></step>
+```
 
 The plan is plain data (each piece's state, what changed since the last click, how far it moved), so a
 renderer only draws it. `footprint-storydeck/focus-html` writes it into slide HTML at build time and

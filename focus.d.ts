@@ -53,11 +53,15 @@ export interface FocusContext {
   readonly options: Readonly<Record<string, unknown>>;
 }
 
-/** A focus strategy: a look (how the context looks), a mover (where things go) or an overlay (what lies over the slide). */
+/** A route, as an order strategy gives it: the names in turn, the seconds between two turns, and the line that names it. */
+export interface FocusRoute { readonly names: readonly string[]; readonly step: number; readonly line?: string; readonly lineAt?: string | null }
+
+/** A focus strategy: a look (how the context looks), a mover (where things go), an overlay (what lies over the slide) or an order (how the subject comes on). */
 export type FocusStrategy =
   | { readonly name?: string; readonly kind: 'look'; readonly look: 'grey' | 'hide' | 'keep' }
   | { readonly name?: string; readonly kind: 'mover'; place(ctx: FocusContext): { stage?: FocusGroup; subject?: FocusGroup; context?: FocusGroup; groups?: { names: readonly string[]; g: FocusGroup | null }[] } }
-  | { readonly name?: string; readonly kind: 'overlay'; cover(ctx: { subjectOnSlide: FocusBox | null; canvas: { w: number; h: number }; options: Readonly<Record<string, unknown>> }): { rects: number[][]; label?: string; out?: number[][] } | null };
+  | { readonly name?: string; readonly kind: 'overlay'; cover(ctx: { subjectOnSlide: FocusBox | null; canvas: { w: number; h: number }; options: Readonly<Record<string, unknown>> }): { rects: number[][]; label?: string; out?: number[][] } | null }
+  | { readonly name?: string; readonly kind: 'order'; route(ctx: { names: readonly string[]; options: Readonly<Record<string, unknown>> }): FocusRoute };
 
 export interface FocusDeck {
   readonly pieces: readonly FocusPiece[];
@@ -89,6 +93,8 @@ export interface FocusPieceLook {
   readonly from: FocusMove | null;
   /** It stepped aside for its lit twin. */
   readonly twinOff: boolean;
+  /** On a path: the seconds its turn waits (0 for the first); null when it is not on the route. */
+  readonly path: number | null;
 }
 
 export interface FocusLook {
@@ -97,6 +103,8 @@ export interface FocusLook {
   readonly stage: { readonly move: { s: number; x: number; y: number } | null; readonly from: { s: number; x: number; y: number } | null } | null;
   /** The blur: 'in-new' when the last click had none, 'in' while it stays, 'out' as it melts away; frameNew when its frame moved or appeared. */
   readonly overlay: { readonly rects: readonly (readonly number[])[]; readonly label: string; readonly phase: 'in-new' | 'in' | 'out'; readonly frameNew: boolean } | null;
+  /** A path: how many turns, the seconds between two, when the last starts (done), and its line; null without one. */
+  readonly path: { readonly turns: number; readonly step: number; readonly done: number; readonly line: string; readonly lineAt: string | null } | null;
   readonly strategies: readonly string[];
   /** The subject where it ends up, on the slide. */
   readonly subject: FocusBox | null;
@@ -105,7 +113,7 @@ export interface FocusLook {
 /** The state a click leaves, to start the next from. Opaque. */
 export type FocusState = { readonly __focusState: true } & Record<string, unknown>;
 
-export const FOCUS: Readonly<Record<'grey' | 'hide' | 'keep' | 'zoom' | 'left' | 'right' | 'up' | 'down' | 'place' | 'blur', FocusStrategy>>;
+export const FOCUS: Readonly<Record<'grey' | 'hide' | 'keep' | 'zoom' | 'left' | 'right' | 'up' | 'down' | 'place' | 'path' | 'blur', FocusStrategy>>;
 export function readFocus(spec: FocusSpec | undefined | null, shared?: Readonly<Record<string, unknown>>): { strategy: string; options: Record<string, unknown> }[];
 export function focusStep(prev: FocusState | null, click: FocusClick, deck: FocusDeck): { state: FocusState; look: FocusLook };
 /** `end` is null only when there are no clicks and no `start`. */

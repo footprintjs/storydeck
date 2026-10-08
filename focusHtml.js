@@ -69,9 +69,11 @@ function pieceLook(p) {
   if (p.hot) cls.push('sd-hot');
   if (p.hotIn) cls.push('sd-hot-in');
   if (p.twinOff) cls.push('sd-twin-off');
+  if (p.path !== null && p.path !== undefined) cls.push('sd-path');
   const vars = [];
   if (p.move) { cls.push('sd-moved'); vars.push(`--sd-dx:${p.move.dx}px`, `--sd-dy:${p.move.dy}px`, `--sd-s:${p.move.s}`); }
   if (p.from) { cls.push('sd-move'); vars.push(`--sd-dx0:${p.from.dx}px`, `--sd-dy0:${p.from.dy}px`, `--sd-s0:${p.from.s}`); }
+  if (p.path !== null && p.path !== undefined) vars.push(`--sd-path-delay:${p.path}s`);   // its turn on the route
   // The point it scales around, inline, so no stylesheet's transform-origin can move it off the planned place.
   const ref = p.move ?? p.from;
   if (ref) { if (ref.origin === 'top-left') cls.push('sd-origin-tl'); vars.push(`transform-origin:${ref.origin === 'top-left' ? '0 0' : '50% 50%'}`); }
@@ -124,19 +126,28 @@ function veilPath([x0, y0, x1, y1], rects) {
   return runs.join(' ');
 }
 
+/** A path's line — the text naming its route — in slide pixels, shown once the route is done. */
+function pathLine(look, [x0, , , y1]) {
+  const p = look.path;
+  if (!p?.line) return '';
+  const at = p.lineAt ? String(p.lineAt).trim().split(/[\s,]+/).map(Number) : [x0 + 24, y1 - 56];
+  if (at.length !== 2 || at.some(n => !Number.isFinite(n))) throw new Error(`focus "path": lineAt is x y in slide px, not "${p.lineAt}"`);
+  return `<div class="sd-path-line" style="left:${at[0]}px;top:${at[1]}px;--sd-path-done:${p.done}s">${esc(p.line)}</div>`;
+}
+
 /**
- * The overlay of a click — a blur with holes, a frame and its label — in slide pixels: put it outside the
- * map's box. `area` ([x0, y0, x1, y1]) limits the blur, so a headline above it stays clear. Empty when the
- * click has none.
+ * The overlay of a click — a blur with holes, a frame and its label, and a path's line — in slide pixels: put
+ * it outside the map's box. `area` ([x0, y0, x1, y1]) limits the blur, so a headline above it stays clear.
+ * Empty when the click has none.
  */
 export function focusOverlay(look, {canvas = {w: 1920, h: 1080}, area} = {}) {
-  const o = look.overlay;
-  if (!o || !o.rects.length) return '';
+  const o = look.overlay, line = pathLine(look, area ?? [0, 0, canvas.w, canvas.h]);
+  if (!o || !o.rects.length) return line;
   const path = veilPath(area ?? [0, 0, canvas.w, canvas.h], o.rects);
   const veil = `<div class="sd-veil sd-veil-${o.phase}" style="width:${canvas.w}px;height:${canvas.h}px;clip-path:path(nonzero,'${path}')"></div>`;
-  if (o.phase === 'out') return veil;
+  if (o.phase === 'out') return veil + line;
   const [x, y, w, h] = o.rects[0];
-  return `${veil}<div class="sd-frame${o.frameNew ? ' sd-new' : ''}" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px">${o.label ? `<span>${esc(o.label)}</span>` : ''}</div>`;
+  return `${veil}<div class="sd-frame${o.frameNew ? ' sd-new' : ''}" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px">${o.label ? `<span>${esc(o.label)}</span>` : ''}</div>${line}`;
 }
 
 /**

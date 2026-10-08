@@ -131,13 +131,13 @@ describe('focusHtml · drawing a click', () => {
   it("keeps its motion rules weak, so a deck's own rule for a piece wins", () => {
     const css = readFileSync(path.join(process.cwd(), 'focus.css'), 'utf8');
     expect(css).not.toMatch(/^\s*\[data-deck-active\]/m);
-    expect(css.match(/:where\(\[data-deck-active\]:not\(\[data-sd-instant\]\):not\(\[data-deck-static\]\)\)/g).length).toBe(5);
+    expect(css.match(/:where\(\[data-deck-active\]:not\(\[data-sd-instant\]\):not\(\[data-deck-static\]\)\)/g).length).toBe(6);   // + the path's line
   });
 
   it('ships a stylesheet for every class it writes', () => {
     const css = readFileSync(path.join(process.cwd(), 'focus.css'), 'utf8');
     for (const c of ['sd-dim', 'sd-gone', 'sd-hide', 'sd-keep', 'sd-hot', 'sd-hot-in', 'sd-enter', 'sd-arrive', 'sd-light', 'sd-fade', 'sd-leave',
-      'sd-moved', 'sd-move', 'sd-origin-tl', 'sd-twin-off', 'sd-relook', 'sd-from-grey', 'sd-from-hide', 'sd-from-keep', 'sd-stage', 'sd-veil', 'sd-veil-in-new', 'sd-veil-out', 'sd-frame', 'sd-new', 'sd-focus-new'])
+      'sd-moved', 'sd-move', 'sd-origin-tl', 'sd-twin-off', 'sd-relook', 'sd-from-grey', 'sd-from-hide', 'sd-from-keep', 'sd-stage', 'sd-veil', 'sd-veil-in-new', 'sd-veil-out', 'sd-frame', 'sd-new', 'sd-focus-new', 'sd-path', 'sd-path-line'])
       expect(css, c).toMatch(new RegExp(`\\.${c}\\b`));
   });
 });
@@ -170,5 +170,21 @@ describe('focusHtml · the runtime', () => {
   });
   it('does nothing on a page with no deck', () => {
     expect(() => focusRuntime()).not.toThrow();
+  });
+});
+
+describe('focusHtml · a path', () => {
+  const html = '<div data-k="a" style="left:0;top:0;width:10px;height:10px"></div><div data-k="b" style="left:20px;top:0;width:10px;height:10px"></div>';
+  it('marks each piece on the route with its turn, and writes the route\'s line where it is asked for', () => {
+    const { html: numbered, pieces } = readPieces(html);
+    const { looks } = planFocus([{ in: ['a', 'b'], focus: 'path', options: { line: 'a → b <done>' } }], { pieces });
+    const drawn = drawFocus(numbered, looks[0]);
+    expect(drawn).toContain('style="left:0;top:0;width:10px;height:10px;--sd-path-delay:0s" class="sd sd-on sd-enter sd-path"');
+    expect(drawn).toContain('--sd-path-delay:0.35s');
+    expect(focusOverlay(looks[0], { area: [0, 200, 1920, 1000] })).toBe('<div class="sd-path-line" style="left:24px;top:944px;--sd-path-done:0.35s">a → b &lt;done&gt;</div>');
+    const placed = planFocus([{ in: ['a', 'b'], focus: 'path', options: { line: 'x', lineAt: '100 200' } }], { pieces }).looks[0];
+    expect(focusOverlay(placed)).toContain('style="left:100px;top:200px;');
+    const bad = planFocus([{ in: ['a', 'b'], focus: 'path', options: { line: 'x', lineAt: 'here' } }], { pieces }).looks[0];
+    expect(() => focusOverlay(bad)).toThrow(/lineAt is x y in slide px/);
   });
 });

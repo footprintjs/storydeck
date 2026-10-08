@@ -2,7 +2,7 @@
 //
 // A slide of this kind is drawn once: a set of named PIECES that keep their places (a diagram, a page,
 // a timeline). Each CLICK says which pieces are there and which ones it is about — its SUBJECT; the
-// rest of what is shown is the CONTEXT. A FOCUS STRATEGY says how the two are shown. There are three
+// rest of what is shown is the CONTEXT. A FOCUS STRATEGY says how the two are shown. There are four
 // kinds, and a click takes one of each at most:
 //
 //   look     how the context looks     grey (greyed in place — the default) · hide · keep
@@ -13,6 +13,9 @@
 //                                      art-direct, still animated from wherever the last click left it)
 //   overlay  what lies over the slide  blur (everything outside the subject's frame is blurred; a frame,
 //                                      and a label if given, on the subject)
+//   order    how the subject comes on  all at once (the default) · path (piece after piece along a route —
+//                                      a request travelling node, wire, node — each lighting in turn, with
+//                                      a line that names the route if given)
 //
 // So `'left blur'` is: the context steps aside to the left, greyed, under a blur, and the subject grows on
 // the right inside a frame. A deck can bring strategies of its own (`strategies`), of any kind.
@@ -25,7 +28,7 @@
 // slide (p' = s·p + [x, y]; the identity unless the map is drawn scaled or shifted); `area` is the part
 // of the slide (slide pixels) where moved things may go — below a headline, above a footer.
 
-const KINDS = ['look', 'mover', 'overlay'];
+const KINDS = ['look', 'mover', 'overlay', 'order'];
 
 /** A box {x, y, w, h} around a list of boxes (null for none). */
 function union(boxes) {
@@ -117,6 +120,17 @@ export const FOCUS = Object.freeze({
    * ends up, `pad` (24) px around it. `out: 'first'` keeps only the frame clear while the blur leaves (what sat
    * beside it melts into the blur).
    */
+  /**
+   * The subject comes on piece after piece along a route, as a request travels it: `route` names the pieces in
+   * order (default: the click's `on`, in the order written), each lights `step` (0.35) s after the one before and
+   * glows as it is reached; `line` is text that names the route ("agent → MCP → gateway"), shown when the route
+   * is done, at `lineAt` (x y, slide px; default the area's bottom left). A lit piece not on the route lights at once.
+   */
+  path: Object.freeze({name: 'path', kind: 'order', route({names, options}) {
+    const step = num(options.step, .35);
+    if (!(step >= 0 && step <= 5)) throw new Error(`focus "path": step is the seconds between two pieces of the route (0–5), not "${options.step}"`);
+    return {names: options.route !== undefined && options.route !== '' ? [].concat(options.route).flatMap(x => String(x).trim().split(/\s+/)).filter(Boolean) : names, step, line: options.line ?? '', lineAt: options.lineAt ?? null};
+  }}),
   blur: Object.freeze({name: 'blur', kind: 'overlay', cover({subjectOnSlide, options}) {
     const pad = num(options.pad, 24), b = subjectOnSlide;
     const rects = options.rect !== undefined && options.rect !== '' ? readRects(options.rect) : b ? [[b.x - pad, b.y - pad, b.w + 2 * pad, b.h + 2 * pad]] : [];
@@ -145,7 +159,7 @@ function pick(focus, strategies) {
   for (const {strategy, options} of focus) {
     const s = all[strategy];
     if (!s) throw new Error(`no focus strategy "${strategy}" (there are ${Object.keys(all).join(', ')})`);
-    if (!KINDS.includes(s.kind)) throw new Error(`focus strategy "${strategy}" has kind ${JSON.stringify(s.kind)}: a strategy is a look, a mover or an overlay`);
+    if (!KINDS.includes(s.kind)) throw new Error(`focus strategy "${strategy}" has kind ${JSON.stringify(s.kind)}: a strategy is a look, a mover, an overlay or an order`);
     if (byKind[s.kind]) throw new Error(`a click takes one ${s.kind} at most: "${byKind[s.kind].name}" and "${strategy}" are both ${s.kind}s`);
     byKind[s.kind] = {s: {...s, name: s.name ?? strategy}, options, name: strategy};
   }
@@ -182,7 +196,8 @@ function changeOf(st, was, look, wasLook, entering, before) {
  * One click. `prev` is the state the last click left (null on a slide's first click when the map arrives
  * fresh). `deck`: {pieces: [{keys, box, twin?}], strategies?, area?, view?, canvas?}. Returns {state, look}:
  * the state to hand the next click, and the look to draw — per piece {state, was, change, look, fromLook, hot,
- * hotIn, move, from, twinOff}, the stage's move, the overlay, and which strategies were used.
+ * hotIn, move, from, twinOff, path (its turn's delay in seconds, on a route; else null)}, the stage's move, the
+ * overlay, the path ({turns, step, done, line, lineAt}, or null) and which strategies were used.
  */
 export function focusStep(prev, step, deck) {
   const {pieces, strategies = {}} = deck, canvas = deck.canvas ?? {w: 1920, h: 1080};
@@ -222,6 +237,19 @@ export function focusStep(prev, step, deck) {
   const subjectOnSlide = ends ? {x: ends.x * view.s + view.x, y: ends.y * view.s + view.y, w: ends.w * view.s, h: ends.h * view.s} : null;
   const cover = chosen.overlay ? chosen.overlay.s.cover({subjectOnSlide, canvas, options: chosen.overlay.options}) : null;
   const looks = pieces.map((_, i) => states[i] === 'dim' ? look : null);
+  // An order: the subject piece after piece along a route. The pieces of each name on it, as shown, take the next
+  // turn together (a name with nothing shown takes none); a piece named twice keeps its first turn.
+  const order = chosen.order ? chosen.order.s.route({names: (on ?? ins).filter(x => x !== '*'), options: chosen.order.options}) : null;
+  const turns = new Map();
+  if (order) {
+    let turn = 0;
+    for (const name of known(order.names, 'focus route: ')) {
+      const reached = all.filter(i => states[i] !== 'gone' && pieces[i].keys.includes(name) && !turns.has(i));
+      reached.forEach(i => turns.set(i, turn));
+      if (reached.length) turn += 1;
+    }
+    order.turns = turn;
+  }
   // What changed since the last click: only that moves. A piece that leaves keeps how it looked and where it
   // stood, so it fades out from there instead of jumping home in colour first.
   const before = prev && !step.fresh ? prev : null;
@@ -233,7 +261,8 @@ export function focusStep(prev, step, deck) {
     const from = stood, moved = st !== 'gone' && was !== 'gone' && !!before && !sameMove(from, moves[i]);
     return {state: st, was, change, look: leaving ? wasLook : looks[i], fromLook: change === 'relook' ? wasLook : null,
       hot: hotNow.has(i), hotIn: hotNow.has(i) && (!before || !before.hot.has(i)),
-      move: leaving ? stood : st === 'gone' ? null : moves[i], from: moved ? from ?? {dx: 0, dy: 0, s: 1} : null, twinOff: twinOff.has(i)};
+      move: leaving ? stood : st === 'gone' ? null : moves[i], from: moved ? from ?? {dx: 0, dy: 0, s: 1} : null, twinOff: twinOff.has(i),
+      path: turns.has(i) ? round(turns.get(i) * order.step, 3) : null};
   });
   const stageMoved = !!before && !sameStage(before.stage, stage);
   // The blur: new only when the last click had none (a blur that moves to another subject stays, and only its
@@ -243,6 +272,7 @@ export function focusStep(prev, step, deck) {
   return {
     state: {vis, states, moves, stage, hot: hotNow, cover, looks},
     look: {pieces: out, stage: stage || stageMoved ? {move: stage, from: stageMoved ? before.stage ?? {s: 1, x: 0, y: 0} : null} : null, overlay,
+      path: order && order.turns ? {turns: order.turns, step: order.step, done: round((order.turns - 1) * order.step, 3), line: order.line, lineAt: order.lineAt} : null,
       strategies: Object.values(chosen).map(c => c.name), subject: subjectOnSlide},
   };
 }
