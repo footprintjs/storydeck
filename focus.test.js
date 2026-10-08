@@ -148,13 +148,13 @@ describe('focus · strategies', () => {
 
   it('a click takes one strategy of each kind, from the built-ins or the deck\'s own', () => {
     expect(() => focusStep(null, { ...lit, focus: 'zoom left' }, deck)).toThrow(/one mover at most.*"zoom" and "left"/);
-    expect(() => focusStep(null, { ...lit, focus: 'spin' }, deck)).toThrow(/no focus strategy "spin" \(there are grey, hide, keep, zoom, left, right, up, down, place, blur\)/);
+    expect(() => focusStep(null, { ...lit, focus: 'spin' }, deck)).toThrow(/no focus strategy "spin" \(there are grey, hide, keep, zoom, left, right, up, down, place, path, blur\)/);
     const tilt = { kind: 'mover', place: ({ subject }) => ({ subject: { o: [subject.x, subject.y], s: 2, t: [0, 0] } }) };
     const look = focusStep(null, { ...lit, focus: 'tilt' }, { ...deck, strategies: { tilt } }).look;
     expect(look.strategies).toEqual(['tilt']);
     expect(look.pieces[1].move.s).toBe(2);
-    expect(() => focusStep(null, { ...lit, focus: 'odd' }, { ...deck, strategies: { odd: { kind: 'paint' } } })).toThrow(/a look, a mover or an overlay/);
-    expect(Object.keys(FOCUS)).toEqual(['grey', 'hide', 'keep', 'zoom', 'left', 'right', 'up', 'down', 'place', 'blur']);
+    expect(() => focusStep(null, { ...lit, focus: 'odd' }, { ...deck, strategies: { odd: { kind: 'paint' } } })).toThrow(/a look, a mover, an overlay or an order/);
+    expect(Object.keys(FOCUS)).toEqual(['grey', 'hide', 'keep', 'zoom', 'left', 'right', 'up', 'down', 'place', 'path', 'blur']);
   });
 });
 
@@ -265,5 +265,112 @@ describe('focus · moves between clicks', () => {
     const [mx, my] = [stage.move.s * 1250 + stage.move.x, stage.move.s * 425 + stage.move.y];
     expect(mx * 0.5 + 100).toBeCloseTo(960, 1);
     expect(my * 0.5 + 50).toBeCloseTo(600, 1);
+  });
+});
+
+describe('focus · path: the subject piece after piece along a route', () => {
+  // a request's route: agent → wire → gateway → wire → app, and a note beside it
+  const route = [
+    { keys: ['agent'], box: { x: 100, y: 300, w: 200, h: 100 } },
+    { keys: ['wire', 'link-a'], box: { x: 300, y: 340, w: 200, h: 20 } },
+    { keys: ['gw'], box: { x: 500, y: 300, w: 200, h: 100 } },
+    { keys: ['wire', 'link-b'], box: { x: 700, y: 340, w: 200, h: 20 } },
+    { keys: ['app'], box: { x: 900, y: 300, w: 200, h: 100 } },
+    { keys: ['note'], box: { x: 100, y: 600, w: 300, h: 60 } },
+  ];
+  const d = { pieces: route, area: [0, 200, 1920, 1000] };
+  const delays = (look) => look.pieces.map((p) => p.path);
+
+  it('lights the route in the order the click names it, a turn per name, `step` seconds apart', () => {
+    const { looks } = planFocus([{ in: ['*'], on: ['agent', 'link-a', 'gw', 'link-b', 'app'], focus: 'path' }], d);
+    expect(delays(looks[0])).toEqual([0, 0.35, 0.7, 1.05, 1.4, null]);   // the note is not on the route
+    expect(looks[0].path).toEqual({ turns: 5, step: 0.35, done: 1.4, line: '', lineAt: null });
+    expect(looks[0].strategies).toEqual(['path']);
+  });
+
+  it('takes its own route and step: a name shared by several pieces is one turn, a lit piece off the route lights at once', () => {
+    const { looks } = planFocus([{ in: ['*'], on: ['agent', 'wire', 'gw', 'note'], focus: { strategy: 'path', route: 'agent wire gw', step: '0.5' } }], d);
+    expect(delays(looks[0])).toEqual([0, 0.5, 1, 0.5, null, null]);
+    expect(looks[0].pieces[5].state).toBe('on');
+  });
+
+  it('goes with a look, a mover and an overlay, and names its route with a line', () => {
+    const { looks } = planFocus([{ in: ['*'], on: ['agent', 'gw'], focus: 'path grey blur', options: { line: 'agent → gateway' } }], d);
+    expect(looks[0].strategies.sort()).toEqual(['blur', 'grey', 'path']);
+    expect(looks[0].path.line).toBe('agent → gateway');
+  });
+
+  it('refuses a route that names no piece, a step it cannot use, and two orders in one click', () => {
+    expect(() => planFocus([{ in: ['*'], focus: { strategy: 'path', route: 'agent ghost' } }], d)).toThrow(/focus route: no piece "ghost"/);
+    expect(() => planFocus([{ in: ['*'], focus: { strategy: 'path', step: '9' } }], d)).toThrow(/step is the seconds between two pieces of the route \(0–5\)/);
+    const strategies = { wave: { kind: 'order', route: () => ({ names: [], step: 0 }) } };
+    expect(() => planFocus([{ in: ['*'], focus: 'path wave' }], { ...d, strategies })).toThrow(/a click takes one order at most: "path" and "wave" are both orders/);
+  });
+
+  it('a route with nothing shown on it is no path', () => {
+    const { looks } = planFocus([{ in: ['agent'], focus: { strategy: 'path', route: 'gw app' } }], d);
+    expect(looks[0].path).toBe(null);
+    expect(delays(looks[0]).every((x) => x === null)).toBe(true);
+  });
+
+  it('gives its turns to LIT pieces only: a name with nothing lit takes none, so nothing greyed waits or glows grey', () => {
+    // link-b shares the name "wire" with link-a but is not lit; the note is on the route but greyed
+    const { looks } = planFocus([{ in: ['*'], on: ['agent', 'link-a', 'gw'], quiet: true, focus: { strategy: 'path', route: 'agent wire note gw' } }], d);
+    expect(states(looks[0])).toEqual(['on', 'on', 'on', 'dim', 'dim', 'dim']);
+    expect(delays(looks[0])).toEqual([0, 0.35, 0.7, null, null, null]);
+    expect(looks[0].path).toMatchObject({ turns: 3, done: 0.7 });
+  });
+
+  it('an empty route falls back to the click\'s on (or in); a path with no order at all is refused, naming the fix', () => {
+    const click = { in: ['*'], on: ['agent', 'gw'] };
+    for (const route of [[], '', '  ', [''], '*', null]) expect(delays(planFocus([{ ...click, focus: { strategy: 'path', route } }], d).looks[0]), JSON.stringify(route)).toEqual([0, null, 0.35, null, null, null]);
+    expect(delays(planFocus([{ in: ['gw', 'agent'], focus: { strategy: 'path', route: [] } }], d).looks[0])).toEqual([0.35, null, 0, null, null, null]);   // no on: in's order
+    const fix = /focus "path": the route is empty — write the pieces in the order they light, in `on` or `route`/;
+    expect(() => planFocus([{ in: ['*'], on: ['*'], focus: 'path' }], d)).toThrow(fix);
+    expect(() => planFocus([{ in: ['*'], focus: { strategy: 'path', route: [] } }], d)).toThrow(fix);
+    expect(() => planFocus([{ in: ['*'] }, { focus: 'path' }], d)).toThrow(fix);   // a later click that names nothing
+    // focus is the click's own: a click that does not ask for a path is never asked for a route
+    expect(planFocus([{ in: ['*'], on: ['*'], focus: 'grey' }, { on: ['*'] }], d).looks.map((l) => l.path)).toEqual([null, null]);
+  });
+
+  it('reads a deck\'s own order without writing to what it gave (a frozen route is fine), with no line as \'\' and no lineAt as null', () => {
+    const given = Object.freeze({ names: Object.freeze(['gw', 'agent']), step: 0.2 });
+    const strategies = { back: { kind: 'order', route: () => given } };
+    const { looks } = planFocus([{ in: ['*'], on: ['agent', 'gw'], focus: 'back' }], { ...d, strategies });
+    expect(delays(looks[0])).toEqual([0.2, null, 0, null, null, null]);
+    expect(looks[0].path).toEqual({ turns: 2, step: 0.2, done: 0.2, line: '', lineAt: null });
+    expect(given).toEqual({ names: ['gw', 'agent'], step: 0.2 });
+    // A blank lineAt (an empty data-focus-line-at) is none, as left out.
+    const blank = planFocus([{ in: ['*'], on: ['agent', 'gw'], focus: 'path', options: { line: 'a → b', lineAt: '  ' } }], d);
+    expect(blank.looks[0].path.lineAt).toBe(null);
+  });
+
+  it('refuses a route a deck\'s own order gives that it cannot use, naming the strategy and the fix', () => {
+    const run = (route) => () => planFocus([{ in: ['*'], focus: 'mine' }], { ...d, strategies: { mine: { kind: 'order', route: () => route } } });
+    const step = /focus "mine": a route's step is the seconds between two turns, a number from 0 to 5 — not /;
+    expect(run({ names: ['agent'] })).toThrow(new RegExp(`${step.source}undefined`));   // no step: never a NaN delay in the page
+    expect(run({ names: ['agent'], step: NaN })).toThrow(new RegExp(`${step.source}NaN`));
+    expect(run({ names: ['agent'], step: '0.3' })).toThrow(new RegExp(`${step.source}"0.3"`));
+    expect(run({ names: ['agent'], step: 6 })).toThrow(new RegExp(`${step.source}6`));
+    expect(run({ names: 'agent gw', step: 0.3 })).toThrow(/focus "mine": a route's names are a list of piece names, in the order they light — not "agent gw"/);
+    expect(run({ names: ['agent', 7], step: 0.3 })).toThrow(/focus "mine": a route's names are a list of piece names/);
+    expect(run({ names: ['agent'], step: 0.3, line: 42 })).toThrow(/focus "mine": a route's line is text that names it, or left out — not 42/);
+    expect(run({ names: ['agent'], step: 0.3, lineAt: [1, 2] })).toThrow(/focus "mine": a route's lineAt is 'x y' in slide px, null, or left out — not \[1,2\]/);
+    expect(run(null)).toThrow(/focus "mine": route\(\) gives \{names, step, line\?, lineAt\?\}, not null/);
+    expect(() => planFocus([{ in: ['*'], on: ['agent'], focus: 'path', options: { line: 7 } }], d)).toThrow(/focus "path": a route's line is text/);
+    expect(run({ names: ['agent'], step: 0, line: 'a', lineAt: '10 20' })().looks[0].path).toEqual({ turns: 1, step: 0, done: 0, line: 'a', lineAt: '10 20' });
+  });
+
+  it('a piece stepping aside for its lit twin on the route goes at that twin\'s turn (the first to come), so the wire is never missing', () => {
+    const twins = [
+      { keys: ['agent'], box: null }, { keys: ['solid'], box: null }, { keys: ['alt'], box: null },
+      { keys: ['dashed'], box: null, twin: ['solid', 'alt'] }, { keys: ['app'], box: null },
+    ];
+    const dashed = (second, first = { in: ['agent', 'dashed', 'app'] }) => planFocus([first, second], { pieces: twins }).looks[1].pieces[3];
+    expect(dashed({ in: ['solid'], on: ['agent', 'solid', 'app'], focus: 'path' })).toMatchObject({ state: 'gone', change: 'leave', twinOff: true, twinTurn: 0.35, path: null });
+    expect(dashed({ in: ['solid', 'alt'], on: ['agent', 'alt', 'solid', 'app'], focus: 'path' }).twinTurn).toBe(0.35);          // alt comes first
+    expect(dashed({ in: ['solid', 'alt'], on: ['agent', 'solid', 'alt'], focus: { strategy: 'path', route: 'agent solid' } }).twinTurn).toBe(null);   // alt lights at once
+    expect(dashed({ in: ['solid'], on: ['agent', 'solid', 'app'] }).twinTurn).toBe(null);                                         // no path: as before
+    expect(dashed({ on: ['agent', 'solid'], focus: 'path' }, { in: ['*'], on: ['solid'] })).toMatchObject({ change: null, twinTurn: null });   // already aside
   });
 });

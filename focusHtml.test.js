@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { readPieces, readStep, drawFocus, wrapStage, focusOverlay, focusRuntime, slideClass } from './focusHtml';
 import { planFocus } from './focus';
@@ -131,13 +132,13 @@ describe('focusHtml · drawing a click', () => {
   it("keeps its motion rules weak, so a deck's own rule for a piece wins", () => {
     const css = readFileSync(path.join(process.cwd(), 'focus.css'), 'utf8');
     expect(css).not.toMatch(/^\s*\[data-deck-active\]/m);
-    expect(css.match(/:where\(\[data-deck-active\]:not\(\[data-sd-instant\]\):not\(\[data-deck-static\]\)\)/g).length).toBe(5);
+    expect(css.match(/:where\(\[data-deck-active\]:not\(\[data-sd-instant\]\):not\(\[data-deck-static\]\)\)/g).length).toBe(6);   // + the path's line
   });
 
   it('ships a stylesheet for every class it writes', () => {
     const css = readFileSync(path.join(process.cwd(), 'focus.css'), 'utf8');
     for (const c of ['sd-dim', 'sd-gone', 'sd-hide', 'sd-keep', 'sd-hot', 'sd-hot-in', 'sd-enter', 'sd-arrive', 'sd-light', 'sd-fade', 'sd-leave',
-      'sd-moved', 'sd-move', 'sd-origin-tl', 'sd-twin-off', 'sd-relook', 'sd-from-grey', 'sd-from-hide', 'sd-from-keep', 'sd-stage', 'sd-veil', 'sd-veil-in-new', 'sd-veil-out', 'sd-frame', 'sd-new', 'sd-focus-new'])
+      'sd-moved', 'sd-move', 'sd-origin-tl', 'sd-twin-off', 'sd-relook', 'sd-from-grey', 'sd-from-hide', 'sd-from-keep', 'sd-stage', 'sd-veil', 'sd-veil-in-new', 'sd-veil-out', 'sd-frame', 'sd-new', 'sd-focus-new', 'sd-path', 'sd-path-line', 'sd-twin-turn'])
       expect(css, c).toMatch(new RegExp(`\\.${c}\\b`));
   });
 });
@@ -170,5 +171,119 @@ describe('focusHtml · the runtime', () => {
   });
   it('does nothing on a page with no deck', () => {
     expect(() => focusRuntime()).not.toThrow();
+  });
+});
+
+describe('focusHtml · a path', () => {
+  const html = '<div data-k="a" style="left:0;top:0;width:10px;height:10px"></div><div data-k="b" style="left:20px;top:0;width:10px;height:10px"></div>';
+  it('marks each piece on the route with its turn, and writes the route\'s line where it is asked for', () => {
+    const { html: numbered, pieces } = readPieces(html);
+    const { looks } = planFocus([{ in: ['a', 'b'], focus: 'path', options: { line: 'a → b <done>' } }], { pieces });
+    const drawn = drawFocus(numbered, looks[0]);
+    expect(drawn).toContain('style="left:0;top:0;width:10px;height:10px;--sd-path-delay:0s" class="sd sd-on sd-enter sd-path"');
+    expect(drawn).toContain('--sd-path-delay:0.35s');
+    expect(focusOverlay(looks[0], { area: [0, 200, 1920, 1000] })).toBe('<div class="sd-path-line" style="left:24px;top:944px;--sd-path-delay:0.35s">a → b &lt;done&gt;</div>');
+    const placed = planFocus([{ in: ['a', 'b'], focus: 'path', options: { line: 'x', lineAt: '100 200' } }], { pieces }).looks[0];
+    expect(focusOverlay(placed)).toContain('style="left:100px;top:200px;');
+    const bad = planFocus([{ in: ['a', 'b'], focus: 'path', options: { line: 'x', lineAt: 'here' } }], { pieces }).looks[0];
+    expect(() => focusOverlay(bad)).toThrow(/lineAt is x y in slide px/);
+  });
+
+  it('marks a piece that steps aside for its lit twin on the route with that twin\'s turn, when it goes', () => {
+    const twin = readPieces('<i data-k="a"></i><i data-k="s"></i><i data-k="d" data-twin="s"></i>');
+    const { looks } = planFocus([{ in: ['a', 'd'] }, { in: ['s'], on: ['a', 's'], focus: 'path' }], { pieces: twin.pieces });
+    const drawn = drawFocus(twin.html, looks[1]);
+    expect(drawn).toContain('<i data-k="s" class="sd sd-on sd-enter sd-path" style="--sd-path-delay:0.35s">');
+    expect(drawn).toContain('<i data-k="d" data-twin="s" class="sd sd-gone sd-leave sd-twin-off sd-twin-turn" style="--sd-path-delay:0.35s">');
+  });
+});
+
+describe('focusHtml · a deck without a path', () => {
+  it('writes the very bytes 0.3.0 wrote, for every change a click can make', () => {
+    const { html, pieces } = readPieces(MAP.replace(/<\/div>$/, `  <i data-k="solid" style="left:700px;top:520px;width:300px;height:4px"></i>
+  <i data-k="dashed" data-twin="solid" style="left:700px;top:520px;width:300px;height:4px"></i>
+</div>`));
+    const area = [0, 200, 1920, 1000];
+    const first = planFocus([
+      { in: ['page', 'wire', 'code', 'label', 'dashed'] },                                              // enter
+      { on: ['code', 'label'], hot: ['code'], focus: 'left blur', options: { label: 'the <code>' } },    // fade, move, a new blur, a ring
+      { on: ['code', 'label'], hot: ['code'], focus: 'blur' },                                           // glide back, the blur stays
+      { on: ['page'], focus: 'zoom' },                                                                   // light, the stage, the blur melts
+      { on: ['page'], focus: 'hide' },                                                                   // a look from grey
+      { on: ['page'], focus: 'keep' },                                                                   // a look from hidden
+      { in: ['solid'], on: ['solid', 'page'], quiet: true },                                             // a twin steps aside
+      { out: ['label'], on: ['code'], focus: { strategy: 'place', groups: 'page: -100 50 0.5 | wire: 0 0 1 @ 700 480' } },   // leave, place
+    ], { pieces, area });
+    const second = planFocus([{ in: ['note'], fresh: true }, { focus: 'up', on: ['note'], hot: ['page'] }], { pieces, area }, first.end);   // arrive
+    const out = [...first.looks, ...second.looks].map((look) => `<section class="${slideClass(look)}"><div class="map">${wrapStage(drawFocus(html, look), look)}</div>${focusOverlay(look, { area })}</section>`).join('\n');
+    expect(out).not.toMatch(/sd-path|sd-twin-turn|--sd-path-delay/);
+    // sha-256 of what 0.3.0 (footprint-storydeck main, 5a424b6) writes for these clicks — 10172 characters
+    expect([createHash('sha256').update(out).digest('hex').slice(0, 12), out.length]).toEqual(['120f9c53be9a', 10172]);
+  });
+});
+
+describe('focusHtml · a path, in focus.css', () => {
+  const css = readFileSync(path.join(process.cwd(), 'focus.css'), 'utf8');
+  const gate = '@media screen and (prefers-reduced-motion: no-preference) {';
+  /** What a block holds: the text inside the braces of the block that starts at `from`. */
+  const inside = (from) => {
+    const start = css.indexOf('{', from);
+    let depth = 0, end = start;
+    do { depth += css[end] === '{' ? 1 : css[end] === '}' ? -1 : 0; end += 1; } while (depth);
+    return css.slice(start + 1, end - 1);
+  };
+  const motion = inside(css.indexOf(gate));
+  /** The motion block's rules, comments left out: [selector, declarations]. */
+  const rules = [...motion.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => [m[1].trim(), m[2].trim()]);
+  /** The declarations of the rule with exactly this selector, in the motion block. */
+  const rule = (selector) => rules.find(([s]) => s === selector)?.[1] ?? null;
+  /** A @keyframes rule's keyframes: [selector, declarations]. */
+  const keyframes = (name) => [...inside(css.indexOf(`@keyframes ${name} {`)).matchAll(/(from|to|\d+%)\s*\{([^}]*)\}/g)].map((m) => [m[1], m[2].trim()]);
+  /** The functions a filter lists, in order — the outer ones (a var() inside drop-shadow is not one). */
+  const functions = (filter) => {
+    const names = []; let depth = 0, word = '';
+    for (const c of filter) {
+      if (c === '(') { if (!depth) names.push(word); depth += 1; word = ''; } else if (c === ')') depth -= 1; else if (!depth) word = /\s/.test(c) ? '' : word + c;
+    }
+    return names;
+  };
+
+  it('lights a piece from grey with ONE animation whose filter lists the same functions at every keyframe, so it glides (no flash)', () => {
+    const frames = keyframes('sdLightPulse');
+    expect(frames.map(([at]) => at)).toEqual(['from', '40%']);   // no end keyframe: it ends on the plain style
+    for (const [, body] of frames) expect(functions(/filter:\s*([^;]+);/.exec(body)[1])).toEqual(['grayscale', 'drop-shadow', 'brightness']);
+    expect(frames[0][1]).toContain('opacity: var(--sd-dim-opacity, .32)');   // it carries the light's opacity
+    expect(rule('.sd-path.sd-light')).toBe('--sd-a-state: sdLightPulse .9s ease var(--sd-turn) backwards; --sd-a-path: sdNone 0s;');   // grey until its turn; no second filter animation
+    // on, entering or arriving, the pulse is the only animation on the filter
+    expect(rule('.sd-path')).toBe('--sd-a-path: sdPulse .9s ease var(--sd-turn);');
+    for (const name of ['sdEnter', 'sdArrive']) expect(keyframes(name).some(([, body]) => /filter/.test(body)), name).toBe(false);
+  });
+
+  it('gives everything on a path one moment, --sd-turn: its delay, .4 s later under a new blur', () => {
+    expect(css).toContain('@property --sd-turn { syntax: \'*\'; inherits: false; }');   // never inherited: 0 off the route
+    expect(rule(':is(.sd-path, .sd-twin-turn, .sd-path-line)')).toBe('--sd-turn: var(--sd-path-delay, 0s);');
+    expect(rule('.sd-focus-new :is(.sd-path, .sd-twin-turn, .sd-path-line)')).toBe('--sd-turn: calc(var(--sd-path-delay, 0s) + .4s);');
+    expect(rule('.sd-path.sd-enter')).toBe('--sd-a-state: sdEnter .6s var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) var(--sd-turn) both;');
+    expect(rule('.sd-path.sd-arrive')).toBe('--sd-a-state: sdArrive .6s ease var(--sd-turn) both;');
+    expect(rule(':where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-path-line')).toBe('animation: sdArrive .5s ease var(--sd-turn) both;');
+    expect(rule('.sd-twin-turn.sd-leave')).toBe('--sd-a-state: sdLeave .45s ease var(--sd-turn) both;');   // a twin goes at its twin's turn
+    expect(rule('.sd-hot-in')).toBe('--sd-a-hot: sdRing .6s var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) calc(.3s + var(--sd-turn, 0s)) both;');   // the ring, .3 s after its turn
+  });
+
+  it('leaves what is not on a path as 0.3.0 had it', () => {
+    expect(rule('.sd-enter')).toBe('--sd-a-state: sdEnter .6s var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) var(--sd-delay, 0s) both;');
+    expect(rule('.sd-arrive')).toBe('--sd-a-state: sdArrive .6s ease both;');
+    expect(rule('.sd-light')).toBe('--sd-a-state: sdLight .7s ease both;');
+    expect(rule('.sd-focus-new .sd-enter')).toBe('--sd-delay: .4s;');
+    // a path never reads or sets --sd-delay, so a new blur's wait cannot lose to it
+    for (const [selector, body] of rules) if (selector.includes('sd-path') || selector.includes('sd-twin-turn')) expect(body, selector).not.toContain('--sd-delay');
+  });
+
+  it('keeps every animation behind the motion gate: a forward click only, never under reduced motion', () => {
+    const outside = css.replace(motion, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(outside).not.toMatch(/--sd-a-[\w-]+\s*:|--sd-turn\s*:|(^|[\s;{])animation\s*:/m);
+    const animated = rules.filter(([, body]) => /(^|[\s;])animation\s*:/.test(body));
+    expect(animated.length).toBe(6);
+    for (const [selector] of animated) expect(selector.startsWith(':where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) '), selector).toBe(true);
   });
 });

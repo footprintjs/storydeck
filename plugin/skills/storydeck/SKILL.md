@@ -1,6 +1,6 @@
 ---
 name: storydeck
-description: Build, focus, narrate and film talks and posts with StoryDeck — one source shown as a Read article, a Scroll story or a Watch deck; per-click focus on a diagram (grey, zoom, left/right, place, blur); narration from the speaker notes (a clip per click in a voice, cached by its words; notes, presenter and listen mode in the page; captions and chapters); and a narrated video for YouTube. Use when creating or editing a StoryDeck post or deck, adding focus to a diagram slide, voicing a talk, or rendering a talk as a video.
+description: Build, focus, narrate and film talks and posts with StoryDeck — one source shown as a Read article, a Scroll story or a Watch deck; per-click focus on a diagram (grey, zoom, left/right, place, blur, path); narration from the speaker notes (a clip per click in a voice, cached by its words; notes, presenter and listen mode in the page; captions and chapters); and a narrated video for YouTube. Use when creating or editing a StoryDeck post or deck, adding focus to a diagram slide, voicing a talk, or rendering a talk as a video.
 ---
 
 # StoryDeck: one source, many lenses — and a deck that tells itself
@@ -48,10 +48,15 @@ const { looks } = planFocus([
 ], { pieces, area });
 const slides = looks.map(look => `<section class="${slideClass(look)}"><div class="map">${wrapStage(drawFocus(html, look), look)}</div>${focusOverlay(look, { area })}</section>`);
 // in the page, once: `(${focusRuntime})()` — only a forward click animates; a jump lands at once
+// A route (who calls whom): `{ on: ['agent', 'link-mcp', 'mcp', 'link-gw', 'gw'], focus: 'path', options: { line: 'agent → MCP → gateway' } }`
+// lights it piece after piece, wires included, in the order written — lit pieces only; `on: ['*']` names no order and is refused.
 ```
 
 Strategies, one of each kind at most: look `grey` (default) · `hide` · `keep`; mover `zoom` · `left` ·
-`right` · `up` · `down` · `place` (named groups moved by amounts you art-direct); overlay `blur`.
+`right` · `up` · `down` · `place` (named groups moved by amounts you art-direct); overlay `blur`; order `path` (the
+subject lit piece after piece along a route, a `line` naming it; write `on` — or `route` — in the order the pieces
+light: only lit pieces take a turn, a ring and a dashed twin keep their piece's turn, and a new blur delays the
+whole path .4 s).
 
 **Narrate a deck in a voice.**
 
