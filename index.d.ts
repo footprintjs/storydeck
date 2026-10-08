@@ -138,6 +138,6 @@ export * from './focus';
 export * from './focusHtml';
 // Narration — what a deck says on each click (narration.d.ts), in the page: notes, presenter, listen mode (narrationHtml.d.ts).
 // The rules a voice reads by, sentences, captions and chapters are footprint-narration's (its own types).
-// storydeck/voice and storydeck/video (Node-only) carry their own types.
+// footprint-storydeck/voice and footprint-storydeck/video (Node-only) carry their own types.
 export * from './narration';
 export * from './narrationHtml';

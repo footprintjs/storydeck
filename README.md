@@ -1,4 +1,4 @@
-# storydeck
+# Footprint StoryDeck
 
 **One source, many lenses.** Write a piece of content once, render it three ways:
 
@@ -79,13 +79,13 @@ decision every click makes again, so it is data on the click, and the library do
 the right, framed. Bring your own strategy of any kind (`strategies: { name: { kind, … } }`).
 
 The plan is plain data (each piece's state, what changed since the last click, how far it moved), so a
-renderer only draws it. `storydeck/focus-html` writes it into slide HTML at build time and
-`storydeck/focus.css` animates **only what changed, only on a forward click** — a jump or a step back
+renderer only draws it. `footprint-storydeck/focus-html` writes it into slide HTML at build time and
+`footprint-storydeck/focus.css` animates **only what changed, only on a forward click** — a jump or a step back
 lands at once (inline `focusRuntime` in the page), and print shows every click as it lands.
 
 ```js
-import { planFocus } from 'storydeck/focus';
-import { readPieces, drawFocus, wrapStage, slideClass, focusOverlay, focusRuntime } from 'storydeck/focus-html';
+import { planFocus } from 'footprint-storydeck/focus';
+import { readPieces, drawFocus, wrapStage, slideClass, focusOverlay, focusRuntime } from 'footprint-storydeck/focus-html';
 
 // Every element with data-k="name …" and an inline left/top (width/height) is a piece.
 const { html, pieces } = readPieces(`
@@ -130,17 +130,17 @@ shared with footprint-storyreel; StoryDeck adds what is the deck's own:
 - **a clip per click, cached by what it says** — `footprint-narration/voice` (Node). A clip's key is a hash of the
   voice settings and the exact words, so editing one note re-voices that click and nothing else, and an interrupted
   run keeps every batch it finished. The voice is a port (`{ name, synthesize(scenes, { work }) }`); `chatterboxKit`
-  is one adapter — a local voice kit (Chatterbox, words aligned with MMS_FA; nothing is uploaded). `storydeck/voice`
+  is one adapter — a local voice kit (Chatterbox, words aligned with MMS_FA; nothing is uploaded). `footprint-storydeck/voice`
   carries the clips inside one page (`embedClips`);
-- **in the page** — `storydeck/narration-html`: N shows this click's notes, P opens a presenter window that
+- **in the page** — `footprint-storydeck/narration-html`: N shows this click's notes, P opens a presenter window that
   stays in step, and L plays the deck by itself — each click in your voice (the clips carried in the page), or
-  the browser's where a click has none — captions lighting sentence by sentence (styles: `storydeck/narration.css`).
+  the browser's where a click has none — captions lighting sentence by sentence (styles: `footprint-storydeck/narration.css`).
 
 ```js
 import { voiceClips, chatterboxKit } from 'footprint-narration/voice';
-import { narrationText } from 'storydeck/narration';
-import { embedClips } from 'storydeck/voice';
-import { notesData, notesRuntime, listenRuntime } from 'storydeck/narration-html';
+import { narrationText } from 'footprint-storydeck/narration';
+import { embedClips } from 'footprint-storydeck/voice';
+import { notesData, notesRuntime, listenRuntime } from 'footprint-storydeck/narration-html';
 
 const texts = clicks.map(c => narrationText(c.notes.now));   // one per click; '' where a click says nothing
 await voiceClips(texts, { cache: 'voice/cache', profile, engine: chatterboxKit({ kit: '../voice-kit' }) });
@@ -154,7 +154,7 @@ without them (the listen mode falls back to the browser's voice).
 
 ## Video: the deck as a narrated video
 
-`storydeck/video` (Node, with ffmpeg 5.0 or newer) renders a deck with its clips into a video for YouTube: every click on
+`footprint-storydeck/video` (Node, with ffmpeg 5.0 or newer) renders a deck with its clips into a video for YouTube: every click on
 screen while its clip plays. Each click is made forward, so its entrance plays as in the room; then every
 animation on the page is paused and **stepped frame by frame** — the same deck renders the same frames — until
 the last entrance ends, and that frame is held for the rest of the clip. Beside the video come what an upload
@@ -167,9 +167,9 @@ would drop one entrance frame in six at 30 fps, and a test with the real ffmpeg 
 
 ```js
 import { chromium } from 'playwright-core';
-import { renderVideo, deckStageDriver } from 'storydeck/video';
+import { renderVideo, deckStageDriver } from 'footprint-storydeck/video';
 import { clipFor } from 'footprint-narration/voice';
-import { narrationText, writtenText } from 'storydeck/narration';
+import { narrationText, writtenText } from 'footprint-storydeck/narration';
 
 const steps = clicks.map(c => {
   const spoken = narrationText(c.notes.now);
@@ -198,12 +198,12 @@ await renderVideo({
 ## Quick start
 
 ```bash
-npm install storydeck
+npm install footprint-storydeck
 ```
 
 ```jsx
-import { PostView, StoryDeckProvider } from 'storydeck';
-import 'storydeck/storydeck.css';
+import { PostView, StoryDeckProvider } from 'footprint-storydeck';
+import 'footprint-storydeck/storydeck.css';
 
 export default function App({ post }) {
   return (
@@ -216,7 +216,7 @@ export default function App({ post }) {
 
 `PostView` renders the Read · Scroll · Watch toggle and each lens. Bring your own `post` (see
 **Authoring**). Requires `react`/`react-dom` (peer) and a slide runtime for Watch (a
-`deck-stage.js` web component served at `${basePath}/deck-stage.js` — it ships as `storydeck/deck-stage.js`).
+`deck-stage.js` web component served at `${basePath}/deck-stage.js` — it ships as `footprint-storydeck/deck-stage.js`).
 
 **For agents:** a skill ships in the package — `plugin/skills/storydeck/SKILL.md` (which door for which job,
 three recipes, the rules that bite, how to verify). Point a coding agent at it, or install the folder as a
@@ -235,7 +235,7 @@ deck-data.json  the slides ({ label, html }[]) — e.g. imported from a Claude D
 The consumer wires these together with the adapter:
 
 ```js
-import { assemblePost } from 'storydeck';
+import { assemblePost } from 'footprint-storydeck';
 const post = assemblePost({ meta, sections, bodyMd, deckSlides });
 ```
 
@@ -252,7 +252,7 @@ the look:
 Headless theme control:
 
 ```jsx
-import { useTheme, ThemeToggle } from 'storydeck';
+import { useTheme, ThemeToggle } from 'footprint-storydeck';
 const { theme, toggle, setTheme } = useTheme();   // flips an html class + persists
 // …or drop in <ThemeToggle />
 ```
@@ -270,12 +270,12 @@ const { theme, toggle, setTheme } = useTheme();   // flips an html class + persi
 | `renderMarkdown` · `splitBodyByMarkers` | the Markdown adapter pieces |
 | `buildSections` · `finalStep` · `allSteps` · `parseGroup` | grouping helpers |
 | `slugify` · `scopeDeckCss` | utilities |
-| `planFocus` · `focusStep` · `readFocus` · `FOCUS` | focus: per click, what it is about and what happens to the rest (also `storydeck/focus`) |
-| `readPieces` · `readStep` · `drawFocus` · `wrapStage` · `slideClass` · `focusOverlay` · `focusRuntime` | focus, written into slide HTML (also `storydeck/focus-html`; styles in `storydeck/focus.css`) |
-| `narrationText` · `writtenText` | narration: what a click says (also `storydeck/narration`); the rules beneath, sentences, captions and chapters are `footprint-narration`'s |
-| `notesData` · `notesRuntime` · `listenRuntime` | narration in the page: notes, presenter window, listen mode (also `storydeck/narration-html`; styles in `storydeck/narration.css`) |
-| `embedClips` | `storydeck/voice` (Node only): a deck's clips inside one page; the clip cache, the voice port and its local-kit adapter are `footprint-narration/voice`'s |
-| `renderVideo` · `planVideo` · `deckStageDriver` · `ffmpegMajor` | `storydeck/video` (Node only, ffmpeg 5.0+): the deck as a narrated video, with captions and chapters |
+| `planFocus` · `focusStep` · `readFocus` · `FOCUS` | focus: per click, what it is about and what happens to the rest (also `footprint-storydeck/focus`) |
+| `readPieces` · `readStep` · `drawFocus` · `wrapStage` · `slideClass` · `focusOverlay` · `focusRuntime` | focus, written into slide HTML (also `footprint-storydeck/focus-html`; styles in `footprint-storydeck/focus.css`) |
+| `narrationText` · `writtenText` | narration: what a click says (also `footprint-storydeck/narration`); the rules beneath, sentences, captions and chapters are `footprint-narration`'s |
+| `notesData` · `notesRuntime` · `listenRuntime` | narration in the page: notes, presenter window, listen mode (also `footprint-storydeck/narration-html`; styles in `footprint-storydeck/narration.css`) |
+| `embedClips` | `footprint-storydeck/voice` (Node only): a deck's clips inside one page; the clip cache, the voice port and its local-kit adapter are `footprint-narration/voice`'s |
+| `renderVideo` · `planVideo` · `deckStageDriver` · `ffmpegMajor` | `footprint-storydeck/video` (Node only, ffmpeg 5.0+): the deck as a narrated video, with captions and chapters |
 
 Types ship beside the source in `index.d.ts` — hand-kept (there is no build to generate them from),
 and here rather than in a consumer's shim, because a package's shape belongs in the package.

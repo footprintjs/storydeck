@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { assemblePost, scopeDeckCss } from 'storydeck';
+import { assemblePost, scopeDeckCss } from 'footprint-storydeck';
 import { BASE } from '../site.config';
 
 // Loads the one post for this site (storydeck explaining storydeck) — same adapter the blog uses.

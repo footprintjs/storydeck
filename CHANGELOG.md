@@ -1,18 +1,23 @@
 # Changelog
 
-## 0.3.0 — the narration rules move into footprint-narration
+## 0.3.0 — `footprint-storydeck`; the narration rules move into footprint-narration
+
+- **The package is renamed `footprint-storydeck`** — the footprintjs family's name, as footprint-storyreel and
+  footprint-narration. Install `footprint-storydeck` and import from it: every door keeps its path under the new
+  name (`footprint-storydeck/focus`, `/focus-html`, `/narration`, `/narration-html`, `/voice`, `/video`,
+  `/deck-stage.js`, the CSS files). `storydeck` (0.1.0, 0.2.0) is deprecated and points here; the repository stays
+  `footprintjs/storydeck`.
 
 The rules a voice reads by, the sentences, the captions, YouTube's chapter rule and the clip cache now live in
 [footprint-narration](https://github.com/footprintjs/footprint-narration) — one package that StoryDeck and
 footprint-storyreel both use, so the two stop keeping copies that drift. StoryDeck keeps what is the deck's own.
 **What each note says is unchanged**: the four clip-key goldens and a real deck's 198 clips still match.
 
-- **`storydeck/narration`** keeps `narrationText` (now footprint-narration's automatic rules over `writtenText`) and
+- **`footprint-storydeck/narration`** keeps `narrationText` (now footprint-narration's automatic rules over `writtenText`) and
   `writtenText`. Removed, now imported from `footprint-narration`: `numberWords`, `SPELL`, `SAY`, `sentences`,
   `saidSentences`, `captionCues`, `stamp`; `toSrt` / `toVtt` → `captionFile(cues, 'srt' | 'vtt')`; `clock` →
-  `clockText`; `chapterList` → `youtubeChapters`. The main `storydeck` door re-exports only `narrationText` and
-  `writtenText`.
-- **`storydeck/voice`** keeps `embedClips`. Removed, now imported from `footprint-narration/voice`: `clipKey`,
+  `clockText`; `chapterList` → `youtubeChapters`. The main door re-exports only `narrationText` and `writtenText`.
+- **`footprint-storydeck/voice`** keeps `embedClips`. Removed, now imported from `footprint-narration/voice`: `clipKey`,
   `clipFor`, `voiceClips`, `chatterboxKit`, `pickSteps`; `sentenceStarts` is `footprint-narration`'s. A clip
   voiced from now on keeps its timed words (`clipFor(…).words`); a clip voiced before keeps working.
 - **`narrationText(notes, { spell, say })`**: what a rule says is final (a custom list no longer chains `A → B → C`),

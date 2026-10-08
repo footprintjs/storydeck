@@ -2,12 +2,12 @@
 // that plays the deck by itself, in the speaker's voice. For decks built as HTML strings, on <deck-stage>.
 //
 //   page += notesData(steps.map(s => s.notes));     // each click's notes: { slide, step, steps, now: [], earlier: [] }
-//   page += embedClips(texts, …).tags;              // the clips (storydeck/voice), when there are any
-//   page += `<script>(${notesRuntime})();(${listenRuntime})();</script>`;   // and storydeck/narration.css
+//   page += embedClips(texts, …).tags;              // the clips (voice.js · embedClips), when there are any
+//   page += `<script>(${notesRuntime})();(${listenRuntime})();</script>`;   // and narration.css
 //
 // N shows this click's notes in this window (practice); P opens a presenter window (a smaller slide, the notes,
 // the next click, a clock) that moves with this one. L plays the deck: each click's narration in the speaker's
-// voice (a clip from storydeck/voice) or, without one, the browser's; captions light sentence by sentence, and
+// voice (a clip carried by voice.js · embedClips) or, without one, the browser's; captions light sentence by sentence, and
 // the deck moves on when a click's narration ends. Space pauses, ← → move (and keep reading), [ ] slower /
 // faster, L or Esc stops. A line after [draft] — a bridge written for the deck — shows in amber.
 // The runtimes are self-contained, so they can be inlined with `(${fn})()`.
@@ -91,7 +91,7 @@ export function listenRuntime() {
     }
     return out;
   };
-  // the speaker's own voice: one clip per click, carried in the page (storydeck/voice · embedClips); else the browser's
+  // the speaker's own voice: one clip per click, carried in the page (voice.js · embedClips); else the browser's
   const vdata = JSON.parse(document.getElementById('deck-voice')?.textContent ?? 'null'), urls = {}, audio = new Audio();
   const clipOf = (i) => { const key = vdata?.steps?.[i]; return key ? { key, ...vdata.clips[key] } : null; };
   const urlOf = (key) => urls[key] ??= URL.createObjectURL(new Blob([Uint8Array.from(atob(document.getElementById(`vc-${key}`).textContent.trim()), (c) => c.charCodeAt(0))], { type: 'audio/mp4' }));

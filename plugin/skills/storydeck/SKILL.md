@@ -8,7 +8,7 @@ description: Build, focus, narrate and film talks and posts with StoryDeck — o
 A talk or a post is written once: **sections** of slide steps plus prose. StoryDeck shows it as an article
 (Read), a scrollytelling story (Scroll) or a click-through deck (Watch), decides per click what the audience
 looks at (focus), and turns the speaker notes into a voice, captions and a video (narration). Most of it is
-plain data and string builders; only `storydeck/voice`, `storydeck/video` and `footprint-narration/voice` touch the
+plain data and string builders; only `footprint-storydeck/voice`, `footprint-storydeck/video` and `footprint-narration/voice` touch the
 file system. The narration rules underneath (what a voice says for a number, captions, chapters, the clip cache)
 are footprint-narration's, a package StoryDeck depends on and shares with footprint-storyreel.
 
@@ -16,20 +16,20 @@ are footprint-narration's, a package StoryDeck depends on and shares with footpr
 
 | You need | Import | Where it runs |
 |---|---|---|
-| the three lenses (React) | `storydeck` — `PostView`, `BlogView`, `ScrollyView`, `SlideDeck`; styles `storydeck/storydeck.css` | browser |
-| the slide runtime Watch plays on (`<deck-stage>`) | `storydeck/deck-stage.js` — serve it, or inline it into a built page | browser |
-| what a click is about, and what happens to the rest | `storydeck/focus` — `planFocus`, `focusStep` | anywhere |
-| that focus written into slide HTML | `storydeck/focus-html` + `storydeck/focus.css`, `focusRuntime` once in the page | build + page |
-| what each click says (`narrationText`, `writtenText`: `[draft]`-aware) | `storydeck/narration` | anywhere |
+| the three lenses (React) | `footprint-storydeck` — `PostView`, `BlogView`, `ScrollyView`, `SlideDeck`; styles `footprint-storydeck/storydeck.css` | browser |
+| the slide runtime Watch plays on (`<deck-stage>`) | `footprint-storydeck/deck-stage.js` — serve it, or inline it into a built page | browser |
+| what a click is about, and what happens to the rest | `footprint-storydeck/focus` — `planFocus`, `focusStep` | anywhere |
+| that focus written into slide HTML | `footprint-storydeck/focus-html` + `footprint-storydeck/focus.css`, `focusRuntime` once in the page | build + page |
+| what each click says (`narrationText`, `writtenText`: `[draft]`-aware) | `footprint-storydeck/narration` | anywhere |
 | the rules beneath (`spokenMap`, `autoRules`, `SPELL`, `SAY`), sentences, captions, YouTube chapters | `footprint-narration` | anywhere |
-| notes (N), presenter (P), listen mode (L) in the page | `storydeck/narration-html` + `storydeck/narration.css` | build + page |
+| notes (N), presenter (P), listen mode (L) in the page | `footprint-storydeck/narration-html` + `footprint-storydeck/narration.css` | build + page |
 | a clip per click in a voice, cached (`voiceClips`, `clipFor`, `chatterboxKit`, `pickSteps`) | `footprint-narration/voice` | **Node only** |
-| those clips carried inside one page (`embedClips`) | `storydeck/voice` | **Node only** |
-| the deck as a narrated video | `storydeck/video` (+ ffmpeg 5.0 or newer on the path, Playwright's `chromium` passed in) | **Node only** |
+| those clips carried inside one page (`embedClips`) | `footprint-storydeck/voice` | **Node only** |
+| the deck as a narrated video | `footprint-storydeck/video` (+ ffmpeg 5.0 or newer on the path, Playwright's `chromium` passed in) | **Node only** |
 
-Never import `storydeck/voice`, `storydeck/video` or `footprint-narration/voice` into browser code: they use `node:fs`
+Never import `footprint-storydeck/voice`, `footprint-storydeck/video` or `footprint-narration/voice` into browser code: they use `node:fs`
 and child processes.
-The main entry (`storydeck`) re-exports only what runs anywhere.
+The main entry (`footprint-storydeck`) re-exports only what runs anywhere.
 
 ## Recipes
 
@@ -37,8 +37,8 @@ The main entry (`storydeck`) re-exports only what runs anywhere.
 (`width/height`) is a piece. A click names its subject (`on`) and a strategy; the rest is context.
 
 ```js
-import { planFocus } from 'storydeck/focus';
-import { readPieces, drawFocus, wrapStage, slideClass, focusOverlay, focusRuntime } from 'storydeck/focus-html';
+import { planFocus } from 'footprint-storydeck/focus';
+import { readPieces, drawFocus, wrapStage, slideClass, focusOverlay, focusRuntime } from 'footprint-storydeck/focus-html';
 
 const { html, pieces } = readPieces(mapHtml);
 const area = [0, 230, 1920, 1000];                       // below the headline: the blur never touches it
@@ -57,9 +57,9 @@ Strategies, one of each kind at most: look `grey` (default) · `hide` · `keep`;
 
 ```js
 import { voiceClips, chatterboxKit } from 'footprint-narration/voice';
-import { narrationText } from 'storydeck/narration';
-import { embedClips } from 'storydeck/voice';
-import { notesData, notesRuntime, listenRuntime } from 'storydeck/narration-html';
+import { narrationText } from 'footprint-storydeck/narration';
+import { embedClips } from 'footprint-storydeck/voice';
+import { notesData, notesRuntime, listenRuntime } from 'footprint-storydeck/narration-html';
 
 // one entry per click: { slide, step, steps, now: [note, …], earlier: [note, …] }
 const texts = clicks.map(c => narrationText(c.notes.now));               // '' where a click says nothing
@@ -76,9 +76,9 @@ A clip keeps its timed words (`clipFor(…).words`; `null` for a clip voiced bef
 
 ```js
 import { chromium } from 'playwright-core';
-import { renderVideo, deckStageDriver } from 'storydeck/video';
+import { renderVideo, deckStageDriver } from 'footprint-storydeck/video';
 import { clipFor } from 'footprint-narration/voice';
-import { narrationText, writtenText } from 'storydeck/narration';
+import { narrationText, writtenText } from 'footprint-storydeck/narration';
 
 const steps = clicks.map(c => {
   const spoken = narrationText(c.notes.now);

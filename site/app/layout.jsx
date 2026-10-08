@@ -1,6 +1,6 @@
-import 'storydeck/storydeck.css';
+import 'footprint-storydeck/storydeck.css';
 import './globals.css';
-import { StoryDeckProvider, ThemeToggle } from 'storydeck';
+import { StoryDeckProvider, ThemeToggle } from 'footprint-storydeck';
 import { BASE, SITE } from '../site.config';
 
 export const metadata = {

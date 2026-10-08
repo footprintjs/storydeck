@@ -8,9 +8,9 @@ const nextConfig = {
   trailingSlash: true,
   images: { unoptimized: true },
   reactStrictMode: true,
-  transpilePackages: ['storydeck'],
+  transpilePackages: ['footprint-storydeck'],
   webpack: (config, { isServer }) => {
-    // storydeck is linked (file:..) and ships its own React; dedupe React in the client bundle only.
+    // footprint-storydeck is linked (file:..) and ships its own React; dedupe React in the client bundle only.
     config.resolve.symlinks = false;
     if (!isServer) {
       config.resolve.alias = {
