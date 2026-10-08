@@ -174,8 +174,8 @@ async function render({ url, plan, out, name, driver, run, fps, maxEntrance, cha
   const srt = captionFile(captionCues(plan), 'srt');
   writeFileSync(path.join(out, 'captions.srt'), srt);
   writeFileSync(path.join(out, 'captions.vtt'), captionFile(captionCues(plan), 'vtt'));
-  // a chapter's title: words (a number is its digits); anything else — null, blank — names no chapter
-  const named = (title) => (typeof title === 'number' ? String(title) : typeof title === 'string' ? title.trim() : '');
+  // a chapter's title: words (a finite number is its digits); anything else — null, blank, NaN — names no chapter
+  const named = (title) => (typeof title === 'number' ? (Number.isFinite(title) ? String(title) : '') : typeof title === 'string' ? title.trim() : '');
   const marks = plan.map((c) => ({ at: c.start, title: named(chapters(c)) })).filter((m) => m.title);
   if (!marks.length || marks[0].at > 0) marks.unshift({ at: 0, title: named(intro) || 'Intro' });
   const list = youtubeChapters(marks, { length });

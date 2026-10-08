@@ -287,7 +287,7 @@ npm test        # vitest
 npm run test:cov
 ```
 
-183 tests · ~99% lines · coverage thresholds enforced (90% statements, 85% branches, 90% functions, 95% lines).
+186 tests · ~99% lines · coverage thresholds enforced (90% statements, 85% branches, 90% functions, 95% lines).
 
 ## License
 

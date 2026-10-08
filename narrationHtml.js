@@ -57,8 +57,9 @@ export function notesRuntime() {
  * Runs in the page: L plays the deck by itself, in the speaker's voice (clips) or the browser's, with captions.
  * It is serialised into the page and cannot import, so it keeps its own copy of footprint-narration's sentence
  * split (saidSentences), applied to each note and each [draft] part — the one accepted copy. It splits as
- * saidSentences(writtenText(notes)) does whenever every note and every [draft] part ends its own sentences (pinned
- * by narrationHtml.test.js); a sentence that runs across a note or a [draft] mark is split there.
+ * saidSentences(writtenText(notes)) does whenever every note and every [draft] part ends its own sentences and a
+ * [draft] mark has white space before it (pinned by narrationHtml.test.js); a sentence that runs across a note or
+ * a [draft] mark is split there.
  */
 export function listenRuntime() {
   const stage = document.querySelector('deck-stage'), data = document.getElementById('deck-notes');
