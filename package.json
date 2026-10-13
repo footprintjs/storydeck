@@ -32,12 +32,15 @@
     "test:cov": "vitest run --coverage"
   },
   "peerDependencies": {
+    "footprintjs": "^10.0.0",
     "react": ">=18",
     "react-dom": ">=18"
   },
+  "peerDependenciesMeta": {
+    "footprintjs": { "optional": true }
+  },
   "dependencies": {
     "footprint-narration": "^0.1.0",
-    "footprintjs": "^10.0.0",
     "markdown-it": "^14.1.0"
   },
   "devDependencies": {
@@ -46,6 +49,7 @@
     "@testing-library/user-event": "^14.6.1",
     "@vitejs/plugin-react": "^5.0.4",
     "@vitest/coverage-v8": "^4.1.9",
+    "footprintjs": "^10.0.0",
     "jsdom": "^29.1.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

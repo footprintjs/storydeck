@@ -33,6 +33,17 @@ export const TYPES = {
 };
 /** The sound a slide can carry, by extension: what PowerPoint plays on Windows and on a Mac. */
 export const AUDIO = { wav: 'audio/wav', m4a: 'audio/mp4', mp3: 'audio/mpeg' };
+const ascii = (bytes, from, to) => Buffer.from(bytes.subarray(from, to)).toString('latin1');
+/** How each kind of sound file begins: its signature, and a test of a file's first bytes (12 are enough) against it. */
+export const SOUND = {
+  wav: { sign: 'RIFF…WAVE', test: (b) => ascii(b, 0, 4) === 'RIFF' && ascii(b, 8, 12) === 'WAVE' },
+  mp3: { sign: 'ID3, or an MP3 frame sync', test: (b) => ascii(b, 0, 3) === 'ID3' || (b[0] === 0xff && (b[1] & 0xe0) === 0xe0) },
+  m4a: { sign: 'ftyp at byte 4', test: (b) => ascii(b, 4, 8) === 'ftyp' },
+};
+/** Whether bytes begin as a sound file of the kind `ext` names (some bytes, the right signature). */
+export const isSound = (bytes, ext) => Boolean(bytes?.length && SOUND[ext]?.test(bytes));
+/** A language tag, BCP 47 in shape: a 2–3 letter language, then subtags of 1–8 letters or digits (en, en-US, zh-Hant-TW). */
+export const LANG_TAG = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{1,8})*$/;
 
 /** The slide (16:9, 13.333 × 7.5 in) and the notes page, in EMU. */
 const W = 12192000, H = 6858000, ICON = 457200;
@@ -179,29 +190,46 @@ function checked(s, n, lang) {
     if (!AUDIO[s.audio.ext]) throw new TypeError(`${where}: its sound is .${s.audio.ext} — give .wav, .m4a or .mp3 (convert it with ffmpeg)`);
     if (!(s.audio.duration > 0) || !Number.isFinite(s.audio.duration)) throw new TypeError(`${where}: its sound has no length (duration ${s.audio.duration}) — give its duration in seconds`);
     if (!s.audio.data?.length) throw new TypeError(`${where}: its sound has no bytes — give the audio file's bytes as data`);
+    if (!isSound(s.audio.data, s.audio.ext)) throw new TypeError(`${where}: its sound's bytes are not a .${s.audio.ext} file (no ${SOUND[s.audio.ext].sign}) — give the file's own bytes`);
   }
   if (s.advance != null && !(s.advance >= 0 && Number.isFinite(s.advance))) throw new TypeError(`${where}: advance ${s.advance} is not a time — give seconds (0 or more), or null to wait for a click`);
   return { ...s, title: plainText(s.title).trim() || `Slide ${n}`, notes: plainText(s.notes), lang };
 }
 
 /**
+ * The media part for a slide's sound: the one already holding the same bytes (same kind, CRC-32 and bytes —
+ * a sound said twice is stored once), or a new one. Keyed by content, never by a name the caller gives: two clips
+ * under one name with different bytes would otherwise play one slide's sound on the other.
+ */
+function mediaPart(media, audio, add) {
+  const crc = crc32(audio.data);
+  const same = media.find((m) => m.ext === audio.ext && m.crc === crc && Buffer.compare(m.data, audio.data) === 0);
+  if (same) return same.name;
+  const name = `media${media.length + 1}.${audio.ext}`;
+  media.push({ ext: audio.ext, crc, data: audio.data, name });
+  add(`ppt/media/${name}`, audio.data);
+  return name;
+}
+
+/**
  * The parts of a .pptx, [{ name, data }] with [Content_Types].xml first — hand them to `zip`. `slides`: { title,
- * notes, picture (PNG bytes), audio?: { data, ext: 'wav' | 'm4a' | 'mp3', duration (s), key? }, advance? (s) } each;
- * slides whose audio has the same `key` share one media part. `title` names the file (docProps); `lang` tags the text.
+ * notes, picture (PNG bytes), audio?: { data, ext: 'wav' | 'm4a' | 'mp3', duration (s) }, advance? (s) } each;
+ * slides whose sound has the same bytes share one media part. `title` names the file (docProps); `lang` (a
+ * language tag, en-US by default) tags the text.
  */
 export function pptxParts({ slides, title = '', lang = 'en-US' }) {
   if (!slides?.length) throw new TypeError('pptxParts: no slides — give one { title, notes, picture } per click');
-  const list = slides.map((s, i) => checked(s, i + 1, lang)), media = new Map(), parts = [], slideRels = [];
+  if (!LANG_TAG.test(lang)) throw new TypeError(`pptxParts: lang "${lang}" is not a language tag — give one like en-US, de or zh-Hant-TW`);
+  const list = slides.map((s, i) => checked(s, i + 1, lang)), media = [], parts = [], slideRels = [];
   const add = (name, data) => parts.push({ name, data });
-  add('ppt/media/icon.png', solidPng(48, 48, [37, 99, 235]));
+  if (list.some((s) => s.audio)) add('ppt/media/icon.png', solidPng(48, 48, [37, 99, 235]));   // the sound's icon, off the page
   list.forEach((s, i) => {
     const n = i + 1, image = `image${n}.png`;
     add(`ppt/media/${image}`, s.picture);
     const own = [['rId1', RELS.layout, '../slideLayouts/slideLayout1.xml'], ['rId2', RELS.notes, `../notesSlides/notesSlide${n}.xml`], ['rId3', RELS.image, `../media/${image}`]];
     if (s.audio) {
-      const key = s.audio.key ?? `slide ${n}`;
-      if (!media.has(key)) { media.set(key, `media${media.size + 1}.${s.audio.ext}`); add(`ppt/media/${media.get(key)}`, s.audio.data); }
-      own.push(['rId4', RELS.audio, `../media/${media.get(key)}`], ['rId5', RELS.media, `../media/${media.get(key)}`], ['rId6', RELS.image, '../media/icon.png']);
+      const name = mediaPart(media, s.audio, add);
+      own.push(['rId4', RELS.audio, `../media/${name}`], ['rId5', RELS.media, `../media/${name}`], ['rId6', RELS.image, '../media/icon.png']);
     }
     slideRels.push(own);
   });

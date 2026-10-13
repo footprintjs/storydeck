@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { clipKey } from 'footprint-narration/voice';
 import { narrationText } from './narration.js';
 import { solidPng } from './pptxParts.js';
@@ -19,10 +20,13 @@ let dir;
 beforeEach(() => { dir = mkdtempSync(path.join(tmpdir(), 'sd-pptx-')); });
 afterEach(() => { readBack.edit = null; rmSync(dir, { recursive: true, force: true }); });
 
-/** A clip as footprint-narration/voice's clipFor gives it, its sound a small file in the test's folder. */
-function clip(key, duration, ext = 'wav') {
+/** A real 0.1 s WAV (8 kHz mono), its bytes made a little different per key: each clip its own sound. */
+const TONE = readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'tone-0.1s.wav'));
+const toneFor = (key) => { const bytes = Buffer.from(TONE); bytes[100] ^= key.charCodeAt(key.length - 1); return bytes; };
+/** A clip as footprint-narration/voice's clipFor gives it, its sound a small file in the test's folder (`bytes` to give other ones). */
+function clip(key, duration, ext = 'wav', bytes = toneFor(key)) {
   const audio = path.join(dir, `${key}.${ext}`);
-  writeFileSync(audio, `RIFF-${key}`);
+  writeFileSync(audio, bytes);
   return { key, audio, duration, sentences: [0], words: null };
 }
 const steps = () => [
@@ -61,7 +65,7 @@ describe('pptx · a deck as PowerPoint', () => {
       ['Intro', 'Hello. There.', 1, 3.6], ['Part 1 · Two ways in', '', 0, 3.1], ['Two ways in', 'On 2000.', 1, 2.6],   // the headline before the label
     ]);
     const media = unzip(readFileSync(done.file)).filter((e) => e.name.startsWith('ppt/media/media'));
-    expect(media.map((e) => [e.name, e.data.toString()])).toEqual([['ppt/media/media1.wav', 'RIFF-k1'], ['ppt/media/media2.wav', 'RIFF-k2']]);
+    expect(media.map((e) => [e.name, Buffer.compare(e.data, toneFor(e.name === 'ppt/media/media1.wav' ? 'k1' : 'k2'))])).toEqual([['ppt/media/media1.wav', 0], ['ppt/media/media2.wav', 0]]);
     expect(lines).toEqual(['picture: click 1', 'picture: click 2', 'picture: click 3', expect.stringMatching(/^zip: \d+ bytes$/), `pptx: ${done.file}`]);
     expect(done.clicks[0]).toEqual({ n: 1, title: 'Intro', notes: 'Hello. There.', spoken: 'Hello. There.', clip: { key: 'k1', audio: path.join(dir, 'k1.wav'), duration: 3 }, advance: 3.6 });
   });
@@ -92,19 +96,25 @@ describe('pptx · a deck as PowerPoint', () => {
     const voiceOf = (notes, duration) => {
       const key = clipKey(narrationText(notes, { spell }), profile);
       writeFileSync(path.join(cache, `${key}.json`), JSON.stringify({ duration, sentences: [0] }));
-      writeFileSync(path.join(cache, `${key}.wav`), 'RIFF');
+      writeFileSync(path.join(cache, `${key}.wav`), toneFor(key));
       return key;
     };
     const deck = [
       { label: 'Title', notes: { now: ['A UI, said.', '[draft] And a bridge.'], earlier: [] } },
       { label: 'Two', headline: 'The second', notes: 'Second words.' },
       { label: 'Quiet' },
+      { label: 'Lines', notes: 'A line,\n  then   another.' },
     ];
-    const keys = [voiceOf(deck[0].notes.now, 2), voiceOf('Second words.', 1.5)];
+    const keys = [voiceOf(deck[0].notes.now, 2), voiceOf('Second words.', 1.5), voiceOf(deck[3].notes, 2.5)];
     const done = await exportPptx({ url: 'u', deck, voice: { cache, profile, spell }, out: dir, driver: fakeDriver(), title: 'My talk' });
     expect(done.clicks.map((c) => [c.title, c.notes, c.clip?.key ?? null, c.advance])).toEqual([
-      ['Title', 'A UI, said. And a bridge.', keys[0], 2.6], ['The second', 'Second words.', keys[1], 2.1], ['Quiet', '', null, 3.1],   // noclip plus gap, as planVideo times it
+      ['Title', 'A UI, said.\nAnd a bridge.', keys[0], 2.6], ['The second', 'Second words.', keys[1], 2.1], ['Quiet', '', null, 3.1],   // noclip plus gap, as planVideo times it
+      ['Lines', 'A line,\nthen another.', keys[2], 3.1],
     ]);
+    // a paragraph per note and per line, on the notes page too
+    const notes = String(unzip(readFileSync(done.file)).find((e) => e.name === 'ppt/notesSlides/notesSlide1.xml').data);
+    expect(notes).toContain('<a:t>A UI, said.</a:t></a:r></a:p><a:p><a:r><a:rPr lang="en-US" dirty="0"/><a:t>And a bridge.</a:t>');
+    expect(read(done.file).slides.map((s) => s.notes)).toEqual(['A UI, said.\nAnd a bridge.', 'Second words.', '', 'A line,\nthen another.']);
     expect(done.clicks[0].spoken).toContain('you eye');
     expect(String(unzip(readFileSync(done.file)).find((e) => e.name === 'docProps/core.xml').data)).toContain('<dc:title>My talk</dc:title>');
     // a step that carries its own clip (even none) keeps it; one without asks the voice
@@ -168,6 +178,21 @@ describe('pptx · what it refuses, and why', () => {
     expect(condition).toContain('"A clip PowerPoint cannot play": clipsUnplayable 2 gt 0 ✓');
   });
 
+  it('refuses a clip whose bytes are not its kind of sound — empty, or garbage in a .wav — before a browser opens', async () => {
+    const odd = steps();
+    odd[0].clip = clip('empty', 1, 'wav', Buffer.alloc(0));
+    odd[2].clip = clip('garbage', 1, 'wav', Buffer.from('this is not a wave file at all'));
+    const { error, driver, condition } = await refusal({ steps: odd });
+    expect(error.message).toBe(`exportPptx: a clip is not ready: click 1: its clip ${odd[0].clip.audio} is empty (0 bytes) — voice it again (footprint-narration/voice · voiceClips); `
+      + `click 3: its clip ${odd[2].clip.audio} is not a .wav file (no RIFF…WAVE) — voice it again, or convert it with ffmpeg`);
+    expect(condition).toBe('[Condition]: It evaluated Rule 1 "A clip PowerPoint cannot play": clipsUnplayable 2 gt 0 ✓, and chose RefuseClips.');
+    expect(driver.open).not.toHaveBeenCalled();
+    expect(error.narrative.some((l) => l.includes('ShootPictures'))).toBe(false);   // refused at CheckClips, before shooting
+    const mp3 = steps();
+    mp3[0].clip = clip('k1', 1, 'mp3', Buffer.from('RIFF....WAVE: a WAV named .mp3'));
+    expect((await refusal({ steps: mp3 })).error.message).toContain('is not a .mp3 file (no ID3, or an MP3 frame sync)');
+  });
+
   it('refuses a clip longer than maxClip, naming the fix', async () => {
     const { error, condition } = await refusal({ steps: steps(), maxClip: 2.5 });
     expect(error.message).toBe('exportPptx: a clip is not ready: click 1: its clip lasts 3 s, over maxClip (2.5 s) — split its notes across clicks, or raise maxClip');
@@ -178,7 +203,7 @@ describe('pptx · what it refuses, and why', () => {
     const given = steps();
     given[2].clip = null;
     const { error, condition } = await refusal({ steps: given });
-    expect(error.message).toBe('exportPptx: a clip is not ready: click 3 says words but has no clip — voice it (footprint-narration/voice · voiceClips), or give its step its clip');
+    expect(error.message).toBe('exportPptx: a clip is not ready: click 3: it says words but has no clip — voice it (footprint-narration/voice · voiceClips), or give its step its clip');
     expect(condition).toContain('"A click says words with no clip, in a voiced deck": clipsUnvoiced 1 gt 0 ✓');
   });
 
@@ -225,10 +250,22 @@ describe('pptx · what it refuses, and why', () => {
     await expect(exportPptx({ url: 'u', deck: { clicks: [] }, out: dir, driver })).rejects.toThrow('exportPptx: `deck` is not a list — give one entry per click');
     await expect(exportPptx({ url: 'u', deck: [], voice: { profile: { id: 'me' } }, out: dir, driver })).rejects.toThrow('exportPptx: `voice` needs { cache, profile } — the clip cache folder and the profile the clips were voiced with');
     await expect(exportPptx({ url: 'u', steps: steps(), only: [7, 9], out: dir, driver })).rejects.toThrow('exportPptx: nothing to export — no click in [7, 9] (it has 3)');
+    await expect(exportPptx({ url: 'u', steps: steps(), lang: 'English', out: dir, driver })).rejects.toThrow('exportPptx: lang "English" is not a language tag — give one like en-US, de or zh-Hant-TW');
     const empty = await exportPptx({ url: 'u', steps: [], out: dir, driver }).catch((e) => e);
     expect(empty.message).toBe('exportPptx: nothing to export — no click in the deck (it has 0)');
     expect(empty.narrative).toEqual(['[Error]: An error occurred at PlanClicks: RangeError: exportPptx: nothing to export — no click in the deck (it has 0).']);
     expect(driver.open).not.toHaveBeenCalled();
+  });
+
+  it('refuses to start without footprintjs (an optional peer), naming the install', async () => {
+    const driver = fakeDriver(), missing = new Error("Cannot find package 'footprintjs' imported from pptx.js");
+    const error = await exportPptx({ url: 'u', steps: steps(), out: path.join(dir, 'out'), driver, load: () => Promise.reject(missing) }).catch((e) => e);
+    expect(error.message).toBe('exportPptx needs footprintjs: npm i footprintjs');
+    expect(error.cause).toBe(missing);
+    expect(driver.open).not.toHaveBeenCalled();
+    expect(existsSync(path.join(dir, 'out'))).toBe(false);
+    const loaded = await exportPptx({ url: 'u', steps: steps(), out: dir, driver: fakeDriver(), load: () => import('footprintjs') });
+    expect(loaded.slides).toBe(3);   // a loader of the caller's own
   });
 
   it('closes the browser when the page does not open or a click fails, and says which', async () => {
@@ -258,7 +295,7 @@ describe('pptx · the door', () => {
     const sources = readdirSync(root).filter((f) => /\.(js|jsx)$/.test(f) && !f.includes('.test.') && !f.startsWith('vitest'));
     expect(sources).toEqual(expect.arrayContaining(['index.js', 'pptx.js', 'video.js']));
     for (const file of sources) expect(readFileSync(path.join(root, file), 'utf8'), file).not.toMatch(/^\s*(import|export)\b[^;]*?\bfrom\s+['"]footprintjs(\/[\w-]+)?['"]/m);
-    expect(readFileSync(path.join(root, 'pptx.js'), 'utf8')).toContain("await import('footprintjs')");
+    expect(readFileSync(path.join(root, 'pptx.js'), 'utf8')).toContain("load = () => import('footprintjs')");
   });
 });
 

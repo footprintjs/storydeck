@@ -1,19 +1,25 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { pptxParts, pngSize, solidPng, plainText, TYPES } from './pptxParts.js';
+import { fileURLToPath } from 'node:url';
+import { pptxParts, pngSize, solidPng, plainText, isSound, TYPES } from './pptxParts.js';
 import { checkPptx } from './pptxCheck.js';
 import { zip, unzip } from './zip.js';
 import { parseXml } from './xml.js';
 
-const sound = (key, duration = 2.5, ext = 'wav') => ({ data: Buffer.from(`RIFF-${key}`), ext, duration, key });
+/** A real 0.1 s WAV (8 kHz mono); `variant` changes one sample, so the bytes differ and it is still a WAV. */
+const TONE = readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'tone-0.1s.wav'));
+const wav = (variant = 0) => { const bytes = Buffer.from(TONE); bytes[100] ^= variant; return bytes; };
+const sound = (variant = 0, duration = 2.5) => ({ data: wav(variant), ext: 'wav', duration });
+const MP3 = Buffer.concat([Buffer.from('ID3'), Buffer.alloc(13)]), M4A = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypM4A '), Buffer.alloc(8)]);
 const SLIDES = [
-  { title: 'Intro', notes: 'Hello & welcome.\nSecond line: <b> "quoted"', picture: solidPng(16, 9, [200, 0, 0]), audio: sound('k1'), advance: 3.1 },
+  { title: 'Intro', notes: 'Hello & welcome.\nSecond line: <b> "quoted"', picture: solidPng(16, 9, [200, 0, 0]), audio: sound(), advance: 3.1 },
   { title: '', notes: '', picture: solidPng(32, 18), advance: 2.5 },
-  { title: 'Again', notes: 'Same words.', picture: solidPng(16, 9), audio: sound('k1'), advance: 3.1 },
+  { title: 'Again', notes: 'Same words.', picture: solidPng(16, 9), audio: sound(), advance: 3.1 },
 ];
+const SILENT = SLIDES.map(({ audio, ...s }) => s);
 const partsOf = (slides = SLIDES, options = {}) => new Map(pptxParts({ slides, ...options }).map((p) => [p.name, p.data]));
 const text = (parts, name) => String(parts.get(name));
 /** The package with one change made to its parts (name → data), zipped. */
@@ -33,9 +39,23 @@ describe('pptx parts · a minimal PresentationML part set', () => {
       'ppt/slideMasters/slideMaster1.xml', 'ppt/slideLayouts/slideLayout1.xml', 'ppt/notesMasters/notesMaster1.xml', 'ppt/theme/theme1.xml', 'ppt/theme/theme2.xml',
       'ppt/slides/slide3.xml', 'ppt/notesSlides/notesSlide3.xml', 'ppt/notesSlides/_rels/notesSlide3.xml.rels', 'docProps/core.xml', 'docProps/app.xml',
       'ppt/media/image1.png', 'ppt/media/icon.png', 'ppt/media/media1.wav']));
-    expect(names.filter((n) => n.startsWith('ppt/media/media'))).toEqual(['ppt/media/media1.wav']);   // one clip, said twice, is one part
-    expect(names).toHaveLength(32);   // 13 shared parts, 4 per slide, 2 docProps, 5 media
+    expect(names.filter((n) => n.startsWith('ppt/media/media'))).toEqual(['ppt/media/media1.wav']);   // one sound, said twice, is one part
+    expect(names).toHaveLength(32);   // 13 shared parts, 4 per slide, 2 docProps, 5 media: 3 pictures, the sound, its icon
     for (const name of names.filter((n) => /\.(xml|rels)$/.test(n))) expect(() => parseXml(text(partsOf(), name)), name).not.toThrow();
+  });
+
+  it('writes the sound\'s icon only when a slide has sound', () => {
+    const names = pptxParts({ slides: SILENT }).map((p) => p.name);
+    expect(names.filter((n) => n.startsWith('ppt/media/'))).toEqual(['ppt/media/image1.png', 'ppt/media/image2.png', 'ppt/media/image3.png']);
+    expect(names).toHaveLength(30);
+    expect(checkPptx(zip(pptxParts({ slides: SILENT }))).problems).toEqual([]);
+  });
+
+  it('gives each paragraph of the notes its own paragraph on the notes page', () => {
+    const notes = text(partsOf(), 'ppt/notesSlides/notesSlide1.xml');
+    expect(notes.match(/<a:p>/g)).toHaveLength(2);
+    expect(notes).toContain('<a:t>Hello &amp; welcome.</a:t></a:r></a:p><a:p><a:r><a:rPr lang="en-US" dirty="0"/><a:t>Second line: &lt;b&gt; &quot;quoted&quot;</a:t>');
+    expect(text(pptxPartsAt({ notes: 'One\r\n\nThree' }), 'ppt/notesSlides/notesSlide1.xml').match(/<a:p>/g)).toHaveLength(3);   // an empty line stays a paragraph
   });
 
   it('reads back whole: every part typed and found, a slide per entry with its title, notes, picture, sound and time', () => {
@@ -68,14 +88,25 @@ describe('pptx parts · a minimal PresentationML part set', () => {
     expect(types).not.toContain('Extension="mp3"');
     expect(types).toContain(`<Override PartName="/ppt/slides/slide2.xml" ContentType="${TYPES.slide}"/>`);
     expect(types).toContain(`<Override PartName="/ppt/notesSlides/notesSlide2.xml" ContentType="${TYPES.notes}"/>`);
-    const mixed = text(partsOf([{ ...SLIDES[0], audio: sound('a', 1, 'mp3') }, { ...SLIDES[0], audio: sound('b', 1, 'm4a') }]), '[Content_Types].xml');
+    const mixed = text(partsOf([{ ...SLIDES[0], audio: { data: MP3, ext: 'mp3', duration: 1 } }, { ...SLIDES[0], audio: { data: M4A, ext: 'm4a', duration: 1 } }]), '[Content_Types].xml');
     expect(mixed).toContain('<Default Extension="mp3" ContentType="audio/mpeg"/><Default Extension="m4a" ContentType="audio/mp4"/>');
     expect(types).not.toContain('Extension="wav" ContentType="audio/wav"/><Default Extension="wav"');
   });
 
-  it('gives each clip without a key its own part, and names the file and its counts in docProps', () => {
-    const parts = partsOf([{ ...SLIDES[0], audio: { ...sound('x'), key: undefined } }, { ...SLIDES[2], audio: { ...sound('x'), key: undefined } }], { title: 'Q&A' });
-    expect([...parts.keys()].filter((n) => n.startsWith('ppt/media/media'))).toEqual(['ppt/media/media1.wav', 'ppt/media/media2.wav']);
+  it('keys each sound by its bytes, never by a name: two sounds under one name stay two, one sound under two names stays one', () => {
+    const named = (variant, key) => ({ ...SLIDES[0], audio: { ...sound(variant), key } });
+    const two = partsOf([named(0, 'same'), named(1, 'same')]);
+    expect([...two.keys()].filter((n) => n.startsWith('ppt/media/media'))).toEqual(['ppt/media/media1.wav', 'ppt/media/media2.wav']);
+    expect(text(two, 'ppt/slides/_rels/slide2.xml.rels')).toContain('Target="../media/media2.wav"');
+    expect(Buffer.compare(two.get('ppt/media/media2.wav'), wav(1))).toBe(0);   // each slide plays its own sound
+    const one = partsOf([named(0, 'a'), named(0, 'b')]);
+    expect([...one.keys()].filter((n) => n.startsWith('ppt/media/media'))).toEqual(['ppt/media/media1.wav']);
+    const kinds = partsOf([{ ...SLIDES[0], audio: { data: MP3, ext: 'mp3', duration: 1 } }, { ...SLIDES[0], audio: { data: Buffer.concat([MP3, Buffer.from('x')]), ext: 'mp3', duration: 1 } }]);
+    expect([...kinds.keys()].filter((n) => n.startsWith('ppt/media/media'))).toEqual(['ppt/media/media1.mp3', 'ppt/media/media2.mp3']);
+  });
+
+  it('names the file and its counts in docProps, and tags the text with its language', () => {
+    const parts = partsOf([{ ...SLIDES[0], audio: sound(0) }, { ...SLIDES[2], audio: sound(1) }], { title: 'Q&A' });
     expect(text(parts, 'docProps/core.xml')).toContain('<dc:title>Q&amp;A</dc:title>');
     expect(text(parts, 'docProps/app.xml')).toContain('<Slides>2</Slides><Notes>2</Notes><MMClips>2</MMClips>');
     expect(text(partsOf(), 'docProps/core.xml')).not.toContain('dc:title');
@@ -95,10 +126,15 @@ describe('pptx parts · a minimal PresentationML part set', () => {
     expect(() => pptxParts({})).toThrow('pptxParts: no slides');
     expect(one({ picture: Buffer.from('JFIF not a png at all, really') })).toThrow('pptxParts: slide 1: its picture is not a PNG — give the PNG\'s bytes');
     expect(one({ picture: undefined })).toThrow('its picture is not a PNG');
-    expect(one({ audio: sound('a', 1, 'ogg') })).toThrow('pptxParts: slide 1: its sound is .ogg — give .wav, .m4a or .mp3');
-    expect(one({ audio: sound('a', 0) })).toThrow('pptxParts: slide 1: its sound has no length (duration 0) — give its duration in seconds');
-    expect(one({ audio: sound('a', Infinity) })).toThrow('its sound has no length (duration Infinity)');
-    expect(one({ audio: { ...sound('a'), data: Buffer.alloc(0) } })).toThrow('pptxParts: slide 1: its sound has no bytes');
+    expect(one({ audio: { ...sound(), ext: 'ogg' } })).toThrow('pptxParts: slide 1: its sound is .ogg — give .wav, .m4a or .mp3');
+    expect(one({ audio: sound(0, 0) })).toThrow('pptxParts: slide 1: its sound has no length (duration 0) — give its duration in seconds');
+    expect(one({ audio: sound(0, Infinity) })).toThrow('its sound has no length (duration Infinity)');
+    expect(one({ audio: { ...sound(), data: Buffer.alloc(0) } })).toThrow('pptxParts: slide 1: its sound has no bytes');
+    expect(one({ audio: { ...sound(), data: Buffer.from('not a wave file, only words') } })).toThrow('pptxParts: slide 1: its sound\'s bytes are not a .wav file (no RIFF…WAVE) — give the file\'s own bytes');
+    expect(one({ audio: { data: TONE, ext: 'mp3', duration: 1 } })).toThrow('its sound\'s bytes are not a .mp3 file (no ID3, or an MP3 frame sync)');
+    expect(() => pptxParts({ slides: SLIDES, lang: 'en_US' })).toThrow('pptxParts: lang "en_US" is not a language tag — give one like en-US, de or zh-Hant-TW');
+    expect(() => pptxParts({ slides: SLIDES, lang: '' })).toThrow('pptxParts: lang "" is not a language tag');
+    expect(() => pptxParts({ slides: SLIDES, lang: 'en-US" onload="x' })).toThrow('is not a language tag');
     expect(one({ advance: -1 })).toThrow('pptxParts: slide 1: advance -1 is not a time — give seconds (0 or more), or null to wait for a click');
     expect(one({ advance: NaN })).toThrow('advance NaN is not a time');
   });
@@ -108,6 +144,19 @@ describe('pptx parts · a minimal PresentationML part set', () => {
 function pptxPartsAt(patch) {
   return partsOf([{ ...SLIDES[0], ...patch }]);
 }
+
+describe('pptx parts · what a sound file begins with', () => {
+  it('knows a WAV, an MP3 (ID3 or a frame sync) and an M4A (ftyp) by their first bytes', () => {
+    expect(isSound(TONE, 'wav')).toBe(true);
+    expect(isSound(MP3, 'mp3')).toBe(true);
+    expect(isSound(Buffer.from([0xff, 0xfb, 0x90, 0x00]), 'mp3')).toBe(true);
+    expect(isSound(M4A, 'm4a')).toBe(true);
+    expect(isSound(new Uint8Array(TONE.subarray(0, 12)), 'wav')).toBe(true);
+    for (const [bytes, ext] of [[TONE, 'mp3'], [MP3, 'wav'], [M4A, 'wav'], [Buffer.alloc(0), 'wav'], [null, 'wav'], [TONE, 'ogg'], [Buffer.from('RIFF....AVI '), 'wav']]) {
+      expect(isSound(bytes, ext), `${ext}`).toBe(false);
+    }
+  });
+});
 
 describe('pptx parts · PNG', () => {
   it('reads a PNG\'s size, and nothing from bytes that are not one', () => {

@@ -205,9 +205,9 @@ Conferences often ask for the talk as a PowerPoint file. `footprint-storydeck/pp
 through the same browser port as the video, so a deck that can be filmed can be exported:
 
 - **one slide per click** — the click's settled picture (made forward, its entrance played to the end, as the
-  video's held frame) full-bleed on a 16:9 slide; its written notes as the speaker notes; its headline (or label) as
-  the slide's title, in the title placeholder just above the page, so the outline, the slide list and a screen
-  reader read it and the audience does not see it; a fade between slides;
+  video's held frame) full-bleed on a 16:9 slide; its written notes as the speaker notes, a paragraph per note;
+  its headline (or label) as the slide's title, in the title placeholder just above the page, so the outline, the
+  slide list and a screen reader read it and the audience does not see it; a fade between slides;
 - **a narrated deck that runs by itself** — with clips (as the video takes them, or found in the voice cache), each
   slide carries its clip, which plays as the slide starts, and moves on after the clip plus `gap` (a click without
   a clip after `noclip` plus `gap`, the video's timing). Without clips no slide moves on by itself: the speaker clicks.
@@ -220,15 +220,18 @@ possible later step.
 PlanClicks → GatherClips → CheckClips → TimeTheDeck → ShootPictures → CheckPictures → WriteParts → Zip →
 CheckPackage → Verdict → Deliver — so every run leaves a record that explains it, to a person or an LLM
 (`done.narrative`). Each check is a `decide()` that records its evidence: a clip whose file is gone, one PowerPoint
-cannot play (.wav, .m4a and .mp3 play everywhere), one over `maxClip` (300 s), a click that says words with no clip;
+cannot play (not a .wav, .m4a or .mp3; an empty file; or bytes that do not begin as their kind of file — RIFF…WAVE,
+ID3 or an MP3 frame, ftyp), one over `maxClip` (300 s), a click that says words with no clip;
 a click without a 16:9 PNG; a package that does not read back as planned. A refusal names each click and its fix,
 carries the record (`error.narrative`), and writes nothing to `out`. The clips are checked before a browser opens.
-footprintjs is loaded only when an export runs; the deck's browser runtime never loads it.
+footprintjs is an optional peer dependency: StoryDeck does not install it (a browser-only install stays small), so
+install it beside StoryDeck to export — `npm i footprintjs` — and an export without it is refused, saying so. It is
+loaded only when an export runs; the deck's browser runtime never loads it.
 
 ```js
 import { chromium } from 'playwright-core';
 import { deckStageDriver } from 'footprint-storydeck/video';
-import { exportPptx } from 'footprint-storydeck/pptx';
+import { exportPptx } from 'footprint-storydeck/pptx';   // and `npm i footprintjs`: an optional peer, needed to export
 
 const done = await exportPptx({
   url: 'file:///…/deck.html', steps, out: 'out/my-talk.pptx',   // the steps the video takes; or `out` a folder → <name>.pptx
@@ -242,13 +245,14 @@ const done = await exportPptx({
 await exportPptx({ url, deck: clicks.map(c => ({ label: c.label, notes: c.notes })), voice: { cache: 'voice/cache', profile }, out: 'out', driver });
 ```
 
-The file is written by hand, with no dependency: a small ZIP writer (`zlib`'s raw deflate and a CRC-32) and the
-a minimal PresentationML part set (ECMA-376) — content types, relationships, the presentation, one master
-and one title-only layout, a theme for each master, the slides, a notes master and a notes page per slide, the
-media and the document properties. The pieces are exported for pictures made elsewhere: `pptxParts({ slides })`
-gives the parts, `zip(parts)` the file, and `checkPptx(bytes)` reads one back — the ZIP against its CRC-32s, every
-part well-formed and typed, every relationship's target there, every `r:id` known, slide and shape ids in
-PowerPoint's ranges — and lists each slide's title, notes, pictures, sound and time. Each export runs that check
+The file is written by hand, with no dependency: a small ZIP writer (`zlib`'s raw deflate and a CRC-32) and a
+minimal PresentationML part set (ECMA-376) — content types, relationships, the presentation, one master and one
+title-only layout, a theme for each master, the slides, a notes master and a notes page per slide, the media (a
+sound said on two clicks is stored once, matched by its bytes) and the document properties. The pieces are
+exported for pictures made elsewhere: `pptxParts({ slides })` gives the parts, `zip(parts)` the file, and
+`checkPptx(bytes)` reads one back — the ZIP against its CRC-32s, every part well-formed and typed, every
+relationship's target there, every `r:id` known, slide, master and layout ids in PowerPoint's ranges, shape ids
+unique on each slide — and lists each slide's title, notes, pictures, sound and time. Each export runs that check
 before it writes to `out`. The tests also run Info-ZIP's `unzip -t`; LibreOffice, where it is installed, opens
 the file and prints it to PDF; and with `STORYDECK_OOXML_SCHEMAS` pointing at the ISO/IEC 29500 schemas, every part
 is validated against them. Limits: a clip is embedded as it is (a .wav as voiced: about 3 MB a minute at 24 kHz

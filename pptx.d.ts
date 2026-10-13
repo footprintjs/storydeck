@@ -1,6 +1,7 @@
 /**
  * storydeck · pptx (pptx.js) — a deck as a PowerPoint file: one slide per click, its settled picture, its notes,
- * its clip. Node. The export is a footprintjs flowchart: every run leaves a record that explains it.
+ * its clip. Node. The export is a footprintjs flowchart: every run leaves a record that explains it. footprintjs is an
+ * optional peer dependency: `npm i footprintjs` beside StoryDeck to export.
  */
 import type { VoiceProfile } from 'footprint-narration/voice';
 import type { VideoClip, VideoDriver, VideoStep } from './video';
@@ -22,7 +23,8 @@ export interface PlannedSlide {
  * Exports the deck at `url` as a .pptx (`out` itself when it ends in .pptx, else `<name>.pptx` in the folder `out`).
  * Give `steps` (as renderVideo takes them) or `deck` (the clicks with their notes); `voice` finds a click's clip when
  * its step gives none. A clip, a picture or a package that is not usable is refused, naming the fix, and nothing is
- * written to `out`; the refusal's error carries the run's `narrative`.
+ * written to `out`; the refusal's error carries the run's `narrative`. Without footprintjs installed, the export is
+ * refused: "exportPptx needs footprintjs: npm i footprintjs".
  */
 export function exportPptx(options: {
   url: string; out: string; driver: VideoDriver;
@@ -31,7 +33,7 @@ export function exportPptx(options: {
   name?: string;
   /** the document's title (docProps; default: the file's name) */
   title?: string;
-  /** the language the notes and titles are tagged with (default 'en-US') */
+  /** the language tag the notes and titles carry (default 'en-US'; a tag such as de or zh-Hant-TW, else refused) */
   lang?: string;
   /** s after a clip before the slide moves on (0.6); s a click without a clip stays, before that gap (2.5) */
   gap?: number; noclip?: number;
@@ -44,19 +46,22 @@ export function exportPptx(options: {
   /** where the pictures and the package are made (its pictures/ is replaced); by default a temporary folder, removed afterwards */
   work?: string;
   log?: (line: string) => void;
+  /** how footprintjs is loaded (default: import('footprintjs')) — for a bundler that needs its own import, or a test */
+  load?: () => Promise<unknown>;
 }): Promise<{ file: string; slides: number; voiced: number; runtime: number | null; bytes: number; clicks: PlannedSlide[]; narrative: string[] }>;
 
-/** A slide for pptxParts: its title, notes, picture (PNG bytes), sound and the seconds it stays (null or absent: the speaker clicks). */
+/** A slide for pptxParts: its title, notes (a paragraph per line), picture (PNG bytes), sound and the seconds it stays (null or absent: the speaker clicks). */
 export interface PptxSlide {
   title?: string; notes?: string; picture: Uint8Array;
-  audio?: { data: Uint8Array; ext: 'wav' | 'm4a' | 'mp3'; duration: number; key?: string } | null;
+  /** the sound file's own bytes (its signature is checked); slides whose sound has the same bytes share one media part */
+  audio?: { data: Uint8Array; ext: 'wav' | 'm4a' | 'mp3'; duration: number } | null;
   advance?: number | null;
 }
 /** A part of a package: its name and its bytes (a string is UTF-8). */
 export interface ZipEntry { name: string; data: string | Uint8Array }
 
 /** The parts of a .pptx, [Content_Types].xml first — a minimal PresentationML set, each part schema-valid. Hand them to `zip`. */
-export function pptxParts(options: { slides: readonly PptxSlide[]; title?: string; lang?: string }): ZipEntry[];
+export function pptxParts(options: { slides: readonly PptxSlide[]; title?: string; /** a language tag (default 'en-US') */ lang?: string }): ZipEntry[];
 /** A ZIP archive of the entries, in order (deflated where that helps; no ZIP64). */
 export function zip(entries: readonly ZipEntry[]): Buffer;
 /** A ZIP archive's entries, each checked against its CRC-32; throws, saying what is wrong, on anything it cannot vouch for. */

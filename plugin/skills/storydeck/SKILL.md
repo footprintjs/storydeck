@@ -26,7 +26,7 @@ are footprint-narration's, a package StoryDeck depends on and shares with footpr
 | a clip per click in a voice, cached (`voiceClips`, `clipFor`, `chatterboxKit`, `pickSteps`) | `footprint-narration/voice` | **Node only** |
 | those clips carried inside one page (`embedClips`) | `footprint-storydeck/voice` | **Node only** |
 | the deck as a narrated video | `footprint-storydeck/video` (+ ffmpeg 5.0 or newer on the path, Playwright's `chromium` passed in) | **Node only** |
-| the deck as PowerPoint (.pptx): a slide per click, its picture, notes and clip | `footprint-storydeck/pptx` — `exportPptx` (the same driver as the video; no ffmpeg) | **Node only** |
+| the deck as PowerPoint (.pptx): a slide per click, its picture, notes and clip | `footprint-storydeck/pptx` — `exportPptx` (the same driver as the video; no ffmpeg; `npm i footprintjs` beside it, an optional peer) | **Node only** |
 
 Never import `footprint-storydeck/voice`, `footprint-storydeck/video`, `footprint-storydeck/pptx` or `footprint-narration/voice` into browser code: they use `node:fs`
 and child processes.
@@ -96,7 +96,7 @@ const done = await renderVideo({ url: `file://${deckHtml}#1`, steps, out: 'out/v
 // → my-talk.mp4 · captions.srt/.vtt · chapters.txt (what YouTube will show; done.chapters.changes says what its rule merged or moved) · thumbnail.jpg · timeline.json
 ```
 
-**Export to PowerPoint.** The same steps and driver; no ffmpeg.
+**Export to PowerPoint.** The same steps and driver; no ffmpeg; footprintjs installed beside StoryDeck (`npm i footprintjs`).
 
 ```js
 import { exportPptx } from 'footprint-storydeck/pptx';

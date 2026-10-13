@@ -11,15 +11,16 @@
 // a package that does not read back as planned — and a refusal names each click and its fix. The browser is
 // video.js's port ({ open, step, freeze, seek, shot, close }; `deckStageDriver` from footprint-storydeck/video), so
 // a deck that films exports. The parts (pptxParts), the ZIP (zip) and the read-back (checkPptx) are plain
-// functions, also exported. footprintjs is imported when an export runs, never by the deck's browser runtime.
+// functions, also exported. footprintjs is an optional peer dependency, imported when an export runs — never by
+// the deck's browser runtime, and never installed with StoryDeck: `npm i footprintjs` beside it to export.
 import { Buffer } from 'node:buffer';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, copyFileSync, existsSync, fstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { clipFor } from 'footprint-narration/voice';
 import { narrationText, writtenText } from './narration.js';
 import { planVideo } from './video.js';
-import { pptxParts, pngSize, plainText, AUDIO } from './pptxParts.js';
+import { pptxParts, pngSize, plainText, isSound, AUDIO, LANG_TAG, SOUND } from './pptxParts.js';
 import { zip } from './zip.js';
 import { checkPptx } from './pptxCheck.js';
 
@@ -31,6 +32,8 @@ const NUM = (n) => String(n).padStart(3, '0');
 const extOf = (file) => path.extname(file ?? '').slice(1).toLowerCase();
 /** A click's notes in a deck: narration-html's notesData entry ({ now }), one string, or a list of them. */
 const notesOf = (click) => click.notes?.now ?? click.notes ?? '';
+/** The notes as written, a paragraph per note and per line ([draft] marks dropped, each line's spaces collapsed). */
+const paragraphsOf = (notes) => [notes].flat().flatMap((note) => String(note ?? '').split(/\r?\n/)).map((line) => writtenText(line)).filter(Boolean).join('\n');
 
 /** The steps to export: `steps` as given, or made from the `deck`'s clicks; a step without a clip of its own asks `voice` for one. */
 function stepsFrom({ steps, deck, voice }) {
@@ -40,7 +43,7 @@ function stepsFrom({ steps, deck, voice }) {
   if (!Array.isArray(steps ?? deck)) throw new TypeError(`exportPptx: \`${steps ? 'steps' : 'deck'}\` is not a list — give one entry per click`);
   if (voice && (!voice.cache || !voice.profile)) throw new TypeError('exportPptx: `voice` needs { cache, profile } — the clip cache folder and the profile the clips were voiced with');
   const rules = { spell: voice?.spell, say: voice?.say };
-  const list = steps ?? deck.map((c) => ({ label: c.label, headline: c.headline, written: writtenText(notesOf(c)), spoken: narrationText(notesOf(c), rules) }));
+  const list = steps ?? deck.map((c) => ({ label: c.label, headline: c.headline, written: paragraphsOf(notesOf(c)), spoken: narrationText(notesOf(c), rules) }));
   return voice ? list.map((s) => ('clip' in s ? s : { ...s, clip: clipFor(s.spoken ?? '', voice) })) : list;
 }
 
@@ -61,22 +64,41 @@ function planClicks(list, { gap, noclip, only }) {
   });
 }
 
-/** What is wrong with the clicks' sound, by kind — each line names the click and the fix. */
+/** A file's size and first 12 bytes, read without loading the rest of it. */
+function headOf(file) {
+  const fd = openSync(file, 'r'), head = Buffer.alloc(12);
+  try {
+    return { size: fstatSync(fd).size, head: head.subarray(0, readSync(fd, head, 0, 12, 0)) };
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/** Why a clip's file will not play, from its bytes: empty, or not beginning as its kind of file; null when it will. */
+function soundProblem(clip, ext) {
+  const { size, head } = headOf(clip.audio);
+  if (!size) return `its clip ${clip.audio} is empty (0 bytes) — voice it again (footprint-narration/voice · voiceClips)`;
+  return isSound(head, ext) ? null : `its clip ${clip.audio} is not a .${ext} file (no ${SOUND[ext].sign}) — voice it again, or convert it with ffmpeg`;
+}
+
+/** One click's sound weighed: [kind, what is wrong and its fix], or null when it is ready (or the click has none to give). */
+function clipProblem(c, { voiced, maxClip }) {
+  const clip = c.clip, d = clip?.duration, ext = extOf(clip?.audio);
+  if (!clip) return voiced && c.spoken.trim() ? ['unvoiced', 'it says words but has no clip — voice it (footprint-narration/voice · voiceClips), or give its step its clip'] : null;
+  if (!clip.audio || !existsSync(clip.audio)) return ['missing', `its clip ${clip.audio} is not there — voice it again (footprint-narration/voice · voiceClips)`];
+  if (!AUDIO[ext]) return ['unplayable', `its clip is .${ext} — PowerPoint plays .wav, .m4a and .mp3 (convert it with ffmpeg)`];
+  const bytes = soundProblem(clip, ext);
+  if (bytes) return ['unplayable', bytes];
+  if (!(d > 0) || !Number.isFinite(d)) return ['unplayable', `its clip has no length (duration ${d}) — voice it again, so its cache records one`];
+  return d > maxClip ? ['tooLong', `its clip lasts ${d} s, over maxClip (${maxClip} s) — split its notes across clicks, or raise maxClip`] : null;
+}
+
+/** What is wrong with the clicks' sound, by kind — each line names the click and the fix. Reads no more than each clip's first bytes. */
 function weighClips(clicks, maxClip) {
   const voiced = clicks.some((c) => c.clip), found = { missing: [], unplayable: [], tooLong: [], unvoiced: [] };
   for (const c of clicks) {
-    const clip = c.clip, d = clip?.duration;
-    if (!clip) {
-      if (voiced && c.spoken.trim()) found.unvoiced.push(`click ${c.n} says words but has no clip — voice it (footprint-narration/voice · voiceClips), or give its step its clip`);
-    } else if (!clip.audio || !existsSync(clip.audio)) {
-      found.missing.push(`click ${c.n}: its clip ${clip.audio} is not there — voice it again (footprint-narration/voice · voiceClips)`);
-    } else if (!AUDIO[extOf(clip.audio)]) {
-      found.unplayable.push(`click ${c.n}: its clip is .${extOf(clip.audio)} — PowerPoint plays .wav, .m4a and .mp3 (convert it with ffmpeg)`);
-    } else if (!(d > 0) || !Number.isFinite(d)) {
-      found.unplayable.push(`click ${c.n}: its clip has no length (duration ${d}) — voice it again, so its cache records one`);
-    } else if (d > maxClip) {
-      found.tooLong.push(`click ${c.n}: its clip lasts ${d} s, over maxClip (${maxClip} s) — split its notes across clicks, or raise maxClip`);
-    }
+    const problem = clipProblem(c, { voiced, maxClip });
+    if (problem) found[problem[0]].push(`click ${c.n}: ${problem[1]}`);
   }
   return found;
 }
@@ -177,7 +199,7 @@ async function shootStage(scope, ctx) {
 function writeStage(scope, ctx) {
   const slides = scope.$getValue('clicks').map((c) => ({
     title: c.title, notes: c.notes, advance: c.advance, picture: readFileSync(path.join(ctx.pictures, `c${NUM(c.n)}.png`)),
-    audio: c.clip && { data: readFileSync(c.clip.audio), ext: extOf(c.clip.audio), duration: c.clip.duration, key: c.clip.key ?? `click ${c.n}` },
+    audio: c.clip && { data: readFileSync(c.clip.audio), ext: extOf(c.clip.audio), duration: c.clip.duration },
   }));
   ctx.box.parts = pptxParts({ slides, title: ctx.title, lang: ctx.lang });
   scope.parts = ctx.box.parts.map((p) => ({ name: p.name, bytes: Buffer.byteLength(p.data) }));
@@ -219,7 +241,9 @@ function exportChart(ctx) {
       .addFunctionBranch('time', 'TimeTheDeck', timeStage, 'How long the deck runs by itself (null: the speaker clicks)')
       .addFunctionBranch('refuse-clips', 'RefuseClips', refusal('clipProblems', 'a clip is not ready'), 'Refuse, naming each clip and its fix')
       .end()
-    // footprintjs takes no decider straight after another's end(): a plain stage stands between them
+    // A plain stage stands between the two deciders: footprintjs's builder refuses a decider straight after another's
+    // end() (FlowChartBuilder · addDeciderFunction checks the cursor, which end() leaves on the first decider) — a
+    // confirmed footprintjs bug, being fixed there; once StoryDeck takes that release, ShootPictures can be a branch again.
     .addFunction('ShootPictures', (scope) => shootStage(scope, ctx), 'shoot-pictures', 'The settled picture of each click, through the driver')
     .addDeciderFunction('CheckPictures', (scope) => decide(scope, [{ when: { unpictured: { gt: 0 } }, then: 'refuse-pictures', label: 'A click has no usable picture' }],
       { branch: 'write', label: 'Every click has a 16:9 PNG' }), 'check-pictures', 'Has every click a usable picture?')
@@ -237,6 +261,15 @@ function exportChart(ctx) {
     .build();
 }
 
+/** footprintjs, loaded as an export starts — or a refusal naming the install, when it is not there (an optional peer). */
+async function footprintjs(load) {
+  try {
+    return await load();
+  } catch (cause) {
+    throw new Error('exportPptx needs footprintjs: npm i footprintjs', { cause });
+  }
+}
+
 /** Where the file goes: `out` itself when it ends in .pptx, else <name>.pptx in the folder `out`. */
 const fileOf = (out, name) => (/\.pptx$/i.test(out) ? path.resolve(out) : path.join(path.resolve(out), `${name}.pptx`));
 const narrativeOf = (executor) => executor.getNarrativeEntries().map((e) => e.text);
@@ -248,14 +281,16 @@ const narrativeOf = (executor) => executor.getNarrativeEntries().map((e) => e.te
  * pictures are made in `work` (its pictures/ is replaced) — by default a temporary folder, removed afterwards. A
  * click whose clip or picture is not usable, or a package that does not read back, is refused, naming the fix, and
  * nothing is written to `out`. Returns { file, slides, voiced, runtime (s the deck runs by itself, or null), bytes,
- * clicks, narrative }; a refusal's error carries the `narrative` too.
+ * clicks, narrative }; a refusal's error carries the `narrative` too. footprintjs is an optional peer: `load` imports it
+ * (default `import('footprintjs')`), and a missing one is refused, naming the install.
  */
 export async function exportPptx({ url, steps, deck, voice, out, name = 'deck', title, lang = 'en-US', driver, gap = 0.6, noclip = 2.5, maxClip = 300,
-  maxEntrance = 4000, only = null, work, log = () => {} }) {
+  maxEntrance = 4000, only = null, work, log = () => {}, load = () => import('footprintjs') }) {
   if (!url) throw new TypeError('exportPptx: no url — give the deck page, e.g. file:///…/deck.html');
   if (!driver) throw new TypeError('exportPptx: no driver — give one, e.g. deckStageDriver({ chromium }) from footprint-storydeck/video');
   if (!out) throw new TypeError('exportPptx: no out — give a folder (the file is <name>.pptx in it) or a path ending in .pptx');
-  const { flowChart, FlowChartExecutor, decide } = await import('footprintjs');
+  if (!LANG_TAG.test(lang)) throw new TypeError(`exportPptx: lang "${lang}" is not a language tag — give one like en-US, de or zh-Hant-TW`);
+  const { flowChart, FlowChartExecutor, decide } = await footprintjs(load);
   const file = fileOf(out, name);
   const ctx = { flowChart, decide, url, steps, deck, voice, file, title: title ?? path.basename(file, path.extname(file)), lang, driver, gap, noclip, maxClip,
     maxEntrance, only, log, box: {} };
