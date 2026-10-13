@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.5.0 — PowerPoint, the exploded view, and a tour for decks nobody presents
+
+- **`footprint-storydeck/pptx`: the deck as a PowerPoint file.** `exportPptx` makes a slide per click: its settled
+  picture full-bleed, its notes as speaker notes (a paragraph per line), its headline or label as an off-page title
+  (the outline and screen readers read it, the audience does not see it), and a fade. With clips, each slide plays
+  its clip and moves on after it (plus `gap`): a narrated deck that runs by itself. It drives the browser through
+  the video's port (`deckStageDriver`). The export is a footprintjs flowchart, so every run leaves a record
+  (`narrative`), and each check is a `decide()` with its evidence. A clip that is missing, empty, not the sound its
+  name says, over `maxClip` or never voiced, a click without a 16:9 PNG, or a package that does not read back is
+  refused before a browser opens or a file is written, naming the fix. Media are shared by their bytes, never by
+  name. The ZIP, the PresentationML parts and the read-back are written by hand and exported (`zip`, `unzip`,
+  `pptxParts`, `checkPptx`). Opened in PowerPoint 16 with no repair prompt; every part validates against the
+  ISO/IEC 29500 schemas. It is pictures, notes and sound, not editable native shapes. footprintjs is an optional
+  peer dependency: `npm i footprintjs` beside StoryDeck to export; nothing else loads it.
+- **`apart`, the exploded view.** A focus mover: named groups fly apart along the vectors you give
+  (`data-focus-apart="lid: 0 -120 | core: 160 0 | base: 0 120 1.1"`), one spring each, `data-focus-stagger` ms apart
+  (35), out in the order written and back in reverse on a later click without it; closing groups settle for one
+  more click. A click reschedules only the groups not yet at its target, in order, never sooner than a start they
+  were already waiting for, so the earlier groups lead. `focusRuntime` plays the springs as Web Animations, each deck
+  its own, so at rest a piece is exactly as drawn and the video renderer steps them; `SlideDeck` now installs it.
+  Two movers on one click are refused, naming the fix; a group's numbers are strict and its scale must be above 0
+  (for `place` too). Every `focusStep` look now carries `apart` (`null` without it), and every piece `apart`.
+- **`footprint-storydeck/tour`: a tour for decks nobody presents.** `idleTour` plays a deck's stops through its own
+  `goTo` after 1.4 s with nobody touching it. A key, tap, click or real move hands the deck over until 45 s of quiet;
+  Escape or the "Stop tour" control (its name is its visible words; hidden while no tour can move in view) stops
+  every tour for the page view (WCAG 2.2.2). It waits while out of sight or while listen mode plays the deck
+  (`data-listening`, now set by `listenRuntime`), and never runs under reduced motion. Declared as
+  `<deck-stage data-tour>`, `SlideDeck`'s `tour`, or post.json's `tour`; `tourPlan` and `tourText` give the plan as
+  data and in one line.
+- **Video:** the driver finishes click n−1's motion before stepping on, so a strip renders the same frames as the
+  full video. `focusRuntime`'s install flag is its version, so an older inlined runtime no longer blocks it.
+
 ## 0.4.0 — a path: the subject piece after piece along a route
 
 - **A fourth kind of focus strategy, the order — how the subject comes on — and its first strategy, `path`.**
