@@ -8,7 +8,7 @@
   "repository": { "type": "git", "url": "git+https://github.com/footprintjs/storydeck.git" },
   "homepage": "https://github.com/footprintjs/storydeck#readme",
   "bugs": "https://github.com/footprintjs/storydeck/issues",
-  "keywords": ["slides", "deck", "presentation", "scrollytelling", "react", "narration", "captions", "voice", "video", "talk", "focus", "exploded-view", "kiosk", "footprintjs"],
+  "keywords": ["slides", "deck", "presentation", "scrollytelling", "react", "narration", "captions", "voice", "video", "pptx", "powerpoint", "talk", "focus", "exploded-view", "kiosk", "footprintjs"],
   "engines": { "node": ">=22" },
   "sideEffects": ["*.css"],
   "types": "./index.d.ts",
@@ -23,6 +23,7 @@
     "./narration.css": "./narration.css",
     "./voice": { "types": "./voice.d.ts", "default": "./voice.js" },
     "./video": { "types": "./video.d.ts", "default": "./video.js" },
+    "./pptx": { "types": "./pptx.d.ts", "default": "./pptx.js" },
     "./storydeck.css": "./storydeck.css",
     "./deck-stage.js": "./site/public/deck-stage.js"
   },
@@ -32,8 +33,12 @@
     "test:cov": "vitest run --coverage"
   },
   "peerDependencies": {
+    "footprintjs": "^10.0.0",
     "react": ">=18",
     "react-dom": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "footprintjs": { "optional": true }
   },
   "dependencies": {
     "footprint-narration": "^0.1.0",
@@ -45,6 +50,7 @@
     "@testing-library/user-event": "^14.6.1",
     "@vitejs/plugin-react": "^5.0.4",
     "@vitest/coverage-v8": "^4.1.9",
+    "footprintjs": "^10.0.0",
     "jsdom": "^29.1.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
