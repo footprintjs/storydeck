@@ -18,4 +18,4 @@ export { FOCUS, readFocus, focusStep, planFocus } from './focus';
 export { readPieces, readStep, drawFocus, wrapStage, slideClass, focusOverlay, focusRuntime } from './focusHtml';
 export { narrationText, writtenText } from './narration';   // the rules beneath, captions and chapters: footprint-narration
 export { notesData, notesRuntime, listenRuntime } from './narrationHtml';
-// footprint-storydeck/voice and footprint-storydeck/video are Node-only (files, ffmpeg): their own doors, never this one.
+// footprint-storydeck/voice, /video and /pptx are Node-only (files, ffmpeg, a browser): their own doors, never this one.
