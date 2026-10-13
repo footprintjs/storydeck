@@ -113,10 +113,13 @@ const done = await renderVideo({ url: `file://${deckHtml}#1`, steps, out: 'out/v
   gives a word's length) rather than guess.
 - **Runtimes are inlined, not imported**: `(${notesRuntime})()`, `(${listenRuntime})()`, `(${focusRuntime})()`,
   `(${idleTour})()` — once per page, after the `<deck-stage>` and the data tags. They read `#deck-notes`,
-  `#deck-voice` and `data-tour`. `apart`'s springs need `focusRuntime` (without it a group lands, as on a jump).
+  `#deck-voice` and `data-tour`. `apart`'s springs need `focusRuntime` (without it a group lands, as on a jump);
+  the React Watch lens (`SlideDeck`) installs it itself.
 - **A tour drives the deck, never a copy of it**: its stops are clicks as the deck counts them (1-based), reached
-  with the deck's own `goTo`, so only a stop one click on animates; a hover, focus, key or press pauses it for 3.6 s
-  after the last, and reduced motion means no tour. Put `tourText(spec)` in the notes so the deck says it tours.
+  with the deck's own `goTo`, so only a stop one click on animates; a key, tap, click, focus or real pointer move hands
+  it over until 45 s of quiet (or until the deck leaves sight and comes back); Escape or the "Stop tour" control stops
+  every tour for the page view (WCAG 2.2.2); reduced motion means no tour. Put `tourText(spec)` in the notes so the
+  deck says it tours.
 - **A cloned voice is its speaker's**: a page that carries clips stays internal. A public build leaves
   `embedClips` out; listen mode falls back to the browser's voice.
 - **Video frames are deterministic**: each click is made forward, every animation paused and stepped. Looping

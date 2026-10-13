@@ -227,6 +227,7 @@ describe('narrationHtml · listen runtime (L)', () => {
     listenRuntime();
     press('l');
     expect(document.body.classList.contains('train')).toBe(true);
+    expect(stage.hasAttribute('data-listening')).toBe(true);   // the deck says it is being played
     expect(queue.map((u) => u.text)).toEqual(['Hello there.', 'Second line.']);
     expect(queue[0].voice.name).toBe('Samantha');
     const panel = document.querySelector('.train-panel');
@@ -251,6 +252,7 @@ describe('narrationHtml · listen runtime (L)', () => {
     expect(synth.resume).toHaveBeenCalled();
     press('L');
     expect(document.body.classList.contains('train')).toBe(false);
+    expect(stage.hasAttribute('data-listening')).toBe(false);
   });
 
   it('waits on a click without narration, and stops after the last click', () => {

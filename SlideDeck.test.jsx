@@ -24,6 +24,12 @@ describe('SlideDeck', () => {
     expect(stage.innerHTML).toContain('c');
   });
 
+  it('installs the focus runtime, so only a forward click animates and apart\'s springs play', () => {
+    delete window.__sdFocusRuntime;
+    renderDeck();
+    expect(window.__sdFocusRuntime).toBe(true);
+  });
+
   it('loads deck-stage.js from the provided base path', () => {
     renderDeck();
     const sc = document.querySelector('script[data-deck-stage]');

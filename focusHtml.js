@@ -167,11 +167,12 @@ export function focusOverlay(look, {canvas = {w: 1920, h: 1080}, area} = {}) {
  * forward click animates its changes; a jump, a deep link or a step back lands on the click at once — what
  * you arrive at is a place, not a change. A forward step over skipped slides is still a step.
  *
- * It also runs apart's springs (focus.js · FOCUS.apart): one per group, its value 0 together and 1 apart, a little
- * under critical damping (ζ .82), so a group settles with a hint of weight. A group sets off from wherever the last
- * click left it — mid-way too: a click that turns groups round reschedules only those whose target changes, by
- * their place in that shorter list (out in the order written, back in reverse, `stagger` ms apart), so the earlier
- * groups always lead and none passes through another. The spring is played as Web Animations sampled from it (60
+ * It also runs apart's springs (focus.js · FOCUS.apart), each deck its own: one per group, its value 0 together and 1
+ * apart, a little under critical damping (ζ .82), so a group settles with a hint of weight. A group sets off from
+ * wherever the last click left it — mid-way too: a click reschedules only the groups not yet at its target (those
+ * turning round, and those still waiting to set off), in that list's order (out in the order written, back in reverse),
+ * each `stagger` ms after the one before and never sooner than a start it was waiting for, so among them the earlier
+ * groups always lead. The spring is played as Web Animations sampled from it (60
  * keyframes a second, `translate`/`scale` as every mover moves a piece), so it never writes the piece: when a group
  * comes to rest the animation is over and the piece is exactly as drawn — at 0, the figure's static art — and the
  * video's frame stepper (video.js · deckStageDriver · freeze) steps it like any animation. A jump, a step back and
@@ -211,13 +212,15 @@ export function focusRuntime() {
     return {dx: at('dx') ?? 0, dy: at('dy') ?? 0, s: at('s') ?? 1};
   };
   const r = (v, d) => Math.round(v * 10 ** d) / 10 ** d;
-  let live = new Map(), playing = [];   // the springs in flight, by group, and their animations (on the slide shown)
-  const springsOn = (slide, moving) => {
-    const now = performance.now();
+  // Each deck has its own springs: what one deck does never stops or replays another's (two decks on a page).
+  const decks = new WeakMap();   // deck → {live: the springs in flight, by group; playing: their animations, on its slide shown}
+  const springsOn = (deck, slide, moving) => {
+    const now = performance.now(), mine = decks.get(deck) ?? {live: new Map(), playing: []};
+    decks.set(deck, mine);
     const elapsed = g => (typeof g.anim?.currentTime === 'number' ? g.anim.currentTime : now - g.t0);
-    const where = new Map([...live].map(([key, g]) => [key, run(g.s, Math.round(elapsed(g) * STEPS / 1000)).s]));
-    playing.forEach(a => a.cancel());
-    playing = []; live = new Map();
+    const where = new Map([...mine.live].map(([key, g]) => [key, run(g.s, Math.round(elapsed(g) * STEPS / 1000)).s]));
+    mine.playing.forEach(a => a.cancel());
+    mine.playing = []; mine.live = new Map();
     if (!moving) return;   // a jump lands: the piece as drawn
     const groups = new Map();
     for (const el of slide.querySelectorAll('[data-sd-apart]')) {
@@ -225,24 +228,31 @@ export function focusRuntime() {
       if (!groups.has(key)) groups.set(key, {key, order: Number(k), to: Number(to), was: Number(was), stagger: Number(stagger), els: []});
       groups.get(key).els.push(el);
     }
-    // Where each group is, and which turn round: one already heading to its target is left alone (its pending start
-    // too); one that never set off the other way stays; the rest change, and only they are rescheduled.
+    // Where each group is, and which turn round. One already at its new target stays (a start still pending the other
+    // way is dropped: it never set off). Every other one is rescheduled — those turning round, and those still waiting
+    // to set off the same way — in that list's order, `stagger` ms after the one before it, and never sooner than a
+    // start it was already waiting for: so among them the earlier groups always lead, and a click that keeps a group's
+    // target keeps its time too.
     const changing = [];
     for (const g of groups.values()) {
       g.s = where.get(g.key) ?? {v: g.was, vel: 0, x: g.was, pending: null};
-      if ((g.s.pending?.to ?? g.s.x) === g.to) continue;
-      if (g.s.x === g.to) { g.s.pending = null; continue; }
-      changing.push(g);
+      if (g.s.x === g.to) g.s.pending = null; else changing.push(g);
     }
     const opening = changing.filter(g => g.to === 1).sort((a, b) => a.order - b.order);
     const closing = changing.filter(g => g.to !== 1).sort((a, b) => b.order - a.order);
-    for (const list of [opening, closing]) list.forEach((g, i) => { g.s.pending = {to: g.to, at: Math.round(i * g.stagger * STEPS / 1000)}; });
+    for (const list of [opening, closing]) {
+      let ms = -Infinity;   // when the group before it sets off
+      for (const g of list) {
+        ms = Math.max(ms + g.stagger, g.s.pending ? g.s.pending.at * 1000 / STEPS : 0, 0);
+        g.s.pending = {to: g.to, at: Math.round(ms * STEPS / 1000)};
+      }
+    }
     for (const g of groups.values()) {
       const frames = [], {s: end, k} = run(g.s, MOST, (v, at) => frames.push([v, at]));
       if (!k) continue;   // at rest where it is drawn
       frames.push([end.x, k]);
       const live1 = {s: g.s, t0: now, anim: null};
-      live.set(g.key, live1);
+      mine.live.set(g.key, live1);
       for (const el of g.els) {
         if (typeof el.animate !== 'function') continue;
         const style = el.getAttribute('style') ?? '', [together, apart] = g.to === 1 ? [placeOf(style, '0'), placeOf(style, '')] : [placeOf(style, ''), placeOf(style, '0')];
@@ -250,16 +260,18 @@ export function focusRuntime() {
         const anim = el.animate(frames.map(([v, f]) => ({offset: f / k, translate: `${r(at(together.dx, apart.dx, v), 2)}px ${r(at(together.dy, apart.dy, v), 2)}px`, scale: String(r(at(together.s, apart.s, v), 4))})),
           {duration: k * 1000 / STEPS, easing: 'linear', fill: 'none'});
         live1.anim ??= anim;
-        playing.push(anim);
+        mine.playing.push(anim);
       }
     }
   };
   document.addEventListener('slidechange', e => {
-    if (!e.detail?.slide) return;
-    document.querySelectorAll('[data-sd-instant]').forEach(s => s.removeAttribute('data-sd-instant'));
+    const slide = e.detail?.slide;
+    if (!slide) return;
+    const deck = slide.parentElement ?? document;   // a deck's slides are its children
+    deck.querySelectorAll('[data-sd-instant]').forEach(s => s.removeAttribute('data-sd-instant'));
     const ahead = forward(e);
-    if (!ahead) e.detail.slide.setAttribute('data-sd-instant', '');
-    springsOn(e.detail.slide, ahead && !e.detail.slide.hasAttribute('data-deck-static') && !calm());
+    if (!ahead) slide.setAttribute('data-sd-instant', '');
+    springsOn(deck, slide, ahead && !slide.hasAttribute('data-deck-static') && !calm());
   });
   // Called after the deck showed its first slide: that arrival was no forward click either.
   document.querySelectorAll('[data-deck-active]').forEach(s => s.setAttribute('data-sd-instant', ''));

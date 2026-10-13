@@ -92,9 +92,10 @@ export function BlogView(props: { sections: readonly Section[] }): ReactElement;
 /** The Scroll lens: a pinned stage that advances as the narrative scrolls. */
 export function ScrollyView(props: { sections: readonly Section[] }): ReactElement;
 /**
- * The Watch lens: the deck slides mounted into the `<deck-stage>` runtime. With `tour` (tour.d.ts · idleTour: the
+ * The Watch lens: the deck slides mounted into the `<deck-stage>` runtime; it installs focusRuntime (focusHtml.d.ts),
+ * so only a forward click animates and apart's springs play. With `tour` (tour.d.ts · idleTour: the
  * stops as text, '3 4 5 9:6s', or the readable options) it is a deck nobody has to present: left alone for a moment
- * it shows its stops through its own goTo, and a hover, focus, key or press hands it back. `PostView` passes the
+ * it shows its stops through its own goTo, and a key, tap, click or move hands it over. `PostView` passes the
  * post's `tour` (post.json).
  */
 export function SlideDeck(props: { steps: readonly string[]; tour?: string | Omit<import('./tour').TourOptions, 'go'> }): ReactElement;

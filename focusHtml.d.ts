@@ -23,7 +23,8 @@ export function slideClass(look: FocusLook): string;
 export function focusOverlay(look: FocusLook, options?: { canvas?: { w: number; h: number }; area?: readonly [number, number, number, number] }): string;
 /**
  * Runs in the page; call it once, at any time: only a forward click animates; a jump or a step back lands at once.
- * It plays apart's springs (one per group, staggered, from wherever the last click left a group, mid-way too) as Web
- * Animations, so a group at rest is exactly as drawn; under reduced motion, or without Element.animate, it lands.
+ * It plays apart's springs (one per group, staggered, from wherever the last click left a group, mid-way too; each deck
+ * on the page its own) as Web Animations, so a group at rest is exactly as drawn; under reduced motion, or without
+ * Element.animate, it lands.
  */
 export function focusRuntime(): void;

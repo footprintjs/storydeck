@@ -129,8 +129,9 @@ export interface FocusLook {
   readonly path: { readonly turns: number; readonly step: number; readonly done: number; readonly line: string; readonly lineAt: string | null } | null;
   /**
    * apart: the groups that open on this click (to 1, in the order written), then those the last click opened that
-   * close now (to 0, in its order); `was` is where the last click left a group (0 together, 1 apart). Null when no
-   * group opens, stays open or closes.
+   * close now (to 0, was 1, in its order), then those the last click closed (to 0, was 0) — carried one click more, so
+   * a spring still closing settles from wherever it is; `was` is where the last click left a group (0 together, 1
+   * apart). Null when no group opens, stays open, closes or settles — as on every click of a deck without apart.
    */
   readonly apart: { readonly stagger: number; readonly groups: readonly { readonly names: readonly string[]; readonly to: 0 | 1; readonly was: 0 | 1 }[] } | null;
   readonly strategies: readonly string[];

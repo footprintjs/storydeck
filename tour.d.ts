@@ -11,11 +11,11 @@ export type TourTime = number | string;
 export interface TourOptions {
   /** The stops, in order: '3 4 5 9:6s' (as data-tour has them) or a list. */
   readonly stops: string | readonly TourStopSpec[];
-  /** How long a stop without its own hold is held. Default 3000. */
+  /** How long a stop without its own hold is held: 300 ms or more. Default 3000. */
   readonly hold?: TourTime;
   /** How long nobody must have touched it before it tours. Default 1400 (data-tour-idle). */
   readonly idleMs?: TourTime;
-  /** How long after the last touch it picks up again. Default 3600 (data-tour-resume). */
+  /** How long a quiet after someone used it before it tours again (or until the deck leaves sight and comes back). Default 45000 (data-tour-resume). */
   readonly resumeMs?: TourTime;
   /** Round again after the last stop (the default), or stop there. */
   readonly loop?: boolean;
@@ -34,8 +34,9 @@ export interface TourPlan { readonly stops: readonly TourStop[]; readonly idleMs
 
 /**
  * A running tour. `state`, also on the stage as data-tour-state: 'waiting' (for idleMs), 'touring', 'paused'
- * (someone is using it), 'hidden' (out of sight, or the page hidden), 'still' (reduced motion: no tour), 'done' (a
- * tour that does not loop, past its last stop) or 'off' (stopped).
+ * (someone used it, or listen mode plays the deck), 'hidden' (out of sight, or the page hidden), 'still' (reduced
+ * motion: no tour), 'done' (a tour that does not loop, past its last stop) or 'off' (stopped — by stop(), or by the
+ * person, with Escape or the control, for the rest of the page view).
  */
 export interface Tour {
   readonly plan: TourPlan;
@@ -46,14 +47,19 @@ export interface Tour {
 
 /**
  * Tours a deck (an element with goTo(index), as <deck-stage> has; one not yet defined is driven once it is) or, given
- * `go`, a figure. Left alone for idleMs it goes to each stop as a person would and holds it; a hover (held while the
- * pointer is over it), focus, key or press — or a move it did not make — pauses it, and it picks up resumeMs after the
- * last, at the next stop (a deck left on one of its stops goes on from that one). It waits while out of sight
- * (IntersectionObserver, the newest entry) or while the page is hidden, yields to listen mode, and under reduced motion
- * does not tour. Refuses, naming the fix, what it cannot read.
+ * `go`, a figure. Left alone for idleMs it goes to each stop as a person would and holds it. A key, tap, click, focus,
+ * a real move of the pointer over it (looked at every 250 ms) or a move it did not make hands it over: it tours again
+ * only after resumeMs of quiet, or once it has left sight and come back, at the next stop (a deck left on one of its
+ * stops goes on from that one). Escape, or the "Stop tour" control it shows while it can move (or the page's own
+ * element marked data-tour-stop), stops every tour for the rest of the page view. It waits while out of sight
+ * (IntersectionObserver, the newest entry), while the page is hidden, and while listen mode plays the deck (the deck's
+ * data-listening); under reduced motion it never runs. Refuses, naming the fix, what it cannot read.
  */
 export function idleTour(stage: Element, options: TourOptions): Tour;
-/** Every element carrying data-tour (data-tour-hold, data-tour-idle, data-tour-resume) tours: inline `(${idleTour})()` once in a built page. */
+/**
+ * Every element carrying data-tour (data-tour-hold, data-tour-idle, data-tour-resume) tours: inline `(${idleTour})()`
+ * once in a built page. One it cannot read is left out with a console warning naming the fix; the others still tour.
+ */
 export function idleTour(): Tour[];
 /** null: the plan only, nothing runs (as tourPlan). */
 export function idleTour(stage: null, options: TourOptions): { readonly plan: TourPlan; readonly state: 'off'; stop(): void };

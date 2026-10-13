@@ -402,12 +402,23 @@ describe('focus · apart: the exploded view', () => {
   });
 
   it('comes back together on a later click without apart: the same groups, closing, from where they stood', () => {
-    const { looks } = planFocus([all, open, {}, {}], fig);
+    const { looks } = planFocus([all, open, {}, {}, {}], fig);
     expect(looks[2].apart.groups.map((g) => [g.names[0], g.to, g.was])).toEqual([['lid', 0, 1], ['core', 0, 1], ['base', 0, 1]]);
     expect(marks(looks[2])).toEqual([0, 1, 1, 2]);
     expect(looks[2].pieces[0]).toMatchObject({ move: null, from: { dx: 0, dy: -120, s: 1 } });
-    expect(looks[3].apart).toBe(null);   // closed: nothing springs
-    expect(marks(looks[3])).toEqual([null, null, null, null]);
+    expect(looks[4].apart).toBe(null);   // closed and settled: nothing springs
+    expect(marks(looks[4])).toEqual([null, null, null, null]);
+  });
+
+  it('carries the groups a click closed one click more (to 0, was 0), so a click right after a close lets them settle', () => {
+    const { looks } = planFocus([all, open, {}, { hot: ['lid'] }], fig);
+    expect(looks[3].apart).toEqual({ stagger: 35, groups: [{ names: ['lid'], to: 0, was: 0 }, { names: ['core'], to: 0, was: 0 }, { names: ['base'], to: 0, was: 0 }] });
+    expect(marks(looks[3])).toEqual([0, 1, 1, 2]);   // still on their springs: the page settles them from wherever they are
+    expect(looks[3].pieces[0]).toMatchObject({ move: null, from: { dx: 0, dy: -120, s: 1 } });   // the spring's other end: apart
+    // opened again on the click after the close, they set off from together (was 0)
+    const again = planFocus([all, open, {}, open], fig).looks[3];
+    expect(again.apart.groups.map((g) => [g.to, g.was])).toEqual([[1, 0], [1, 0], [1, 0]]);
+    expect(again.pieces[0]).toMatchObject({ apart: 0, from: { dx: 0, dy: 0, s: 1 }, move: { dx: 0, dy: -120 } });
   });
 
   it('a group that stays open keeps its value; the ones that open or close beside it spring; a new vector glides as any move', () => {
@@ -451,6 +462,13 @@ describe('focus · apart: the exploded view', () => {
     expect(at('apart')).toThrow(/focus "apart": give groups, 'names: dx dy \[scale\] \| …' \(data-focus-apart, or the option apart\)/);
     expect(at('apart', { apart: 'lid: 0 -120 1 @ 10 10' })).toThrow(/focus "apart": a group is 'names: dx dy \[scale\]', not "lid: 0 -120 1 @ 10 10"/);
     expect(at('apart', { apart: 'lids: 0 -120' })).toThrow(/focus group: no piece "lids"/);
+    expect(at('apart', { apart: 'lid: 1.2.3 0' })).toThrow(/focus "apart": a group is 'names: dx dy \[scale\]', not "lid: 1.2.3 0"/);
+    expect(at('apart', { apart: 'lid: . 0' })).toThrow(/not "lid: \. 0"/);
+    expect(at('apart', { apart: '|' })).toThrow(/focus "apart": give groups, 'names: dx dy \[scale\] \| …' \(data-focus-apart, or the option apart\) — not "\|"/);
+    expect(at('apart', { apart: 'lid: 0 -120 0' })).toThrow(/focus "apart": a group's scale is a number above 0 \(1 keeps its size\), not 0 in "lid: 0 -120 0"/);
+    expect(at('apart', { apart: 'lid: 0 -120 -1' })).toThrow(/not -1 in/);
+    expect(at({ strategy: 'place', groups: 'lid: 0 0 0' })).toThrow(/focus "place": a group's scale is a number above 0/);   // one reader: place's too
+    expect(planFocus([all, { focus: 'apart', options: { apart: 'lid: .5 -12. 1.5' } }], fig).looks[1].pieces[0].move).toMatchObject({ dx: 0.5, dy: -12, s: 1.5 });
     expect(at('apart', { apart: groups, stagger: 'slow' })).toThrow(/focus "apart": stagger is the ms between two groups setting off, a number from 0 to 1000 — not NaN/);
     expect(at('apart', { apart: groups, stagger: 2000 })).toThrow(/not 2000/);
     // a deck's own mover may say its groups go by a spring; what it gives is checked the same way

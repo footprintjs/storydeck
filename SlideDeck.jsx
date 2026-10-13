@@ -2,13 +2,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { useBasePath } from './context';
 import { idleTour } from './tour';
+import { focusRuntime } from './focusHtml';
 
 // Slide (watch) lens: the deck slides (as raw HTML strings, in order) mounted into <deck-stage>
 // (the deck's own web component, loaded from /deck-stage.js). We set innerHTML imperatively so
 // React doesn't fight the runtime once it restructures the stage; remounts auto-upgrade.
 //
+// It installs focusHtml.js · focusRuntime (once a page), as a built deck inlines it: only a forward click
+// animates, and apart's springs play.
+//
 // `tour` (tour.js · idleTour) makes it a deck nobody has to present: left alone for a moment it shows
-// its stops through the deck's own goTo, and a hover, focus, key or press hands it back. It is the
+// its stops through the deck's own goTo, and a key, tap, click or move hands it over. It is the
 // readable spec only ('3 4 5 9:6s', or {stops, hold, idleMs, resumeMs, loop}), so it can come from JSON.
 export default function SlideDeck({ steps, tour }) {
   const host = useRef(null);
@@ -27,6 +31,7 @@ export default function SlideDeck({ steps, tour }) {
   useEffect(() => {
     const el = host.current;
     if (!el) return;
+    focusRuntime();
     const inner = (steps || []).join('\n');
     el.innerHTML = `<deck-stage no-rail width="1920" height="1080">${inner}</deck-stage>`;
     if (!document.querySelector('script[data-deck-stage]')) {

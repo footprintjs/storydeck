@@ -9,7 +9,8 @@
 // the next click, a clock) that moves with this one. L plays the deck: each click's narration in the speaker's
 // voice (a clip carried by voice.js · embedClips) or, without one, the browser's; captions light sentence by sentence, and
 // the deck moves on when a click's narration ends. Space pauses, ← → move (and keep reading), [ ] slower /
-// faster, L or Esc stops. A line after [draft] — a bridge written for the deck — shows in amber.
+// faster, L or Esc stops. A line after [draft] — a bridge written for the deck — shows in amber. While it plays, the
+// <deck-stage> carries data-listening (an idle tour waits for it).
 // The runtimes are self-contained, so they can be inlined with `(${fn})()`.
 
 /** Each click's notes as a JSON <script> the runtimes read (id deck-notes); safe inside HTML. */
@@ -128,8 +129,10 @@ export function listenRuntime() {
       synth.speak(u);
     });
   };
-  const start = () => { on = true; paused = false; document.body.classList.add('train'); speak(stage.index ?? 0); };
-  const stop = () => { on = false; paused = false; token++; synth.cancel(); audio.pause(); clearTimeout(timer); document.body.classList.remove('train'); };
+  // While it plays, the deck says so — data-listening on the <deck-stage> — so anything else that would move it (tour.js ·
+  // idleTour) knows the deck is being presented and waits.
+  const start = () => { on = true; paused = false; document.body.classList.add('train'); stage.setAttribute('data-listening', ''); speak(stage.index ?? 0); };
+  const stop = () => { on = false; paused = false; token++; synth.cancel(); audio.pause(); clearTimeout(timer); document.body.classList.remove('train'); stage.removeAttribute('data-listening'); };
   stage.addEventListener('slidechange', (e) => { if (on) { paused = false; speak(e.detail.index); } });
   window.addEventListener('keydown', (e) => {
     const t = e.target;   // keys typed into a field on a slide are the field's

@@ -8,5 +8,8 @@ export interface ClickNotes { slide?: string; step?: number; steps?: number; now
 export function notesData(notes: readonly ClickNotes[]): string;
 /** Runs in the page: N shows this click's notes (practice); P opens a presenter window that stays in step. */
 export function notesRuntime(): void;
-/** Runs in the page: L plays the deck in the speaker's voice (embedded clips) or the browser's, with captions. */
+/**
+ * Runs in the page: L plays the deck in the speaker's voice (embedded clips) or the browser's, with captions. While it
+ * plays, the <deck-stage> carries `data-listening` (tour.js · idleTour waits for it).
+ */
 export function listenRuntime(): void;

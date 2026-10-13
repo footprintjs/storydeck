@@ -148,11 +148,84 @@ describe('apart · in the page', () => {
     go(1, 0);
     const first = byPiece('a');
     clock = 50; go(2, 1);
-    const d = byPiece('d');   // due at 300 ms: 250 ms after this click
-    expect(setsOff(d)).toBeGreaterThan(250 - 1);
-    expect(setsOff(d)).toBeLessThanOrEqual(250 + FRAME + 1);
+    // b, c and d were still waiting (due at 100, 200, 300): they keep their times — 50, 150 and 250 ms after this click
+    [['b', 50], ['c', 150], ['d', 250]].forEach(([k, ms]) => { expect(setsOff(byPiece(k))).toBeGreaterThan(ms - 1); expect(setsOff(byPiece(k))).toBeLessThanOrEqual(ms + FRAME + 1); });
     expect(valueAt(byPiece('a'), 0)).toBeGreaterThan(0);   // a, already on its way, carries on from where it was
     expect(valueAt(byPiece('a'), 0)).toBeCloseTo(valueAt(first, 50), 2);
+  });
+
+  it('three quick clicks (0, 150, 260 ms, stagger 100): each click sets its groups off in order — a start still pending is rescheduled behind the earlier groups', () => {
+    const two = 'c: 0 -100 | d: 0 -100';
+    const { go } = mountDeck([{ in: ['*'] }, { focus: 'apart', options: { apart: UP, stagger: 100 } }, { focus: 'apart', options: { apart: two, stagger: 100 } }, { focus: 'apart', options: { apart: UP, stagger: 100 } }]);
+    const within = (ms, at) => { expect(ms).toBeGreaterThan(at - 1); expect(ms).toBeLessThanOrEqual(at + FRAME + 1); };
+    go(1, 0);
+    clock = 150; go(2, 1);
+    // a and b turn round in reverse (b at once, a 100 ms on); c and d, still waiting, keep their times (200 and 300 ms)
+    const second = Object.fromEntries(['a', 'b', 'c', 'd'].map((k) => [k, byPiece(k)]));
+    within(setsOff(second.c), 50);
+    within(setsOff(second.d), 150);
+    clock = 260; go(3, 2);
+    // now a and b turn out again, a at once and b a stagger later; d, still waiting (due at 300), goes behind them
+    const a = byPiece('a'), b = byPiece('b'), d = byPiece('d');
+    // (the keyframes are the spring sampled 60 times a second: read between two, they agree to within a hundredth)
+    expect(Math.abs(valueAt(a, 0) - valueAt(second.a, 110))).toBeLessThan(0.01);
+    expect(Math.abs(valueAt(b, 0) - valueAt(second.b, 110))).toBeLessThan(0.01);
+    const low = (anim) => { const v = anim.frames.map((f) => (0 - parseFloat(f.translate.split(' ')[1])) / 100); return anim.frames[v.indexOf(Math.min(...v))].offset * anim.timing.duration; };
+    expect(low(a)).toBeLessThan(low(b));
+    expect(low(b)).toBeGreaterThan(100 - FRAME);
+    within(setsOff(d), 200);
+    for (let ms = 0; ms <= Math.max(a.timing.duration, b.timing.duration, d.timing.duration); ms += 5) {
+      expect(valueAt(a, ms)).toBeGreaterThanOrEqual(valueAt(b, ms) - 0.015);   // settling: each its hint past apart
+      expect(valueAt(b, ms)).toBeGreaterThanOrEqual(valueAt(d, ms) - 0.015);
+    }
+    for (let ms = 0; valueAt(b, ms) < 0.98; ms += 5) expect(valueAt(a, ms)).toBeGreaterThan(valueAt(b, ms));
+    for (let ms = 0; valueAt(d, ms) < 0.98; ms += 5) expect(valueAt(b, ms)).toBeGreaterThan(valueAt(d, ms));
+    // c was on its way out already: left alone, it carries on from where it was
+    expect(Math.abs(valueAt(byPiece('c'), 0) - valueAt(second.c, 110))).toBeLessThan(0.01);
+  });
+
+  it('a click right after a close lets the groups settle from wherever they are, instead of snapping home', () => {
+    const { go } = mountDeck([{ in: ['*'] }, { focus: 'apart', options: { apart: UP } }, {}, { hot: ['b'] }]);
+    go(1, 0); clock = 5000; go(2, 1);
+    const closing = byPiece('a');
+    clock = 5150; go(3, 2);
+    const settling = byPiece('a');
+    expect(closing.cancelled).toBe(true);
+    expect(valueAt(settling, 0)).toBeCloseTo(valueAt(closing, 150), 2);
+    expect(valueAt(settling, 0)).toBeGreaterThan(0.05);   // still on its way home…
+    expect(settling.frames.at(-1)).toMatchObject({ offset: 1, translate: '0px 0px', scale: '1' });   // …and home at rest
+  });
+
+  it('reads where a group is from its animation\'s own clock when it has one (a paused or stepped timeline)', () => {
+    const { go } = mountDeck([{ in: ['*'] }, { focus: 'apart', options: { apart: 'a: 0 -100' } }, {}]);
+    go(1, 0);
+    const opening = byPiece('a');
+    opening.currentTime = 80;   // the page's clock says 0 ms went by; the animation says 80
+    clock = 0; go(2, 1);
+    expect(Math.abs(valueAt(byPiece('a'), 0) - valueAt(opening, 80))).toBeLessThan(0.01);
+    played = [];
+    const { go: again } = mountDeck([{ in: ['*'] }, { focus: 'apart', options: { apart: 'a: 0 -100' } }, {}]);
+    again(1, 0);
+    byPiece('a').currentTime = 1e9;   // finished (a stepper finished it): at rest, apart — whatever the page's clock says
+    again(2, 1);
+    expect(valueAt(byPiece('a'), 0)).toBe(1);
+  });
+
+  it('keeps each deck\'s springs its own: a second deck on the page moving never stops or replays the first', () => {
+    const { html, pieces } = readPieces(MAP);
+    const { looks } = planFocus([{ in: ['*'] }, { focus: 'apart', options: { apart: UP } }], { pieces });
+    const deck = (id) => `<deck-stage id="${id}">${looks.map((l) => `<section>${drawFocus(html, l)}</section>`).join('')}</deck-stage>`;
+    document.body.innerHTML = deck('A') + deck('B');
+    const go = (id, index, previousIndex) => { const s = document.getElementById(id), slides = [...s.querySelectorAll('section')]; s.dispatchEvent(new CustomEvent('slidechange', { bubbles: true, detail: { index, previousIndex, slide: slides[index] } })); };
+    go('A', 1, 0);
+    const springsA = played.filter((p) => p.el.closest('#A'));
+    expect(springsA.length).toBe(4);
+    go('B', 0, 1);                                                  // deck B steps back: it lands…
+    expect(document.querySelector('#B section').hasAttribute('data-sd-instant')).toBe(true);
+    expect(springsA.every((p) => !p.cancelled)).toBe(true);        // …and deck A's springs play on
+    go('A', 0, 1);                                                  // deck A steps back: its own land, B's mark stays
+    expect(springsA.every((p) => p.cancelled)).toBe(true);
+    expect(document.querySelector('#B section').hasAttribute('data-sd-instant')).toBe(true);
   });
 
   it('at rest the piece is exactly as drawn — together, the static art — for nothing of the spring is written on it', () => {

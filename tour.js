@@ -4,8 +4,12 @@
 // often looked at by someone who has not touched it yet. Left alone for a moment (1.4 s), it plays a short loop of
 // stops, the clicks that make its point, and it drives the SAME targets a person would: the deck's own goTo, so a
 // stop one click on animates as that click does (focus, apart's springs and all), or the figure's own function. There
-// is no second animation to keep in step. A hover, focus, key or press pauses it, and it picks up 3.6 s after the
-// last; it waits while the deck or the page is out of sight, and under reduced motion there is no tour.
+// is no second animation to keep in step.
+//
+// Accessibility first. The moment someone uses it — a key, a tap, a click, a real move of the pointer over it — it
+// hands itself over, and it does not take the deck back soon: only after a long quiet (45 s) or once the deck has
+// left sight and come back. Escape, or the "Stop tour" control (or any element marked data-tour-stop), stops every
+// tour for the rest of the page view (WCAG 2.2.2). It waits while out of sight, and under reduced motion it never runs.
 //
 //   idleTour(deck, { stops: '3 4 5 9:6s' })                       // clicks 3, 4, 5, then 9 held 6 s, and round again
 //   idleTour(figure, { stops: ['lid', 'core'], go: (part) => show(part) })
@@ -17,19 +21,20 @@
 /**
  * Tours a deck (any element with goTo(index), as <deck-stage> has) or, given `go`, a figure; returns {plan, state,
  * stop()}. Called with no arguments — `(${idleTour})()` inlined in a built page — it tours every element carrying
- * data-tour (data-tour-hold, data-tour-idle, data-tour-resume) and returns those tours. Self-contained, so it inlines.
- * `stage` null reads the plan only (tourPlan); nothing runs.
+ * data-tour (data-tour-hold, data-tour-idle, data-tour-resume) and returns those tours; one it cannot read is left
+ * out with a console warning naming the fix, and the others still tour. Self-contained, so it inlines. `stage` null
+ * reads the plan only (tourPlan); nothing runs.
  */
 export function idleTour(stage, options) {
   // ── the plan: read and checked here, the one reader (tourPlan is this, without a page) ──
   const refuse = (fix) => { throw new Error(`idleTour: ${fix}`); };
   const shown = (v) => (typeof v === 'number' || v === undefined ? String(v) : JSON.stringify(v));
-  /** A time in ms: 1400, '1400ms', '1400' or '1.4s' (up to ten minutes); `d` when left out. */
-  const time = (v, d, what) => {
+  /** A time in ms: 1400, '1400ms', '1400' or '1.4s' — from `least` up to ten minutes; `d` when left out. */
+  const time = (v, d, what, least = 0) => {
     if (v === undefined || v === null || v === '') return d;
     const m = typeof v === 'number' ? null : /^\s*(\d+(?:\.\d+)?)\s*(ms|s)?\s*$/.exec(String(v));
     const ms = typeof v === 'number' ? v : m ? Number(m[1]) * (m[2] === 's' ? 1000 : 1) : NaN;
-    return ms >= 0 && ms <= 600000 ? ms : refuse(`${what} is a time — 1400, '1400ms' or '1.4s', up to ten minutes — not ${shown(v)}`);
+    return ms >= least && ms <= 600000 ? ms : refuse(`${what} is a time — 1400, '1400ms' or '1.4s', from ${least} ms up to ten minutes — not ${shown(v)}`);
   };
   /** One stop: a click as the deck counts them (3), a figure's own name ('lid'), 'to:hold' ('9:6s'), or {to, hold?, say?}. */
   const stopOf = (x, hold) => {
@@ -39,21 +44,30 @@ export function idleTour(stage, options) {
     })();
     if (typeof o.to === 'number' ? !(Number.isInteger(o.to) && o.to >= 1) : typeof o.to !== 'string' || !o.to.trim()) refuse(`a stop goes to a click as the deck counts them (1, 2, …) or to a name, not ${shown(o.to)}`);
     if (o.say !== undefined && typeof o.say !== 'string') refuse(`a stop's say is a line of text saying what it shows, not ${shown(o.say)}`);
-    return {to: o.to, hold: time(o.hold, hold, `the hold of stop ${shown(o.to)}`), ...(o.say ? {say: o.say} : {})};
+    // a stop is held long enough to be seen: under 300 ms the deck would flicker
+    return {to: o.to, hold: time(o.hold, hold, `the hold of stop ${shown(o.to)}`, 300), ...(o.say ? {say: o.say} : {})};
   };
   const planOf = (o) => {
     if (!o || typeof o !== 'object') refuse(`give options, {stops, hold?, idleMs?, resumeMs?, loop?, go?} — not ${shown(o)}`);
     const list = typeof o.stops === 'string' ? o.stops.trim().split(/\s+/).filter(Boolean) : Array.isArray(o.stops) ? o.stops : [];
     if (!list.length) refuse(`give stops, the clicks that make the point, in order: '3 4 5 9:6s' (data-tour), or [3, 4, {to: 9, hold: 6000, say: 'the recorders light up'}]`);
     if (o.loop !== undefined && typeof o.loop !== 'boolean') refuse(`loop is true (round again, the default) or false (stop at the last), not ${shown(o.loop)}`);
-    const hold = time(o.hold, 3000, 'hold');
-    return {stops: list.map((x) => stopOf(x, hold)), idleMs: time(o.idleMs, 1400, 'idleMs'), resumeMs: time(o.resumeMs, 3600, 'resumeMs'), loop: o.loop !== false};
+    const hold = time(o.hold, 3000, 'hold', 300);
+    return {stops: list.map((x) => stopOf(x, hold)), idleMs: time(o.idleMs, 1400, 'idleMs'), resumeMs: time(o.resumeMs, 45000, 'resumeMs'), loop: o.loop !== false};
   };
   const fromAttrs = (el) => {
     const at = (name) => el.getAttribute(name) ?? undefined;
     return {stops: at('data-tour'), hold: at('data-tour-hold'), idleMs: at('data-tour-idle'), resumeMs: at('data-tour-resume')};
   };
-  if (stage === undefined) return [...document.querySelectorAll('[data-tour]')].filter((el) => !el.__sdTour).map((el) => idleTour(el, fromAttrs(el)));
+  if (stage === undefined) {
+    // one deck the tour cannot read is left out, said aloud, and the others still tour
+    return [...document.querySelectorAll('[data-tour]')].filter((el) => !el.__sdTour).flatMap((el) => {
+      try { return [idleTour(el, fromAttrs(el))]; } catch (e) {
+        console.warn(`footprint-storydeck · <${el.localName} data-tour="${el.getAttribute('data-tour')}"> does not tour: ${e.message}`);
+        return [];
+      }
+    });
+  }
   const plan = planOf(options);
   if (stage === null) return {plan, state: 'off', stop() {}};
 
@@ -69,27 +83,51 @@ export function idleTour(stage, options) {
   }
   const go = deck ? (to) => { if (typeof stage.goTo === 'function') stage.goTo(to - 1); } : options.go;
 
+  // ── the page: a person's "stop the tour" holds for the whole page view, and one control offers it ──
+  const page = window.__sdTourPage ??= {off: false, tours: new Set(), control: null};
+  const tour = {plan, get state() { return state; }, stop: () => end()};
+  let state = 'off', timer = 0, at = -1, seen = true, moving = false, own = null, ref = null;
+  const offs = [], on = (target, type, fn, opts) => { target.addEventListener(type, fn, opts); offs.push(() => target.removeEventListener(type, fn, opts)); };
+  const moves = (t) => t.state !== 'off' && t.state !== 'still' && t.state !== 'done';   // a tour that can still move the deck
+  if (page.off) return tour;   // stopped by the person earlier in this page view: it stays stopped
+  const showControl = () => {
+    const alive = [...page.tours].some(moves);
+    if (page.control?.isConnected) { if (page.control.hasAttribute('data-sd-made')) page.control.hidden = !alive; return; }
+    if (!alive || document.querySelector('[data-tour-stop]')) return;   // the page's own control is the one
+    if (!document.getElementById('sd-tour-style')) {
+      const css = document.createElement('style');
+      css.id = 'sd-tour-style';
+      css.textContent = ':where(.sd-tour-stop){position:fixed;left:16px;bottom:16px;z-index:2147483000;padding:8px 14px;border-radius:999px;'
+        + 'border:1px solid currentColor;background:rgba(11,16,32,.72);color:#fff;font:600 14px/1 system-ui,sans-serif;cursor:pointer}';
+      document.head.append(css);
+    }
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'sd-tour-stop'; b.textContent = 'Stop tour';
+    b.setAttribute('data-tour-stop', ''); b.setAttribute('data-sd-made', '');
+    b.setAttribute('aria-label', 'Stop the tour: the deck stays where you leave it');
+    document.body.append(b);
+    page.control = b;
+  };
+
   // ── the runtime ──
   stage.__sdTour?.stop();
-  const offs = [], on = (target, type, fn, opts) => { target.addEventListener(type, fn, opts); offs.push(() => target.removeEventListener(type, fn, opts)); };
   const motion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
-  // narrationHtml.js · listenRuntime marks the body `train` while it plays the deck: someone is presenting, so no tour
-  const listening = () => !!document.body?.classList.contains('train');
-  let state = 'off', timer = 0, at = -1, hovering = false, seen = true, moving = false;
-  const set = (s) => { state = s; stage.setAttribute('data-tour-state', s); };
+  // narrationHtml.js · listenRuntime marks the deck data-listening while it plays it: someone is presenting, so it waits
+  const listening = () => stage.hasAttribute('data-listening');
+  const set = (s) => { state = s; stage.setAttribute('data-tour-state', s); showControl(); };
   const wait = (ms, then) => { clearTimeout(timer); timer = setTimeout(then, ms); };
   const away = () => !seen || document.hidden;
   const arm = () => { if (motion?.matches) { clearTimeout(timer); set('still'); } else if (away()) { clearTimeout(timer); set('hidden'); } else { set('waiting'); wait(plan.idleMs, next); } };
-  /** Someone is using it: hold still, and pick up resumeMs after the last thing they did (not while they hover it). */
-  const touch = () => {
-    if (state === 'off' || state === 'still' || state === 'hidden' || state === 'done') return;
+  /** Someone is using it: hand it over, and take it back only after a long quiet (or once it has left sight and come back). */
+  const use = () => {
+    if (moving || state === 'off' || state === 'still' || state === 'hidden' || state === 'done') return;
     clearTimeout(timer); set('paused');
-    if (!hovering) wait(plan.resumeMs, next);
+    wait(plan.resumeMs, next);
   };
-  /** The next stop, as a person would go there, and its hold — unless someone is there (hovering, or listen mode playing). */
+  /** The next stop, as a person would go there, and its hold — unless the deck is being played (listen mode). */
   function next() {
     if (away() || motion?.matches) return arm();
-    if (hovering || listening()) return touch();
+    if (listening()) { set('paused'); return wait(plan.resumeMs, next); }
     // A deck someone left on one of the stops goes on from that stop, so the tour picks up where they were.
     const here = deck && typeof stage.index === 'number' ? stage.index + 1 : null;
     if (here !== null && plan.stops[at]?.to !== here) { const i = plan.stops.findIndex((s) => s.to === here); if (i >= 0) at = i; }
@@ -98,15 +136,39 @@ export function idleTour(stage, options) {
     const stop = plan.stops[at];
     set('touring');
     wait(stop.hold, next);   // first, so a figure's go that throws still leaves the tour going
+    // its own move is not someone's: while go runs, and the deck's slidechange for that click whenever it comes
+    own = deck ? {index: stop.to - 1, until: Date.now() + 1000} : null;
     moving = true;
     try { go(stop.to); } finally { moving = false; }
   }
-  on(stage, 'pointerenter', () => { hovering = true; touch(); });
-  on(stage, 'pointerleave', () => { hovering = false; touch(); });
-  for (const type of ['pointerdown', 'focusin']) on(stage, type, touch);
-  on(window, 'keydown', touch, true);
+  /** Stopped for good: everything let go, and the control gone once no tour is left. */
+  function end() {
+    clearTimeout(timer); offs.splice(0).forEach((off) => off());
+    state = 'off'; stage.removeAttribute('data-tour-state');
+    if (stage.__sdTour === tour) delete stage.__sdTour;
+    page.tours.delete(tour);
+    if (page.control?.hasAttribute('data-sd-made') && ![...page.tours].some(moves)) { page.control.remove(); page.control = null; }
+  }
+  /** The person stopped it: every tour on the page, for the rest of the page view. */
+  const stopAll = () => { page.off = true; [...page.tours].forEach((t) => t.stop()); };
+  for (const type of ['pointerdown', 'focusin']) on(stage, type, use);
+  // a real move of the pointer over it, looked at every 250 ms: a resting mouse (or the deck moving under it) is no move,
+  // and a finger lifted off a touch screen is not someone leaving
+  on(stage, 'pointermove', (e) => {
+    const now = Date.now();
+    if (ref && now - ref.at < 250) return;
+    const moved = ref && Math.hypot(e.clientX - ref.x, e.clientY - ref.y) >= 4;
+    ref = {x: e.clientX, y: e.clientY, at: now};
+    if (moved) use();
+  });
+  on(window, 'keydown', (e) => (e.key === 'Escape' ? stopAll() : use()), true);
+  on(document, 'click', (e) => { if (e.target?.closest?.('[data-tour-stop]')) stopAll(); });
   // a move the tour did not make is someone's (a key, a tap, the presenter window) — but not the deck showing its first slide
-  on(stage, 'slidechange', (e) => { if (!moving && e.detail?.reason !== 'init' && e.detail?.reason !== 'mutation') touch(); });
+  on(stage, 'slidechange', (e) => {
+    const mine = own && e.detail?.index === own.index && Date.now() <= own.until;
+    if (mine) { own = null; return; }
+    if (e.detail?.reason !== 'init' && e.detail?.reason !== 'mutation') use();
+  });
   /** Out of sight (the deck scrolled away, or the page hidden), it waits; back in sight, it waits idleMs again. */
   const sight = () => {
     if (away()) { clearTimeout(timer); if (state !== 'still' && state !== 'done') set('hidden'); } else if (state === 'hidden') arm();
@@ -122,9 +184,8 @@ export function idleTour(stage, options) {
     io.observe(stage);
     offs.push(() => io.disconnect());
   }
-  const stop = () => { clearTimeout(timer); offs.splice(0).forEach((off) => off()); state = 'off'; stage.removeAttribute('data-tour-state'); if (stage.__sdTour === tour) delete stage.__sdTour; };
-  const tour = {plan, get state() { return state; }, stop};
   stage.__sdTour = tour;
+  page.tours.add(tour);
   arm();
   return tour;
 }
@@ -139,5 +200,5 @@ export function tourText(options) {
   const plan = tourPlan(options), s = (ms) => `${Math.round(ms / 100) / 10} s`;
   const stops = plan.stops.map((x) => `${typeof x.to === 'number' ? `slide ${x.to}` : x.to} for ${s(x.hold)}${x.say ? ` (${x.say})` : ''}`);
   return `Left alone for ${s(plan.idleMs)}, it tours itself: ${stops.join(', then ')}${plan.loop ? ', and round again' : ''}. `
-    + `A hover, focus, key or press pauses it; it picks up ${s(plan.resumeMs)} after the last, and waits while out of sight.`;
+    + `A key, tap, click or move hands it over until ${s(plan.resumeMs)} of quiet; Escape or "Stop tour" stops it.`;
 }
