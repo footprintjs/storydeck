@@ -60,10 +60,16 @@ export interface FocusContext {
  */
 export interface FocusRoute { readonly names: readonly string[]; readonly step: number; readonly line?: string; readonly lineAt?: string | null }
 
+/**
+ * A mover's groups going by a spring each (apart), `stagger` ms apart (0–1000): out in the order the groups are given,
+ * back in reverse. Checked, and refused (naming the strategy and the fix) when it is not this; only read.
+ */
+export interface FocusSpring { readonly stagger: number }
+
 /** A focus strategy: a look (how the context looks), a mover (where things go), an overlay (what lies over the slide) or an order (how the subject comes on). */
 export type FocusStrategy =
   | { readonly name?: string; readonly kind: 'look'; readonly look: 'grey' | 'hide' | 'keep' }
-  | { readonly name?: string; readonly kind: 'mover'; place(ctx: FocusContext): { stage?: FocusGroup; subject?: FocusGroup; context?: FocusGroup; groups?: { names: readonly string[]; g: FocusGroup | null }[] } }
+  | { readonly name?: string; readonly kind: 'mover'; place(ctx: FocusContext): { stage?: FocusGroup; subject?: FocusGroup; context?: FocusGroup; groups?: { names: readonly string[]; g: FocusGroup | null }[]; spring?: FocusSpring } }
   | { readonly name?: string; readonly kind: 'overlay'; cover(ctx: { subjectOnSlide: FocusBox | null; canvas: { w: number; h: number }; options: Readonly<Record<string, unknown>> }): { rects: number[][]; label?: string; out?: number[][] } | null }
   | { readonly name?: string; readonly kind: 'order'; route(ctx: { names: readonly string[]; options: Readonly<Record<string, unknown>> }): FocusRoute };
 
@@ -93,7 +99,11 @@ export interface FocusPieceLook {
   readonly hot: boolean;
   readonly hotIn: boolean;
   readonly move: FocusMove | null;
-  /** Where it moved from, when it moved since the last click. (A leaving piece's `move` is where it stood.) */
+  /**
+   * Where it moved from, when it moved since the last click. (A leaving piece's `move` is where it stood.) A piece on
+   * its group's spring (`apart`) has the spring's other end: where it stands together as its group opens — kept while
+   * the group stays open — and where it stood apart as its group closes.
+   */
   readonly from: FocusMove | null;
   /** It stepped aside for its lit twin. */
   readonly twinOff: boolean;
@@ -101,6 +111,12 @@ export interface FocusPieceLook {
   readonly twinTurn: number | null;
   /** On a path: the seconds its turn waits (0 for the first); null when it takes no turn — not on the route, or not lit. */
   readonly path: number | null;
+  /**
+   * It goes by its group's spring on this click (apart): the group's index in the look's `apart.groups` — the page's
+   * focusRuntime moves it from `from` to `move`. Null for every other piece (one that enters, leaves, or is in no
+   * group that opens or closes; one whose group stays open but moved anyway glides as any mover's piece does).
+   */
+  readonly apart: number | null;
 }
 
 export interface FocusLook {
@@ -111,6 +127,13 @@ export interface FocusLook {
   readonly overlay: { readonly rects: readonly (readonly number[])[]; readonly label: string; readonly phase: 'in-new' | 'in' | 'out'; readonly frameNew: boolean } | null;
   /** A path: how many turns, the seconds between two, when the last starts (done), and its line ('' for none) and where it goes (null: the area's bottom left); null when no lit piece took a turn. */
   readonly path: { readonly turns: number; readonly step: number; readonly done: number; readonly line: string; readonly lineAt: string | null } | null;
+  /**
+   * apart: the groups that open on this click (to 1, in the order written), then those the last click opened that
+   * close now (to 0, was 1, in its order), then those the last click closed (to 0, was 0) — carried one click more, so
+   * a spring still closing settles from wherever it is; `was` is where the last click left a group (0 together, 1
+   * apart). Null when no group opens, stays open, closes or settles — as on every click of a deck without apart.
+   */
+  readonly apart: { readonly stagger: number; readonly groups: readonly { readonly names: readonly string[]; readonly to: 0 | 1; readonly was: 0 | 1 }[] } | null;
   readonly strategies: readonly string[];
   /** The subject where it ends up, on the slide. */
   readonly subject: FocusBox | null;
@@ -119,7 +142,12 @@ export interface FocusLook {
 /** The state a click leaves, to start the next from. Opaque. */
 export type FocusState = { readonly __focusState: true } & Record<string, unknown>;
 
-export const FOCUS: Readonly<Record<'grey' | 'hide' | 'keep' | 'zoom' | 'left' | 'right' | 'up' | 'down' | 'place' | 'path' | 'blur', FocusStrategy>>;
+/**
+ * The built-in strategies. `apart` (a mover) is the exploded view: its option `apart` — data-focus-apart — is
+ * 'names: dx dy [scale] | …' (slide px; each group scaled around its own centre), `stagger` the ms between two
+ * groups (35); a later click without it brings the groups back together, the last one out first.
+ */
+export const FOCUS: Readonly<Record<'grey' | 'hide' | 'keep' | 'zoom' | 'left' | 'right' | 'up' | 'down' | 'place' | 'apart' | 'path' | 'blur', FocusStrategy>>;
 export function readFocus(spec: FocusSpec | undefined | null, shared?: Readonly<Record<string, unknown>>): { strategy: string; options: Record<string, unknown> }[];
 export function focusStep(prev: FocusState | null, click: FocusClick, deck: FocusDeck): { state: FocusState; look: FocusLook };
 /** `end` is null only when there are no clicks and no `start`. */

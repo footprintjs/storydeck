@@ -26,6 +26,8 @@
 .sd-moved { translate: var(--sd-dx, 0px) var(--sd-dy, 0px); scale: var(--sd-s, 1); }
 .sd-origin-tl { transform-origin: 0 0; }
 .sd-stage { position: absolute; inset: 0; transform-origin: 0 0; translate: var(--sd-tx, 0px) var(--sd-ty, 0px); scale: var(--sd-ts, 1); }
+/* apart: a piece its group's spring moves is marked .sd-apart and has no CSS motion — focusRuntime plays the spring as
+   Web Animations of the same translate/scale; at rest it is the plain style above (together: the piece as drawn) */
 
 /* the blur overlay: everything outside the holes, in the area, blurred and darkened; a frame on the subject */
 .sd-veil { position: absolute; left: 0; top: 0; pointer-events: none; -webkit-backdrop-filter: blur(var(--sd-blur, 7px)); backdrop-filter: blur(var(--sd-blur, 7px));

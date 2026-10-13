@@ -207,6 +207,14 @@ export function deckStageDriver({ chromium, executablePath, viewport = { width: 
       if (n > 1) {
         await page.evaluate((i) => document.querySelector('deck-stage').goTo(i), n - 2);
         await page.waitForTimeout(250);
+        // Click n − 1's motion, ended: arriving there forward (a strip's first click) starts its entrances and apart's
+        // springs, and 250 ms of real time would leave click n to set off from wherever they had got to.
+        await page.evaluate(() => {
+          const stage = document.querySelector('deck-stage');
+          for (const a of [...document.getAnimations(), ...(stage?.shadowRoot?.getAnimations() ?? [])]) {
+            try { a.finish(); } catch { /* an endless animation has no end to go to */ }
+          }
+        });
         await page.keyboard.press('ArrowRight');
       }
       await settle();

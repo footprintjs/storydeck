@@ -73,6 +73,7 @@ decision every click makes again, so it is data on the click, and the library do
 | mover | `zoom` | the view closes in on the subject (`share`, `most`) |
 | mover | `left` · `right` · `up` · `down` | the context steps aside that way, smaller (`scale`), and the subject grows into the room it leaves (`grow`, `fill`, `gap`, `align`; `move: 'aside'` keeps the subject where it is) |
 | mover | `place` | named groups moved by the amounts you give (`groups: 'page floor: -90 -200 0.5 \| tl: 0 -230 1.1 @ 960 968'`): a layout you art-direct, still animated from wherever the last click left it |
+| mover | `apart` | the exploded view: named groups fly apart along the vectors you give (`apart: 'lid: 0 -120 \| core: 160 0 \| base: 0 120 1.1'`), one spring each, `stagger` ms apart (35), and come back together on a later click without it — the last one out is the first one back |
 | overlay | `blur` | everything outside the subject's frame is blurred; a frame (and a `label`) on it, or on the `rect`s you give |
 | order | `path` | the subject comes on piece after piece along a route, as a request travels it — node, wire, node: each lit piece on it lights at its turn (`step` seconds apart, 0.35) and glows as it is reached; `route` names the order (default — and for an empty `route` — the click's `on`, or its `in`); a greyed piece on it takes no turn, and a route with no order at all (`on: ['*']`) is refused; a `line` ("agent → MCP → gateway") names the route, shown as the last turn starts. A deck's own `filter` on a path piece is not carried through the glow: it steps where the glow starts and ends |
 
@@ -92,6 +93,35 @@ Everything on a path keeps its turn: a piece lit from grey glides into colour an
 on one `filter` would flash), its ring (`hot`) comes .3 s after its turn, and a dashed twin stays until its solid
 twin's turn and only then steps aside, so the wire is never missing. Under a new blur the whole path, line included,
 waits .4 s for it, as what a click adds does.
+
+**An exploded view, on a figure of parts.** A figure built of parts — an engine, a stack, a page and the layers
+under it — explains itself best when the parts come apart: the audience sees what it is made of, then sees it whole
+again. Name the parts as groups and the way each one leaves:
+
+```html
+<step data-focus="apart" data-focus-apart="lid: 0 -120 | core: 160 0 | base: 0 120 1.1"></step>
+<step data-on="core"></step>   <!-- no apart: the parts come back together, the core lit -->
+```
+
+Each group has one spring, its value 0 together and 1 apart, a little under critical damping, so a part settles with
+a hint of weight instead of stopping dead. The groups set off `stagger` ms apart (`data-focus-stagger`, 35) — out in
+the order written, back in reverse — so the last one out is the first one back. A click that turns the parts round
+mid-way reschedules only the groups not yet at its target (those turning round, and those still waiting to set off),
+in order, each a stagger after the one before and never sooner than a start it was already waiting for — so the
+order is kept: among them the earlier groups always lead, and a click that keeps a group's target keeps its time.
+The order is what the library keeps; where the parts go is yours — vectors that cross make paths that cross, so give
+each part its own way out. The click after a close keeps the closing groups on their springs one click more, so a
+quick click lets them settle from wherever they are. A line or connector that carries a group's name
+(`data-k="wire core"`) moves with that group, keeping its place against it. `apart` is a mover, so it goes with a look (the rest
+greyed), an overlay and an order, and a click that also asks for `place` is refused, naming the fix; across clicks
+the two compose: the parts fly out from the layout `place` left, and back into it.
+
+The springs run in `focusRuntime` (the Watch lens, `SlideDeck`, installs it; a built page inlines it), each deck on
+the page its own, played as Web Animations of the same `translate`/`scale` every mover uses (so a piece's own
+transform, an SVG group's `transform` attribute included, is never overwritten), which means the video renderer
+steps them like any animation. Nothing of a spring is written on the piece: at rest the animation is over and the
+piece is exactly as drawn — closed, the figure is its static art. A jump, a step back, print and reduced motion land
+at once, as every focus does.
 
 The plan is plain data (each piece's state, what changed since the last click, how far it moved), so a
 renderer only draws it. `footprint-storydeck/focus-html` writes it into slide HTML at build time and
@@ -127,6 +157,56 @@ name its two groups when they are not simply the greyed and the lit pieces, and 
 a piece (a dashed wire under a solid one) step aside while its twin is lit. A piece that leaves fades out
 from how it looked and where it stood; a blur that moves to another subject stays, and only its frame is
 new; overlapping holes stay clear, and nothing outside the `area` is blurred.
+
+## Tour: a deck that shows its point while nobody is using it
+
+A deck left on a screen with nobody presenting it — at a booth, on a post's Watch lens, as a page's hero figure — is
+mostly looked at by people who have not touched it yet. If it sits on its first slide, they never see what it is
+for. So, left alone for a moment (1.4 s), it plays a short loop of **stops**, the clicks that make its point, and the
+moment someone reaches for it, it hands itself over:
+
+- it drives the **same targets a person would** — the deck's own `goTo`, so a stop one click on animates as that click
+  does (focus, `apart`'s springs and all) and a jump lands, as a person's jump does; there is no second animation to
+  keep in step;
+- **accessibility first**: the moment someone uses it — a key, a tap, a click, a focus, a real move of the pointer
+  over it (looked at every 250 ms, so a resting mouse or the deck moving under it is no move, and a finger lifting off
+  is not someone leaving), or a move it did not make (the presenter window) — it hands itself over, and it does not
+  take the deck back soon: only after **45 s of quiet** (`resumeMs`), or once the deck has left sight and come back.
+  It then goes on from the stop they left it on, when that is a stop;
+- **Escape**, or the small **"Stop tour"** control it shows while a tour can move in view (or the page's own element
+  marked `data-tour-stop`, which it uses instead), stops every tour for the rest of the page view (WCAG 2.2.2). Escape
+  is one key with three meanings on a StoryDeck page, each by what is running: while listen mode plays, it stops listen
+  mode, and only that; in `PostView`'s Watch lens it returns to Read; and wherever a tour runs it stops every tour on
+  the page — so in a touring Watch lens one Escape does both;
+- it **waits while out of sight** — scrolled away (IntersectionObserver, reading the newest entry) or the page
+  hidden — and while listen mode plays the deck (the deck carries `data-listening`); under **reduced motion** there
+  is no tour.
+
+The plan is plain data — the stops, each one's hold, the waits — that a person or an LLM can read, and that the
+deck's notes can say in one line (`tourText`):
+
+```js
+import { idleTour, tourPlan, tourText } from 'footprint-storydeck/tour';
+
+idleTour(document.querySelector('deck-stage'), { stops: '3 4 5 9:6s', hold: '3s' });   // clicks as the deck counts them
+tourText({ stops: '3 4 5 9:6s' });
+// "Left alone for 1.4 s, it tours itself: slide 3 for 3 s, then slide 4 for 3 s, then slide 5 for 3 s, then slide 9
+//  for 6 s, and round again. A key, tap, click or move hands it over until 45 s of quiet; Escape or "Stop tour" stops it."
+```
+
+Declared on the deck instead, for a page built as HTML: `<deck-stage data-tour="3 4 5 9:6s" data-tour-hold="3s">` (and
+`data-tour-idle`, `data-tour-resume`), with `(${idleTour})()` once in the page; a deck whose `data-tour` it cannot
+read is left out with a console warning naming the fix, and the others still tour. A stop is held 300 ms or more. In
+React, the Watch lens takes the same spec — `<SlideDeck steps={…} tour="3 4 5 9:6s" />` — and `PostView` passes the
+post's own `tour` (post.json), so a post opts in where its structure is written. A figure that is not a deck tours
+through its own function: stops are its names, `go` is what a person's click calls
+(`idleTour(figure, { stops: ['lid', 'core'], go: (part) => show(part) })`). The tour's state rides on the element as `data-tour-state` (`waiting`,
+`touring`, `paused`, `hidden`, `still`, `done`), so a page can say "touring — touch to explore"; the control is
+`.sd-tour-stop`, styled as weakly as can be, so a page restyles it.
+
+It lives on the Watch deck, not in the Scroll or Read lenses: their figure follows the reader's scroll position, so a
+tour there would move the page under the reader's eyes; a deck is a place a person steps through, and the tour steps
+through it the same way.
 
 ## Narration: the deck tells itself, in your voice
 
@@ -337,7 +417,7 @@ const { theme, toggle, setTheme } = useTheme();   // flips an html class + persi
 | Export | What |
 |---|---|
 | `PostView` | the lens controller (Read · Scroll · Watch toggle) |
-| `BlogView` · `ScrollyView` · `SlideDeck` | the three lenses (take `sections` / `sections` / `steps`) |
+| `BlogView` · `ScrollyView` · `SlideDeck` | the three lenses (take `sections` / `sections` / `steps`; `SlideDeck` also a `tour`) |
 | `SlideFigure` | one slide rendered as a scaled static figure |
 | `StoryDeckProvider` · `useBasePath` | inject deploy config (asset base path) |
 | `useTheme` · `ThemeToggle` | headless theming + a default toggle |
@@ -347,6 +427,7 @@ const { theme, toggle, setTheme } = useTheme();   // flips an html class + persi
 | `slugify` · `scopeDeckCss` | utilities |
 | `planFocus` · `focusStep` · `readFocus` · `FOCUS` | focus: per click, what it is about and what happens to the rest (also `footprint-storydeck/focus`) |
 | `readPieces` · `readStep` · `drawFocus` · `wrapStage` · `slideClass` · `focusOverlay` · `focusRuntime` | focus, written into slide HTML (also `footprint-storydeck/focus-html`; styles in `footprint-storydeck/focus.css`) |
+| `idleTour` · `tourPlan` · `tourText` | tour: a deck (or a figure) that shows its point while nobody is using it, and its plan in data and in one line (also `footprint-storydeck/tour`) |
 | `narrationText` · `writtenText` | narration: what a click says (also `footprint-storydeck/narration`); the rules beneath, sentences, captions and chapters are `footprint-narration`'s |
 | `notesData` · `notesRuntime` · `listenRuntime` | narration in the page: notes, presenter window, listen mode (also `footprint-storydeck/narration-html`; styles in `footprint-storydeck/narration.css`) |
 | `embedClips` | `footprint-storydeck/voice` (Node only): a deck's clips inside one page; the clip cache, the voice port and its local-kit adapter are `footprint-narration/voice`'s |
@@ -363,7 +444,7 @@ npm test        # vitest
 npm run test:cov
 ```
 
-266 tests (and 2 that run where LibreOffice or the ECMA-376 schemas are found) · ~99% lines · coverage thresholds enforced (90% statements, 85% branches, 90% functions, 95% lines).
+317 tests (and 2 that run where LibreOffice or the ECMA-376 schemas are found) · ~99% lines · coverage thresholds enforced (90% statements, 85% branches, 90% functions, 95% lines).
 
 ## License
 

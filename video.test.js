@@ -252,15 +252,16 @@ describe.skipIf(!hasFfmpeg && !process.env.CI)('video · with the real ffmpeg', 
 describe('video · the deck-stage driver', () => {
   /** Playwright's chromium, faked: page.evaluate runs the page function against a stand-in document. */
   function fakeChromium() {
+    const order = [];
     const anims = [
-      { pause: vi.fn(), effect: { getComputedTiming: () => ({ endTime: 700 }) }, currentTime: 0 },
-      { pause: vi.fn(), effect: { getComputedTiming: () => ({ endTime: Infinity }) }, currentTime: 0 },
+      { pause: vi.fn(), finish: vi.fn(() => order.push('finish')), effect: { getComputedTiming: () => ({ endTime: 700 }) }, currentTime: 0 },
+      { pause: vi.fn(), finish: vi.fn(() => { order.push('endless'); throw new Error('InvalidStateError'); }), effect: { getComputedTiming: () => ({ endTime: Infinity }) }, currentTime: 0 },
     ];
     const stage = { index: 0, goTo: vi.fn((i) => { stage.index = i; }), shadowRoot: { getAnimations: () => [anims[1]], append: vi.fn() } };
     const doc = { querySelector: () => stage, getAnimations: () => [anims[0]], createElement: () => ({}) };
     const page = {
       goto: vi.fn(), waitForFunction: vi.fn(), addStyleTag: vi.fn(), waitForTimeout: vi.fn(), screenshot: vi.fn(),
-      keyboard: { press: vi.fn(async () => { stage.index += 1; }) },
+      keyboard: { press: vi.fn(async () => { order.push('press'); stage.index += 1; }) },
       evaluate: vi.fn(async (fn, arg) => {
         const saved = { document: globalThis.document, raf: globalThis.requestAnimationFrame };
         globalThis.document = doc; globalThis.requestAnimationFrame = (cb) => cb();
@@ -268,7 +269,7 @@ describe('video · the deck-stage driver', () => {
       }),
     };
     const browser = { newPage: vi.fn(async () => page), close: vi.fn() };
-    return { chromium: { launch: vi.fn(async () => browser) }, page, browser, stage, anims };
+    return { chromium: { launch: vi.fn(async () => browser) }, page, browser, stage, anims, order };
   }
 
   it('opens the page with motion on and the room\'s chrome hidden', async () => {
@@ -294,6 +295,8 @@ describe('video · the deck-stage driver', () => {
     await driver.step(3);                                   // a jump to click 2, then one step on
     expect(f.stage.goTo).toHaveBeenCalledWith(1);
     expect(f.page.keyboard.press).toHaveBeenCalledWith('ArrowRight');
+    // click 2's motion is ended before the step on, so click 3 sets off from rest — the same frames on every render
+    expect(f.order).toEqual(['finish', 'endless', 'press']);
     expect(await driver.freeze()).toBe(700);                // the looping one does not count
     expect(f.anims.every((a) => a.pause.mock.calls.length === 1)).toBe(true);
     await driver.seek(350);

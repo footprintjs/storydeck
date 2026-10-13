@@ -71,6 +71,8 @@ export interface Post {
   readonly sections: readonly Section[];
   /** Every deck slide's HTML, in order — the Watch lens. */
   readonly deckSteps: readonly string[];
+  /** The Watch deck's tour, when it shows its point by itself (SlideDeck's `tour`): '3 4 5 9:6s', or the readable options. */
+  readonly tour?: string | Omit<import('./tour').TourOptions, 'go'>;
   readonly [meta: string]: unknown;
 }
 
@@ -89,8 +91,14 @@ export function PostView(props: { post: Post }): ReactElement;
 export function BlogView(props: { sections: readonly Section[] }): ReactElement;
 /** The Scroll lens: a pinned stage that advances as the narrative scrolls. */
 export function ScrollyView(props: { sections: readonly Section[] }): ReactElement;
-/** The Watch lens: the deck slides mounted into the `<deck-stage>` runtime. */
-export function SlideDeck(props: { steps: readonly string[] }): ReactElement;
+/**
+ * The Watch lens: the deck slides mounted into the `<deck-stage>` runtime; it installs focusRuntime (focusHtml.d.ts),
+ * so only a forward click animates and apart's springs play. With `tour` (tour.d.ts · idleTour: the
+ * stops as text, '3 4 5 9:6s', or the readable options) it is a deck nobody has to present: left alone for a moment
+ * it shows its stops through its own goTo, and a key, tap, click or move hands it over. `PostView` passes the
+ * post's `tour` (post.json).
+ */
+export function SlideDeck(props: { steps: readonly string[]; tour?: string | Omit<import('./tour').TourOptions, 'go'> }): ReactElement;
 /** One slide as a static figure: a fixed 1920×1080 canvas scaled to the column. */
 export function SlideFigure(props: { html: string }): ReactElement;
 /** The default light/dark control, built on {@link useTheme}. */
@@ -136,6 +144,8 @@ export function scopeDeckCss(css: string): string;
 // Focus — per click, what the click is about and what happens to the rest (focus.d.ts), written into slide HTML (focusHtml.d.ts).
 export * from './focus';
 export * from './focusHtml';
+// Tour — a deck or a figure that shows its point by itself while nobody is using it (tour.d.ts).
+export * from './tour';
 // Narration — what a deck says on each click (narration.d.ts), in the page: notes, presenter, listen mode (narrationHtml.d.ts).
 // The rules a voice reads by, sentences, captions and chapters are footprint-narration's (its own types).
 // footprint-storydeck/voice, /video and /pptx (Node-only) carry their own types.

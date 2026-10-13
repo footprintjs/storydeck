@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { StoryDeckProvider } from './context';
 import SlideDeck from './SlideDeck';
@@ -24,9 +24,38 @@ describe('SlideDeck', () => {
     expect(stage.innerHTML).toContain('c');
   });
 
+  it('installs the focus runtime, so only a forward click animates and apart\'s springs play — even over an older one inlined in the page', () => {
+    window.__sdFocusRuntime = true;   // what 0.4.0's focusRuntime left: no springs
+    renderDeck();
+    expect(window.__sdFocusRuntime).toBe(2);
+  });
+
   it('loads deck-stage.js from the provided base path', () => {
     renderDeck();
     const sc = document.querySelector('script[data-deck-stage]');
     expect(sc.getAttribute('src')).toBe('/blog/deck-stage.js');
+  });
+
+  it('with a tour, the deck tours itself when left alone, through its own goTo, and lets go when it unmounts', () => {
+    vi.useFakeTimers();
+    try {
+      const { container, unmount, rerender } = render(<StoryDeckProvider basePath="/blog"><SlideDeck steps={steps} tour="2 3" /></StoryDeckProvider>);
+      const stage = container.querySelector('deck-stage');
+      stage.goTo = vi.fn();
+      expect(stage.getAttribute('data-tour-state')).toBe('waiting');
+      vi.advanceTimersByTime(1400);
+      expect(stage.goTo).toHaveBeenCalledWith(1);   // click 2, as the deck counts them
+      rerender(<StoryDeckProvider basePath="/blog"><SlideDeck steps={steps} tour="2 3" /></StoryDeckProvider>);
+      expect(container.querySelector('deck-stage')).toBe(stage);   // the same spec is the same tour: no remount
+      unmount();
+      expect(stage.hasAttribute('data-tour-state')).toBe(false);
+      vi.advanceTimersByTime(60000);
+      expect(stage.goTo).toHaveBeenCalledTimes(1);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('without a tour, nothing tours', () => {
+    const { container } = renderDeck();
+    expect(container.querySelector('deck-stage').hasAttribute('data-tour-state')).toBe(false);
   });
 });
