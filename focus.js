@@ -10,7 +10,10 @@
 //                                      left · right · up · down (the context steps aside that way, smaller,
 //                                      and the subject grows into the room it leaves) ·
 //                                      place (named groups moved by the amounts you give — a layout you
-//                                      art-direct, still animated from wherever the last click left it)
+//                                      art-direct, still animated from wherever the last click left it) ·
+//                                      apart (the exploded view: named groups fly apart along the vectors you
+//                                      give, one spring each, staggered, and come back together on a later
+//                                      click without it — the last one out is the first one back)
 //   overlay  what lies over the slide  blur (everything outside the subject's frame is blurred; a frame,
 //                                      and a label if given, on the subject)
 //   order    how the subject comes on  all at once (the default) · path (piece after piece along a route —
@@ -74,14 +77,24 @@ function aside(side) {
   }});
 }
 
-/** place's groups: 'names: dx dy scale [@ ox oy] | …' (or a list of such strings). */
-function readGroups(v) {
-  if (v === undefined || v === null || v === '') throw new Error('focus "place": give groups, \'names: dx dy scale [@ ox oy] | …\'');
+/**
+ * Groups moved by amounts: 'names: dx dy scale [@ ox oy] | …' (or a list of such strings) — place's, and apart's
+ * without the origin ('names: dx dy [scale]', written in data-focus-apart).
+ */
+function readGroups(v, who = 'place', origin = true) {
+  const form = origin ? 'names: dx dy scale [@ ox oy]' : 'names: dx dy [scale]';
+  if (v === undefined || v === null || v === '') throw new Error(`focus "${who}": give groups, '${form} | …'${origin ? '' : ` (data-focus-${who}, or the option ${who})`}`);
   return [].concat(v).flatMap(x => String(x).split('|')).map(g => g.trim()).filter(Boolean).map(g => {
     const m = /^([^:]+):\s*(-?[\d.]+)\s+(-?[\d.]+)(?:\s+(-?[\d.]+))?(?:\s*@\s*(-?[\d.]+)\s+(-?[\d.]+))?$/.exec(g);
-    if (!m) throw new Error(`focus "place": a group is 'names: dx dy scale [@ ox oy]', not "${g}"`);
+    if (!m || (!origin && m[5] !== undefined)) throw new Error(`focus "${who}": a group is '${form}', not "${g}"`);
     return {names: m[1].trim().split(/\s+/), dx: Number(m[2]), dy: Number(m[3]), s: m[4] === undefined ? 1 : Number(m[4]), origin: m[5] === undefined ? null : [Number(m[5]), Number(m[6])]};
   });
+}
+
+/** A group move that puts the centre of the group's box (or the point `origin`, map px) where dx dy (slide px) and s say. */
+function groupMove({names, dx, dy, s, origin}, boxOf, view) {
+  const box = boxOf(names); if (!box && !origin) return {names, g: null};
+  return {names, g: {o: origin ?? centre(box), s, t: [dx / view.s, dy / view.s]}};
 }
 
 /** Rectangles x y w h from an option: numbers, a string of them, or a list of either. */
@@ -108,11 +121,16 @@ export const FOCUS = Object.freeze({
    * moves by dx, dy (slide px) and scales around its own centre, or around the point ox oy (map px) when given.
    */
   place: Object.freeze({name: 'place', kind: 'mover', place({boxOf, view, options}) {
-    return {groups: readGroups(options.groups).map(({names, dx, dy, s, origin}) => {
-      const box = boxOf(names); if (!box && !origin) return {names, g: null};
-      const o = origin ?? centre(box);
-      return {names, g: {o, s, t: [dx / view.s, dy / view.s]}};
-    })};
+    return {groups: readGroups(options.groups).map(g => groupMove(g, boxOf, view))};
+  }}),
+  /**
+   * The exploded view: `apart` is 'names: dx dy [scale] | names: …' — each named group (lines and connectors that
+   * carry one of its names come with it) flies out by dx, dy (slide px), scaled around its own centre, and comes back
+   * together on a later click without apart. Its way there is a spring per group (focusHtml.js · focusRuntime), the
+   * groups `stagger` (35) ms apart: out in the order written, back in reverse, so the last one out is the first one back.
+   */
+  apart: Object.freeze({name: 'apart', kind: 'mover', place({boxOf, view, options}) {
+    return {groups: readGroups(options.apart, 'apart', false).map(g => groupMove(g, boxOf, view)), spring: {stagger: num(options.stagger, 35)}};
   }}),
   /**
    * The subject comes on piece after piece along a route, as a request travels it: `route` names the pieces in
@@ -164,7 +182,7 @@ function pick(focus, strategies) {
     const s = all[strategy];
     if (!s) throw new Error(`no focus strategy "${strategy}" (there are ${Object.keys(all).join(', ')})`);
     if (!KINDS.includes(s.kind)) throw new Error(`focus strategy "${strategy}" has kind ${JSON.stringify(s.kind)}: a strategy is a look, a mover, an overlay or an order`);
-    if (byKind[s.kind]) throw new Error(`a click takes one ${s.kind} at most: "${byKind[s.kind].name}" and "${strategy}" are both ${s.kind}s`);
+    if (byKind[s.kind]) throw new Error(`a click takes one ${s.kind} at most: "${byKind[s.kind].name}" and "${strategy}" are both ${s.kind}s — keep one, and give the other a click of its own`);
     byKind[s.kind] = {s: {...s, name: s.name ?? strategy}, options, name: strategy};
   }
   return byKind;
@@ -184,6 +202,17 @@ function readRoute(r, strategy) {
   if (line !== undefined && typeof line !== 'string') refuse(`a route's line is text that names it, or left out — not ${shown(line)}`);
   if (lineAt !== undefined && lineAt !== null && typeof lineAt !== 'string') refuse(`a route's lineAt is 'x y' in slide px, null, or left out — not ${shown(lineAt)}`);
   return {names: [...names], step, line: line ?? '', lineAt: lineAt?.trim() ? lineAt : null};   // (a blank lineAt, an empty data-focus-line-at, is none)
+}
+
+/**
+ * What a mover's `spring` gave — its groups go by a spring each, `stagger` ms apart — checked like an order's route
+ * (a deck's own mover is held to what apart gives) and read into a new object.
+ */
+function readSpring(r, strategy) {
+  const shown = v => (typeof v === 'number' || v === undefined ? String(v) : JSON.stringify(v));
+  if (!r || typeof r !== 'object') throw new Error(`focus "${strategy}": spring is {stagger}, the ms between two groups — not ${shown(r)}`);
+  if (typeof r.stagger !== 'number' || !(r.stagger >= 0 && r.stagger <= 1000)) throw new Error(`focus "${strategy}": stagger is the ms between two groups setting off, a number from 0 to 1000 — not ${shown(r.stagger)}`);
+  return {stagger: r.stagger};
 }
 
 /** Where a group move puts one piece: its reference point (the centre, or the top-left when it has no size) moves by [dx, dy], and it scales by s around it. */
@@ -217,8 +246,10 @@ function changeOf(st, was, look, wasLook, entering, before) {
  * fresh). `deck`: {pieces: [{keys, box, twin?}], strategies?, area?, view?, canvas?}. Returns {state, look}:
  * the state to hand the next click, and the look to draw — per piece {state, was, change, look, fromLook, hot,
  * hotIn, move, from, twinOff, twinTurn (stepping aside for a lit twin on a route: the seconds until that twin's
- * turn; else null), path (a lit piece on a route: the seconds until its turn; else null)}, the stage's move, the
- * overlay, the path ({turns, step, done, line, lineAt}, or null) and which strategies were used.
+ * turn; else null), path (a lit piece on a route: the seconds until its turn; else null), apart (a piece that goes by
+ * its group's spring on this click: the group's index in the look's apart; else null)}, the stage's move, the
+ * overlay, the path ({turns, step, done, line, lineAt}, or null), the apart ({stagger, groups: [{names, to, was}]} —
+ * to 1 opens, to 0 closes, was is where the last click left it — or null) and which strategies were used.
  */
 export function focusStep(prev, step, deck) {
   const {pieces, strategies = {}} = deck, canvas = deck.canvas ?? {w: 1920, h: 1080};
@@ -250,8 +281,15 @@ export function focusStep(prev, step, deck) {
   // boxOf(names): the box around the shown pieces of those names, for a mover that moves named groups (place).
   const boxOf = l => union(all.filter(i => states[i] !== 'gone' && has(i, known(names([].concat(l)), 'focus group: '))).map(i => pieces[i].box));
   const placed = chosen.mover ? chosen.mover.s.place({subject, context, area, view, canvas, boxOf, options: chosen.mover.options}) ?? {} : {};
-  // Named groups (later ones win a piece in two of them) take their pieces out of the subject and context groups.
-  for (const {names: l, g} of placed.groups ?? []) for (const i of all) if (states[i] !== 'gone' && has(i, l)) inGroup.set(i, g ? {g} : 'still');
+  // Named groups (later ones win a piece in two of them) take their pieces out of the subject and context groups. A
+  // mover whose groups go by a spring (apart) has each moved piece remember its group, so the next click knows what closes.
+  const spring = placed.spring === undefined || placed.spring === null ? null : readSpring(placed.spring, chosen.mover.name);
+  const springOf = new Map();
+  for (const {names: l, g} of placed.groups ?? []) for (const i of all) if (states[i] !== 'gone' && has(i, l)) {
+    inGroup.set(i, g ? {g} : 'still');
+    if (spring && g) springOf.set(i, l.join(' ')); else springOf.delete(i);
+  }
+  const springGroups = [...new Map((spring ? placed.groups ?? [] : []).filter(x => x.g).map(x => [x.names.join(' '), [...x.names]]))];
   const stage = placed.stage ? {s: round(placed.stage.s, 4), x: round(placed.stage.o[0] * (1 - placed.stage.s) + placed.stage.t[0]), y: round(placed.stage.o[1] * (1 - placed.stage.s) + placed.stage.t[1])} : null;
   const groupOf = i => { const k = inGroup.get(i); return k === 'subject' ? placed.subject : k === 'context' ? placed.context : k?.g ?? null; };
   const moves = pieces.map((p, i) => states[i] === 'gone' ? null : placePiece(groupOf(i), p.box));
@@ -278,15 +316,35 @@ export function focusStep(prev, step, deck) {
   // stood, so it fades out from there instead of jumping home in colour first.
   const before = prev && !step.fresh ? prev : null;
   const hotNow = new Set(all.filter(i => states[i] !== 'gone' && has(i, hot)));
+  // apart: the groups that open on this click (in the order written), then those the last click opened that close now
+  // (in its order). A piece shown on both clicks goes by its group's spring; one whose group stays open but moved anyway
+  // (a new vector) glides as any mover's piece does.
+  const last = before?.spring ?? null, nowKeys = new Set(springGroups.map(([k]) => k)), lastKeys = new Set((last?.groups ?? []).map(([k]) => k));
+  const springList = [...springGroups.map(([key, l]) => ({key, names: l, to: 1, was: lastKeys.has(key) ? 1 : 0})),
+    ...(last?.groups ?? []).filter(([k]) => !nowKeys.has(k)).map(([key, l]) => ({key, names: l, to: 0, was: 1}))];
+  const springAt = new Map(springList.map((g, k) => [g.key, k]));
+  const springIdx = (i, moved) => {
+    if (!before || states[i] === 'gone' || before.states[i] === 'gone') return null;
+    const had = before.springOf?.[i], key = springOf.get(i) ?? (lastKeys.has(had) && !nowKeys.has(had) ? had : null);
+    const k = key === null ? undefined : springAt.get(key);
+    return k === undefined || (springList[k].to === springList[k].was && moved) ? null : k;
+  };
+  // Where a piece in an open group stands when its group is together: where the last click left it as the group
+  // opens, kept while the group stays open — the other end of its spring, so a spring caught mid-way goes on from there.
+  const home = () => ({dx: 0, dy: 0, s: 1});
+  const together = pieces.map((_, i) => !springOf.has(i) ? null
+    : lastKeys.has(springOf.get(i)) ? before?.springFrom?.[i] ?? home() : before?.moves[i] ?? home());
   const out = pieces.map((p, i) => {
     const st = states[i], was = before ? before.states[i] : 'gone', wasLook = before?.looks?.[i] ?? null;
     const change = changeOf(st, was, looks[i], wasLook, has(i, ins), before);
     const leaving = change === 'leave', stood = before?.moves[i] ?? null;
     const from = stood, moved = st !== 'gone' && was !== 'gone' && !!before && !sameMove(from, moves[i]);
+    // A piece on its group's spring has the spring's other end as `from`: together as it opens, apart as it closes.
+    const k = springIdx(i, moved), spun = k === null ? null : springList[k].to === 1 ? together[i] : stood ?? home();
     return {state: st, was, change, look: leaving ? wasLook : looks[i], fromLook: change === 'relook' ? wasLook : null,
       hot: hotNow.has(i), hotIn: hotNow.has(i) && (!before || !before.hot.has(i)),
-      move: leaving ? stood : st === 'gone' ? null : moves[i], from: moved ? from ?? {dx: 0, dy: 0, s: 1} : null, twinOff: twinOff.has(i),
-      twinTurn: leaving && twinOff.has(i) ? twinTurn(i) : null, path: delayOf(i)};
+      move: leaving ? stood : st === 'gone' ? null : moves[i], from: spun ?? (moved ? from ?? home() : null), twinOff: twinOff.has(i),
+      twinTurn: leaving && twinOff.has(i) ? twinTurn(i) : null, path: delayOf(i), apart: k};
   });
   const stageMoved = !!before && !sameStage(before.stage, stage);
   // The blur: new only when the last click had none (a blur that moves to another subject stays, and only its
@@ -294,9 +352,11 @@ export function focusStep(prev, step, deck) {
   const overlay = cover ? {rects: cover.rects, label: cover.label, phase: before?.cover ? 'in' : 'in-new', frameNew: !before?.cover || !sameCover(before.cover, cover)}
     : before?.cover ? {rects: before.cover.out ?? before.cover.rects, label: '', phase: 'out', frameNew: false} : null;
   return {
-    state: {vis, states, moves, stage, hot: hotNow, cover, looks},
+    state: {vis, states, moves, stage, hot: hotNow, cover, looks,
+      spring: spring ? {stagger: spring.stagger, groups: springGroups} : null, springOf: pieces.map((_, i) => springOf.get(i) ?? null), springFrom: together},
     look: {pieces: out, stage: stage || stageMoved ? {move: stage, from: stageMoved ? before.stage ?? {s: 1, x: 0, y: 0} : null} : null, overlay,
       path: turns ? {turns, step: order.step, done: round((turns - 1) * order.step, 3), line: order.line, lineAt: order.lineAt} : null,
+      apart: springList.length ? {stagger: (spring ?? last).stagger, groups: springList.map(({names: l, to, was}) => ({names: [...l], to, was}))} : null,
       strategies: Object.values(chosen).map(c => c.name), subject: subjectOnSlide},
   };
 }

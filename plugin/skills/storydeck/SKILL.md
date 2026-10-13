@@ -20,6 +20,7 @@ are footprint-narration's, a package StoryDeck depends on and shares with footpr
 | the slide runtime Watch plays on (`<deck-stage>`) | `footprint-storydeck/deck-stage.js` — serve it, or inline it into a built page | browser |
 | what a click is about, and what happens to the rest | `footprint-storydeck/focus` — `planFocus`, `focusStep` | anywhere |
 | that focus written into slide HTML | `footprint-storydeck/focus-html` + `footprint-storydeck/focus.css`, `focusRuntime` once in the page | build + page |
+| a deck (or figure) that shows its point while nobody is using it (`idleTour`, its plan `tourPlan`, a notes line `tourText`) | `footprint-storydeck/tour`; declared as `<deck-stage data-tour="3 4 5 9:6s">` + `(${idleTour})()`, or `SlideDeck`'s `tour` / post.json's `tour` | build + page |
 | what each click says (`narrationText`, `writtenText`: `[draft]`-aware) | `footprint-storydeck/narration` | anywhere |
 | the rules beneath (`spokenMap`, `autoRules`, `SPELL`, `SAY`), sentences, captions, YouTube chapters | `footprint-narration` | anywhere |
 | notes (N), presenter (P), listen mode (L) in the page | `footprint-storydeck/narration-html` + `footprint-storydeck/narration.css` | build + page |
@@ -53,7 +54,10 @@ const slides = looks.map(look => `<section class="${slideClass(look)}"><div clas
 ```
 
 Strategies, one of each kind at most: look `grey` (default) · `hide` · `keep`; mover `zoom` · `left` ·
-`right` · `up` · `down` · `place` (named groups moved by amounts you art-direct); overlay `blur`; order `path` (the
+`right` · `up` · `down` · `place` (named groups moved by amounts you art-direct) · `apart` (the exploded view:
+`data-focus-apart="lid: 0 -120 | core: 160 0"`, a spring per group `data-focus-stagger` ms apart, back together on a
+later click without it; a line carrying a group's name moves with it; `apart place` on one click is refused — give
+each its own click); overlay `blur`; order `path` (the
 subject lit piece after piece along a route, a `line` naming it; write `on` — or `route` — in the order the pieces
 light: only lit pieces take a turn, a ring and a dashed twin keep their piece's turn, and a new blur delays the
 whole path .4 s).
@@ -107,8 +111,12 @@ const done = await renderVideo({ url: `file://${deckHtml}#1`, steps, out: 'out/v
 - **Acronyms stay as written** unless a voice misreads them as a word. Spelled with spaces ("L L M"), a cloned
   voice said them slowly; written as one word it says quick letters. Measure before and after (forced alignment
   gives a word's length) rather than guess.
-- **Runtimes are inlined, not imported**: `(${notesRuntime})()`, `(${listenRuntime})()`, `(${focusRuntime})()` —
-  once per page, after the `<deck-stage>` and the data tags. They read `#deck-notes` and `#deck-voice`.
+- **Runtimes are inlined, not imported**: `(${notesRuntime})()`, `(${listenRuntime})()`, `(${focusRuntime})()`,
+  `(${idleTour})()` — once per page, after the `<deck-stage>` and the data tags. They read `#deck-notes`,
+  `#deck-voice` and `data-tour`. `apart`'s springs need `focusRuntime` (without it a group lands, as on a jump).
+- **A tour drives the deck, never a copy of it**: its stops are clicks as the deck counts them (1-based), reached
+  with the deck's own `goTo`, so only a stop one click on animates; a hover, focus, key or press pauses it for 3.6 s
+  after the last, and reduced motion means no tour. Put `tourText(spec)` in the notes so the deck says it tours.
 - **A cloned voice is its speaker's**: a page that carries clips stays internal. A public build leaves
   `embedClips` out; listen mode falls back to the browser's voice.
 - **Video frames are deterministic**: each click is made forward, every animation paused and stepped. Looping

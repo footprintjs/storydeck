@@ -35,6 +35,12 @@ describe('PostView', () => {
     expect(container.querySelector('.deck-shell')).toBeTruthy();
   });
 
+  it('hands the post\'s tour (post.json\'s "tour") to the Watch deck, which tours itself when left alone', async () => {
+    const { container } = render(<PostView post={{ ...post, tour: '2 3' }} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Watch it' }));
+    expect(container.querySelector('deck-stage').getAttribute('data-tour-state')).toBe('waiting');
+  });
+
   it('opens a lens directly from ?view=scrolly and can return to Read', async () => {
     window.history.replaceState({}, '', '/blog/x?view=scrolly');
     const { container } = render(<PostView post={post} />);

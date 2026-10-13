@@ -148,13 +148,13 @@ describe('focus · strategies', () => {
 
   it('a click takes one strategy of each kind, from the built-ins or the deck\'s own', () => {
     expect(() => focusStep(null, { ...lit, focus: 'zoom left' }, deck)).toThrow(/one mover at most.*"zoom" and "left"/);
-    expect(() => focusStep(null, { ...lit, focus: 'spin' }, deck)).toThrow(/no focus strategy "spin" \(there are grey, hide, keep, zoom, left, right, up, down, place, path, blur\)/);
+    expect(() => focusStep(null, { ...lit, focus: 'spin' }, deck)).toThrow(/no focus strategy "spin" \(there are grey, hide, keep, zoom, left, right, up, down, place, apart, path, blur\)/);
     const tilt = { kind: 'mover', place: ({ subject }) => ({ subject: { o: [subject.x, subject.y], s: 2, t: [0, 0] } }) };
     const look = focusStep(null, { ...lit, focus: 'tilt' }, { ...deck, strategies: { tilt } }).look;
     expect(look.strategies).toEqual(['tilt']);
     expect(look.pieces[1].move.s).toBe(2);
     expect(() => focusStep(null, { ...lit, focus: 'odd' }, { ...deck, strategies: { odd: { kind: 'paint' } } })).toThrow(/a look, a mover, an overlay or an order/);
-    expect(Object.keys(FOCUS)).toEqual(['grey', 'hide', 'keep', 'zoom', 'left', 'right', 'up', 'down', 'place', 'path', 'blur']);
+    expect(Object.keys(FOCUS)).toEqual(['grey', 'hide', 'keep', 'zoom', 'left', 'right', 'up', 'down', 'place', 'apart', 'path', 'blur']);
   });
 });
 
@@ -372,5 +372,91 @@ describe('focus · path: the subject piece after piece along a route', () => {
     expect(dashed({ in: ['solid', 'alt'], on: ['agent', 'solid', 'alt'], focus: { strategy: 'path', route: 'agent solid' } }).twinTurn).toBe(null);   // alt lights at once
     expect(dashed({ in: ['solid'], on: ['agent', 'solid', 'app'] }).twinTurn).toBe(null);                                         // no path: as before
     expect(dashed({ on: ['agent', 'solid'], focus: 'path' }, { in: ['*'], on: ['solid'] })).toMatchObject({ change: null, twinTurn: null });   // already aside
+  });
+});
+
+describe('focus · apart: the exploded view', () => {
+  // A figure of three parts and a wire that belongs to the core (it carries the core's name).
+  const parts = [
+    { keys: ['lid'], box: { x: 800, y: 200, w: 300, h: 100 } },
+    { keys: ['core'], box: { x: 800, y: 400, w: 300, h: 200 } },
+    { keys: ['wire', 'core'], box: { x: 700, y: 480, w: 100, h: 20 } },
+    { keys: ['base'], box: { x: 800, y: 700, w: 300, h: 100 } },
+  ];
+  const fig = { pieces: parts };
+  const groups = 'lid: 0 -120 | core: 160 0 | base: 0 120 1.1';
+  const open = { focus: 'apart', options: { apart: groups } };
+  const all = { in: ['*'] };
+  const marks = (look) => look.pieces.map((p) => p.apart);
+
+  it('flies the named groups out along their vectors, a line that carries a group\'s name with it, and lists them in order', () => {
+    const look = planFocus([all, open], fig).looks[1];
+    expect(look.apart).toEqual({ stagger: 35, groups: [{ names: ['lid'], to: 1, was: 0 }, { names: ['core'], to: 1, was: 0 }, { names: ['base'], to: 1, was: 0 }] });
+    expect(marks(look)).toEqual([0, 1, 1, 2]);
+    expect(look.pieces[0]).toMatchObject({ move: { dx: 0, dy: -120, s: 1, origin: 'center' }, from: { dx: 0, dy: 0, s: 1 } });
+    expect(look.pieces[1].move).toMatchObject({ dx: 160, dy: 0, s: 1 });
+    expect(look.pieces[2].move).toMatchObject({ dx: 160, dy: 0, s: 1 });   // the wire keeps its place against the core
+    expect(look.pieces[3].move).toEqual({ dx: 0, dy: 120, s: 1.1, origin: 'center' });   // scaled around its own centre
+    expect(look.strategies).toEqual(['apart']);
+    expect(planFocus([all, { ...open, options: { apart: groups, stagger: '60' } }], fig).looks[1].apart.stagger).toBe(60);
+  });
+
+  it('comes back together on a later click without apart: the same groups, closing, from where they stood', () => {
+    const { looks } = planFocus([all, open, {}, {}], fig);
+    expect(looks[2].apart.groups.map((g) => [g.names[0], g.to, g.was])).toEqual([['lid', 0, 1], ['core', 0, 1], ['base', 0, 1]]);
+    expect(marks(looks[2])).toEqual([0, 1, 1, 2]);
+    expect(looks[2].pieces[0]).toMatchObject({ move: null, from: { dx: 0, dy: -120, s: 1 } });
+    expect(looks[3].apart).toBe(null);   // closed: nothing springs
+    expect(marks(looks[3])).toEqual([null, null, null, null]);
+  });
+
+  it('a group that stays open keeps its value; the ones that open or close beside it spring; a new vector glides as any move', () => {
+    const fewer = { focus: 'apart', options: { apart: 'lid: 0 -120 | base: 0 120 1.1' } };
+    const look = planFocus([all, open, fewer], fig).looks[2];
+    expect(look.apart.groups.map((g) => [g.names[0], g.to, g.was])).toEqual([['lid', 1, 1], ['base', 1, 1], ['core', 0, 1]]);
+    expect(marks(look)).toEqual([0, 2, 2, 1]);
+    expect(look.pieces[0].from).toEqual({ dx: 0, dy: 0, s: 1 });                       // the other end of the lid's spring: together
+    expect(look.pieces[1].from).toEqual({ dx: 160, dy: 0, s: 1, origin: 'center' });   // the core's: apart, where it stood
+    const moved = planFocus([all, open, { focus: 'apart', options: { apart: 'lid: 0 -200 | core: 160 0 | base: 0 120 1.1' } }], fig).looks[2];
+    expect(marks(moved)).toEqual([null, 1, 1, 2]);   // the lid stays open, further out: the CSS move takes it there
+    expect(moved.pieces[0].from).toEqual({ dx: 0, dy: -120, s: 1, origin: 'center' });
+  });
+
+  it('composes with a look (the rest greyed) and with place, in both directions', () => {
+    const lit = planFocus([all, { ...open, on: ['core'] }], fig).looks[1];
+    expect(states(lit)).toEqual(['dim', 'on', 'on', 'dim']);
+    expect(lit.pieces.map((p) => p.look)).toEqual(['grey', null, null, 'grey']);
+    expect(marks(lit)).toEqual([0, 1, 1, 2]);   // greyed or lit, every group flies
+    const placed = { focus: { strategy: 'place', groups: 'lid: 40 40' } };
+    const { looks } = planFocus([all, placed, open, placed], fig);
+    expect(looks[2].pieces[0]).toMatchObject({ apart: 0, from: { dx: 40, dy: 40, s: 1 }, move: { dx: 0, dy: -120 } });   // out from the layout place left
+    expect(looks[3].pieces[0]).toMatchObject({ apart: 0, from: { dx: 0, dy: -120 }, move: { dx: 40, dy: 40 } });         // back into it
+    expect(looks[3].pieces[1]).toMatchObject({ apart: 1, move: null });
+    // placed exactly where apart would take it, the lid's spring has both ends there: it does not move
+    const there = planFocus([all, { focus: { strategy: 'place', groups: 'lid: 0 -120' } }, open], fig).looks[2].pieces[0];
+    expect(there).toMatchObject({ apart: 0, from: { dx: 0, dy: -120, s: 1 }, move: { dx: 0, dy: -120, s: 1 } });
+  });
+
+  it('on a fresh map the groups enter where apart puts them, and nothing springs', () => {
+    const look = planFocus([{ ...all, ...open }], fig).looks[0];
+    expect(look.apart.groups.map((g) => g.was)).toEqual([0, 0, 0]);
+    expect(marks(look)).toEqual([null, null, null, null]);
+    expect(changes(look)).toEqual(['enter', 'enter', 'enter', 'enter']);
+  });
+
+  it('is a mover: a click with two movers is refused, naming the fix; so are groups it cannot read', () => {
+    const at = (focus, options = {}) => () => planFocus([all, { focus, options }], fig);
+    expect(at('apart place', { apart: groups, groups: 'lid: 1 1' })).toThrow(/a click takes one mover at most: "apart" and "place" are both movers — keep one, and give the other a click of its own/);
+    expect(at('zoom apart', { apart: groups })).toThrow(/"zoom" and "apart" are both movers/);
+    expect(at('apart')).toThrow(/focus "apart": give groups, 'names: dx dy \[scale\] \| …' \(data-focus-apart, or the option apart\)/);
+    expect(at('apart', { apart: 'lid: 0 -120 1 @ 10 10' })).toThrow(/focus "apart": a group is 'names: dx dy \[scale\]', not "lid: 0 -120 1 @ 10 10"/);
+    expect(at('apart', { apart: 'lids: 0 -120' })).toThrow(/focus group: no piece "lids"/);
+    expect(at('apart', { apart: groups, stagger: 'slow' })).toThrow(/focus "apart": stagger is the ms between two groups setting off, a number from 0 to 1000 — not NaN/);
+    expect(at('apart', { apart: groups, stagger: 2000 })).toThrow(/not 2000/);
+    // a deck's own mover may say its groups go by a spring; what it gives is checked the same way
+    const mine = (spring) => () => planFocus([all, { focus: 'mine' }], { ...fig, strategies: { mine: { kind: 'mover', place: () => ({ groups: [{ names: ['lid'], g: { o: [0, 0], s: 1, t: [5, 5] } }], spring }) } } });
+    expect(mine(7)).toThrow(/focus "mine": spring is \{stagger\}, the ms between two groups — not 7/);
+    expect(mine({ stagger: -1 })).toThrow(/focus "mine": stagger is .* not -1/);
+    expect(mine(Object.freeze({ stagger: 10 }))().looks[1].apart).toEqual({ stagger: 10, groups: [{ names: ['lid'], to: 1, was: 0 }] });
   });
 });

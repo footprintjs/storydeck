@@ -188,7 +188,7 @@ export default function PostView({ post }) {
               ) : null}
               <span className="watch-lens-hint" title="Press Esc to return to Read" aria-hidden="true">Esc</span>
             </div>
-            <SlideDeck steps={post.deckSteps} />
+            <SlideDeck steps={post.deckSteps} tour={post.tour} />
           </>
         ) : null}
       </div>
