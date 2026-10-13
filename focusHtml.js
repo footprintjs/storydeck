@@ -179,8 +179,11 @@ export function focusOverlay(look, {canvas = {w: 1920, h: 1080}, area} = {}) {
  * reduced motion land at once; so does a browser without Element.animate.
  */
 export function focusRuntime() {
-  if (window.__sdFocusRuntime) return;
-  window.__sdFocusRuntime = true;
+  // The flag is the runtime's version: an older runtime inlined in the page (0.4.0 set it to true, with no springs)
+  // does not keep this one out; the same or a newer one does.
+  const VERSION = 2;
+  if (window.__sdFocusRuntime >= VERSION) return;
+  window.__sdFocusRuntime = VERSION;
   const forward = e => {
     const {index, previousIndex, slide} = e.detail;
     if (index <= previousIndex) return false;

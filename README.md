@@ -173,8 +173,11 @@ moment someone reaches for it, it hands itself over:
   is not someone leaving), or a move it did not make (the presenter window) — it hands itself over, and it does not
   take the deck back soon: only after **45 s of quiet** (`resumeMs`), or once the deck has left sight and come back.
   It then goes on from the stop they left it on, when that is a stop;
-- **Escape**, or the small **"Stop tour"** control it shows while a tour can move (or the page's own element marked
-  `data-tour-stop`, which it uses instead), stops every tour for the rest of the page view (WCAG 2.2.2);
+- **Escape**, or the small **"Stop tour"** control it shows while a tour can move in view (or the page's own element
+  marked `data-tour-stop`, which it uses instead), stops every tour for the rest of the page view (WCAG 2.2.2). Escape
+  is one key with three meanings on a StoryDeck page, each by what is running: while listen mode plays, it stops listen
+  mode, and only that; in `PostView`'s Watch lens it returns to Read; and wherever a tour runs it stops every tour on
+  the page — so in a touring Watch lens one Escape does both;
 - it **waits while out of sight** — scrolled away (IntersectionObserver, reading the newest entry) or the page
   hidden — and while listen mode plays the deck (the deck carries `data-listening`); under **reduced motion** there
   is no tour.
@@ -441,7 +444,7 @@ npm test        # vitest
 npm run test:cov
 ```
 
-316 tests (and 2 that run where LibreOffice or the ECMA-376 schemas are found) · ~99% lines · coverage thresholds enforced (90% statements, 85% branches, 90% functions, 95% lines).
+317 tests (and 2 that run where LibreOffice or the ECMA-376 schemas are found) · ~99% lines · coverage thresholds enforced (90% statements, 85% branches, 90% functions, 95% lines).
 
 ## License
 

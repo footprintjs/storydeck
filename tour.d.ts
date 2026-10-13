@@ -47,13 +47,15 @@ export interface Tour {
 
 /**
  * Tours a deck (an element with goTo(index), as <deck-stage> has; one not yet defined is driven once it is) or, given
- * `go`, a figure. Left alone for idleMs it goes to each stop as a person would and holds it. A key, tap, click, focus,
- * a real move of the pointer over it (looked at every 250 ms) or a move it did not make hands it over: it tours again
- * only after resumeMs of quiet, or once it has left sight and come back, at the next stop (a deck left on one of its
- * stops goes on from that one). Escape, or the "Stop tour" control it shows while it can move (or the page's own
- * element marked data-tour-stop), stops every tour for the rest of the page view. It waits while out of sight
- * (IntersectionObserver, the newest entry), while the page is hidden, and while listen mode plays the deck (the deck's
- * data-listening); under reduced motion it never runs. Refuses, naming the fix, what it cannot read.
+ * `go`, a figure. Left alone for idleMs it goes to each stop as a person would and holds it. A key, tap, click,
+ * focus, a real move of the pointer over it (looked at every 250 ms) or a move it did not make hands it over: it
+ * tours again only after resumeMs of quiet, or once it has left sight and come back, at the next stop (a deck left on
+ * one of its stops goes on from that one). Escape, or the "Stop tour" control it shows while a tour can move in view
+ * (its name its visible words, what it does in its title; or the page's own element marked data-tour-stop), stops
+ * every tour for the rest of the page view — Escape page-wide, beside its other meanings (listen mode, PostView's
+ * Watch lens). It waits while out of sight (IntersectionObserver, the newest entry), while the page is hidden, and
+ * while listen mode plays the deck (the deck's data-listening); under reduced motion it never runs. Refuses, naming
+ * the fix, what it cannot read.
  */
 export function idleTour(stage: Element, options: TourOptions): Tour;
 /**

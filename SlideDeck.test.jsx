@@ -24,10 +24,10 @@ describe('SlideDeck', () => {
     expect(stage.innerHTML).toContain('c');
   });
 
-  it('installs the focus runtime, so only a forward click animates and apart\'s springs play', () => {
-    delete window.__sdFocusRuntime;
+  it('installs the focus runtime, so only a forward click animates and apart\'s springs play — even over an older one inlined in the page', () => {
+    window.__sdFocusRuntime = true;   // what 0.4.0's focusRuntime left: no springs
     renderDeck();
-    expect(window.__sdFocusRuntime).toBe(true);
+    expect(window.__sdFocusRuntime).toBe(2);
   });
 
   it('loads deck-stage.js from the provided base path', () => {

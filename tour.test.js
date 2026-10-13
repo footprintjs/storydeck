@@ -188,6 +188,14 @@ describe('tour · in the page', () => {
     const t = tour(stage, { stops: '2 3' });
     const control = document.querySelector('button[data-tour-stop]');
     expect(control.textContent).toBe('Stop tour');
+    // its accessible name is its visible words (WCAG 2.5.3): no aria-label to say otherwise; what it does is its title
+    const name = control.getAttribute('aria-labelledby') ? null : (control.getAttribute('aria-label') ?? control.textContent).trim();
+    expect(name).toMatch(/^Stop tour/);
+    expect(control.title).toBe('Stops every tour on this page: the deck stays where you leave it');
+    expect(control.hidden).toBe(false);
+    sight(false);                                // its deck out of view: nothing on screen can move, so neither can the control be needed
+    expect(control.hidden).toBe(true);
+    sight(true);
     expect(control.hidden).toBe(false);
     expect(document.getElementById('sd-tour-style').textContent).toMatch(/^:where\(\.sd-tour-stop\)\{position:fixed/);   // as weak as can be: a page restyles it
     control.click();

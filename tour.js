@@ -89,9 +89,10 @@ export function idleTour(stage, options) {
   let state = 'off', timer = 0, at = -1, seen = true, moving = false, own = null, ref = null;
   const offs = [], on = (target, type, fn, opts) => { target.addEventListener(type, fn, opts); offs.push(() => target.removeEventListener(type, fn, opts)); };
   const moves = (t) => t.state !== 'off' && t.state !== 'still' && t.state !== 'done';   // a tour that can still move the deck
+  const inView = (t) => moves(t) && t.state !== 'hidden';   // …and can be seen to: the control shows only then
   if (page.off) return tour;   // stopped by the person earlier in this page view: it stays stopped
   const showControl = () => {
-    const alive = [...page.tours].some(moves);
+    const alive = [...page.tours].some(inView);
     if (page.control?.isConnected) { if (page.control.hasAttribute('data-sd-made')) page.control.hidden = !alive; return; }
     if (!alive || document.querySelector('[data-tour-stop]')) return;   // the page's own control is the one
     if (!document.getElementById('sd-tour-style')) {
@@ -104,7 +105,8 @@ export function idleTour(stage, options) {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'sd-tour-stop'; b.textContent = 'Stop tour';
     b.setAttribute('data-tour-stop', ''); b.setAttribute('data-sd-made', '');
-    b.setAttribute('aria-label', 'Stop the tour: the deck stays where you leave it');
+    // its accessible name is its visible words (WCAG 2.5.3); what it does is said in its title
+    b.title = 'Stops every tour on this page: the deck stays where you leave it';
     document.body.append(b);
     page.control = b;
   };

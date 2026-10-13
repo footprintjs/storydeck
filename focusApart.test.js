@@ -243,6 +243,17 @@ describe('apart · in the page', () => {
     expect(played.filter((p) => !p.cancelled).length).toBe(0);
   });
 
+  it('a page that already holds this runtime (or a newer one) installs it once; an older one (0.4.0\'s, no springs) does not keep it out', () => {
+    expect(window.__sdFocusRuntime).toBe(2);
+    focusRuntime();
+    expect(added.filter(([type]) => type === 'slidechange').length).toBe(1);
+    for (const [type, fn, opts] of added.splice(0)) document.removeEventListener(type, fn, opts);
+    window.__sdFocusRuntime = true;
+    focusRuntime();
+    expect(window.__sdFocusRuntime).toBe(2);
+    expect(added.filter(([type]) => type === 'slidechange').length).toBe(1);
+  });
+
   it('runs inlined, as a built page has it: the springs need nothing from their module', () => {
     for (const [type, fn, opts] of added.splice(0)) document.removeEventListener(type, fn, opts);
     delete window.__sdFocusRuntime;

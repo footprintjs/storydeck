@@ -1,6 +1,6 @@
 ---
 name: storydeck
-description: Build, focus, narrate and film talks and posts with StoryDeck — one source shown as a Read article, a Scroll story or a Watch deck; per-click focus on a diagram (grey, zoom, left/right, place, blur, path); narration from the speaker notes (a clip per click in a voice, cached by its words; notes, presenter and listen mode in the page; captions and chapters); a narrated video for YouTube; and a PowerPoint file (.pptx: a slide per click, its picture, notes and clip). Use when creating or editing a StoryDeck post or deck, adding focus to a diagram slide, voicing a talk, rendering a talk as a video, or exporting it to PowerPoint.
+description: Build, focus, narrate and film talks and posts with StoryDeck — one source shown as a Read article, a Scroll story or a Watch deck; per-click focus on a diagram (grey, zoom, left/right, place, apart — the exploded view, blur, path); a tour that shows a deck's point while nobody is using it; narration from the speaker notes (a clip per click in a voice, cached by its words; notes, presenter and listen mode in the page; captions and chapters); a narrated video for YouTube; and a PowerPoint file (.pptx: a slide per click, its picture, notes and clip). Use when creating or editing a StoryDeck post or deck, adding focus to a diagram slide, voicing a talk, rendering a talk as a video, or exporting it to PowerPoint.
 ---
 
 # StoryDeck: one source, many lenses — and a deck that tells itself
