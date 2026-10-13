@@ -1,6 +1,6 @@
 ---
 name: storydeck
-description: Build, focus, narrate and film talks and posts with StoryDeck — one source shown as a Read article, a Scroll story or a Watch deck; per-click focus on a diagram (grey, zoom, left/right, place, blur, path); narration from the speaker notes (a clip per click in a voice, cached by its words; notes, presenter and listen mode in the page; captions and chapters); and a narrated video for YouTube. Use when creating or editing a StoryDeck post or deck, adding focus to a diagram slide, voicing a talk, or rendering a talk as a video.
+description: Build, focus, narrate and film talks and posts with StoryDeck — one source shown as a Read article, a Scroll story or a Watch deck; per-click focus on a diagram (grey, zoom, left/right, place, blur, path); narration from the speaker notes (a clip per click in a voice, cached by its words; notes, presenter and listen mode in the page; captions and chapters); a narrated video for YouTube; and a PowerPoint file (.pptx: a slide per click, its picture, notes and clip). Use when creating or editing a StoryDeck post or deck, adding focus to a diagram slide, voicing a talk, rendering a talk as a video, or exporting it to PowerPoint.
 ---
 
 # StoryDeck: one source, many lenses — and a deck that tells itself
@@ -8,7 +8,7 @@ description: Build, focus, narrate and film talks and posts with StoryDeck — o
 A talk or a post is written once: **sections** of slide steps plus prose. StoryDeck shows it as an article
 (Read), a scrollytelling story (Scroll) or a click-through deck (Watch), decides per click what the audience
 looks at (focus), and turns the speaker notes into a voice, captions and a video (narration). Most of it is
-plain data and string builders; only `footprint-storydeck/voice`, `footprint-storydeck/video` and `footprint-narration/voice` touch the
+plain data and string builders; only `footprint-storydeck/voice`, `footprint-storydeck/video`, `footprint-storydeck/pptx` and `footprint-narration/voice` touch the
 file system. The narration rules underneath (what a voice says for a number, captions, chapters, the clip cache)
 are footprint-narration's, a package StoryDeck depends on and shares with footprint-storyreel.
 
@@ -26,8 +26,9 @@ are footprint-narration's, a package StoryDeck depends on and shares with footpr
 | a clip per click in a voice, cached (`voiceClips`, `clipFor`, `chatterboxKit`, `pickSteps`) | `footprint-narration/voice` | **Node only** |
 | those clips carried inside one page (`embedClips`) | `footprint-storydeck/voice` | **Node only** |
 | the deck as a narrated video | `footprint-storydeck/video` (+ ffmpeg 5.0 or newer on the path, Playwright's `chromium` passed in) | **Node only** |
+| the deck as PowerPoint (.pptx): a slide per click, its picture, notes and clip | `footprint-storydeck/pptx` — `exportPptx` (the same driver as the video; no ffmpeg; `npm i footprintjs` beside it, an optional peer) | **Node only** |
 
-Never import `footprint-storydeck/voice`, `footprint-storydeck/video` or `footprint-narration/voice` into browser code: they use `node:fs`
+Never import `footprint-storydeck/voice`, `footprint-storydeck/video`, `footprint-storydeck/pptx` or `footprint-narration/voice` into browser code: they use `node:fs`
 and child processes.
 The main entry (`footprint-storydeck`) re-exports only what runs anywhere.
 
@@ -94,6 +95,18 @@ const done = await renderVideo({ url: `file://${deckHtml}#1`, steps, out: 'out/v
   chapters: c => (/^Part \d+ · /.test(c.label) ? c.label : null), thumbnail: c => c.label === 'Title' });
 // → my-talk.mp4 · captions.srt/.vtt · chapters.txt (what YouTube will show; done.chapters.changes says what its rule merged or moved) · thumbnail.jpg · timeline.json
 ```
+
+**Export to PowerPoint.** The same steps and driver; no ffmpeg; footprintjs installed beside StoryDeck (`npm i footprintjs`).
+
+```js
+import { exportPptx } from 'footprint-storydeck/pptx';
+const done = await exportPptx({ url: `file://${deckHtml}`, steps, out: 'out/my-talk.pptx', driver: deckStageDriver({ chromium }) });
+// → a slide per click: its settled picture, its notes as speaker notes, its label as an off-page title; with clips,
+//   each slide plays its clip and moves on. done.narrative is the run's record; a refusal (a clip missing or over
+//   maxClip, a click without a 16:9 picture) names each click and its fix, carries the record, and writes nothing.
+```
+
+It is pictures + notes + sound, not editable PowerPoint shapes.
 
 ## Rules that bite
 
