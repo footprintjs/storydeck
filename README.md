@@ -7,7 +7,7 @@
 - **Watch** — an animated, click-through slide deck.
 
 Same content, your lens. It's the footprintjs idea — *one canonical record, you choose the view* —
-applied to content. A React library; theme-agnostic; ships as source.
+applied to content. A React library; theme-agnostic; ships compiled ESM that Node and any bundler load as-is.
 
 > Demo (dogfooded — storydeck explaining storydeck): **[footprintjs.github.io/storydeck](https://footprintjs.github.io/storydeck/)**
 > First consumer: the **[footprintjs blog](https://footprintjs.github.io/blog/)**.
@@ -57,6 +57,32 @@ Three things are true of it, and each is a decision:
 A function cannot come from JSON, so `figure` is not part of the authoring model: `assemblePost`
 builds sections from post.json + Markdown, and the consumer attaches `figure` to them. The beat a
 figure is handed carries `sectionKey`, `step` and `index` — which beat it is being asked to draw.
+
+### A figure in any framework: `StoryFigure`
+
+A section's `figure` may instead be a **`StoryFigure`** — three plain methods, no React:
+
+```ts
+interface StoryFigure {
+  mount(el: HTMLElement): void;                         // draw into this element
+  seek(beat: StoryFigureBeat): Promise<string | void>;  // the reader is on this beat: move there
+  dispose(): void;                                      // take down what mount drew
+}
+// StoryFigureBeat = { key, index, sectionKey, step } — plain data
+```
+
+```js
+const figure = { mount(el) { chart.attach(el); }, seek: (beat) => chart.goTo(beat.sectionKey), dispose() { chart.detach(); } };
+<ScrollyView sections={sections.map((s) => ({ ...s, figure }))} />
+```
+
+It is the seam for a figure the story should not have to know: a chart library, a canvas, another
+framework's component. `ScrollyView` adapts it in a thin host — mounted once while it is on stage (a
+different section's figure is disposed and the new one mounted), and asked to `seek` on every beat change.
+**A seek that cannot move says why:** it resolves to a sentence, and the lens prints that sentence under the
+figure, verbatim, until a later seek answers; it resolves nothing when it moved. Only the latest seek's
+answer is shown, and a seek that rejects is shown as the lens's own sentence. The lens judges nothing — the
+figure knows whether it can stand on a beat. `isStoryFigure(value)` is the check the lens uses.
 
 ## Focus: what a click is about, and what happens to the rest
 
@@ -434,8 +460,12 @@ const { theme, toggle, setTheme } = useTheme();   // flips an html class + persi
 | `renderVideo` · `planVideo` · `deckStageDriver` · `ffmpegMajor` | `footprint-storydeck/video` (Node only, ffmpeg 5.0+): the deck as a narrated video, with captions and chapters |
 | `exportPptx` · `pptxParts` · `zip` · `unzip` · `checkPptx` | `footprint-storydeck/pptx` (Node only): the deck as a PowerPoint file — a slide per click, its picture, notes and clip — through a footprintjs flowchart that records why |
 
-Types ship beside the source in `index.d.ts` — hand-kept (there is no build to generate them from),
-and here rather than in a consumer's shim, because a package's shape belongs in the package.
+The package ships compiled JavaScript (`dist/`, built by `npm run build`: each source file compiled on its
+own, JSX turned into `react/jsx-runtime` calls, every relative import given its `.js`, `'use client'` kept), so
+plain Node and every bundler load it with no transform of their own; `npm run check:dist` loads every door in
+plain Node and refuses a package that ships source JSX. Types ship in `index.d.ts` — hand-kept (nothing
+type-checks the JSX to generate them from), and here rather than in a consumer's shim, because a package's
+shape belongs in the package.
 
 ## Tests
 

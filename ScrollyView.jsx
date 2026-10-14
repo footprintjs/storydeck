@@ -1,7 +1,8 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import SlideFigure from './SlideFigure';
 import { slugify } from './slug';
+import { isStoryFigure } from './figure';
 
 // Scrolly lens (the agentfootprint-homepage pattern, generalized): a pinned figure "stage" whose
 // content advances as you scroll the narrative. Each section flattens into one or more "beats" (its
@@ -31,6 +32,15 @@ import { slugify } from './slug';
 // handing them here. The Read and Watch lenses are untouched — a live figure cannot be joined as
 // markup (SlideDeck concatenates every step into one canvas, BlogView shows the last), so those
 // lenses go on showing the slide HTML, which is the snapshot of the same beat.
+//
+// ── A STORY FIGURE (`section.figure` as an object) ───────────────────────────
+// `figure` may instead be a StoryFigure — `{ mount(el), seek(beat), dispose() }` (index.d.ts), the
+// framework-neutral seam: the lens hands it a plain element in the same live slot, mounts it ONCE
+// while it is on stage, and on every beat change asks it to seek there with the beat's plain
+// coordinates. A seek resolves nothing when it moved and a SENTENCE when it could not; the lens
+// prints that sentence under the figure, verbatim, until a later seek answers, and an older seek
+// that answers late is ignored. The lens judges nothing itself — the figure knows whether it can
+// stand on a beat, and the lens carries its answer. `FigureHost` below is the whole adapter.
 export default function ScrollyView({ sections }) {
   const beats = [];
   sections.forEach((s) => {
@@ -47,7 +57,7 @@ export default function ScrollyView({ sections }) {
         sectionKey: s.key,
         step: stepIdx,
         firstOfSection: stepIdx === 0,
-        figure: typeof s.figure === 'function' ? s.figure : null,
+        figure: isStoryFigure(s.figure) || typeof s.figure === 'function' ? s.figure : null,
       });
     });
   });
@@ -81,7 +91,11 @@ export default function ScrollyView({ sections }) {
       <div className="scrolly-stage">
         {activeBeat ? (
           activeBeat.figure !== null ? (
-            <div className="scrolly-stage-live">{activeBeat.figure(activeBeat)}</div>
+            isStoryFigure(activeBeat.figure) ? (
+              <FigureHost figure={activeBeat.figure} beat={activeBeat} />
+            ) : (
+              <div className="scrolly-stage-live">{activeBeat.figure(activeBeat)}</div>
+            )
           ) : (
             <SlideFigure html={activeBeat.html} key={active} />
           )
@@ -107,6 +121,45 @@ export default function ScrollyView({ sections }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** What the lens says when a figure's seek rejected instead of answering — the figure said nothing, so the words are the lens's own. */
+const UNREACHED = 'this figure could not move to this beat';
+
+/** `useLayoutEffect` in a browser, `useEffect` where there is no DOM (server rendering warns about a layout effect it cannot run). */
+const useMountEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+
+// The thin React adapter over a StoryFigure. Rendered without a key in the live slot, so a beat change
+// re-renders it rather than remounting: `mount` runs once per figure (a different figure — another
+// section's — is disposed and the new one mounted), and the seek effect is the lens's clock.
+function FigureHost({ figure, beat }) {
+  const host = useRef(null);
+  const [said, setSaid] = useState(null);
+
+  // mounted in the LAYOUT phase, so the figure has drawn before the stage first paints (no empty
+  // frame); the seek below is a passive effect and always comes after it
+  useMountEffect(() => {
+    figure.mount(host.current);
+    return () => figure.dispose();
+  }, [figure]);
+
+  const { key, index, sectionKey, step } = beat;
+  useEffect(() => {
+    let current = true; // only the latest seek's answer is shown
+    new Promise((resolve) => resolve(figure.seek({ key, index, sectionKey, step }))).then(
+      (answer) => { if (current) setSaid(typeof answer === 'string' && answer !== '' ? answer : null); },
+      () => { if (current) setSaid(UNREACHED); },
+    );
+    return () => { current = false; };
+  }, [figure, key, index, sectionKey, step]);
+
+  return (
+    <div className="scrolly-stage-live">
+      {/* the figure's own element: React renders nothing inside it */}
+      <div className="scrolly-figure" ref={host} />
+      {said === null ? null : <p className="scrolly-figure-said" role="status">{said}</p>}
     </div>
   );
 }

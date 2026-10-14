@@ -1,8 +1,8 @@
 /**
  * storydeck's shape, written down.
  *
- * The library is plain JSX with no build step, so there is nothing to generate
- * these from — they are hand-kept, and they live HERE rather than in a
+ * The library is plain JSX compiled file by file (build.mjs), with no type
+ * checker in the loop, so there is nothing to generate these from — they are hand-kept, and they live HERE rather than in a
  * consumer's shim on purpose: a consumer that declares another package's shape
  * has written that package's contract in the wrong repository, where the next
  * change to the JSX cannot see it.
@@ -36,9 +36,53 @@ export interface ScrollyBeat {
   /** Which of that section's steps this is, 0-based. */
   readonly step: number;
   readonly firstOfSection: boolean;
-  /** The section's live figure, or null when it carries none. */
-  readonly figure: ((beat: ScrollyBeat) => ReactNode) | null;
+  /** The section's live figure (a render function or a {@link StoryFigure}), or null when it carries none. */
+  readonly figure: ((beat: ScrollyBeat) => ReactNode) | StoryFigure | null;
 }
+
+/**
+ * Which beat a {@link StoryFigure} is asked to stand on — plain data, so a
+ * figure written in any framework (or none) can read it. The same coordinates
+ * the flow marks each beat with: `index` is its `data-beat`.
+ */
+export interface StoryFigureBeat {
+  /** Unique per beat (`<slugified section key>-<step index>`). */
+  readonly key: string;
+  /** Position in the flattened sequence, 0-based. */
+  readonly index: number;
+  /** The `key` of the section this beat belongs to, as the section carries it. */
+  readonly sectionKey: string;
+  /** Which of that section's steps this is, 0-based. */
+  readonly step: number;
+}
+
+/**
+ * A live figure the Scroll lens drives WITHOUT knowing how it draws — the
+ * framework-neutral seam between a story and whatever renders its figure.
+ * A section carries one as its `figure`; `ScrollyView` adapts it in a thin
+ * React host and the figure never sees React.
+ *
+ * - `mount(el)`: draw into `el`, a plain block in the pinned stage (outside
+ *   the scaled slide canvas). Called once while the figure is on stage; after
+ *   `dispose()` it may be called again (React's StrictMode does exactly that).
+ * - `seek(beat)`: the reader arrived on `beat` — move there. Resolve nothing
+ *   when it moved, or a SENTENCE when it could not: the lens prints that
+ *   sentence under the figure, verbatim, until a later seek answers. Only the
+ *   latest seek's answer is shown; one that resolves after a newer seek began
+ *   is ignored. A seek that rejects is shown as the lens's own sentence.
+ * - `dispose()`: take down what `mount` drew.
+ *
+ * The lens judges nothing: whether the figure can stand on a beat is the
+ * figure's to say, and the lens carries the answer.
+ */
+export interface StoryFigure {
+  mount(el: HTMLElement): void;
+  seek(beat: StoryFigureBeat): Promise<string | void>;
+  dispose(): void;
+}
+
+/** Is `value` a {@link StoryFigure} (it has `mount`, `seek` and `dispose`)? The check the lens itself uses. */
+export function isStoryFigure(value: unknown): value is StoryFigure;
 
 /** One section: 1..N slide steps plus authored prose. The unit of the whole model. */
 export interface Section {
@@ -52,12 +96,13 @@ export interface Section {
   readonly body: string;
   /**
    * A LIVE figure for the Scroll lens: rendered in the pinned stage instead of
-   * the slide canvas, and outside its transform (see `ScrollyView`'s header).
+   * the slide canvas, and outside its transform (see `ScrollyView`'s header) —
+   * a React render function, or a framework-neutral {@link StoryFigure}.
    * It cannot come from JSON, so `assemblePost` never sets it — the consumer
    * attaches it to the assembled sections. Read and Watch ignore it and go on
    * showing the slide HTML.
    */
-  readonly figure?: (beat: ScrollyBeat) => ReactNode;
+  readonly figure?: ((beat: ScrollyBeat) => ReactNode) | StoryFigure;
 }
 
 /** A normalized post: the author's metadata, the sections, and the full deck. */

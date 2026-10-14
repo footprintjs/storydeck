@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — a figure in any framework, and compiled JavaScript
+
+- **`StoryFigure`: the Scroll lens drives a figure it does not know how to draw.** A section's `figure` may
+  now be `{ mount(el), seek(beat), dispose() }` beside the React render function it already took. The lens
+  mounts it once into a plain element in the pinned stage, asks it to `seek` with the beat's plain coordinates
+  (`{ key, index, sectionKey, step }`) on every beat change, and prints the sentence a seek resolves to under
+  the figure (a refusal, verbatim) until a later seek answers; only the latest seek's answer is shown.
+  `isStoryFigure` is exported. Additive: render-function figures and HTML steps are unchanged.
+- **The package ships compiled JavaScript.** `dist/` holds each source file compiled on its own (JSX to
+  `react/jsx-runtime`, relative imports with `.js`, `'use client'` kept), so plain Node and any bundler load
+  it with no transform: the `.jsx` workarounds consumers needed (`transpilePackages`, a test runner's
+  inline list) are no longer required. Types stay the hand-kept `*.d.ts`. `npm run check:dist` loads every
+  door in plain Node and refuses a package that ships source JSX; CI runs it.
+
 ## 0.5.0 — PowerPoint, the exploded view, and a tour for decks nobody presents
 
 - **`footprint-storydeck/pptx`: the deck as a PowerPoint file.** `exportPptx` makes a slide per click: its settled
