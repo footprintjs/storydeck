@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — a figure in any framework, and compiled JavaScript
+## 0.6.0 — a figure in any framework, and compiled JavaScript
 
 - **`StoryFigure`: the Scroll lens drives a figure it does not know how to draw.** A section's `figure` may
   now be `{ mount(el), seek(beat), dispose() }` beside the React render function it already took. The lens
