@@ -4,6 +4,7 @@
 export { default as PostView } from './PostView';
 export { default as BlogView } from './BlogView';
 export { default as ScrollyView } from './ScrollyView';
+export { isStoryFigure } from './figure';
 export { default as SlideDeck } from './SlideDeck';
 export { default as SlideFigure } from './SlideFigure';
 export { default as ThemeToggle } from './ThemeToggle';

@@ -39,62 +39,59 @@
   "exports": {
     ".": {
       "types": "./index.d.ts",
-      "default": "./index.js"
+      "default": "./dist/index.js"
     },
     "./focus": {
       "types": "./focus.d.ts",
-      "default": "./focus.js"
+      "default": "./dist/focus.js"
     },
     "./focus-html": {
       "types": "./focusHtml.d.ts",
-      "default": "./focusHtml.js"
+      "default": "./dist/focusHtml.js"
     },
     "./focus.css": "./focus.css",
     "./tour": {
       "types": "./tour.d.ts",
-      "default": "./tour.js"
+      "default": "./dist/tour.js"
     },
     "./narration": {
       "types": "./narration.d.ts",
-      "default": "./narration.js"
+      "default": "./dist/narration.js"
     },
     "./narration-html": {
       "types": "./narrationHtml.d.ts",
-      "default": "./narrationHtml.js"
+      "default": "./dist/narrationHtml.js"
     },
     "./narration.css": "./narration.css",
     "./voice": {
       "types": "./voice.d.ts",
-      "default": "./voice.js"
+      "default": "./dist/voice.js"
     },
     "./video": {
       "types": "./video.d.ts",
-      "default": "./video.js"
+      "default": "./dist/video.js"
     },
     "./pptx": {
       "types": "./pptx.d.ts",
-      "default": "./pptx.js"
+      "default": "./dist/pptx.js"
     },
     "./storydeck.css": "./storydeck.css",
     "./deck-stage.js": "./site/public/deck-stage.js"
   },
   "files": [
-    "/*.js",
-    "/*.jsx",
+    "dist",
     "/*.d.ts",
     "/*.css",
-    "content",
     "site/public/deck-stage.js",
     "plugin",
     "README.md",
     "CHANGELOG.md",
-    "LICENSE",
-    "!*.test.js",
-    "!*.test.jsx",
-    "!vitest.config.js",
-    "!vitest.setup.js"
+    "LICENSE"
   ],
   "scripts": {
+    "build": "node build.mjs",
+    "check:dist": "node scripts/check-dist.mjs",
+    "prepack": "npm run build",
     "test": "vitest run",
     "test:cov": "vitest run --coverage"
   },
@@ -118,6 +115,7 @@
     "@testing-library/user-event": "^14.6.1",
     "@vitejs/plugin-react": "^5.0.4",
     "@vitest/coverage-v8": "^4.1.9",
+    "esbuild": "^0.28.2",
     "footprintjs": "^10.0.0",
     "jsdom": "^29.1.1",
     "react": "^19.0.0",

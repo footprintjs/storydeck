@@ -5,3 +5,4 @@ coverage/
 site/.next/
 site/out/
 site/node_modules/
+dist/

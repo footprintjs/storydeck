@@ -19,4 +19,6 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg   # the real-ffmpeg video test runs on CI, never skips
       - run: npm ci
       - run: npm run test:cov
+      - run: npm run build          # the compiled dist/ the package ships (prepack builds it again for npm pack)
+      - run: npm run check:dist     # every door loads in plain Node; no source JSX in the package
       - run: npx publint

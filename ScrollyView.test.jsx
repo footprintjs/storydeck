@@ -93,3 +93,88 @@ describe('ScrollyView — a live figure', () => {
     expect(container.querySelectorAll('.scrolly-beat-figure .slide-figure')).toHaveLength(4);
   });
 });
+
+// ── a StoryFigure (a section's `figure` as `{ mount, seek, dispose }`) ───────
+describe('ScrollyView — a StoryFigure', () => {
+  /** A figure that draws by hand and answers each seek with what `answer(beat)` says. */
+  function storyFigure(answer = () => undefined) {
+    const calls = [];
+    const figure = {
+      mount: vi.fn((el) => { calls.push('mount'); el.textContent = 'drawn by hand'; }),
+      seek: vi.fn((beat) => { calls.push(`seek ${beat.sectionKey}/${beat.step}`); return answer(beat); }),
+      dispose: vi.fn(() => calls.push('dispose')),
+    };
+    return { figure, calls };
+  }
+  const withFigure = (figure, second = figure) => [
+    { key: 'one', label: 'A', heading: 'First', steps: ['<section>a1</section>', '<section>a2</section>'], body: '<p>alpha</p>', figure },
+    { key: 'two', label: 'B', heading: 'Second', steps: ['<section>b1</section>'], body: '', figure: second },
+  ];
+  const beatTo = async (i) => {
+    const io = global.__iobs[global.__iobs.length - 1];
+    await act(async () => io.cb([{ isIntersecting: true, target: io.els[i] }]));
+  };
+
+  it('mounts it ONCE into a plain element in the stage and seeks the first beat with plain data', async () => {
+    const { figure, calls } = storyFigure();
+    const { container } = render(<ScrollyView sections={withFigure(figure)} />);
+    await act(async () => {});
+    const el = container.querySelector('.scrolly-stage .scrolly-stage-live .scrolly-figure');
+    expect(el).toHaveTextContent('drawn by hand');
+    expect(figure.mount).toHaveBeenCalledWith(el);
+    expect(container.querySelector('.scrolly-stage .slide-figure')).toBeNull(); // never under the canvas transform
+    expect(container.querySelector('.scrolly.scrolly-live')).toBeTruthy();
+    expect(figure.seek).toHaveBeenCalledWith({ key: 'one-0', index: 0, sectionKey: 'one', step: 0 });
+    await beatTo(2);
+    expect(figure.seek).toHaveBeenLastCalledWith({ key: 'two-0', index: 2, sectionKey: 'two', step: 0 });
+    expect(calls).toEqual(['mount', 'seek one/0', 'seek two/0']); // moved, never remounted
+  });
+
+  it('prints the figure\'s refusal under it, verbatim, and clears it once a seek lands', async () => {
+    const { figure } = storyFigure((beat) => Promise.resolve(beat.sectionKey === 'two' ? 'cannot stand on two' : undefined));
+    const { container, queryByRole } = render(<ScrollyView sections={withFigure(figure)} />);
+    await act(async () => {});
+    expect(queryByRole('status')).toBeNull();
+    await beatTo(2);
+    expect(container.querySelector('.scrolly-figure-said')).toHaveTextContent('cannot stand on two');
+    expect(queryByRole('status')).toHaveTextContent('cannot stand on two');
+    await beatTo(1);
+    expect(queryByRole('status')).toBeNull();
+  });
+
+  it('never lets an older seek\'s answer write over a newer one', async () => {
+    const pending = [];
+    const { figure } = storyFigure(() => new Promise((resolve) => pending.push(resolve)));
+    const { queryByRole } = render(<ScrollyView sections={withFigure(figure)} />);
+    await act(async () => {});
+    await beatTo(1); // a newer seek, while the first is in flight
+    await act(async () => pending[0]('stale'));
+    expect(queryByRole('status')).toBeNull();
+    await act(async () => pending[1]('current'));
+    expect(queryByRole('status')).toHaveTextContent('current');
+  });
+
+  it('says so in its own words when a seek rejects or throws', async () => {
+    const { figure } = storyFigure((beat) => {
+      if (beat.index === 0) return Promise.reject(new Error('offline'));
+      throw new Error('broken');
+    });
+    const { queryByRole } = render(<ScrollyView sections={withFigure(figure)} />);
+    await act(async () => {});
+    expect(queryByRole('status')).toHaveTextContent('this figure could not move to this beat');
+    await beatTo(1);
+    expect(queryByRole('status')).toHaveTextContent('this figure could not move to this beat');
+  });
+
+  it('disposes it when the lens goes, and swaps figures between sections that carry different ones', async () => {
+    const a = storyFigure();
+    const b = storyFigure();
+    const { unmount } = render(<ScrollyView sections={withFigure(a.figure, b.figure)} />);
+    await act(async () => {});
+    await beatTo(2);
+    expect(a.calls).toEqual(['mount', 'seek one/0', 'dispose']);
+    expect(b.calls).toEqual(['mount', 'seek two/0']);
+    unmount();
+    expect(b.calls).toEqual(['mount', 'seek two/0', 'dispose']);
+  });
+});
