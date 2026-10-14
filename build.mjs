@@ -29,9 +29,10 @@ const SOURCES = ['', 'content'].flatMap((dir) =>
 function compiledSpecifier(fromFile, spec) {
   if (!spec.startsWith('./') && !spec.startsWith('../')) return spec;
   if (spec.endsWith('.jsx')) return spec.slice(0, -1);
-  if (path.extname(spec) !== '') return spec;
   const base = path.join(ROOT, path.dirname(fromFile), spec);
+  // what the source names first, so `./a.b` (a file `a.b.js`) is never mistaken for one with an extension
   if (existsSync(`${base}.js`) || existsSync(`${base}.jsx`)) return `${spec}.js`;
+  if (path.extname(spec) === '.js' && existsSync(base)) return spec;
   throw new Error(`${fromFile}: cannot resolve "${spec}" to a source file`);
 }
 
