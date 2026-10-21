@@ -523,6 +523,12 @@ describe('focus · the camera: zoom goes with a mover', () => {
       expect(() => focusStep(null, { in: ['*'], on: ['core'], quiet: true, focus: `zoom ${side}` }, fig))
         .toThrow(new RegExp(`"zoom" closes in on the subject, and "${side}" keeps the context in view beside it — together they push the context off the slide: keep one, and give the other a click of its own`));
     }
+    // refused by what the mover is, not by what it did on this click: with nothing greyed it still keeps a context's place
+    expect(() => focusStep(null, { in: ['*'], focus: 'zoom left' }, fig)).toThrow(/"zoom" closes in on the subject, and "left" keeps the context in view/);
+    // a deck's own mover may move the context and go with a camera, unless it says it cannot
+    const shrink = { kind: 'mover', place: ({ context }) => (context ? { context: { o: [context.x, context.y], s: 0.5, t: [0, 0] } } : {}) };
+    expect(focusStep(null, { in: ['*'], on: ['core'], quiet: true, focus: 'zoom shrink' }, { ...fig, strategies: { shrink } }).look.strategies).toEqual(['zoom', 'shrink']);
+    expect(() => focusStep(null, { in: ['*'], on: ['core'], quiet: true, focus: 'zoom beside' }, { ...fig, strategies: { beside: { ...shrink, withCamera: false } } })).toThrow(/"beside" keeps the context in view/);
     // a side mover alone, and a zoom alone, are both as before
     expect(focusStep(null, { in: ['*'], on: ['core'], quiet: true, focus: 'left' }, fig).look.strategies).toEqual(['left']);
   });

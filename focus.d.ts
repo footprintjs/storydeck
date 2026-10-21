@@ -39,6 +39,10 @@ export interface FocusClick {
 /** A group move: a point p goes to o + s·(p − o) + t (map px). */
 export interface FocusGroup { readonly o: readonly [number, number]; readonly s: number; readonly t: readonly [number, number] }
 
+/**
+ * What a strategy sees of its click. A mover sees the boxes where the pieces are drawn; a camera sees them where the
+ * click's mover leaves them (each piece moved by its group), so it frames the click's end.
+ */
 export interface FocusContext {
   /** The lit pieces' box, and the greyed pieces' box (map px); null when there are none. */
   readonly subject: FocusBox | null;
@@ -74,7 +78,10 @@ export interface FocusSpring { readonly stagger: number }
 export type FocusStrategy =
   | { readonly name?: string; readonly kind: 'look'; readonly look: 'grey' | 'hide' | 'keep' }
   | { readonly name?: string; readonly kind: 'camera'; place(ctx: FocusContext): { stage?: FocusGroup } }
-  | { readonly name?: string; readonly kind: 'mover'; place(ctx: FocusContext): { stage?: FocusGroup; subject?: FocusGroup; context?: FocusGroup; groups?: { names: readonly string[]; g: FocusGroup | null }[]; spring?: FocusSpring } }
+  | { readonly name?: string; readonly kind: 'mover';
+      /** false: it keeps the context in view beside the subject, so a click with a camera too is refused (left/right/up/down). */
+      readonly withCamera?: boolean;
+      place(ctx: FocusContext): { stage?: FocusGroup; subject?: FocusGroup; context?: FocusGroup; groups?: { names: readonly string[]; g: FocusGroup | null }[]; spring?: FocusSpring } }
   | { readonly name?: string; readonly kind: 'overlay'; cover(ctx: { subjectOnSlide: FocusBox | null; canvas: { w: number; h: number }; options: Readonly<Record<string, unknown>> }): { rects: number[][]; label?: string; out?: number[][] } | null }
   | { readonly name?: string; readonly kind: 'order'; route(ctx: { names: readonly string[]; options: Readonly<Record<string, unknown>> }): FocusRoute };
 
