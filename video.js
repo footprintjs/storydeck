@@ -187,20 +187,46 @@ async function render({ url, plan, out, name, driver, run, fps, maxEntrance, cha
 }
 
 /**
+ * How a browser runs a page it must keep off the network (deckStageDriver's `offline`), in layers, since no one of
+ * them stops everything: no name resolves (no DNS leaves the machine), WebRTC sends no UDP of its own, the browser does
+ * no background networking; the page's context is offline with service workers blocked; the context's route refuses
+ * every request that is not the page's own file or inline data — for every page of the context, popups included — and
+ * its WebSockets are closed; and any other page the deck opens is closed at once.
+ */
+export const OFFLINE = Object.freeze({
+  args: Object.freeze(['--host-resolver-rules=MAP * ~NOTFOUND', '--force-webrtc-ip-handling-policy=disable_non_proxied_udp',
+    '--disable-background-networking', '--no-pings']),
+  context: Object.freeze({ offline: true, serviceWorkers: 'block' }),
+});
+
+/** The requests an offline page may make: its own file (`page`, without its #fragment) and what it carries inline. */
+export function offlineAllows(page, url) {
+  const strip = (u) => u.split('#')[0];
+  return /^(data|blob|about):/.test(url) || strip(url) === strip(page);
+}
+
+/**
  * The driver for storydeck's <deck-stage> pages, with Playwright (pass its `chromium`). A click is made
  * forward — a jump to the click before it, then one step on — and `hide` keeps the room's chrome out of
- * the frame (the deck's toolbar always; key hints and panels by selector). `offline` refuses every request that
- * is not the page's own file or inline data (the layout check measures a deck that way).
+ * the frame (the deck's toolbar always; key hints and panels by selector). `offline` keeps the page off the network
+ * (OFFLINE: it loads only its own file and inline data — the layout check measures a deck that way).
  */
 export function deckStageDriver({ chromium, executablePath, viewport = { width: 1920, height: 1080 }, hide = ['.fs-btn', '.notes-panel', '.train-panel'], offline = false }) {
   let browser, page;
   const settle = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   return {
     async open(url) {
-      browser = await chromium.launch(executablePath ? { executablePath } : {});
-      page = await browser.newPage({ viewport, reducedMotion: 'no-preference' });
-      // offline: the page loads only itself (a file, and what it carries inline); any network request is refused
-      if (offline) await page.route('**/*', (route) => (/^(file|data|blob|about):/.test(route.request().url()) ? route.continue() : route.abort()));
+      browser = await chromium.launch({ ...(executablePath ? { executablePath } : {}), ...(offline ? { args: [...OFFLINE.args] } : {}) });
+      if (offline) {
+        const context = await browser.newContext({ viewport, reducedMotion: 'no-preference', ...OFFLINE.context });
+        await context.route('**/*', (route) => (offlineAllows(url, route.request().url()) ? route.continue() : route.abort()));
+        if (typeof context.routeWebSocket !== 'function') throw new Error('offline needs Playwright 1.48 or newer (context.routeWebSocket closes WebSockets)');
+        await context.routeWebSocket(/.*/, (ws) => ws.close());
+        page = await context.newPage();
+        context.on('page', (other) => { if (other !== page) other.close().catch(() => {}); });   // a popup the deck opens
+      } else {
+        page = await browser.newPage({ viewport, reducedMotion: 'no-preference' });
+      }
       await page.goto(url);
       await page.waitForFunction(() => customElements.get('deck-stage') && document.querySelector('deck-stage')?.shadowRoot && document.fonts.status === 'loaded');
       if (hide.length) await page.addStyleTag({ content: `${hide.join(',')}{display:none!important}` });

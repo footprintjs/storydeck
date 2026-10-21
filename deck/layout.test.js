@@ -39,24 +39,60 @@ describe('layoutCheck', () => {
     expect(driver.close).toHaveBeenCalled();
   });
 
-  it('builds the deck-stage driver from a chromium when no driver is given — offline: only the page itself loads', async () => {
-    const page = {goto: vi.fn(), waitForFunction: vi.fn(), addStyleTag: vi.fn(), route: vi.fn(), evaluate: vi.fn(async (fn) => (fn === measureSlide ? [] : undefined))};
-    const chromium = {launch: vi.fn(async () => ({newPage: async () => page, close: vi.fn()}))};
-    expect(await layoutCheck('u', {clicks: clicks.slice(0, 2), chromium})).toEqual([]);
-    expect(page.evaluate.mock.calls.filter(([fn]) => fn === measureSlide)).toHaveLength(2);
-    expect(page.route).toHaveBeenCalledWith('**/*', expect.any(Function));
-    expect(page.route.mock.invocationCallOrder[0]).toBeLessThan(page.goto.mock.invocationCallOrder[0]);
-    const handler = page.route.mock.calls[0][1];
+  it('closes the browser when the page never comes up', async () => {
+    const driver = {open: vi.fn(async () => { throw new Error('Timeout'); }), close: vi.fn(), measure: vi.fn()};
+    await expect(layoutCheck('u', {clicks, driver})).rejects.toThrow('Timeout');
+    expect(driver.close).toHaveBeenCalled();
+    expect(driver.measure).not.toHaveBeenCalled();
+  });
+
+  it('runs the page offline when it makes the driver: no names resolve, the context is offline and routed, WebSockets and popups closed', async () => {
+    const pageEvents = {};
+    const page = {goto: vi.fn(), waitForFunction: vi.fn(), addStyleTag: vi.fn(), evaluate: vi.fn(async (fn) => (fn === measureSlide ? [] : undefined))};
+    const context = {route: vi.fn(), routeWebSocket: vi.fn(), newPage: vi.fn(async () => page), on: vi.fn((name, fn) => { pageEvents[name] = fn; })};
+    const browser = {newContext: vi.fn(async () => context), newPage: vi.fn(), close: vi.fn()};
+    const chromium = {launch: vi.fn(async () => browser)};
+    expect(await layoutCheck('file:///tmp/deck/index.html', {clicks: clicks.slice(0, 2), chromium})).toEqual([]);
+    expect(chromium.launch.mock.calls[0][0].args).toEqual(expect.arrayContaining(['--host-resolver-rules=MAP * ~NOTFOUND', '--force-webrtc-ip-handling-policy=disable_non_proxied_udp']));
+    expect(browser.newContext).toHaveBeenCalledWith(expect.objectContaining({offline: true, serviceWorkers: 'block'}));
+    expect(browser.newPage).not.toHaveBeenCalled();
+    expect(context.route).toHaveBeenCalledWith('**/*', expect.any(Function));
+    expect(context.routeWebSocket).toHaveBeenCalledWith(/.*/, expect.any(Function));
+    expect(context.route.mock.invocationCallOrder[0]).toBeLessThan(page.goto.mock.invocationCallOrder[0]);
+    const handler = context.route.mock.calls[0][1];
     const request = (url) => ({request: () => ({url: () => url}), continue: vi.fn(), abort: vi.fn()});
-    for (const [url, allowed] of [['file:///tmp/deck/index.html', true], ['data:image/png;base64,x', true], ['https://example.com/x', false], ['http://169.254.169.254/', false], ['ws://localhost:1', false]]) {
+    for (const [url, allowed] of [['file:///tmp/deck/index.html', true], ['file:///tmp/deck/index.html#4', true], ['data:image/png;base64,x', true],
+      ['file:///etc/passwd', false], ['https://example.com/x', false], ['http://169.254.169.254/', false]]) {
       const r = request(url);
       handler(r);
       expect([url, r.continue.mock.calls.length, r.abort.mock.calls.length]).toEqual([url, allowed ? 1 : 0, allowed ? 0 : 1]);
     }
+    const ws = {close: vi.fn()};
+    context.routeWebSocket.mock.calls[0][1](ws);
+    expect(ws.close).toHaveBeenCalled();
+    const popup = {close: vi.fn(async () => {})};
+    pageEvents.page(popup);
+    pageEvents.page(page);
+    expect(popup.close).toHaveBeenCalled();
+    expect(page.close).toBeUndefined();
+    expect(page.evaluate.mock.calls.filter(([fn]) => fn === measureSlide)).toHaveLength(2);
+  });
+
+  it('refuses to go offline with a Playwright that cannot close WebSockets', async () => {
+    const context = {route: vi.fn(), newPage: vi.fn(), on: vi.fn()};
+    const chromium = {launch: async () => ({newContext: async () => context, close: vi.fn()})};
+    await expect(layoutCheck('u', {clicks, chromium})).rejects.toThrow(/offline needs Playwright 1.48 or newer/);
   });
 
   it('finds no chromium where playwright-core is not installed beside StoryDeck', async () => {
-    expect(await findChromium()).toBeNull();
+    expect(await findChromium()).toEqual({chromium: null, why: null});
+  });
+
+  it('loads nothing when StoryDeck itself runs from inside the deck folder (that node_modules is the deck\'s)', async () => {
+    const {realpathSync} = await import('node:fs');
+    const {packageRoot} = await import('./assets.js');
+    const around = (await import('node:path')).default.dirname(realpathSync(packageRoot()));
+    expect(await findChromium({deckRoot: around})).toEqual({chromium: null, why: expect.stringMatching(/StoryDeck is running from inside the deck folder/)});
   });
 
   it('never loads Playwright from the folder you run in (a deck someone sent you, or the folder around it)', async () => {
@@ -71,7 +107,7 @@ describe('layoutCheck', () => {
     const before = process.cwd();
     process.chdir(deck);
     try {
-      expect(await findChromium()).toBeNull();
+      expect((await findChromium()).chromium).toBeNull();
     } finally {
       process.chdir(before);
     }

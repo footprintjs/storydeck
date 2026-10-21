@@ -39,14 +39,21 @@ export function presence(full) {
   return existsSync(full) ? 'present' : 'dangling';
 }
 
+/** Why a real path is not a place of the deck's own — outside the folder, or hidden inside it — or null when it is. */
+function notDeckPlace(root, real) {
+  if (!isInside(root, real)) return 'outside';
+  return path.relative(root, real).split(path.sep).some(hidden) ? 'hidden' : null;
+}
+
 /**
  * Where a deck file really is, refused when its real path leaves the deck folder or is hidden inside it — so a deck
  * cannot pull a file from elsewhere on your machine (or its own .env) into its page, its review or its server.
  */
 export function realInside(root, full, name) {
   const real = realpathSync(full);
-  if (!isInside(root, real)) throw new Error(`${name} is a link to a file outside the deck folder — a deck reads only its own files`);
-  if (path.relative(root, real).split(path.sep).some(hidden)) throw new Error(`${name} is a link to a hidden file — a deck never reads hidden files (.env and the like)`);
+  const why = notDeckPlace(root, real);
+  if (why === 'outside') throw new Error(`${name} is a link to a file outside the deck folder — a deck reads only its own files`);
+  if (why === 'hidden') throw new Error(`${name} is a link to a hidden file — a deck never reads hidden files (.env and the like)`);
   return real;
 }
 
@@ -75,13 +82,18 @@ export function servedFile(root, pathname) {
  */
 export function writeInside(root, file, text, {chosen = false} = {}) {
   const name = path.relative(root, file) || file;
-  const outside = `${name} would land outside the deck folder (a folder on the way is a link) — the build writes only inside the deck`;
+  // a file deck.json names lands in a place of the deck's own: inside it and not hidden (a link into .git is refused)
+  const refuse = (dir) => {
+    const why = chosen ? null : notDeckPlace(root, realpathSync(dir));
+    if (why === 'outside') throw new Error(`${name} would land outside the deck folder (a folder on the way is a link) — the build writes only inside the deck`);
+    if (why === 'hidden') throw new Error(`${name} would land in a hidden folder (a folder on the way is a link to one) — the build never writes hidden files`);
+  };
   let existing = path.dirname(file);
   while (presence(existing) === 'missing') existing = path.dirname(existing);
   if (presence(existing) === 'dangling') throw new Error(`${path.relative(root, existing) || existing} is a link to nothing — the build cannot write through it`);
-  if (!chosen && !isInside(root, realpathSync(existing))) throw new Error(outside);
+  refuse(existing);   // before any folder is made
   mkdirSync(path.dirname(file), {recursive: true});
-  if (!chosen && !isInside(root, realpathSync(path.dirname(file)))) throw new Error(outside);
+  refuse(path.dirname(file));
   if (presence(file) !== 'missing' && lstatSync(file).isSymbolicLink()) {
     throw new Error(`${name} is a link — the build writes a file, never through a link (remove the link, or build to another --out)`);
   }

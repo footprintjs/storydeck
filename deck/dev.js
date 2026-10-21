@@ -14,7 +14,7 @@
 //   · a request it cannot read is answered 400; nothing a request sends can stop the server.
 // A deck's own HTML runs in the page, as any page you open does: serve decks you trust.
 import http from 'node:http';
-import {watch, createReadStream} from 'node:fs';
+import {watch, createReadStream, readdirSync, lstatSync} from 'node:fs';
 import path from 'node:path';
 import {deckHtml} from './build.js';
 import {devClient} from './devClient.js';
@@ -31,6 +31,28 @@ const TYPES = {
 const SAFE = {'x-content-type-options': 'nosniff', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'cross-origin-resource-policy': 'same-origin'};
 const LOOPBACK = ['127.0.0.1', '::1', 'localhost'];
 const IGNORED = /(^|[\\/])(node_modules|\.[^\\/]*)([\\/]|$)/;   // dependencies and hidden files (.git, editor swap files)
+
+/**
+ * The deck folder's stamp: every file it holds (not hidden, not a dependency, not its own output) with its size and
+ * time. A file watcher can miss a save (some disks, a busy machine); comparing stamps once a second never does.
+ */
+export function folderStamp(root, outputs = []) {
+  const lines = [];
+  const walk = (dir, rel) => {
+    let names;
+    try { names = readdirSync(dir).sort(); } catch { return; }
+    for (const name of names) {
+      const r = rel ? `${rel}/${name}` : name;
+      if (IGNORED.test(r) || outputs.includes(r)) continue;
+      let st;
+      try { st = lstatSync(path.join(dir, name)); } catch { continue; }
+      if (st.isDirectory()) walk(path.join(dir, name), r);
+      else lines.push(`${r} ${st.size} ${st.mtimeMs}`);
+    }
+  };
+  walk(root, '');
+  return lines.join('\n');
+}
 
 /** The page shown before the deck has ever built: the dev client alone, which shows why and reloads once it builds. */
 const waitingPage = () => `<!doctype html>
@@ -64,18 +86,20 @@ function listen(server, port, host, tries) {
 
 /**
  * Serve a deck folder for editing. Options: port (4321; the next free one is taken), host (127.0.0.1, ::1 or localhost
- * — loopback only, anything else is refused), watch (true), log (a line per build). Returns {url, port, close(),
- * rebuild(), state()}.
+ * — loopback only, anything else is refused), watch (true: a save rebuilds at once), poll (1000 ms: and the folder's
+ * stamp is compared that often, so a save the watcher missed still rebuilds; 0 turns it off), log (a line per build).
+ * Returns {url, port, close(), rebuild(), state()}.
  */
-export async function serveDeck(dir, {port = 4321, host = '127.0.0.1', watch: watching = true, log = () => {}, tries = 20} = {}) {
+export async function serveDeck(dir, {port = 4321, host = '127.0.0.1', watch: watching = true, poll = 1000, log = () => {}, tries = 20} = {}) {
   if (!LOOPBACK.includes(host)) throw new Error(`storydeck dev listens on this machine only (${LOOPBACK.join(', ')}), not on ${host}`);
   const root = deckRoot(dir);
-  let version = 0, page = null, problem = null, outputs = ['index.html'];
+  let version = 0, page = null, problem = null, outputs = ['index.html'], stamp = null;
   const clients = new Set();
   const send = (event, data) => { for (const res of clients) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
 
   const rebuild = () => {
     const t0 = performance.now();
+    stamp = folderStamp(root, outputs);   // what this build read: a later stamp that differs is a save
     try {
       const {compiled, html} = deckHtml(root, {dev: {client: devClient, version: version + 1}});
       version += 1;
@@ -93,7 +117,11 @@ export async function serveDeck(dir, {port = 4321, host = '127.0.0.1', watch: wa
   };
   rebuild();
 
-  let timer = null, watcher = null;
+  let timer = null, watcher = null, poller = null;
+  if (poll > 0) {
+    poller = setInterval(() => { if (folderStamp(root, outputs) !== stamp) rebuild(); }, poll);
+    poller.unref();
+  }
   if (watching) {
     watcher = watch(root, {recursive: true}, (_, file) => {
       const name = file ? String(file).replace(/\\/g, '/') : null;
@@ -148,6 +176,7 @@ export async function serveDeck(dir, {port = 4321, host = '127.0.0.1', watch: wa
     state: () => ({version, problem}),
     close: () => new Promise((resolve) => {
       clearTimeout(timer);
+      clearInterval(poller);
       clearInterval(keepAlive);
       watcher?.close();
       for (const res of clients) res.end();

@@ -17,20 +17,26 @@ export const styleSafe = (css) => String(css).replace(/<\/(style)/gi, '<\\/$1');
  * another, is refused naming it. Returns [{attrs, inner, start, end}] (end is past the closing tag).
  */
 export function elements(html, tag) {
-  const open = new RegExp(`<${tag}\\b`, 'gi'), close = `</${tag}>`, lower = html.toLowerCase();
+  // Both searches run on the text itself: a lower-cased copy can be longer (İ becomes two code units), and its
+  // positions would no longer be the text's.
+  const open = new RegExp(`<${tag}\\b`, 'gi'), shutter = closing(tag), close = `</${tag}>`;
   const out = [];
   for (let m = open.exec(html); m; m = open.exec(html)) {
     const tagEnd = html.indexOf('>', m.index);
     if (tagEnd < 0) throw new Error(`a <${tag}> tag is never finished: "${html.slice(m.index, m.index + 60)}" — end it with ">"`);
     const attrs = html.slice(m.index + tag.length + 1, tagEnd);
-    const shut = lower.indexOf(close, tagEnd + 1);
+    shutter.lastIndex = tagEnd + 1;
+    const shut = shutter.exec(html);
     const opening = `<${tag}${attrs}>`;
-    if (shut < 0) throw new Error(`${opening.slice(0, 80)} is never closed — end it with ${close}`);
+    if (!shut) throw new Error(`${opening.slice(0, 80)} is never closed — end it with ${close}`);
     open.lastIndex = tagEnd + 1;
     const next = open.exec(html);
-    if (next && next.index < shut) throw new Error(`${opening.slice(0, 80)} is not closed before the next <${tag}> — end it with ${close} (they do not nest)`);
-    out.push({attrs, inner: html.slice(tagEnd + 1, shut), start: m.index, end: shut + close.length});
-    open.lastIndex = shut + close.length;
+    if (next && next.index < shut.index) throw new Error(`${opening.slice(0, 80)} is not closed before the next <${tag}> — end it with ${close} (they do not nest)`);
+    out.push({attrs, inner: html.slice(tagEnd + 1, shut.index), start: m.index, end: shut.index + shut[0].length});
+    open.lastIndex = shut.index + shut[0].length;
   }
   return out;
 }
+
+/** A tag's closing tag in any case (`</STEP >` too): a search over the text itself, from its lastIndex. */
+export const closing = (tag) => new RegExp(`</${tag}\\s*>`, 'gi');

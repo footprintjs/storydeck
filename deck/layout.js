@@ -2,22 +2,29 @@
 // It drives the built page through the video's browser port (video.js · deckStageDriver · measure), one click at a
 // time as it settles, offline. Optional: it needs Playwright installed beside StoryDeck (`npm i -D footprint-storydeck
 // playwright-core`, then `npx playwright-core install chromium`); without it the check says so and the others run.
+import {realpathSync} from 'node:fs';
 import {deckStageDriver} from '../video.js';
+import {packageRoot} from './assets.js';
+import {isInside} from './paths.js';
 
 const PLAYWRIGHT = 'playwright-core';   // an optional dependency: named, never imported until a layout check asks
 
 /**
- * Playwright's chromium, found the way StoryDeck finds its own dependencies — beside it, where it is installed — or
- * null when it is not there. Never from the deck's folder or the folder you run in: those may hold files someone sent
- * you, and a module found there would run as you. Loading a package installed beside StoryDeck trusts nothing more
- * than StoryDeck itself, which is already running.
+ * Playwright's chromium, found the way StoryDeck finds its own dependencies — beside it, where it is installed: {chromium}
+ * or {chromium: null, why}. Never from the deck's folder or the folder you run in: those may hold files someone sent
+ * you, and a module found there would run as you. Loading a package installed beside StoryDeck trusts nothing more than
+ * StoryDeck itself, which is already running — unless StoryDeck is running from inside the deck (`deckRoot`), whose
+ * node_modules is the deck's, not yours: then nothing is loaded.
  */
-export async function findChromium() {
+export async function findChromium({deckRoot = null} = {}) {
+  if (deckRoot !== null && isInside(deckRoot, realpathSync(packageRoot()))) {
+    return {chromium: null, why: 'StoryDeck is running from inside the deck folder — run it from your own project, naming the deck'};
+  }
   try {
     const mod = await import(/* @vite-ignore */ PLAYWRIGHT);
-    return mod?.chromium ?? mod?.default?.chromium ?? null;
+    return {chromium: mod?.chromium ?? mod?.default?.chromium ?? null, why: null};
   } catch {
-    return null;
+    return {chromium: null, why: null};
   }
 }
 
@@ -62,8 +69,8 @@ export function layoutProblems(found, clicks) {
 export async function layoutCheck(url, {clicks, driver, chromium}) {
   const port = driver ?? deckStageDriver({chromium, offline: true});   // the page is whole; it needs no network
   const found = [];
-  await port.open(url);
   try {
+    await port.open(url);   // inside the try: a page that never comes up still closes its browser
     for (let n = 1; n <= clicks.length; n++) for (const f of await port.measure(n)) found.push({n, ...f});
   } finally {
     await port.close();

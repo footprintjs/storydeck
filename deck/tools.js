@@ -9,6 +9,7 @@ import {loadDeck, buildDeck, deckHtml} from './build.js';
 import {outline, reviewClick} from './review.js';
 import {checkDeck, failure, formatProblems} from './check.js';
 import {findChromium, layoutCheck} from './layout.js';
+import {deckRoot} from './paths.js';
 
 const kb = (n) => `${Math.round(n / 1024)} KB`;
 
@@ -40,15 +41,22 @@ export async function checkTool(dir, {layout = false, chromium} = {}) {
   const problems = checkDeck(compiled);
   let note = '';
   if (layout) {
-    const browser = chromium ?? (await findChromium());   // beside StoryDeck only: never from the deck or the folder you run in
+    // beside StoryDeck only: never from the deck or the folder you run in, nor from a StoryDeck inside the deck
+    const found = chromium ? {chromium, why: null} : await findChromium({deckRoot: deckRoot(dir)});
+    const browser = found.chromium;
     if (!browser) {
-      note = '\nlayout not checked: it needs Playwright installed beside StoryDeck — npm i -D footprint-storydeck playwright-core, then npx playwright-core install chromium';
+      note = `\nlayout not checked: ${found.why ?? 'it needs Playwright installed beside StoryDeck — npm i -D footprint-storydeck playwright-core, then npx playwright-core install chromium'}`;
     } else {
       const work = mkdtempSync(path.join(tmpdir(), 'storydeck-layout-'));
       try {
         const file = path.join(work, 'index.html');
         writeFileSync(file, deckHtml(dir).html);
-        problems.push(...(await layoutCheck(pathToFileURL(file).href, {clicks: compiled.clicks, chromium: browser})));
+        try {
+          problems.push(...(await layoutCheck(pathToFileURL(file).href, {clicks: compiled.clicks, chromium: browser})));
+        } catch (e) {
+          problems.push({level: 'error', rule: 'layout', click: null, label: null,
+            message: `the layout check stopped: ${e.message.split('\n')[0]} — the page did not settle in the browser (a script in the deck may navigate away or keep it busy)`});
+        }
       } finally {
         rmSync(work, {recursive: true, force: true});
       }

@@ -20,7 +20,8 @@
   starter that builds and checks clean.
 - **A deck is files, never a program — on your machine.** No deck code runs in Node; Playwright, for the layout check,
   is loaded only from beside StoryDeck (never from the deck folder or the folder you run in), and the page is measured
-  offline (`deckStageDriver({offline: true})`). A deck reads only its own files: a link out of the
+  offline (`deckStageDriver({offline: true})`: no name resolves, the context is offline and routed to the page's own
+  file, WebSockets and popups closed; Playwright 1.48 or newer). A deck reads only its own files: a link out of the
   folder, or to a hidden file, is refused. A build renames a new file into place (never writing through a link) and a
   file deck.json names never lands outside the deck; `--out` writes where you say. The dev server is loopback-only and
   survives any request; the MCP server reaches only decks inside the folder it was started with. A deck's own HTML still

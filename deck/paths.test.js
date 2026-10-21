@@ -66,6 +66,15 @@ describe('paths', () => {
     expect(readFileSync(path.join(root, 'index.html'), 'utf8')).toBe('page');
   });
 
+  it('never writes into a hidden folder through a link inside the deck (site -> .git)', () => {
+    const {root} = folder();
+    mkdirSync(path.join(root, '.git'));
+    writeFileSync(path.join(root, '.git', 'config'), '[core]');
+    symlinkSync(path.join(root, '.git'), path.join(root, 'site'));
+    expect(() => writeInside(root, path.join(root, 'site', 'config'), 'page')).toThrow(/would land in a hidden folder/);
+    expect(readFileSync(path.join(root, '.git', 'config'), 'utf8')).toBe('[core]');
+  });
+
   it('refuses a link at the name, a dangling folder link on the way, and a folder link that leaves the deck', () => {
     const {root, outside} = folder();
     symlinkSync(outside, path.join(root, 'index.html'));

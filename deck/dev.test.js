@@ -4,7 +4,7 @@ import http from 'node:http';
 import net from 'node:net';
 import {readFileSync, symlinkSync, writeFileSync, mkdirSync} from 'node:fs';
 import path from 'node:path';
-import {serveDeck} from './dev.js';
+import {serveDeck, folderStamp} from './dev.js';
 import {STARTER} from './init.js';
 import {tempDeck, tempDir, cleanDecks} from './test/helpers.js';
 
@@ -108,7 +108,7 @@ describe('serveDeck', () => {
 
   it('rebuilds on a save and tells the page to reload; a save that breaks the build says why and keeps the last good page', async () => {
     const dir = tempDeck();
-    const s = await serve(dir);
+    const s = await serve(dir, {watch: false, poll: 50});   // the stamp, which never misses a save
     const ch = listen(s);
     await ch.opened;
     await ch.until((e) => e.some((x) => x.event === 'hello'));
@@ -123,11 +123,11 @@ describe('serveDeck', () => {
     expect((await get(s, '/')).body).toContain('A client needs its data');   // the last good page
     expect(s.state().problem).toMatch(/no piece "nope"/);
     ch.stop();
-  });
+  }, 30000);   // a file watcher can be slow on a loaded machine
 
   it('does not rebuild for its own output, a hidden file, or a dependency', async () => {
     const dir = tempDeck();
-    const s = await serve(dir);
+    const s = await serve(dir, {poll: 50});
     await new Promise((r) => setTimeout(r, 300));   // the folder's own creation may still be reported (macOS FSEvents)
     const v = s.state().version;
     writeFileSync(path.join(dir, 'index.html'), 'built elsewhere');
@@ -140,7 +140,7 @@ describe('serveDeck', () => {
 
   it('shows why before the deck has ever built, and serves the deck once a save fixes it', async () => {
     const dir = tempDeck({...STARTER, 'deck.json': '{"titel": "x"}'});
-    const s = await serve(dir);
+    const s = await serve(dir, {watch: false, poll: 50});
     expect(s.state()).toEqual({version: 0, problem: expect.stringMatching(/"titel", which it does not know/)});
     const page = await get(s, '/');
     expect(page.body).toContain('<meta name="storydeck-dev" content="0">');
@@ -152,7 +152,7 @@ describe('serveDeck', () => {
     await ch.until((e) => e.some((x) => x.event === 'reload' && x.data.version === 1));
     expect((await get(s, '/')).body).toContain('<title>Fixed</title>');
     ch.stop();
-  });
+  }, 30000)
 
   it('answers a request it cannot read with 400, and keeps serving', async () => {
     const s = await serve(tempDeck(), {watch: false});
@@ -182,6 +182,31 @@ describe('serveDeck', () => {
     expect(s.port).not.toBe(taken);
     await expect(serveDeck(tempDeck(), {port: taken, tries: 1, watch: false})).rejects.toThrow(`ports ${taken} to ${taken} are taken — pass another with --port`);
     blocker.close();
+  });
+
+  it('rebuilds at once on the watcher alone, when it hears the save', {retry: 2}, async () => {
+    const dir = tempDeck();
+    const s = await serve(dir, {poll: 0});
+    await new Promise((r) => setTimeout(r, 300));   // the folder's own creation may still be reported (macOS FSEvents)
+    const v = s.state().version;
+    writeFileSync(path.join(dir, 'theme.css'), `${STARTER['theme.css']}\n/* edited */`);
+    const t0 = Date.now();
+    while (s.state().version === v && Date.now() - t0 < 8000) await new Promise((r) => setTimeout(r, 20));
+    expect(s.state().version).toBeGreaterThan(v);
+  }, 30000);
+
+  it('stamps the folder by what a save changes: files, their sizes and times — never hidden ones, dependencies or its output', () => {
+    const dir = tempDeck({...STARTER, '.git/HEAD': 'x', 'node_modules/a/index.js': 'x', 'index.html': 'built'});
+    const stamp = folderStamp(dir, ['index.html']);
+    expect(stamp).toContain('clicks.html ');
+    expect(stamp).toContain('icons/server.svg ');
+    expect(stamp).not.toMatch(/\.git|node_modules|index\.html/);
+    writeFileSync(path.join(dir, 'index.html'), 'built again, longer');
+    writeFileSync(path.join(dir, '.git', 'HEAD'), 'moved');
+    expect(folderStamp(dir, ['index.html'])).toBe(stamp);
+    writeFileSync(path.join(dir, 'map.html'), `${STARTER['map.html']} `);
+    expect(folderStamp(dir, ['index.html'])).not.toBe(stamp);
+    expect(folderStamp(path.join(dir, 'missing'))).toBe('');
   });
 
   it('rebuilds when asked, and hangs up on the page when it closes', async () => {

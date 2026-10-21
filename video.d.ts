@@ -46,6 +46,10 @@ export function renderVideo(options: {
   work?: string; log?: (line: string) => void;
 }): Promise<{ video: string; length: number; cues: number; chapters: Chapters; plan: PlannedClick[] }>;
 /** The driver for storydeck's <deck-stage> pages, with Playwright's `chromium`. */
-export function deckStageDriver(options: { chromium: unknown; executablePath?: string; viewport?: { width: number; height: number }; hide?: string[]; /** refuse every request but the page's own file and inline data */ offline?: boolean }): DeckStageDriver;
+export function deckStageDriver(options: { chromium: unknown; executablePath?: string; viewport?: { width: number; height: number }; hide?: string[]; /** keep the page off the network: it loads only its own file and inline data (OFFLINE) */ offline?: boolean }): DeckStageDriver;
 /** Runs in the page: what spills on the slide shown, its animations finished first (deckStageDriver · measure). */
 export function measureSlide(): SlideSpill[];
+/** How an offline page is run: the browser's launch args and the page context's options (see deckStageDriver's `offline`). */
+export const OFFLINE: { readonly args: readonly string[]; readonly context: { readonly offline: true; readonly serviceWorkers: 'block' } };
+/** Whether an offline page (`page`, its URL) may make a request: its own file (any #fragment) and inline data only. */
+export function offlineAllows(page: string, url: string): boolean;

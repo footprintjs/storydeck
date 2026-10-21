@@ -54,6 +54,15 @@ describe('parseClicks, scanned once', () => {
     expect(() => parseClicks('<section data-label="A"><aside class="notes">x</section>')).toThrow(/<aside class="notes"> is never closed/);
   });
 
+  it('keeps every position right when text lower-cases longer (Turkish \u0130)', () => {
+    const parts = parseClicks('<section data-label="A"><p>\u0130\u0130\u0130</p></section><section data-label="B"><p>x</p></SECTION>');
+    expect(parts.map((p) => p.label)).toEqual(['A', 'B']);
+    expect(parts[0].body).toBe('<p>\u0130\u0130\u0130</p>');
+    const [notes] = parseClicks('<section data-label="N"><p>x</p><aside class="notes">\u0130\u0130 said</aside><p>after</p></section>');
+    expect(notes.body).toBe('<p>x</p><p>after</p>');
+    expect(notes.notes).toEqual(['\u0130\u0130 said']);
+  });
+
   it('keeps an aside that is not notes, where it is', () => {
     const [part] = parseClicks('<section data-label="P"><aside class="callout">Look</aside><aside class="notes">Say</aside></section>');
     expect(part.body).toBe('<aside class="callout">Look</aside>');
@@ -68,6 +77,10 @@ describe('plainText and wordCount', () => {
     expect(wordCount('<h2>The request travels, 12 ms · to PowerScale</h2>')).toBe(7);
     expect(wordCount('')).toBe(0);
     expect(wordCount('— · →')).toBe(0);
+  });
+
+  it('never counts a script or a style as words', () => {
+    expect(plainText('<p>Hello</p><script>const a = "many words here";</script><style>.x{color:red}</style><p>there</p>')).toBe('Hello there');
   });
 
   it('takes notes out of HTML, empty ones dropped', () => {

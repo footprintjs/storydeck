@@ -11,7 +11,7 @@
 // A part is strict about what it holds, so nothing an author wrote is dropped without a word: a step holds its
 // headline and its notes, and anything else in it is refused, naming where it goes instead (on the map). The file is
 // scanned once (html.js · elements): a <section> or <step> left open is refused at once, naming it.
-import {elements, stripComments} from './html.js';
+import {closing, elements, stripComments} from './html.js';
 
 const HEADLINE = /<h2\b[^>]*>([\s\S]*?)<\/h2>/;
 const NOTES_CLASS = /\sclass=(["'])(?:[^"']*\s)?notes(?:\s[^"']*)?\1/;
@@ -21,10 +21,13 @@ export function attrOf(attrs, name) {
   return new RegExp(`\\s${name}=(["'])(.*?)\\1`).exec(attrs)?.[2] ?? null;
 }
 
-/** HTML as the words it shows: tags out (a block or a line break leaves a space; inline tags leave none), entities read, white space folded. */
+/**
+ * HTML as the words it shows: scripts and styles out (they are not read), tags out (a block or a line break leaves a
+ * space; inline tags leave none), entities read, white space folded.
+ */
 export function plainText(html) {
   const ENTITY = {amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' '};
-  return html.replace(/<(?:br|\/?(?:p|div|li|ul|ol|h[1-6]|tr|td|th|section|aside|blockquote|header|footer|figure|figcaption))\b[^>]*>/gi, ' ')
+  return html.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, ' ').replace(/<(?:br|\/?(?:p|div|li|ul|ol|h[1-6]|tr|td|th|section|aside|blockquote|header|footer|figure|figcaption))\b[^>]*>/gi, ' ')
     .replace(/<[^>]+>/g, '')
     .replace(/&(#\d+|#x[\da-f]+|\w+);/gi, (m, e) => (e[0] === '#' ? String.fromCodePoint(e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : Number(e.slice(1))) : ENTITY[e.toLowerCase()] ?? m))
     .replace(/\s+/g, ' ').trim();
@@ -38,15 +41,16 @@ export const wordCount = (html) => (plainText(html).match(/[\p{L}\p{N}][\p{L}\p{
  * Scanned once; any other <aside> stays where it is.
  */
 export function takeNotes(html) {
-  const open = /<aside\b([^>]*)>/gi, lower = html.toLowerCase(), notes = [];
+  const open = /<aside\b([^>]*)>/gi, shutter = closing('aside'), notes = [];
   let kept = '', from = 0;
   for (let m = open.exec(html); m; m = open.exec(html)) {
     if (!NOTES_CLASS.test(m[1])) continue;
-    const shut = lower.indexOf('</aside>', m.index + m[0].length);
-    if (shut < 0) throw new Error(`<aside${m[1]}> is never closed — end the notes with </aside>`);
-    notes.push(plainText(html.slice(m.index + m[0].length, shut)));
+    shutter.lastIndex = m.index + m[0].length;
+    const shut = shutter.exec(html);
+    if (!shut) throw new Error(`<aside${m[1]}> is never closed — end the notes with </aside>`);
+    notes.push(plainText(html.slice(m.index + m[0].length, shut.index)));
     kept += html.slice(from, m.index);
-    from = shut + '</aside>'.length;
+    from = shut.index + shut[0].length;
     open.lastIndex = from;
   }
   return {html: kept + html.slice(from), notes: notes.filter(Boolean)};

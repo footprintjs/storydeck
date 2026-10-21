@@ -403,8 +403,10 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   and count), wires, packets, icons and the theme toggle from the token contract, every rule `:where()`, so your
   theme wins.
 - **A deck is files, never a program — on your machine.** No deck code runs in Node: no build script, no deck module.
-  Playwright, for `check --layout`, is loaded only from beside StoryDeck — never from the deck folder or the folder you
-  run in — and the page is measured offline, so a deck's own scripts cannot reach the network from your machine.
+  Playwright (1.48 or newer), for `check --layout`, is loaded only from beside StoryDeck — never from the deck folder or
+  the folder you run in — and the page is measured offline: no name resolves, the browser context is offline and routed
+  to the page's own file, and WebSockets and popups are closed. A hostile test deck's fetch, WebSocket, popup, beacon,
+  worker, service worker, WebRTC, form and navigation all failed to reach a local server.
   A deck reads only its own files: a link that leaves the folder, or points at a hidden file (`.env`), is refused, so
   a deck someone sent you cannot pull a file from elsewhere into its page, its review or its server. A build renames a
   new file into place, so it never writes through a link, and a file deck.json names never lands outside the deck.
