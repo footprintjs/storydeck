@@ -8,8 +8,8 @@ import {generated} from './test/helpers.js';
 describe('wires', () => {
   it('draws a straight wire in a box that holds it, with its head, keeping the element\'s attributes', () => {
     expect(wires('<i data-k="w" class="req" data-arrow="100 200 300 200"></i>')).toBe(
-      '<svg data-k="w" class="wire req" style="left:80px;top:180px;width:240px;height:40px" viewBox="0 0 240 40" aria-hidden="true">'
-      + '<path d="M20 20 Q120 20 205.6 20" pathLength="1"/><path class="head" d="M220 20L202 30.8L202 9.2Z"/></svg>');
+      '<svg data-k="w" class="wire req" style="left:80px;top:180px;width:240px;height:40px;--sd-angle:90deg" viewBox="0 0 240 40" aria-hidden="true">'
+      + '<path d="M20 20 Q120 20 205.6 20"/><path class="head" d="M220 20L202 30.8L202 9.2Z"/></svg>');
   });
 
   it('adds a packet for class "pkt", bends the curve, and gives a wire without a class its "wire"', () => {
@@ -128,27 +128,28 @@ describe('wires and icons in one pass', () => {
   });
 });
 
-describe('a packet on the curve', () => {
-  /** deck.css · sdPkt read back: each step's percentage and its weights on the control point and the end. */
-  const steps = () => [...readFileSync(path.join(process.cwd(), 'deck.css'), 'utf8').matchAll(/(\d+)% \{[^}]*?calc\(var\(--cdx\) \* ([\d.]+) \+ var\(--pdx\) \* ([\d.]+)\)/g)]
-    .map((m) => ({p: Number(m[1]) / 100, a: Number(m[2]), b: Number(m[3])}));
+describe('a packet on the curve, a wire shown in', () => {
+  const css = () => readFileSync(path.join(process.cwd(), 'deck.css'), 'utf8');
+  const angle = (spec) => Number(/--sd-angle:(-?[\d.]+)deg/.exec(wires(`<i data-k="w" data-arrow="${spec}"></i>`))[1]);
 
-  it('steps along the quadratic itself: each step is B(t) = 2(1-t)t·C + t²·E for one t, rising, eased', () => {
-    const s = steps();
-    expect(s).toHaveLength(19);   // 5% to 95%; 0% is the start, 100% the end
-    let last = 0;
-    for (const {p, a, b} of s) {
-      const t = a / 2 + b;   // t(1-t) + t² = t, whatever the rounding of each weight
-      expect(b).toBeCloseTo(t * t, 3);
-      expect(a).toBeCloseTo(2 * (1 - t) * t, 3);   // one t on both weights: a point of the curve
-      expect(t).toBeCloseTo(p * p * (3 - 2 * p), 3);   // smoothstep: slow at both ends
-      expect(t).toBeGreaterThan(last);
-      last = t;
-    }
+  it('places the packet at B(t) = 2(1-t)t·C + t²·E, the same on both axes, with t one registered number', () => {
+    const t = css();
+    expect(t).toContain("@property --sd-t { syntax: '<number>'; inherits: false; initial-value: 0; }");
+    const axis = (c, p) => `calc(var(--${c}) * 2 * (1 - var(--sd-t)) * var(--sd-t) + var(--${p}) * var(--sd-t) * var(--sd-t))`;
+    expect(t).toContain(`transform: translate(${axis('cdx', 'pdx')},\n    ${axis('cdy', 'pdy')});`);
+    expect(t).toContain('@keyframes sdPkt { from { --sd-t: 0; } to { --sd-t: 1; } }');
+    // B(0) is the start and B(1) the end; a straight wire (C = E/2) gives B(t) = t·E
+    const B = (u, c, e) => 2 * (1 - u) * u * c + u * u * e;
+    expect([B(0, 50, 100), B(1, 50, 100), B(0.3, 50, 100)]).toEqual([0, 100, 30]);
   });
 
-  it('keeps a straight wire\'s ride on its line, always forward: with the control point halfway, B(t) = t·E', () => {
-    const progress = steps().map(({a, b}) => a * 0.5 + b);
-    expect(progress.every((v, i) => v > (progress[i - 1] ?? 0) && v < 1)).toBe(true);
+  it('shows a wire coming in by a sweep square to its run, on the piece itself — never by its dashes', () => {
+    expect([angle('0 0 100 0'), angle('0 0 0 100'), angle('0 0 -100 0'), angle('0 0 0 -100'), angle('0 0 100 100')]).toEqual([90, 180, -90, 0, 135]);
+    const t = css();
+    expect(t).not.toMatch(/stroke-dash|pathLength/);   // a theme's dashes are its own
+    expect(t).toMatch(/:where\(svg\.wire\.sd-enter\) \{ --sd-a-more: sdReveal [^}]*var\(--sd-delay, 0s\) both; \}/);
+    expect(t).toMatch(/:where\(svg\.wire\.sd-path\.sd-enter\) \{ --sd-a-more: sdReveal [^}]*var\(--sd-turn, 0s\) both; \}/);
+    expect(readFileSync(path.join(process.cwd(), 'focus.css'), 'utf8')).toContain('var(--sd-a-path, sdNone 0s), var(--sd-a-more, sdNone 0s); }');
+    expect(wires('<i data-k="w" data-arrow="0 0 9 9"></i>')).not.toContain('pathLength');
   });
 });

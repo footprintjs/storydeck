@@ -49,6 +49,7 @@
 @property --sd-a-move { syntax: '*'; inherits: false; }
 @property --sd-a-hot { syntax: '*'; inherits: false; }
 @property --sd-a-path { syntax: '*'; inherits: false; }
+@property --sd-a-more { syntax: '*'; inherits: false; }   /* one more animation a stylesheet may give a piece, on the piece itself (deck.css: a wire showing itself in) */
 @property --sd-turn { syntax: '*'; inherits: false; }   /* a piece's moment on a path; never inherited, so 0 off the route */
 @keyframes sdNone {}
 @keyframes sdEnter { from { opacity: 0; scale: calc(var(--sd-s, 1) * .92); } }
@@ -90,7 +91,7 @@
   .sd-path.sd-light { --sd-a-state: sdLightPulse .9s ease var(--sd-turn) backwards; --sd-a-path: sdNone 0s; }   /* grey until its turn */
   .sd-twin-turn.sd-leave { --sd-a-state: sdLeave .45s ease var(--sd-turn) both; }
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) :is(.sd-enter, .sd-arrive, .sd-light, .sd-fade, .sd-leave, .sd-relook, .sd-move, .sd-hot-in, .sd-path) {
-    animation: var(--sd-a-state, sdNone 0s), var(--sd-a-move, sdNone 0s), var(--sd-a-hot, sdNone 0s), var(--sd-a-path, sdNone 0s); }
+    animation: var(--sd-a-state, sdNone 0s), var(--sd-a-move, sdNone 0s), var(--sd-a-hot, sdNone 0s), var(--sd-a-path, sdNone 0s), var(--sd-a-more, sdNone 0s); }
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-path-line { animation: sdArrive .5s ease var(--sd-turn) both; }
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-stage.sd-move { animation: sdStage var(--sd-move-time, 1s) var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) both; }
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-veil-in-new { animation: sdVeilIn .7s cubic-bezier(.4, 0, .2, 1) both; }

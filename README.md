@@ -408,7 +408,8 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   `claude mcp add storydeck -- npx footprint-storydeck mcp my-talk`.
 - **The helpers a diagram needs.** `<i data-k="w1" class="wire pkt" data-arrow="252 352 318 352"></i>` is a wire (an
   SVG arrow, with an optional bend; class `pkt` adds a packet that rides it on a `path` click, at its turn — along the
-  curve itself, not a straight line across the bend). A wire that comes in draws itself, from its start to its tip.
+  curve itself, not a straight line across the bend). A wire that comes in shows itself from its start to its tip,
+  its dashes and colours as your theme draws them.
   `<i class="ic" data-icon="server"></i>` is `icons/server.svg`. `deck.css` styles the chrome (kicker, headline, footer
   and count), wires, packets, icons and the theme toggle from the token contract, every rule `:where()`, so your
   theme wins.

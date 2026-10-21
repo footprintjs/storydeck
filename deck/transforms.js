@@ -36,8 +36,9 @@ function wireSvg(attrs, spec) {
   const pkt = /\bpkt\b/.test(at)
     ? `<rect class="pkt" x="${f(x1 - X - 8)}" y="${f(y1 - Y - 6)}" width="16" height="12" rx="3" style="--cdx:${f(cx - x1)}px;--cdy:${f(cy - y1)}px;--pdx:${f(ex - x1)}px;--pdy:${f(ey - y1)}px"/>`
     : '';
-  // pathLength="1": the line is one unit long, so a dash of 1 is the whole line — how it draws itself (deck.css · sdDraw)
-  return `<svg${at} style="left:${f(X)}px;top:${f(Y)}px;width:${f(W)}px;height:${f(H)}px" viewBox="0 0 ${f(W)} ${f(H)}" aria-hidden="true"><path d="${d}" pathLength="1"/>${head}${pkt}</svg>`;
+  // which way it runs, start to tip, as a CSS angle (0 up, 90 right): a wire coming in shows itself that way (deck.css · sdReveal)
+  const angle = f((Math.atan2(dx, -dy) * 180) / Math.PI);
+  return `<svg${at} style="left:${f(X)}px;top:${f(Y)}px;width:${f(W)}px;height:${f(H)}px;--sd-angle:${angle}deg" viewBox="0 0 ${f(W)} ${f(H)}" aria-hidden="true"><path d="${d}"/>${head}${pkt}</svg>`;
 }
 
 /**
