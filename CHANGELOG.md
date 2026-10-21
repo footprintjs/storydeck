@@ -26,7 +26,9 @@
   signature covers the person's words and the deck's folder, never the click's label (the deck's text), which is never
   listed. In development only StoryDeck's own scripts run (a nonce policy on every answer): a deck's own scripts run in
   the built page, and none can reach the dev page's edits. The build refuses a `data-sd-…` attribute a deck writes
-  itself. The note key is never read through a link nor kept inside the deck folder. `loadDeck`/`compileDeck` take `{dev}`; `deckHtml` also returns the source.
+  itself. The note key is never read through a link or a second name, nor kept inside the deck folder. Every rule that
+  compares paths does so as the disk spells them (`realpathSync.native`), so on a disk that ignores case one folder is
+  never taken for two. `loadDeck`/`compileDeck` take `{dev}`; `deckHtml` also returns the source.
 - **Every scan of a deck's text is one pass.** Stripping comments, reading a map's pieces and drawing a slide's focus
   (`readPieces`, `drawFocus`, also on `footprint-storydeck/focus-html`), reading an icon file, and drawing wires and
   icons were quadratic on unfinished tags, unclosed comments or one tag repeating an attribute: a hostile 4 MB map took

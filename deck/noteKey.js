@@ -8,10 +8,10 @@
 // The key is read from the file it opened, never through a link, and must be a plain file of this user's that no one
 // else can read; and it never lives inside the deck folder, where the dev server would serve it.
 import {createHmac, randomBytes, timingSafeEqual} from 'node:crypto';
-import {closeSync, constants, fstatSync, mkdirSync, openSync, readFileSync, realpathSync, writeSync} from 'node:fs';
+import {closeSync, constants, fstatSync, mkdirSync, openSync, readFileSync, writeSync} from 'node:fs';
 import {homedir} from 'node:os';
 import path from 'node:path';
-import {isInside} from './paths.js';
+import {isInside, realPath} from './paths.js';
 
 /** Where the person's StoryDeck state lives: STORYDECK_HOME (a relative one from the home folder), or ~/.storydeck. */
 export const storydeckHome = () => path.resolve(homedir(), process.env.STORYDECK_HOME || '.storydeck');
@@ -22,6 +22,7 @@ const NOFOLLOW = constants.O_NOFOLLOW ?? 0;
 /** Why an opened key file cannot be trusted to sign — not a plain file, open to others, someone else's — or null. */
 function untrusted(st) {
   if (!st.isFile()) return 'is not a plain file';
+  if (st.nlink > 1) return 'has another name (a hard link) — a copy of the key may sit where it is served';
   if (process.platform === 'win32') return null;
   if (st.mode & 0o077) return 'can be read or written by others (chmod 600 it)';
   return typeof process.getuid === 'function' && st.uid !== process.getuid() ? 'belongs to another user' : null;
@@ -42,7 +43,7 @@ function openKey(file) {
 function realPlace(p) {
   const rest = [];
   for (let at = path.resolve(p); ; at = path.dirname(at)) {
-    try { return path.join(realpathSync(at), ...rest.reverse()); } catch { /* not there yet */ }
+    try { return path.join(realPath(at), ...rest.reverse()); } catch { /* not there yet */ }
     if (path.dirname(at) === at) return path.resolve(p);
     rest.push(path.basename(at));
   }
@@ -67,7 +68,7 @@ function makeKey(home, file) {
  */
 export function noteKey(home = storydeckHome(), {create = false, deck = null} = {}) {
   const file = path.join(home, 'key');
-  if (deck && isInside(realpathSync(deck), realPlace(home))) {
+  if (deck && isInside(realPath(deck), realPlace(home))) {
     return {key: null, why: `the note key folder ${home} is inside the deck folder, which the dev server serves — set STORYDECK_HOME elsewhere`};
   }
   let fd = openKey(file);

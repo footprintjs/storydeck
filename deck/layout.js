@@ -2,10 +2,9 @@
 // It drives the built page through the video's browser port (video.js · deckStageDriver · measure), one click at a
 // time as it settles, offline. Optional: it needs Playwright installed beside StoryDeck (`npm i -D footprint-storydeck
 // playwright-core`, then `npx playwright-core install chromium`); without it the check says so and the others run.
-import {realpathSync} from 'node:fs';
 import {deckStageDriver} from '../video.js';
 import {packageRoot} from './assets.js';
-import {isInside} from './paths.js';
+import {isInside, realPath} from './paths.js';
 
 const PLAYWRIGHT = 'playwright-core';   // an optional dependency: named, never imported until a layout check asks
 
@@ -17,7 +16,7 @@ const PLAYWRIGHT = 'playwright-core';   // an optional dependency: named, never 
  * node_modules is the deck's, not yours: then nothing is loaded.
  */
 export async function findChromium({deckRoot = null} = {}) {
-  if (deckRoot !== null && isInside(deckRoot, realpathSync(packageRoot()))) {
+  if (deckRoot !== null && isInside(deckRoot, realPath(packageRoot()))) {
     return {chromium: null, why: 'StoryDeck is running from inside the deck folder — run it from your own project, naming the deck'};
   }
   try {

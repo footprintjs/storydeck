@@ -72,9 +72,12 @@ describe('nudgePiece', () => {
   });
 
   it('refuses a style CSS would read its own way: a comment, an escape, a second left or top', () => {
-    for (const style of ['left:10px;/*;top:5px;*/top:20px', 'left:10px;top:0px;left:40px', 'left:1px;top:2px;top:3px', 'l\\eft:5px;left:1px;top:1px']) {
-      expect(() => move(`<div data-k="a" style="${style}">`, 0, 'a'), style).toThrow(/its style holds a comment, an escape or a second left\/top/);
+    for (const style of ['left:10px;/*;top:5px;*/top:20px', 'left:10px;top:0px;left:40px', 'left:1px;top:2px;top:3px', 'l\\eft:5px;left:1px;top:1px',
+      'LEFT:40px;left:10px;top:1px', 'left&#58;40px;left:10px;top:1px', 'inset-inline-start:40px;left:10px;top:1px', 'inset:0;left:1px;top:1px']) {
+      expect(() => move(`<div data-k="a" style="${style}">`, 0, 'a'), style).toThrow(/its style could set its place twice/);
     }
+    // a wire is placed by its arrow: one with a style of its own (drawn first, so it wins) is refused
+    expect(() => move('<i data-k="w" style="left:5px;top:5px" data-arrow="10 20 300 20"></i>', 0, 'w')).toThrow(/a wire is placed by its data-arrow, and its own style attribute hides that/);
   });
 
   it('refuses a tag a browser reads differently from the build — never edits bytes it only thinks are the place', () => {

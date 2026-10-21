@@ -7,12 +7,11 @@
 // deck code runs (a deck is files, not a program), and `build` writes only the deck's own page (deck.json "out").
 // A call may name another deck (`dir`) only inside the folder the server was started with: what a deck's notes say
 // reaches the model, so a planted instruction cannot send it to read or build anything else on the machine.
-import {realpathSync} from 'node:fs';
 import path from 'node:path';
 import {createInterface} from 'node:readline';
 import {outlineTool, reviewTool, checkTool, buildTool, feedbackTool, printable} from './tools.js';
 import {packageVersion} from './assets.js';
-import {deckRoot, isInside} from './paths.js';
+import {deckRoot, isInside, realPath} from './paths.js';
 
 const DIR = {type: 'string', description: 'a deck folder inside the one the server was started with (default: that folder)'};
 
@@ -35,7 +34,7 @@ function deckFor(args, dir) {
   if (typeof args.dir !== 'string' || !args.dir) return root;
   const asked = path.resolve(root, args.dir);
   let real;
-  try { real = realpathSync(asked); } catch { throw new Error(`no folder ${args.dir} inside ${dir}`); }
+  try { real = realPath(asked); } catch { throw new Error(`no folder ${args.dir} inside ${dir}`); }
   if (!isInside(root, real)) throw new Error(`${args.dir} is outside the folder this server was started with (${dir}) — start it with a folder that holds that deck`);
   return real;
 }

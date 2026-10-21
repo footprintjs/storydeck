@@ -99,16 +99,20 @@ function moveEdits(html, piece, dx, dy) {
     }
     const at = piece.start + '<i'.length + wire.before.length + ' data-arrow="'.length;
     if (browserValueAt(html, piece, 'data-arrow') !== at) throw ambiguous();
+    // the build draws a wire's box from its arrow; a style of its own comes first in the drawn tag and places it instead
+    if (browserValueAt(html, piece, 'style') >= 0) throw new Error(`"${piece.name}": a wire is placed by its data-arrow, and its own style attribute hides that — move it in the file`);
     const [x1, y1, x2, y2] = nums;   // the bend is kept as written: a move does not bend a wire
     return [[at, spec.length, [x1 + dx, y1 + dy, x2 + dx, y2 + dy].map(num).concat(parts.slice(4)).join(' ')]];
   }
   const left = placeOf(piece, 'left'), top = placeOf(piece, 'top');
   if (!left || !top) throw new Error(`"${piece.name}" has no inline left/top in px — a piece without them keeps its place; give it left and top to move it`);
   if (browserValueAt(html, piece, 'style') !== left.styleAt) throw ambiguous();
-  // CSS reads a style its own way: a comment, an escape, or a second left/top (the last one wins) — refused, not guessed
-  const declared = (prop) => (left.style.match(new RegExp(`(?:^|;)\\s*${prop}\\s*:`, 'g')) ?? []).length;
-  if (/\/\*|\\/.test(left.style) || declared('left') > 1 || declared('top') > 1) {
-    throw new Error(`"${piece.name}": its style holds a comment, an escape or a second left/top — move it in the file`);
+  // CSS reads a style its own way, so anything that could set the place twice is refused, not guessed: a comment, an
+  // escape, a character reference (the browser decodes it first), a second left or top in any case (the last wins), or
+  // an inset (it sets left and top too)
+  const declared = (prop) => (left.style.match(new RegExp(`(?:^|;)\\s*${prop}\\s*:`, 'gi')) ?? []).length;
+  if (/\/\*|\\|&/.test(left.style) || /(?:^|;)\s*inset/i.test(left.style) || declared('left') > 1 || declared('top') > 1) {
+    throw new Error(`"${piece.name}": its style could set its place twice (a comment, an escape, a character reference, an inset, or a second left/top) — move it in the file`);
   }
   // a bare 0 is the one length CSS takes without a unit: once it is not 0, it is written in px
   return [left, top].map((p, i) => [p.at, p.length, `${num(p.value + (i ? dy : dx))}${p.unit ? '' : 'px'}`]);

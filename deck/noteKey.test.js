@@ -1,6 +1,6 @@
 // @vitest-environment node
 import {afterEach, describe, it, expect} from 'vitest';
-import {chmodSync, existsSync, statSync, symlinkSync, writeFileSync} from 'node:fs';
+import {chmodSync, existsSync, linkSync, mkdirSync, statSync, symlinkSync, writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
 import path from 'node:path';
 import {noteKey, signNote, signedBy, storydeckHome} from './noteKey.js';
@@ -18,6 +18,22 @@ describe('noteKey', () => {
     expect(noteKey(home).key.equals(key)).toBe(true);
     expect(noteKey(home, {create: true}).key.equals(key)).toBe(true);   // never made twice
     if (posix) expect(statSync(path.join(home, 'key')).mode & 0o777).toBe(0o600);
+  });
+
+  it('trusts no key with a second name — a hard link could put a copy where the dev server serves it', () => {
+    const home = path.join(tempDir(), 'h');
+    expect(noteKey(home, {create: true}).key).toHaveLength(32);
+    linkSync(path.join(home, 'key'), path.join(tempDeck(), 'k.txt'));
+    expect(noteKey(home).why).toMatch(/has another name \(a hard link\)/);
+  });
+
+  it('compares the deck folder as the disk spells it, on a disk that ignores case', () => {
+    const deck = path.join(tempDir(), 'Deck');
+    mkdirSync(deck);
+    const other = deck.replace(/Deck$/, 'deck');
+    if (!existsSync(other)) return;   // a disk that tells cases apart: nothing to compare
+    expect(noteKey(path.join(other, 'state'), {create: true, deck}).why).toMatch(/inside the deck folder/);
+    expect(noteKey(path.join(deck, 'state'), {create: true, deck: other}).why).toMatch(/inside the deck folder/);
   });
 
   it('trusts no key that is a link, open to others, or not a key', () => {

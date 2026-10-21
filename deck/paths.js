@@ -10,6 +10,12 @@ import {existsSync, lstatSync, mkdirSync, realpathSync, renameSync, rmSync, stat
 import path from 'node:path';
 
 const hidden = (segment) => segment.startsWith('.');
+
+/**
+ * A path's real place: links followed, and each name as the disk spells it (on a disk that ignores case, "Deck" and
+ * "deck" are one folder — compared as typed they would be two). Every real path a deck rule compares comes from here.
+ */
+export const realPath = (p) => realpathSync.native(p);
 const isText = (v) => typeof v === 'string' && v.trim().length > 0;
 
 /** A file name deck.json gives: relative, inside the deck folder, no "..", no hidden segment. */
@@ -25,7 +31,7 @@ export function deckPath(value, key) {
 /** A deck folder's real path, or why it is not one. */
 export function deckRoot(dir) {
   if (!existsSync(dir) || !statSync(dir).isDirectory()) throw new Error(`${dir} is not a folder — a deck is a folder with deck.json (make one: storydeck init ${dir})`);
-  return realpathSync(path.resolve(dir));
+  return realPath(path.resolve(dir));
 }
 
 /** `real` is the deck folder or inside it. */
@@ -50,7 +56,7 @@ function notDeckPlace(root, real) {
  * cannot pull a file from elsewhere on your machine (or its own .env) into its page, its review or its server.
  */
 export function realInside(root, full, name) {
-  const real = realpathSync(full);
+  const real = realPath(full);
   const why = notDeckPlace(root, real);
   if (why === 'outside') throw new Error(`${name} is a link to a file outside the deck folder — a deck reads only its own files`);
   if (why === 'hidden') throw new Error(`${name} is a link to a hidden file — a deck never reads hidden files (.env and the like)`);
@@ -67,9 +73,10 @@ export function servedFile(root, pathname) {
   if (rel.includes('\0')) return null;
   const segs = rel.split(/[\\/]+/).filter(Boolean);
   // a deck's dependencies are not the deck: never served (the watcher never reads them either)
-  if (!segs.length || segs.some((s) => s === '..' || hidden(s) || s === 'node_modules')) return null;
+  if (!segs.length || segs.some((s) => s === '..' || hidden(s) || s.toLowerCase() === 'node_modules')) return null;
   try {
     const real = realInside(root, path.join(root, ...segs), rel);
+    if (path.relative(root, real).split(path.sep).some((s) => s.toLowerCase() === 'node_modules')) return null;
     return statSync(real).isFile() ? real : null;
   } catch {
     return null;
@@ -85,7 +92,7 @@ export function writeInside(root, file, text, {chosen = false} = {}) {
   const name = path.relative(root, file) || file;
   // a file deck.json names lands in a place of the deck's own: inside it and not hidden (a link into .git is refused)
   const refuse = (dir) => {
-    const why = chosen ? null : notDeckPlace(root, realpathSync(dir));
+    const why = chosen ? null : notDeckPlace(root, realPath(dir));
     if (why === 'outside') throw new Error(`${name} would land outside the deck folder (a folder on the way is a link) — the build writes only inside the deck`);
     if (why === 'hidden') throw new Error(`${name} would land in a hidden folder (a folder on the way is a link to one) — the build never writes hidden files`);
   };

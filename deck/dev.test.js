@@ -93,13 +93,14 @@ describe('serveDeck', () => {
 
   it('serves nothing hidden, nothing outside the folder, and nothing through a link that leaves it or hides', async () => {
     const dir = tempDeck({...STARTER, '.env': 'SECRET=1', 'sub/.hidden': 'x', 'node_modules/w/demo.html': '<script>SECRET</script>'});
+    symlinkSync(path.join(dir, 'node_modules'), path.join(dir, 'deps'));   // a dependency folder by another name
     const secret = path.join(tempDir(), 'secret.txt');
     writeFileSync(secret, 'TOP SECRET');
     symlinkSync(secret, path.join(dir, 'leak.txt'));
     symlinkSync(path.join(dir, '.env'), path.join(dir, 'env.txt'));
     mkdirSync(path.join(dir, 'pics'));
     const s = await serve(dir);
-    for (const p of ['/.env', '/sub/.hidden', '/../package.json', '/%2e%2e/%2e%2e/etc/passwd', '/leak.txt', '/env.txt', '/icons', '/nope.png', '/%E0%A4%A', '/a%00b', '/pics', '/node_modules/w/demo.html']) {
+    for (const p of ['/.env', '/sub/.hidden', '/../package.json', '/%2e%2e/%2e%2e/etc/passwd', '/leak.txt', '/env.txt', '/icons', '/nope.png', '/%E0%A4%A', '/a%00b', '/pics', '/node_modules/w/demo.html', '/NODE_MODULES/w/demo.html', '/Node_Modules/w/demo.html', '/deps/w/demo.html']) {
       const r = await get(s, p);
       expect([p, r.status]).toEqual([p, 404]);
       expect(r.body).not.toContain('SECRET');

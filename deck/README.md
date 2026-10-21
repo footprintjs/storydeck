@@ -47,12 +47,15 @@ text. Each module does one job, and they compose in one direction:
   StoryDeck's own, which `page.js` marks (`dev.nonce`). So no script a deck carries, in its page or in any file of its
   folder opened on its own, runs in development, and none can read the page's token to send these edits; the dev bar
   says "deck scripts off in dev" when one is held back. A deck's own scripts run in the page `storydeck build` writes.
-  The deck's dependencies (`node_modules`) are never served.
+  The deck's dependencies (`node_modules`) are never served, by any spelling or link (judged by the real path).
+- **A real path is the disk's own spelling** (`paths.js · realPath`: links followed, each name as the disk spells it).
+  On a disk that ignores case, "Deck" and "deck" are one folder; every rule that compares paths — inside the deck or
+  not, the folder a note is signed for — compares them through it.
 - **A note is known for the person's by its signature, never by where it is** (`noteKey.js`). A deck someone sent you
   can carry a feedback.md; its lines must never pass for your requests. The dev server signs each note it writes with a
   key kept with you (`~/.storydeck/key`, or STORYDECK_HOME — a relative one from your home folder; made once, readable
-  by you only, read from the file it opened and never through a link, refused inside the deck folder, which the dev
-  server serves), for this deck's folder, and `feedback`, `check` and the MCP tool list only the notes that key signed
+  by you only, read from the file it opened and never through a link nor with a second name, refused inside the deck
+  folder, which the dev server serves), for this deck's folder, and `feedback`, `check` and the MCP tool list only the notes that key signed
   for that folder (a note copied into another deck is not that deck's). Any other open line is counted, never listed: text that came
   with the deck (or was edited by hand), not a request. A signature vouches for the person's words only — the click,
   the text, the time — never the click's label, which is the deck's text: it stays in the line for a reader of the
@@ -71,9 +74,10 @@ text. Each module does one job, and they compose in one direction:
   as the build finds them: without comments, after icons). A move is refused while the build fails, when the map's
   file changed since the build, when the build's pieces are not the file's in order (an icon holding pieces), when any
   tag of the map holds a quote never closed before its `>` (`edit.js · mapAmbiguity`), when a comment sits inside the
-  piece's tag, when a browser reads the piece's tag differently (`pieceRules.js · readAttributes`), and when its style
-  is one CSS reads its own way (a comment, an escape, a second left or top). Every other byte of the file is kept; a
-  bare `0` moved is written in px.
+  piece's tag, when a browser reads the piece's tag differently (`pieceRules.js · readAttributes`), when its style
+  could set its place twice (a comment, an escape, a character reference, an inset, a second left or top in any case),
+  and when a wire carries a style of its own (drawn first, it would place the wire instead of its arrow). Every other
+  byte of the file is kept; a bare `0` moved is written in px.
 - **Every scan of a deck's text is one pass.** Comments, pieces, a slide's focus, icons and icon files, wires and
   elements are each found once: a 4 MB file of unfinished tags, unclosed comments or one tag repeating an attribute
   costs no more than its length (pinned by tests, and each rewritten scan proved equal to the regex it replaced on

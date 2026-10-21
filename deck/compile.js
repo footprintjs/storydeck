@@ -31,8 +31,9 @@ function numberForDev(html) {
  * and the dev page moves a piece by them — one written by hand would name a piece that is not the one shown.
  */
 function refuseOwnNumbers(where, html) {
-  const own = tagsWith(stripComments(html), /\sdata-sd-[\w-]*/i)[0];
-  if (own) throw new Error(`${where}: ${own.m[0].trim()} is StoryDeck's own attribute (it numbers the pieces) — remove it from <${own.tag}>`);
+  // anywhere in a tag, however it is joined to the rest (a browser takes <div/data-sd-at> and x="1"data-sd-at too)
+  const own = tagsWith(stripComments(html), /data-sd-[\w-]*/i)[0];
+  if (own) throw new Error(`${where}: ${own.m[0]} is StoryDeck's own attribute (it numbers the pieces) — remove it from <${own.tag}>`);
 }
 
 /** A map ready to plan on: its HTML with the helpers applied and its pieces read (`dev`: numbered for the dev page). */

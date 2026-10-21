@@ -32,6 +32,10 @@ describe('compileDeck', () => {
     const plain = CLICKS.replace('<h1>Hi</h1>', '<h1 DATA-SD-I="3">Hi</h1>');
     expect(() => compileDeck(sourceOf({clicks: plain}))).toThrow(/"Title": DATA-SD-I is StoryDeck's own attribute/);
     expect(() => compileDeck(sourceOf({clicks: CLICKS.replace('<h1>Hi</h1>', '<!-- <i data-sd-at="1"> --><h1>Hi</h1>')}))).not.toThrow();
+    // however it is joined to the tag: a browser takes <div/data-sd-at> and x="1"data-sd-at as attributes too
+    for (const tag of ['<div/data-sd-at="0" data-k="f" style="left:1px;top:1px">', '<div x="1"data-sd-at="0" data-k="f" style="left:1px;top:1px">']) {
+      expect(() => compileDeck(sourceOf({clicks: CLICKS, maps: {map: `${MAP}${tag}F</div>`}})), tag).toThrow(/data-sd-at is StoryDeck's own attribute/);
+    }
   });
 
   it('numbers each piece as the build read it in the dev page only (data-sd-at), and nowhere else', () => {
