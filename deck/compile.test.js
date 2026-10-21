@@ -26,6 +26,14 @@ describe('compileDeck', () => {
     expect(compiled.maps.map.pieces.map((p) => p.keys[0])).toEqual(['a', 'w1', 'b', 'w2', 'c']);
   });
 
+  it('refuses a deck that writes StoryDeck\'s own numbering attributes, in a map or a plain slide', () => {
+    const map = `${MAP}<div data-k="f" data-sd-at="0" style="left:1px;top:1px">F</div>`;
+    expect(() => compileDeck(sourceOf({clicks: CLICKS, maps: {map}}))).toThrow(/map "map": data-sd-at is StoryDeck's own attribute \(it numbers the pieces\) — remove it from <div>/);
+    const plain = CLICKS.replace('<h1>Hi</h1>', '<h1 DATA-SD-I="3">Hi</h1>');
+    expect(() => compileDeck(sourceOf({clicks: plain}))).toThrow(/"Title": DATA-SD-I is StoryDeck's own attribute/);
+    expect(() => compileDeck(sourceOf({clicks: CLICKS.replace('<h1>Hi</h1>', '<!-- <i data-sd-at="1"> --><h1>Hi</h1>')}))).not.toThrow();
+  });
+
   it('numbers each piece as the build read it in the dev page only (data-sd-at), and nowhere else', () => {
     expect(compiled.slides.some((sl) => sl.html.includes('data-sd-at'))).toBe(false);
     const dev = compileDeck(sourceOf({deck: {title: 'T'}, clicks: CLICKS}), {dev: true});

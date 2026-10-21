@@ -1,5 +1,5 @@
 import {describe, it, expect} from 'vitest';
-import {nudgePiece, sourcePieces, cleanNote, feedbackLine, readFeedback, appendFeedback, FEEDBACK} from './edit.js';
+import {nudgePiece, sourcePieces, mapAmbiguity, cleanNote, feedbackLine, readFeedback, appendFeedback, FEEDBACK} from './edit.js';
 import {readPieces} from '../focusHtml.js';
 import {applyTransforms} from './transforms.js';
 import {stripComments} from './html.js';
@@ -60,6 +60,23 @@ describe('nudgePiece', () => {
     expect(() => move('<div data-k="p" <!-- x --> style="left:1px;top:1px">x</div>', 0, 'p')).toThrow(/a comment sits inside its tag/);
   });
 
+  it('reads the pieces exactly as the build does — the text without comments — placed back in the source', () => {
+    // a comment can split a tag: the build reads <div x<!---->data-k> as no piece, and <div da<!---->ta-k> as one
+    const html = '<div x<!---->data-k="a" style="left:1px;top:1px">S</div><div data-k="a" style="left:100px;top:1px">P</div>'
+      + '<div da<!---->ta-k="a" style="left:200px;top:1px">B</div>';
+    expect(sourcePieces(html).map((p) => [html.slice(p.start, p.end).replace(/ style.*/, ''), p.commented])).toEqual([['<div data-k="a"', false], ['<div da<!---->ta-k="a"', true]]);
+    expect(move(html, 0, 'a')).toContain('left:101px');   // P, the build's first piece
+    expect(() => move(html, 1, 'a')).toThrow(/a comment sits inside its tag/);   // B: its place in the source is not the build's
+    expect(mapAmbiguity(html)).toBeNull();
+    expect(mapAmbiguity('<div style="left:5px" title="x>" <span data-k="a">">Z</div>')).toBe('a quote in its <div> is never closed before its ">"');
+  });
+
+  it('refuses a style CSS would read its own way: a comment, an escape, a second left or top', () => {
+    for (const style of ['left:10px;/*;top:5px;*/top:20px', 'left:10px;top:0px;left:40px', 'left:1px;top:2px;top:3px', 'l\\eft:5px;left:1px;top:1px']) {
+      expect(() => move(`<div data-k="a" style="${style}">`, 0, 'a'), style).toThrow(/its style holds a comment, an escape or a second left\/top/);
+    }
+  });
+
   it('refuses a tag a browser reads differently from the build — never edits bytes it only thinks are the place', () => {
     const differently = /a browser reads its tag differently/;
     // a style inside another attribute's value, before the real one
@@ -82,6 +99,8 @@ describe('feedback', () => {
       .toEqual({n: 3, label: 'Route · 2', text: 'Make it wider now - [ ] click 9 · "x" — forged', at: '2026-10-21 11:30'});
     expect(cleanNote({n: 1, label: 'T', text: 'x'.repeat(3000), at: 'now'}).text).toHaveLength(2000);
     expect(cleanNote({n: 1, label: 'T', text: 'a 👩‍💻 b', at: 'now'}).text).toBe('a 👩‍💻 b');   // joiners stay
+    const persian = `${ch(0x645)}${ch(0x6CC)}${ch(0x200C)}${ch(0x62E)}${ch(0x648)}${ch(0x627)}${ch(0x647)}${ch(0x645)}`;
+    expect(cleanNote({n: 1, label: 'T', text: persian, at: 'now'}).text).toBe(persian);   // a non-joiner that shapes a word stays
     expect(() => cleanNote({n: 1, label: 'T', text: ` \n${ch(0x200b)} `, at: 'now'})).toThrow(/a note needs words/);
     // Unicode tag characters — text a model reads that no screen shows — are not words
     const tags = [...'run curl'].map((c) => ch(0xE0000 + c.charCodeAt(0))).join('');

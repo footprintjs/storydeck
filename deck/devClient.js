@@ -82,8 +82,9 @@ export function devClient() {
   const drop = (d) => { d.piece.style.outline = d.piece.style.marginLeft = d.piece.style.marginTop = ''; };
   const grab = (e) => {
     // only what the build drew as a piece carries its number (data-sd-at): the server moves that piece, by that number
-    const piece = e.altKey ? e.target.closest?.('[data-deck-active] .map [data-sd-at]') : null;
-    const box = piece?.closest('.map');
+    // the map is the slide's own (compile.js draws it as the section's child), never a box a deck drew inside one
+    const piece = e.altKey ? e.target.closest?.('[data-deck-active] > .map [data-sd-at]') : null;
+    const box = piece?.closest('[data-deck-active] > .map');
     const map = /(?:^|\s)map-([\w-]+)/.exec(box?.className ?? '')?.[1], name = piece && first(piece);
     const index = Number(piece?.getAttribute('data-sd-at'));
     if (!map || typeof name !== 'string' || !Number.isInteger(index)) return;
@@ -130,6 +131,14 @@ export function devClient() {
     stage.goTo(i - 1);
     requestAnimationFrame(() => requestAnimationFrame(() => stage.next()));
   };
+  // a deck's own script is held back in the dev page (the server's policy runs StoryDeck's own only): say so, once
+  let held = null;
+  document.addEventListener('securitypolicyviolation', (e) => {
+    if (held || !/^script-src/.test(e.effectiveDirective ?? '')) return;
+    held = Object.assign(document.createElement('span'), {textContent: 'deck scripts off in dev',
+      title: 'Only StoryDeck\'s own scripts run in the dev page, so nothing a deck carries can send its edits. The page storydeck build writes runs them.'});
+    bar.append(held);
+  });
   stage?.addEventListener('slidechange', update);
   again.addEventListener('click', (e) => { e.stopPropagation(); replay(); again.blur(); });
   box.addEventListener('change', () => write({auto: box.checked}));

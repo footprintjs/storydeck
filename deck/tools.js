@@ -26,8 +26,8 @@ export const printable = (text) => String(text).replace(UNSEEN, '\uFFFD');
 export function deckFeedback(dir, {home = storydeckHome()} = {}) {
   const root = deckRoot(dir);
   const open = presence(path.join(root, FEEDBACK)) === 'missing' ? [] : readFeedback(deckFileText(root, FEEDBACK)).filter((f) => !f.done);
-  const {key} = noteKey(home);
-  const mine = open.filter((f) => signedBy(key, f));
+  const {key} = noteKey(home, {deck: root});
+  const mine = open.filter((f) => signedBy(key, f, root));
   return {mine, other: open.length - mine.length};
 }
 

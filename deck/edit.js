@@ -9,7 +9,7 @@
 // A piece is found by the rules the page was drawn by, never a second reading of the map: pieceRules.js (which tags are
 // pieces, where a left/top is written) and transforms.js · wireTags (which pieces are wires). And a move is refused
 // when a browser would read the piece's tag differently (a quote or a ">" inside a value): it edits only what both see.
-import {attrValue, pieceTags, readAttributes, styleLength} from '../pieceRules.js';
+import {attrValue, pieceTags, readAttributes, styleLength, tagsWith} from '../pieceRules.js';
 import {UNSEEN, commentRanges, stripComments} from './html.js';
 import {wireTags} from './transforms.js';
 
@@ -20,22 +20,38 @@ const MAX_MOVE = 5000;
 /** A coordinate as written back: at most two decimals, so no float noise lands in the file. */
 const num = (v) => String(Math.round(v * 100) / 100);
 
-/** The text with its comments blanked to spaces, every position kept (the build reads a map with them stripped). */
-function blankComments(html) {
-  let out = '', from = 0;
-  for (const [start, end] of commentRanges(html)) { out += html.slice(from, start) + ' '.repeat(end - start); from = end; }
-  return out + html.slice(from);
+/**
+ * Places in a text without its comments (html.js · commentRanges), back to places in the text itself — asked in rising
+ * order, one pass for all of them.
+ */
+function toSource(ranges) {
+  let r = 0, removed = 0;
+  return (p) => {
+    while (r < ranges.length && p >= ranges[r][0] - removed) { removed += ranges[r][1] - ranges[r][0]; r += 1; }
+    return p + removed;
+  };
 }
 
 /**
- * The pieces of a map's source, in the build's order: {start, end, tag, before, after, name, commented} — `name` its
- * first data-k name, `commented` when a comment sits inside its tag.
+ * The pieces of a map's source exactly as the build reads them — its scan of the text without comments — placed back
+ * in the source: {start, end, tag, before, after, name, commented}. `name` is the first data-k name; `commented` when a
+ * comment sits inside the piece's tag (its place in the source is then not the build's).
  */
 export function sourcePieces(html) {
-  const blank = blankComments(html);
-  return pieceTags(blank).map(({start, end, tag, before, value, after}) => ({
-    start, end, tag, before, after, name: value.trim().split(/\s+/)[0], commented: blank.slice(start, end) !== html.slice(start, end),
-  }));
+  const at = toSource(commentRanges(html));
+  return pieceTags(stripComments(html)).map(({start, end, tag, before, value, after}) => {
+    const from = at(start), to = at(end - 1) + 1;
+    return {start: from, end: to, tag, before, after, name: value.trim().split(/\s+/)[0], commented: to - from !== end - start};
+  });
+}
+
+/**
+ * Why a browser would read this map's tags differently from the build, or null: a quote never closed before a tag's
+ * ">" (a ">" inside a value) — from there on, which tag is which is the browser's call, not the scan's.
+ */
+export function mapAmbiguity(html) {
+  const odd = tagsWith(stripComments(html), /(?:)/).find((t) => readAttributes(t.after) === null);
+  return odd ? `a quote in its <${odd.tag}> is never closed before its ">"` : null;
 }
 
 /** Where a piece's inline `prop` (left or top) is written: {value, at, length, unit, styleAt} as places in the whole text, or null. */
@@ -46,7 +62,7 @@ function placeOf(piece, prop) {
     const style = attrValue(attrs, 'style');
     if (!style) continue;
     const n = styleLength(style.value, prop);
-    return n && Number.isFinite(n.value) ? {...n, at: from + style.at + n.at, styleAt: from + style.at} : null;
+    return n && Number.isFinite(n.value) ? {...n, at: from + style.at + n.at, styleAt: from + style.at, style: style.value} : null;
   }
   return null;
 }
@@ -56,11 +72,10 @@ function placeOf(piece, prop) {
  * comments, after the icons (an <i> with an icon is an icon, never a wire) — so this does too, and maps them back.
  */
 function wiresBySource(html) {
-  const ranges = commentRanges(html), at = new Map();
-  let r = 0, removed = 0;
+  const place = toSource(commentRanges(html)), at = new Map();
   for (const w of wireTags(stripComments(html))) {
-    while (r < ranges.length && w.start >= ranges[r][0] - removed) { removed += ranges[r][1] - ranges[r][0]; r += 1; }
-    if (!/\sdata-icon="[\w-]+"/.test(w.before + w.after)) at.set(w.start + removed, w);
+    const start = place(w.start);
+    if (!/\sdata-icon="[\w-]+"/.test(w.before + w.after)) at.set(start, w);
   }
   return at;
 }
@@ -90,6 +105,11 @@ function moveEdits(html, piece, dx, dy) {
   const left = placeOf(piece, 'left'), top = placeOf(piece, 'top');
   if (!left || !top) throw new Error(`"${piece.name}" has no inline left/top in px — a piece without them keeps its place; give it left and top to move it`);
   if (browserValueAt(html, piece, 'style') !== left.styleAt) throw ambiguous();
+  // CSS reads a style its own way: a comment, an escape, or a second left/top (the last one wins) — refused, not guessed
+  const declared = (prop) => (left.style.match(new RegExp(`(?:^|;)\\s*${prop}\\s*:`, 'g')) ?? []).length;
+  if (/\/\*|\\/.test(left.style) || declared('left') > 1 || declared('top') > 1) {
+    throw new Error(`"${piece.name}": its style holds a comment, an escape or a second left/top — move it in the file`);
+  }
   // a bare 0 is the one length CSS takes without a unit: once it is not 0, it is written in px
   return [left, top].map((p, i) => [p.at, p.length, `${num(p.value + (i ? dy : dx))}${p.unit ? '' : 'px'}`]);
 }

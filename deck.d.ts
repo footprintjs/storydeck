@@ -151,8 +151,8 @@ export interface DeckServer {
  * 127.0.0.1, ::1 or localhost; anything else is refused), requests addressed to localhost only. It reads, and takes
  * two edits from its own page (its origin and its per-session token, JSON, at most 16 KB): a note on a click, appended
  * to feedback.md and signed with the person's note key (kept in `home`: STORYDECK_HOME or ~/.storydeck), and a piece
- * moved by Alt-drag, written into its map file. `poll` (ms, 0 for none) compares the folder's stamp so a save the
- * watcher missed still rebuilds.
+ * moved by Alt-drag, written into its map file. Only StoryDeck's own scripts run in what it serves (a nonce policy).
+ * `poll` (ms, 0 for none) compares the folder's stamp so a save the watcher missed still rebuilds.
  */
 export function serveDeck(dir: string, options?: { port?: number; host?: '127.0.0.1' | '::1' | 'localhost'; watch?: boolean; poll?: number; log?: (line: string) => void; tries?: number; home?: string }): Promise<DeckServer>;
 

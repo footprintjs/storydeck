@@ -1,9 +1,10 @@
 // @vitest-environment node
 import {afterEach, describe, it, expect} from 'vitest';
-import {chmodSync, statSync, symlinkSync, writeFileSync} from 'node:fs';
+import {chmodSync, existsSync, statSync, symlinkSync, writeFileSync} from 'node:fs';
+import {homedir} from 'node:os';
 import path from 'node:path';
 import {noteKey, signNote, signedBy, storydeckHome} from './noteKey.js';
-import {tempDir, cleanDecks} from './test/helpers.js';
+import {tempDeck, tempDir, cleanDecks} from './test/helpers.js';
 
 afterEach(cleanDecks);
 const posix = process.platform !== 'win32';
@@ -35,25 +36,40 @@ describe('noteKey', () => {
 
   it('signs a note over its click, the person\'s words and the time — never the deck\'s label — and knows its own signatures only', () => {
     const {key} = noteKey(path.join(tempDir(), 's'), {create: true});
-    const note = {n: 3, label: 'Route', text: 'wider', at: '2026-10-21 12:00'};
-    const sig = signNote(key, note);
+    const note = {n: 3, label: 'Route', text: 'wider', at: '2026-10-21 12:00'}, deck = '/decks/a';
+    const sig = signNote(key, note, deck);
     expect(sig).toMatch(/^[0-9a-f]{16}$/);
-    expect(signedBy(key, {...note, done: true, sig})).toBe(true);   // ticking a note keeps it the person's
-    expect(signedBy(key, {...note, label: 'the deck renamed this click', sig})).toBe(true);   // the label is the deck's text
-    for (const changed of [{n: 4}, {text: 'narrower'}, {at: '2026-10-22 12:00'}]) expect(signedBy(key, {...note, ...changed, sig})).toBe(false);
+    expect(signedBy(key, {...note, done: true, sig}, deck)).toBe(true);   // ticking a note keeps it the person's
+    expect(signedBy(key, {...note, label: 'the deck renamed this click', sig}, deck)).toBe(true);   // the label is the deck's text
+    for (const changed of [{n: 4}, {text: 'narrower'}, {at: '2026-10-22 12:00'}]) expect(signedBy(key, {...note, ...changed, sig}, deck)).toBe(false);
+    expect(signedBy(key, {...note, sig}, '/decks/b')).toBe(false);   // copied into another deck, it is not this deck's note
     const {key: theirs} = noteKey(path.join(tempDir(), 't'), {create: true});
-    expect(signedBy(theirs, {...note, sig})).toBe(false);
-    expect(signedBy(null, {...note, sig})).toBe(false);
-    expect(signedBy(key, {...note, sig: 'XYZ'})).toBe(false);
+    expect(signedBy(theirs, {...note, sig}, deck)).toBe(false);
+    expect(signedBy(null, {...note, sig}, deck)).toBe(false);
+    expect(signedBy(key, {...note, sig: 'XYZ'}, deck)).toBe(false);
   });
 
-  it('lives in STORYDECK_HOME, or in ~/.storydeck', () => {
+  it('never lives inside the deck folder the dev server serves — made there or not, through a link or not', () => {
+    const deck = tempDeck();
+    for (const home of [path.join(deck, 'state'), deck, path.join(deck, 'a', 'b')]) {
+      expect(noteKey(home, {create: true, deck}).why).toMatch(/is inside the deck folder, which the dev server serves — set STORYDECK_HOME elsewhere/);
+    }
+    expect(existsSync(path.join(deck, 'state'))).toBe(false);   // refused before anything is made
+    const outside = tempDir();
+    symlinkSync(deck, path.join(outside, 'link'));
+    expect(noteKey(path.join(outside, 'link', 'state'), {create: true, deck}).why).toMatch(/inside the deck folder/);
+    expect(noteKey(path.join(outside, 'home'), {create: true, deck}).key).toHaveLength(32);
+  });
+
+  it('lives in STORYDECK_HOME (a relative one from the home folder, never the folder you run in), or in ~/.storydeck', () => {
     const before = process.env.STORYDECK_HOME;
     try {
       process.env.STORYDECK_HOME = '/somewhere/else';
       expect(storydeckHome()).toBe('/somewhere/else');
+      process.env.STORYDECK_HOME = 'state';
+      expect(storydeckHome()).toBe(path.join(homedir(), 'state'));
       delete process.env.STORYDECK_HOME;
-      expect(storydeckHome()).toMatch(/\.storydeck$/);
+      expect(storydeckHome()).toBe(path.join(homedir(), '.storydeck'));
     } finally {
       if (before === undefined) delete process.env.STORYDECK_HOME; else process.env.STORYDECK_HOME = before;
     }

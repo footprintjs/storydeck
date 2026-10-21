@@ -23,7 +23,10 @@
   gave it (in the dev page only) and is refused while the build fails, when the map changed since the build, or when a
   browser would read the piece's tag differently; a bare `0` moved is written in px. Everything the tools print is
   text, never what a reader cannot see (controls, bidi marks, Unicode tag characters, runs of selectors); a note's
-  signature covers the person's words, never the click's label (the deck's text), which is never listed. `loadDeck`/`compileDeck` take `{dev}`; `deckHtml` also returns the source.
+  signature covers the person's words and the deck's folder, never the click's label (the deck's text), which is never
+  listed. In development only StoryDeck's own scripts run (a nonce policy on every answer): a deck's own scripts run in
+  the built page, and none can reach the dev page's edits. The build refuses a `data-sd-…` attribute a deck writes
+  itself. The note key is never read through a link nor kept inside the deck folder. `loadDeck`/`compileDeck` take `{dev}`; `deckHtml` also returns the source.
 - **Every scan of a deck's text is one pass.** Stripping comments, reading a map's pieces and drawing a slide's focus
   (`readPieces`, `drawFocus`, also on `footprint-storydeck/focus-html`), reading an icon file, and drawing wires and
   icons were quadratic on unfinished tags, unclosed comments or one tag repeating an attribute: a hostile 4 MB map took

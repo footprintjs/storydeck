@@ -204,6 +204,33 @@ describe('devClient', () => {
       delete globalThis.fetch;
     });
 
+    it('names the slide\'s own map — never a box a deck drew inside it to look like one', async () => {
+      const stage = editable();
+      globalThis.fetch = answer(true, {ok: true});
+      devClient();
+      // a piece holding a fake map, with a numbered element inside: the map is the section's own child, "route"
+      stage.querySelector('[data-sd-at="1"]').innerHTML = '<div class="map map-other"><span data-k="a" data-sd-at="0">x</span></div>';
+      const inner = stage.querySelector('.map-other [data-sd-at]');
+      pointer(inner, 'pointerdown', {altKey: true, clientX: 0, clientY: 0});
+      pointer(inner, 'pointerup', {clientX: 20, clientY: 0});
+      await settle();
+      expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({map: 'route', index: 0});
+      delete globalThis.fetch;
+    });
+
+    it('says once when a deck script was held back by the dev page\'s policy', () => {
+      editable();
+      devClient();
+      const blocked = (directive) => document.dispatchEvent(Object.assign(new Event('securitypolicyviolation'), {effectiveDirective: directive}));
+      blocked('img-src');
+      expect(document.querySelector('.sd-dev').textContent).not.toContain('deck scripts off in dev');
+      blocked('script-src-elem');
+      blocked('script-src-attr');
+      const bar = document.querySelector('.sd-dev');
+      expect(bar.textContent.match(/deck scripts off in dev/g)).toHaveLength(1);
+      expect(bar.querySelector('span[title]').title).toMatch(/Only StoryDeck's own scripts run in the dev page/);
+    });
+
     it('ignores a drag without Alt, one that ends where it began, a cancelled one — and every drag on a page without its token', () => {
       const stage = editable();
       globalThis.fetch = answer(true, {ok: true});

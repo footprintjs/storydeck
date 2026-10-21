@@ -397,8 +397,8 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   coordinates — is written into the map file, every other byte kept, and the page reloads on the same click. An agent
   reads the open notes (`storydeck feedback`, or the MCP `feedback` tool; `check` counts them), makes the change, and
   ticks the line (`- [x]`). Pointing costs the person a second and the agent no screenshot. Each note is signed with a
-  key kept with you (`~/.storydeck/key`), so a feedback.md that came with someone else's deck is never read as your
-  requests: its lines are counted, never listed.
+  key kept with you (`~/.storydeck/key`) for that deck's folder, so a feedback.md that came with someone else's deck is
+  never read as your requests: its lines are counted, never listed.
 - **Read first, look last.** A reviewer — a person, or a model that pays for every screenshot — reads the deck as text:
   `outline` (a line per click), `review --click 14` (its headline and words, what it lights, greys, brings in and moves,
   its route, its notes), `check` (what to fix, each with its click and its fix: a headline over 12 words, pieces that
@@ -423,7 +423,8 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   It writes only the two edits its own page sends — a note and a piece moved — each checked before it is read (the
   page's origin, a per-session token only that page carries, JSON, 16 KB at most) and written by the same rules as a
   build; a move edits only the piece the build drew, and only bytes a browser reads the same way. No other origin may
-  frame it. Every scan of a deck's text is one pass, so a hostile 4 MB file costs no more than its length, and what the
+  frame it, and only StoryDeck's own scripts run in it (a nonce policy): a deck's own scripts run in the built page,
+  never in development, so nothing a deck carries can send those edits. Every scan of a deck's text is one pass, so a hostile 4 MB file costs no more than its length, and what the
   tools print is text, never a deck's control characters. A deck's own HTML — its scripts included — runs in the browser like any page you open, in the dev page
   and in the layout check: open decks you trust. Run the commands from your own project, naming the deck folder.
 

@@ -92,14 +92,14 @@ describe('serveDeck', () => {
   });
 
   it('serves nothing hidden, nothing outside the folder, and nothing through a link that leaves it or hides', async () => {
-    const dir = tempDeck({...STARTER, '.env': 'SECRET=1', 'sub/.hidden': 'x'});
+    const dir = tempDeck({...STARTER, '.env': 'SECRET=1', 'sub/.hidden': 'x', 'node_modules/w/demo.html': '<script>SECRET</script>'});
     const secret = path.join(tempDir(), 'secret.txt');
     writeFileSync(secret, 'TOP SECRET');
     symlinkSync(secret, path.join(dir, 'leak.txt'));
     symlinkSync(path.join(dir, '.env'), path.join(dir, 'env.txt'));
     mkdirSync(path.join(dir, 'pics'));
     const s = await serve(dir);
-    for (const p of ['/.env', '/sub/.hidden', '/../package.json', '/%2e%2e/%2e%2e/etc/passwd', '/leak.txt', '/env.txt', '/icons', '/nope.png', '/%E0%A4%A', '/a%00b', '/pics']) {
+    for (const p of ['/.env', '/sub/.hidden', '/../package.json', '/%2e%2e/%2e%2e/etc/passwd', '/leak.txt', '/env.txt', '/icons', '/nope.png', '/%E0%A4%A', '/a%00b', '/pics', '/node_modules/w/demo.html']) {
       const r = await get(s, p);
       expect([p, r.status]).toEqual([p, 404]);
       expect(r.body).not.toContain('SECRET');
@@ -295,7 +295,8 @@ describe('edits from the dev page', () => {
     expect((await post(s, '/__storydeck/elsewhere', note, {token})).status).toBe(405);
     for (const origin of [`http://127.0.0.1:${s.port}`, `http://[::1]:${s.port}`]) expect((await post(s, '/__storydeck/feedback', note, {token, origin})).status).toBe(200);
     for (const answer of [await get(s, '/'), await get(s, '/icons/server.svg'), await post(s, '/__storydeck/feedback', note, {token})]) {
-      expect(answer.headers).toMatchObject({'x-frame-options': 'SAMEORIGIN', 'content-security-policy': "frame-ancestors 'self'"});
+      expect(answer.headers['x-frame-options']).toBe('SAMEORIGIN');
+      expect(answer.headers['content-security-policy']).toMatch(/^script-src 'nonce-[A-Za-z0-9+/=]{24}'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'$/);
     }
   });
 
@@ -323,13 +324,30 @@ describe('edits from the dev page', () => {
     expect(s.state().version).toBe(2);
   });
 
-  it('refuses every move on a map whose drawn pieces are not its file\'s, in order', async () => {
-    // the build reads <div<!-- c -->data-k…> as no piece (its comment stripped, "divdata-k" is one name); the file holds one
-    const dir = tempDeck({...STARTER, 'map.html': `${STARTER['map.html']}<div<!-- c -->data-k="y" style="left:5px;top:5px">Y</div>`});
-    const {s, token, at} = await editing(dir);
-    const r = await post(s, '/__storydeck/move', {map: 'map', index: at('server'), name: 'server', dx: 1, dy: 1}, {token});
-    expect(r.body.error).toMatch(/map "map": the pieces it draws are not the pieces its file holds/);
-    expect(readFileSync(path.join(dir, 'map.html'), 'utf8')).toContain('left:720px;top:420px');
+  it('refuses every move on a map whose drawn pieces are not its file\'s, or that a browser reads differently', async () => {
+    // an icon drawn with a piece of its own: the build's pieces are not the file's, so no number names the same one
+    const iconic = tempDeck({...STARTER, 'icons/server.svg': '<svg viewBox="0 0 8 8"><g data-k="inner"></g></svg>'});
+    const one = await editing(iconic);
+    const r = await post(one.s, '/__storydeck/move', {map: 'map', index: 0, name: 'client', dx: 1, dy: 1}, {token: one.token});
+    expect(r.body.error).toMatch(/map "map": the pieces it draws are not the pieces its file holds, in that order \(an icon holding pieces of its own\)/);
+    // a quote never closed before a tag's ">": from there on the browser, not the scan, says which tag is which
+    const odd = tempDeck({...STARTER, 'map.html': `${STARTER['map.html']}<div title="x>y">Q</div>`});
+    const two = await editing(odd);
+    const r2 = await post(two.s, '/__storydeck/move', {map: 'map', index: two.at('server'), name: 'server', dx: 1, dy: 1}, {token: two.token});
+    expect(r2.body.error).toMatch(/map "map": a browser reads it differently from the build \(a quote in its <div> is never closed before its ">"\)/);
+    expect(readFileSync(path.join(odd, 'map.html'), 'utf8')).toContain('left:720px;top:420px');
+  });
+
+  it('runs only StoryDeck\'s own scripts: every script it writes carries the nonce its policy names, no other', async () => {
+    const dir = tempDeck({...STARTER, 'clicks.html': STARTER['clicks.html'].replace('</section>', '<script>steal()</script></section>')});
+    const s = await serve(dir, {watch: false, poll: 0, home: tempDir()});
+    const page = await get(s, '/');
+    const nonce = /script-src 'nonce-([^']+)'/.exec(page.headers['content-security-policy'])[1];
+    // StoryDeck's own: the theme, the stage, four runtimes and the dev client — each with the nonce; nothing else has one
+    expect(page.body.split(`<script nonce="${nonce}">`).length - 1).toBe(7);
+    expect(page.body.match(/<script nonce=/g)).toHaveLength(7);
+    expect(page.body).toContain('<script>steal()</script>');   // the deck's script is in the page, and its policy will not run it
+    expect((await get(s, '/icons/server.svg')).headers['content-security-policy']).toContain(`'nonce-${nonce}'`);
   });
 
   it('waits for a first build before any edit, and signs no note with a key it cannot trust', async () => {

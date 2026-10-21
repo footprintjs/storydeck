@@ -43,26 +43,37 @@ text. Each module does one job, and they compose in one direction:
   `/__storydeck/move`, written into that map's file). Each is checked before its body is read: the page's own origin,
   the per-session token only the served page carries (compared in constant time), JSON, at most 16 KB. Both are
   written by `paths.js · writeInside`, so never through a link; a note never rebuilds, a move rebuilds at once. Every
-  answer refuses to be framed by another origin. A deck's own HTML runs in the dev page and can send these two edits
-  as the page does: serve decks you trust.
+  answer refuses to be framed by another origin and carries a policy that runs only scripts with this server's nonce —
+  StoryDeck's own, which `page.js` marks (`dev.nonce`). So no script a deck carries, in its page or in any file of its
+  folder opened on its own, runs in development, and none can read the page's token to send these edits; the dev bar
+  says "deck scripts off in dev" when one is held back. A deck's own scripts run in the page `storydeck build` writes.
+  The deck's dependencies (`node_modules`) are never served.
 - **A note is known for the person's by its signature, never by where it is** (`noteKey.js`). A deck someone sent you
   can carry a feedback.md; its lines must never pass for your requests. The dev server signs each note it writes with a
-  key kept with you (`~/.storydeck/key`, or STORYDECK_HOME; made once, readable by you only), and `feedback`, `check`
-  and the MCP tool list only the notes that key signed. Any other open line is counted, never listed: text that came
+  key kept with you (`~/.storydeck/key`, or STORYDECK_HOME — a relative one from your home folder; made once, readable
+  by you only, read from the file it opened and never through a link, refused inside the deck folder, which the dev
+  server serves), for this deck's folder, and `feedback`, `check` and the MCP tool list only the notes that key signed
+  for that folder (a note copied into another deck is not that deck's). Any other open line is counted, never listed: text that came
   with the deck (or was edited by hand), not a request. A signature vouches for the person's words only — the click,
   the text, the time — never the click's label, which is the deck's text: it stays in the line for a reader of the
   file, and is never listed. Everything the tools print passes `tools.js · printable`, so a deck's labels and notes
   reach a terminal or a model as text, never as what a reader cannot see (html.js · UNSEEN, an allow-list: visible
   letters, marks, numbers, punctuation, symbols and spaces; a joiner or presentation selector only where an emoji
-  needs it — so controls, bidi marks, fillers, Unicode tag characters and private code points are out).
+  needs it, a non-joiner only inside a word of a script it shapes — so controls, bidi marks, fillers, Unicode tag
+  characters and private code points are out).
 - **A move names the piece the build drew, and edits only what a browser and the build both read.** In the dev page
   only, each piece carries the number the build gave it (`compile.js · numberForDev`, `data-sd-at`); an element the
-  build did not read as a piece has none and cannot be dragged. `pieceRules.js` (at the package root) owns which tags
-  are pieces and where a left/top is written, for `focusHtml.js` and `edit.js` alike; `transforms.js · wireTags` owns
-  which pieces are wires (found as the build finds them: without comments, after icons). A move is refused while the
-  build fails, when the map's file changed since the build, when the build's pieces are not the file's in order, and
-  when a browser reads the piece's tag differently (`pieceRules.js · readAttributes`: a quote or a `>` inside a value).
-  Every other byte of the file is kept; a bare `0` moved is written in px.
+  build did not read as a piece has none and cannot be dragged, and a deck may not write those numbers itself (the
+  build refuses any `data-sd-…` attribute in a map or a slide). The map is the slide's own (`[data-deck-active] >
+  .map`), never a box a deck drew. `pieceRules.js` (at the package root) owns which tags are pieces and where a
+  left/top is written, for `focusHtml.js` and `edit.js` alike; `edit.js · sourcePieces` is the build's own scan of the
+  text without comments, placed back in the source, and `transforms.js · wireTags` owns which pieces are wires (found
+  as the build finds them: without comments, after icons). A move is refused while the build fails, when the map's
+  file changed since the build, when the build's pieces are not the file's in order (an icon holding pieces), when any
+  tag of the map holds a quote never closed before its `>` (`edit.js · mapAmbiguity`), when a comment sits inside the
+  piece's tag, when a browser reads the piece's tag differently (`pieceRules.js · readAttributes`), and when its style
+  is one CSS reads its own way (a comment, an escape, a second left or top). Every other byte of the file is kept; a
+  bare `0` moved is written in px.
 - **Every scan of a deck's text is one pass.** Comments, pieces, a slide's focus, icons and icon files, wires and
   elements are each found once: a 4 MB file of unfinished tags, unclosed comments or one tag repeating an attribute
   costs no more than its length (pinned by tests, and each rewritten scan proved equal to the regex it replaced on

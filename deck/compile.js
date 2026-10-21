@@ -26,8 +26,18 @@ function numberForDev(html) {
   return out + html.slice(from);
 }
 
+/**
+ * The deck's own HTML never carries StoryDeck's numbering attributes (data-sd-…): the build numbers the pieces with them,
+ * and the dev page moves a piece by them — one written by hand would name a piece that is not the one shown.
+ */
+function refuseOwnNumbers(where, html) {
+  const own = tagsWith(stripComments(html), /\sdata-sd-[\w-]*/i)[0];
+  if (own) throw new Error(`${where}: ${own.m[0].trim()} is StoryDeck's own attribute (it numbers the pieces) — remove it from <${own.tag}>`);
+}
+
 /** A map ready to plan on: its HTML with the helpers applied and its pieces read (`dev`: numbered for the dev page). */
 function prepareMap(name, html, icons, dev) {
+  refuseOwnNumbers(`map "${name}"`, html);
   let drawn;
   try {
     drawn = applyTransforms(stripComments(html), {icons});
@@ -45,6 +55,7 @@ function planClicks(parts, maps, {area, canvas, icons}) {
   const clicks = [];
   for (const part of parts) {
     if (!part.map) {
+      refuseOwnNumbers(`"${part.label}"`, part.body);
       let inner;
       try {
         inner = applyTransforms(part.body, {icons});

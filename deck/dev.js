@@ -16,8 +16,10 @@
 //   · it reads the page, the reload channel and the deck folder's own files (paths.js · servedFile: no hidden file,
 //     nothing outside the folder, through a link either), and writes only the two edits above (paths.js · writeInside);
 //   · it sends no CORS header and marks every answer same-origin only, so another site cannot read, embed or frame it;
+//   · every answer runs only StoryDeck's own scripts (a nonce policy): no script a deck carries runs in the dev page or
+//     in any file of the folder served on its own, so none can read the page's token and send its edits;
 //   · a request it cannot read is answered 400; nothing a request sends can stop the server.
-// A deck's own HTML runs in the page, as any page you open does — and can send the page's two edits: serve decks you trust.
+// A deck's own HTML still renders in the page, as any page you open does (its scripts run in the built page only).
 import http from 'node:http';
 import {randomBytes, timingSafeEqual} from 'node:crypto';
 import {watch, createReadStream, readdirSync, lstatSync} from 'node:fs';
@@ -27,7 +29,7 @@ import {devClient} from './devClient.js';
 import {scriptSafe} from './html.js';
 import {deckRoot, servedFile, presence, writeInside} from './paths.js';
 import {deckFileText, mapFile} from './source.js';
-import {FEEDBACK, nudgePiece, sourcePieces, cleanNote, feedbackLine, appendFeedback, readFeedback} from './edit.js';
+import {FEEDBACK, nudgePiece, sourcePieces, mapAmbiguity, cleanNote, feedbackLine, appendFeedback, readFeedback} from './edit.js';
 import {noteKey, signNote, signedBy, storydeckHome} from './noteKey.js';
 
 const MAX_BODY = 16 * 1024;
@@ -39,9 +41,15 @@ const TYPES = {
   '.avif': 'image/avif', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.woff': 'font/woff', '.mp4': 'video/mp4',
   '.webm': 'video/webm', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.wav': 'audio/wav', '.txt': 'text/plain; charset=utf-8', '.md': 'text/plain; charset=utf-8',
 };
-// every answer: no sniffing, no caching, no referrer, readable and frameable by this origin only
-const SAFE = {'x-content-type-options': 'nosniff', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'cross-origin-resource-policy': 'same-origin',
-  'x-frame-options': 'SAMEORIGIN', 'content-security-policy': "frame-ancestors 'self'"};
+/**
+ * The headers of every answer: no sniffing, no caching, no referrer, readable and frameable by this origin only — and a
+ * policy that runs only the scripts carrying this server's nonce (StoryDeck's own: page.js marks them), so nothing a
+ * deck carries, in its page or any file of its folder, runs here: no deck script can read the page's token and send
+ * its edits. (A deck's own scripts run in the page `storydeck build` writes.)
+ */
+const answerHeaders = (nonce) => ({'x-content-type-options': 'nosniff', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer',
+  'cross-origin-resource-policy': 'same-origin', 'x-frame-options': 'SAMEORIGIN',
+  'content-security-policy': `script-src 'nonce-${nonce}'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'`});
 const LOOPBACK = ['127.0.0.1', '::1', 'localhost'];
 const IGNORED = /(^|[\\/])(node_modules|\.[^\\/]*)([\\/]|$)/;   // dependencies and hidden files (.git, editor swap files)
 
@@ -53,8 +61,10 @@ const IGNORED = /(^|[\\/])(node_modules|\.[^\\/]*)([\\/]|$)/;   // dependencies 
 function editableMaps(source, compiled) {
   return Object.fromEntries(Object.entries(compiled.maps).map(([name, {pieces}]) => {
     const text = source.maps[name], names = pieces.map((p) => p.keys[0]);
+    const odd = mapAmbiguity(text);
+    if (odd) return [name, {why: `a browser reads it differently from the build (${odd})`}];
     const same = sourcePieces(text).map((p) => p.name).join('\n') === names.join('\n');
-    return [name, same ? {file: mapFile(source.config, name), text, names} : {why: 'the pieces it draws are not the pieces its file holds, in that order (an icon holding pieces, or a comment inside a tag)'}];
+    return [name, same ? {file: mapFile(source.config, name), text, names} : {why: 'the pieces it draws are not the pieces its file holds, in that order (an icon holding pieces of its own)'}];
   }));
 }
 
@@ -87,9 +97,9 @@ export function folderStamp(root, outputs = []) {
 }
 
 /** The page shown before the deck has ever built: the dev client alone, which shows why and reloads once it builds. */
-const waitingPage = (token) => `<!doctype html>
+const waitingPage = (token, nonce) => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="storydeck-dev" content="0"><meta name="storydeck-dev-token" content="${token}"><title>storydeck dev</title></head>
-<body style="background:#0f1216"><script>(${scriptSafe(devClient)})();</script></body></html>
+<body style="background:#0f1216"><script nonce="${nonce}">(${scriptSafe(devClient)})();</script></body></html>
 `;
 
 /** A request's Host header names this server on the loopback address. */
@@ -128,6 +138,8 @@ export async function serveDeck(dir, {port = 4321, host = '127.0.0.1', watch: wa
   // feedback.md is written by the page itself: a note never rebuilds the deck
   let version = 0, page = null, problem = null, outputs = ['index.html', FEEDBACK], stamp = null, current = null;
   const token = randomBytes(16).toString('hex');   // only the page this server serves can read it
+  const nonce = randomBytes(16).toString('base64');   // only StoryDeck's own scripts carry it
+  const SAFE = answerHeaders(nonce);
   const clients = new Set();
   const send = (event, data) => { for (const res of clients) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
 
@@ -135,7 +147,7 @@ export async function serveDeck(dir, {port = 4321, host = '127.0.0.1', watch: wa
     const t0 = performance.now();
     stamp = folderStamp(root, outputs);   // what this build read: a later stamp that differs is a save
     try {
-      const {source, compiled, html} = deckHtml(root, {dev: {client: devClient, version: version + 1, token}});
+      const {source, compiled, html} = deckHtml(root, {dev: {client: devClient, version: version + 1, token, nonce}});
       version += 1;
       page = html;
       problem = null;
@@ -178,13 +190,13 @@ export async function serveDeck(dir, {port = 4321, host = '127.0.0.1', watch: wa
       if (!Number.isInteger(n) || n < 1 || n > compiled.clicks.length) return [400, {error: `no click ${JSON.stringify(n)}`}];
       if (typeof body.text !== 'string') return [400, {error: 'a note is text'}];
       const note = cleanNote({n, label: compiled.clicks[n - 1].label, text: body.text, at: localStamp(new Date())});
-      const {key, why} = noteKey(home, {create: true});
+      const {key, why} = noteKey(home, {create: true, deck: root});
       if (!key) return [409, {error: `${why} — a note is signed with it, so it is known for yours`}];
       const file = path.join(root, FEEDBACK);
-      const after = appendFeedback(presence(file) === 'missing' ? '' : deckFileText(root, FEEDBACK), feedbackLine(note, signNote(key, note)));
+      const after = appendFeedback(presence(file) === 'missing' ? '' : deckFileText(root, FEEDBACK), feedbackLine(note, signNote(key, note, root)));
       writeInside(root, file, after);
       log(`noted on click ${n}`);
-      return [200, {ok: true, open: readFeedback(after).filter((f) => !f.done && signedBy(key, f)).length}];
+      return [200, {ok: true, open: readFeedback(after).filter((f) => !f.done && signedBy(key, f, root)).length}];
     }
     const {map, index, name, dx, dy} = body;
     if (typeof map !== 'string' || !Object.hasOwn(maps, map)) return [400, {error: `no map ${JSON.stringify(map)}`}];
@@ -246,7 +258,7 @@ export async function serveDeck(dir, {port = 4321, host = '127.0.0.1', watch: wa
     try { ({pathname} = new URL(req.url, 'http://localhost')); } catch { return deny(400, 'a request storydeck dev cannot read'); }
     if (pathname === '/' || pathname === '/index.html') {
       res.writeHead(200, {'content-type': 'text/html; charset=utf-8', ...SAFE});
-      return res.end(req.method === 'HEAD' ? undefined : page ?? waitingPage(token));
+      return res.end(req.method === 'HEAD' ? undefined : page ?? waitingPage(token, nonce));
     }
     if (pathname === '/__storydeck/events') {
       res.writeHead(200, {'content-type': 'text/event-stream', ...SAFE, connection: 'keep-alive'});

@@ -58,15 +58,16 @@ export function realInside(root, full, name) {
 }
 
 /**
- * The file a URL path names in the deck folder, for the dev server — or null: no hidden segment in the name, and its
- * real path a file inside the folder and not hidden.
+ * The file a URL path names in the deck folder, for the dev server — or null: no hidden segment and no node_modules in
+ * the name, and its real path a file inside the folder and not hidden.
  */
 export function servedFile(root, pathname) {
   let rel;
   try { rel = decodeURIComponent(pathname); } catch { return null; }
   if (rel.includes('\0')) return null;
   const segs = rel.split(/[\\/]+/).filter(Boolean);
-  if (!segs.length || segs.some((s) => s === '..' || hidden(s))) return null;
+  // a deck's dependencies are not the deck: never served (the watcher never reads them either)
+  if (!segs.length || segs.some((s) => s === '..' || hidden(s) || s === 'node_modules')) return null;
   try {
     const real = realInside(root, path.join(root, ...segs), rel);
     return statSync(real).isFile() ? real : null;
