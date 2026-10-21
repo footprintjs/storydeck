@@ -9,13 +9,12 @@
 //   <section data-label="Summary" data-kicker="Summary">…any slide HTML…</section>  a plain slide: one click
 //
 // A part is strict about what it holds, so nothing an author wrote is dropped without a word: a step holds its
-// headline and its notes, and anything else in it is refused, naming where it goes instead (on the map).
+// headline and its notes, and anything else in it is refused, naming where it goes instead (on the map). The file is
+// scanned once (html.js · elements): a <section> or <step> left open is refused at once, naming it.
+import {elements, stripComments} from './html.js';
 
-const COMMENT = /<!--[\s\S]*?-->/g;
-const SECTION = /<section\b([^>]*)>([\s\S]*?)<\/section>/g;
-const STEP = /<step\b([^>]*)>([\s\S]*?)<\/step>/g;
-const NOTES = /<aside\b[^>]*\bclass=(["'])(?:[^"']*\s)?notes(?:\s[^"']*)?\1[^>]*>([\s\S]*?)<\/aside>/g;
 const HEADLINE = /<h2\b[^>]*>([\s\S]*?)<\/h2>/;
+const NOTES_CLASS = /\sclass=(["'])(?:[^"']*\s)?notes(?:\s[^"']*)?\1/;
 
 /** An attribute's value in a run of attributes (double or single quoted), or null. */
 export function attrOf(attrs, name) {
@@ -34,10 +33,27 @@ export function plainText(html) {
 /** The number of words a reader reads in a piece of HTML. */
 export const wordCount = (html) => (plainText(html).match(/[\p{L}\p{N}][\p{L}\p{N}'’.,%-]*/gu) ?? []).length;
 
-/** The notes taken out of some HTML: {html: the HTML without them, notes: one plain paragraph per <aside class="notes">}. */
+/**
+ * The notes taken out of some HTML: {html: the HTML without them, notes: one plain paragraph per <aside class="notes">}.
+ * Scanned once; any other <aside> stays where it is.
+ */
 export function takeNotes(html) {
-  return {html: html.replace(NOTES, ''), notes: [...html.matchAll(NOTES)].map((m) => plainText(m[2])).filter(Boolean)};
+  const open = /<aside\b([^>]*)>/gi, lower = html.toLowerCase(), notes = [];
+  let kept = '', from = 0;
+  for (let m = open.exec(html); m; m = open.exec(html)) {
+    if (!NOTES_CLASS.test(m[1])) continue;
+    const shut = lower.indexOf('</aside>', m.index + m[0].length);
+    if (shut < 0) throw new Error(`<aside${m[1]}> is never closed — end the notes with </aside>`);
+    notes.push(plainText(html.slice(m.index + m[0].length, shut)));
+    kept += html.slice(from, m.index);
+    from = shut + '</aside>'.length;
+    open.lastIndex = from;
+  }
+  return {html: kept + html.slice(from), notes: notes.filter(Boolean)};
 }
+
+/** The HTML with the given [start, end) ranges taken out. */
+const without = (html, ranges) => ranges.reduceRight((out, r) => out.slice(0, r.start) + out.slice(r.end), html);
 
 const where = (label) => `"${label}"`;
 
@@ -58,15 +74,13 @@ function readMapStep(label, k, attrs, inner) {
  * <step>; a part without one is a plain slide (one click). Labels are unique; every part has one.
  */
 export function parseClicks(html) {
-  const source = html.replace(COMMENT, '');
+  const source = stripComments(html);
   const parts = [];
   const seen = new Set();
-  let end = 0;
-  for (const m of source.matchAll(SECTION)) {
-    const between = plainText(source.slice(end, m.index));
-    if (between) throw new Error(`text outside a <section>: "${between.slice(0, 60)}" — every slide is a <section data-label="…">`);
-    end = m.index + m[0].length;
-    const [, attrs, body] = m;
+  const sections = elements(source, 'section');
+  const stray = plainText(without(source, sections));
+  if (stray) throw new Error(`text outside a <section>: "${stray.slice(0, 60)}" — every slide is a <section data-label="…">`);
+  for (const {attrs, inner: body} of sections) {
     const label = attrOf(attrs, 'data-label');
     if (!label || !label.trim()) throw new Error(`a <section> has no data-label: <section${attrs}> — give each part a label, unique in the deck`);
     if (seen.has(label)) throw new Error(`two parts are labelled ${where(label)} — labels name the clicks, so each is unique`);
@@ -74,20 +88,19 @@ export function parseClicks(html) {
     const kicker = attrOf(attrs, 'data-kicker') ?? '';
     const map = attrOf(attrs, 'data-map');
     if (map === null) {
-      if (/<step\b/.test(body)) throw new Error(`${where(label)} has <step> clicks but no data-map — name the map they are told on (data-map="map")`);
+      if (/<step\b/i.test(body)) throw new Error(`${where(label)} has <step> clicks but no data-map — name the map they are told on (data-map="map")`);
       const {html: inner, notes} = takeNotes(body);
       parts.push({label, kicker, map: null, body: inner, notes});
       continue;
     }
     if (!map.trim()) throw new Error(`${where(label)}: data-map is empty — name a map (a file in the deck, e.g. data-map="map")`);
-    const steps = [...body.matchAll(STEP)];
+    let steps;
+    try { steps = elements(body, 'step'); } catch (e) { throw new Error(`${where(label)}: ${e.message}`, {cause: e}); }
     if (!steps.length) throw new Error(`${where(label)} is told on map "${map}" but has no <step> — a map part is one click per <step>`);
-    const outside = plainText(body.replace(STEP, '').replace(NOTES, ''));
+    const outside = plainText(takeNotes(without(body, steps)).html);
     if (outside) throw new Error(`${where(label)}: "${outside.slice(0, 60)}" is outside every <step> — put a headline or notes inside the step they belong to`);
-    parts.push({label, kicker, map: map.trim(), steps: steps.map(([, a, inner], k) => readMapStep(label, k, a, inner))});
+    parts.push({label, kicker, map: map.trim(), steps: steps.map(({attrs: a, inner}, k) => readMapStep(label, k, a, inner))});
   }
-  const after = plainText(source.slice(end));
-  if (after) throw new Error(`text outside a <section>: "${after.slice(0, 60)}" — every slide is a <section data-label="…">`);
   if (!parts.length) throw new Error('the clicks file has no <section> — a deck is one <section data-label="…"> per part');
   return parts;
 }

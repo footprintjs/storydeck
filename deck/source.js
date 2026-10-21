@@ -6,32 +6,27 @@
 //     map.html       a map: every element with data-k="name" and an inline left/top/width/height is a piece
 //     theme.css      the deck's tokens and look (light, and :root.dark)
 //     icons/*.svg    drawn identities, used as <i class="ic" data-icon="name"></i>
-import {existsSync, readFileSync, readdirSync, realpathSync, statSync} from 'node:fs';
+//
+// Every file is read as paths.js says: by its real path, inside the deck folder, never hidden.
+import {readFileSync, readdirSync, statSync} from 'node:fs';
 import path from 'node:path';
-import {readConfig, deckPath} from './config.js';
+import {readConfig} from './config.js';
 import {parseClicks} from './parse.js';
 import {readIcon} from './transforms.js';
+import {deckPath, deckRoot, presence, realInside} from './paths.js';
 
 const MAX_FILE = 4 * 1024 * 1024;   // a deck's text file is small; a bigger one is a mistake (a video, a dump), never read whole
-
-/**
- * Where a deck file really is — refused when it (or a folder on the way) is a link that leaves the deck folder, so a
- * deck someone sent you cannot pull a file from elsewhere on your machine into its page, its review or its server.
- */
-export function inside(root, full, file) {
-  const real = realpathSync(full);
-  if (real !== root && !real.startsWith(root + path.sep)) throw new Error(`${file} is a link to a file outside the deck folder — a deck reads only its own files`);
-  return real;
-}
 
 /** A text file inside the deck folder (`root`, a real path), or null when it is not there (and `need` is false). */
 function readText(root, file, {need, what}) {
   const full = path.join(root, file);
-  if (!existsSync(full)) {
+  const state = presence(full);
+  if (state === 'dangling') throw new Error(`${file} is a link to a file that is not there`);
+  if (state === 'missing') {
     if (need) throw new Error(`${what}: the deck has no ${file}`);
     return null;
   }
-  const real = inside(root, full, file);
+  const real = realInside(root, full, file);
   if (!statSync(real).isFile()) throw new Error(`${file} is not a file`);
   const size = statSync(real).size;
   if (size > MAX_FILE) throw new Error(`${file} is ${(size / 1048576).toFixed(1)} MB — a deck's text files stay under ${MAX_FILE / 1048576} MB`);
@@ -41,12 +36,16 @@ function readText(root, file, {need, what}) {
 /** The icons folder: every *.svg in it, by its name. */
 function readIcons(root, folder, need) {
   const full = path.join(root, folder);
-  if (!existsSync(full)) {
+  const state = presence(full);
+  if (state === 'dangling') throw new Error(`${folder}/ is a link to a folder that is not there`);
+  if (state === 'missing') {
     if (need) throw new Error(`deck.json "icons": the deck has no ${folder}/ folder`);
     return {};
   }
+  const real = realInside(root, full, `${folder}/`);
+  if (!statSync(real).isDirectory()) throw new Error(`${folder} is not a folder — icons are a folder of .svg files (deck.json "icons" names it)`);
   const set = {};
-  for (const name of readdirSync(inside(root, full, `${folder}/`)).filter((f) => f.endsWith('.svg')).sort()) {
+  for (const name of readdirSync(real).filter((f) => f.endsWith('.svg')).sort()) {
     const key = name.slice(0, -4);
     if (!/^[\w-]+$/.test(key)) throw new Error(`icons/${name}: an icon's name is letters, digits, - and _ (it is written data-icon="${key}")`);
     set[key] = readIcon(key, readText(root, `${folder}/${name}`, {need: true, what: 'icon'}));
@@ -59,8 +58,7 @@ function readIcons(root, folder, need) {
  * file it names must be inside the folder; a map is the file deck.json "maps" names, or <name>.html.
  */
 export function readDeck(dir) {
-  if (!existsSync(dir) || !statSync(dir).isDirectory()) throw new Error(`${dir} is not a folder — a deck is a folder with deck.json (make one: storydeck init ${dir})`);
-  const root = realpathSync(path.resolve(dir));
+  const root = deckRoot(dir);
   const config = readConfig(readText(root, 'deck.json', {need: true, what: `${dir} is not a deck`}));
   const clicksHtml = readText(root, config.clicks, {need: true, what: 'the clicks'});
   const parts = parseClicks(clicksHtml);

@@ -402,11 +402,14 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   `<i class="ic" data-icon="server"></i>` is `icons/server.svg`. `deck.css` styles the chrome (kicker, headline, footer
   and count), wires, packets, icons and the theme toggle from the token contract, every rule `:where()`, so your
   theme wins.
-- **A deck is files, never a program.** Nothing in a deck folder runs: no build script, no deck code. A deck reads only
-  its own files (a link that leaves the folder is refused, so a deck someone sent you cannot pull in a file from
-  elsewhere), the build never writes through a link, and `dev` listens on the loopback address only, answers only
-  requests addressed to localhost, and only reads. The browser for `check --layout` is found in the project you run
-  in, never in the deck folder.
+- **A deck is files, never a program — on your machine.** No deck code runs in Node: no build script, no deck module,
+  and the browser for `check --layout` is never loaded from the deck folder (nor from a copy of StoryDeck inside it).
+  A deck reads only its own files: a link that leaves the folder, or points at a hidden file (`.env`), is refused, so
+  a deck someone sent you cannot pull a file from elsewhere into its page, its review or its server. A build renames a
+  new file into place, so it never writes through a link, and a file deck.json names never lands outside the deck.
+  `dev` listens on the loopback address only, answers only requests addressed to localhost, only reads, and survives
+  any request. A deck's own HTML — its scripts included — runs in the browser like any page you open, in the dev page
+  and in the layout check: open decks you trust. Run the commands from your own project, naming the deck folder.
 
 The same parts are a Node door, for a script or a test of your own:
 

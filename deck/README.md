@@ -6,6 +6,8 @@ text. Each module does one job, and they compose in one direction:
 
 | Module | Its one job |
 |---|---|
+| `paths.js` | where a deck may read and write — the one owner of every path rule |
+| `html.js` | the shared HTML string rules: escaping, comments, closing-tag safety, the one-pass element scan |
 | `config.js` | deck.json read: defaults filled, an unknown key refused with the keys there are |
 | `parse.js` | clicks.html read into parts and clicks (a step holds its `<h2>` and notes; anything else is refused) |
 | `transforms.js` | the built-in drawing helpers: `data-arrow` wires (with packets), `data-icon` icons |
@@ -22,14 +24,21 @@ text. Each module does one job, and they compose in one direction:
 
 ## Laws
 
-- **A deck is files, never a program.** Nothing in a deck folder runs. The dev server rebuilds in its own process from
-  the deck's files; the browser for the layout check comes from the project you run in, never the deck folder.
-- **A deck reads only its own files.** Every file is read by its real path, and one outside the folder (through a link)
-  is refused — so a deck someone sent you cannot pull a file from elsewhere into its page, its review or its server.
-- **A build writes only what it says, where it says.** Never through a link (a dangling one included), and for a file
-  deck.json names, never outside the deck folder — checked before any folder is made.
-- **The dev server is for one person on one machine.** Loopback only; a request not addressed to localhost is refused
-  (DNS rebinding); GET and HEAD only; no hidden file, nothing outside the folder; no CORS header.
+- **A deck is files, never a program — in Node.** No deck code runs: the dev server rebuilds in its own process from
+  the deck's files, and the browser for the layout check is never loaded from the deck folder (nor from a StoryDeck
+  installed inside it). A deck's HTML does run in the browser, as any page does.
+- **A deck reads only its own files** (`paths.js · realInside`). Every file is read by its real path; one outside the
+  folder, or a hidden one inside it, reached through a link, is refused — so a deck someone sent you cannot pull a file
+  from elsewhere (or its own .env) into its page, its review or its server.
+- **A build writes only what it says, where it says** (`paths.js · writeInside`). A new file renamed into place, so never
+  through a link (a dangling or a hard link included); a file deck.json names never lands outside the deck folder —
+  checked before any folder is made.
+- **The dev server is for one person on one machine.** Loopback only (any other host refused); a request not addressed
+  to localhost is refused (DNS rebinding); GET and HEAD only; nothing hidden or outside the folder; no CORS, and every
+  answer same-origin only; a request it cannot read is answered 400, never a crash.
+- **An assistant reaches only what it was given.** The MCP server answers for the folder it was started with and the
+  decks inside it; a call naming anything else is refused (a deck's notes reach the model, so they may carry an
+  instruction someone planted).
 - **One page, in development and in the room.** `dev` serves the page `build` writes, plus the dev client; nothing of the
   dev client ships.
 - **Read first, look last.** Every finding is text a reviewer can act on: its click, its label and its fix.

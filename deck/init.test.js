@@ -32,8 +32,11 @@ describe('initDeck', () => {
     expect(readFileSync(path.join(full, 'notes.txt'), 'utf8')).toBe('mine');
   });
 
-  it('tells a reader how to use the deck with the commands that run without installing', () => {
-    expect(STARTER['README.md']).toContain('npx footprint-storydeck dev');
+  it('tells a reader how to use the deck with the commands that run without installing, naming its folder', () => {
+    expect(STARTER['README.md']).toContain('npx footprint-storydeck dev my-talk');
+    const dir = path.join(tempDir(), 'q3-review');
+    initDeck(dir);
+    expect(readFileSync(path.join(dir, 'README.md'), 'utf8')).toContain('npx footprint-storydeck review q3-review --click 3');
     expect(STARTER['clicks.html']).toContain('data-focus="path"');
     expect(STARTER['theme.css']).toContain(':root.dark');
   });

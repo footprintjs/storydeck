@@ -47,7 +47,23 @@ describe('layoutCheck', () => {
   });
 
   it('finds no chromium where playwright-core is not installed', async () => {
-    expect(await findChromium(tempDir())).toBeNull();
+    expect(await findChromium({cwd: tempDir()})).toBeNull();
+  });
+
+  it('never loads Playwright from the deck folder, even when you run inside it', async () => {
+    const {mkdirSync, writeFileSync, existsSync, realpathSync} = await import('node:fs');
+    const path = (await import('node:path')).default;
+    const deck = realpathSync(tempDir());
+    const pkg = path.join(deck, 'node_modules', 'playwright-core');
+    mkdirSync(pkg, {recursive: true});
+    const marker = path.join(deck, 'ran.txt');
+    writeFileSync(path.join(pkg, 'package.json'), '{"name":"playwright-core","main":"index.js"}');
+    writeFileSync(path.join(pkg, 'index.js'), `require('fs').writeFileSync(${JSON.stringify(marker)}, 'ran'); module.exports = {chromium: {planted: true}};`);
+    expect(await findChromium({cwd: deck, deckRoot: deck})).toBeNull();
+    expect(await findChromium({cwd: path.join(deck, 'node_modules'), deckRoot: deck})).toBeNull();
+    expect(existsSync(marker)).toBe(false);
+    // the same folder as an ordinary project (not the deck): its own install is what you meant
+    expect(await findChromium({cwd: deck})).toEqual({planted: true});
   });
 });
 

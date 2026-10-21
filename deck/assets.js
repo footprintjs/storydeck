@@ -19,6 +19,13 @@ export function packageRoot(from = path.dirname(fileURLToPath(import.meta.url)))
 }
 
 let cached = null;
+let version = null;
+
+/** The installed package's version, read once (the page's generator line, `storydeck --version`, the MCP server). */
+export function packageVersion() {
+  version ??= JSON.parse(readFileSync(path.join(packageRoot(), 'package.json'), 'utf8')).version;
+  return version;
+}
 
 /** {stageJs, css: [focus.css, narration.css, deck.css], version}, read once per process. */
 export function pageAssets() {
@@ -28,7 +35,7 @@ export function pageAssets() {
   cached = Object.freeze({
     stageJs: read('site/public/deck-stage.js'),
     css: Object.freeze([read('focus.css'), read('narration.css'), read('deck.css')]),
-    version: JSON.parse(read('package.json')).version,
+    version: packageVersion(),
   });
   return cached;
 }

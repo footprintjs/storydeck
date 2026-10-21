@@ -70,6 +70,16 @@ describe('buildDeck', () => {
   });
 });
 
+describe('what a build never carries', () => {
+  it('puts no hidden file in the page, even through a link named like a deck file', () => {
+    const base = Object.fromEntries(Object.entries(STARTER).filter(([k]) => k !== 'theme.css'));
+    const dir = tempDeck({...base, '.env': 'VOICE_API_KEY=abc'});
+    symlinkSync(path.join(dir, '.env'), path.join(dir, 'theme.css'));
+    expect(() => buildDeck(dir)).toThrow(/theme.css is a link to a hidden file/);
+    expect(existsSync(path.join(dir, 'index.html'))).toBe(false);
+  });
+});
+
 describe('loadDeck and deckHtml', () => {
   it('reads and compiles, and gives the page as a string, with the dev client only when asked', () => {
     const dir = tempDeck();

@@ -124,38 +124,47 @@ const ICONS = {
   database: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><ellipse cx="32" cy="14" rx="20" ry="7"/><path d="M12 14v36c0 3.9 9 7 20 7s20-3.1 20-7V14M12 32c0 3.9 9 7 20 7s20-3.1 20-7"/></svg>\n',
 };
 
-const README = `# A StoryDeck deck
+/** The starter's README, naming its own folder in the commands. */
+const readme = (name) => `# A StoryDeck deck
 
 One picture, built click by click. Edit these files; the dev page reloads on the click you are on.
 
 | File | What it holds |
 |---|---|
-| \`deck.json\` | title, description, footer (and \`area\`, \`canvas\`, \`checks.maxWords\` when you need them) |
+| \`deck.json\` | title, description, footer (and \`area\`, \`canvas\`, \`checks\` when you need them) |
 | \`clicks.html\` | the parts and their clicks: \`<section>\` per part, \`<step>\` per click on a map |
 | \`map.html\` | the picture: every \`data-k\` element with an inline left/top/width/height is a piece |
 | \`theme.css\` | tokens (light, \`:root.dark\`) and the look of your pieces |
 | \`icons/*.svg\` | drawn identities, used as \`<i class="ic" data-icon="name"></i>\` |
 
+Run these from your project — the folder that holds this deck — naming the deck (\`npx\` would otherwise prefer a
+copy of StoryDeck that a deck someone sent you carries inside it):
+
 \`\`\`bash
-npx footprint-storydeck dev                # live preview: a save reloads on the same click and plays it again
-npx footprint-storydeck outline            # the whole deck, one line per click
-npx footprint-storydeck review --click 3   # one click as text: what it lights, greys, moves and says
-npx footprint-storydeck check              # what to fix (add --layout to let a browser find text that spills)
-npx footprint-storydeck build              # index.html: one self-contained page, nothing loaded from the network
+npx footprint-storydeck dev ${name}                # live preview: a save reloads on the same click and plays it again
+npx footprint-storydeck outline ${name}            # the whole deck, one line per click
+npx footprint-storydeck review ${name} --click 3   # one click as text: what it lights, greys, moves and says
+npx footprint-storydeck check ${name}              # what to fix (add --layout to let a browser find text that spills)
+npx footprint-storydeck build ${name}              # index.html: one self-contained page, nothing loaded from the network
 \`\`\`
 
 In the page: ← → or Space step · T light/dark · N notes · P presenter window · L read aloud.
 `;
 
-/** The starter deck's files: {relative path: content}. */
-export const STARTER = Object.freeze({
-  'deck.json': DECK_JSON,
-  'clicks.html': CLICKS,
-  'map.html': MAP,
-  'theme.css': THEME,
-  'README.md': README,
-  ...Object.fromEntries(Object.entries(ICONS).map(([k, v]) => [`icons/${k}.svg`, v])),
-});
+/** The starter deck's files for a deck folder called `name`: {relative path: content}. */
+export function starterFiles(name = 'my-talk') {
+  return {
+    'deck.json': DECK_JSON,
+    'clicks.html': CLICKS,
+    'map.html': MAP,
+    'theme.css': THEME,
+    'README.md': readme(name),
+    ...Object.fromEntries(Object.entries(ICONS).map(([k, v]) => [`icons/${k}.svg`, v])),
+  };
+}
+
+/** The starter deck's files, for a deck folder called my-talk. */
+export const STARTER = Object.freeze(starterFiles());
 
 /** Write the starter into `dir` (made when missing). A folder that already holds files is refused, so nothing is overwritten. */
 export function initDeck(dir) {
@@ -163,10 +172,11 @@ export function initDeck(dir) {
   if (existsSync(root) && readdirSync(root).filter((f) => !f.startsWith('.')).length) {
     throw new Error(`${dir} already holds files — init writes a new deck into an empty or new folder, so nothing is overwritten`);
   }
-  for (const [file, content] of Object.entries(STARTER)) {
+  const files = starterFiles(path.basename(root));
+  for (const [file, content] of Object.entries(files)) {
     const full = path.join(root, file);
     mkdirSync(path.dirname(full), {recursive: true});
     writeFileSync(full, content);
   }
-  return {dir: root, files: Object.keys(STARTER)};
+  return {dir: root, files: Object.keys(files)};
 }

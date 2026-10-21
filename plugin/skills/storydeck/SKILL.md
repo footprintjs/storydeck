@@ -37,7 +37,8 @@ The main entry (`footprint-storydeck`) re-exports only what runs anywhere.
 ## Recipes
 
 **Make or edit a deck: a folder, not a build script.** Never write a build script for a deck: the library builds the
-folder. Read first, look last — an outline and a click's review cost a fraction of a screenshot.
+folder. Read first, look last — an outline and a click's review cost a fraction of a screenshot. Run the commands from
+the project that holds the deck, naming its folder (npx would prefer a StoryDeck a sent deck carries inside it).
 
 ```bash
 npx footprint-storydeck init my-talk            # a starter: deck.json, clicks.html, map.html, theme.css, icons/

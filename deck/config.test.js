@@ -1,5 +1,6 @@
 import {describe, it, expect} from 'vitest';
-import {readConfig, deckPath, DEFAULTS} from './config.js';
+import {readConfig, DEFAULTS} from './config.js';
+import {deckPath} from './paths.js';
 
 describe('readConfig', () => {
   it('fills every default from a title alone', () => {

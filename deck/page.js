@@ -6,7 +6,7 @@
 // window, L plays the deck in the speaker's voice (or the browser's).
 import {focusRuntime} from '../focusHtml.js';
 import {notesData, notesRuntime, listenRuntime} from '../narrationHtml.js';
-import {esc} from './compile.js';
+import {esc, scriptSafe, styleSafe} from './html.js';
 
 /** Runs in the page: the theme toggle (its button, or T). Light or dark follows the system until a choice is saved. */
 export function themeRuntime() {
@@ -30,11 +30,6 @@ const THEME_FIRST = "(function(){var d;try{var t=localStorage.getItem('theme');d
 const TOGGLE = '<button class="theme-toggle" type="button" aria-label="Switch theme" title="Light / dark (T)">'
   + '<svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path stroke-linecap="round" d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>'
   + '<svg class="moon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>';
-
-/** Text safe inside a <script> (no `</script` can close it early). */
-export const scriptSafe = (code) => String(code).replace(/<\/(script)/gi, '<\\/$1');
-/** Text safe inside a <style> (no `</style` can close it early). */
-export const styleSafe = (css) => String(css).replace(/<\/(style)/gi, '<\\/$1');
 
 /**
  * The page. `assets`: {stageJs, css: [stylesheet …] (focus.css, narration.css, deck.css), version} — what the

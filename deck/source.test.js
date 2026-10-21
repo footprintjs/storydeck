@@ -72,6 +72,27 @@ describe('readDeck', () => {
     expect(() => readDeck(dirC)).toThrow(/icons\/ is a link to a file outside the deck folder/);
   });
 
+  it('never reads a hidden file through a link inside the deck (.env as theme.css or post.json)', () => {
+    const base = Object.fromEntries(Object.entries(STARTER).filter(([k]) => k !== 'theme.css'));
+    const dir = tempDeck({...base, '.env': 'VOICE_API_KEY=abc'});
+    symlinkSync(path.join(dir, '.env'), path.join(dir, 'theme.css'));
+    expect(() => readDeck(dir)).toThrow(/theme.css is a link to a hidden file — a deck never reads hidden files/);
+    const withPost = tempDeck({...STARTER, 'deck.json': '{"title":"T","post":"post.json"}', '.env': 'SECRET=1'});
+    symlinkSync(path.join(withPost, '.env'), path.join(withPost, 'post.json'));
+    expect(() => readDeck(withPost)).toThrow(/post.json is a link to a hidden file/);
+  });
+
+  it('says plainly when the icons folder is a file and when a link leads nowhere', () => {
+    const iconsFile = tempDeck({...Object.fromEntries(Object.entries(STARTER).filter(([k]) => !k.startsWith('icons/'))), icons: 'not a folder'});
+    expect(() => readDeck(iconsFile)).toThrow(/icons is not a folder — icons are a folder of .svg files/);
+    const dangling = tempDeck(Object.fromEntries(Object.entries(STARTER).filter(([k]) => k !== 'map.html')));
+    symlinkSync(path.join(dangling, 'gone.html'), path.join(dangling, 'map.html'));
+    expect(() => readDeck(dangling)).toThrow(/map.html is a link to a file that is not there/);
+    const danglingIcons = tempDeck(Object.fromEntries(Object.entries(STARTER).filter(([k]) => !k.startsWith('icons/'))));
+    symlinkSync(path.join(danglingIcons, 'gone'), path.join(danglingIcons, 'icons'));
+    expect(() => readDeck(danglingIcons)).toThrow(/icons\/ is a link to a folder that is not there/);
+  });
+
   it('follows a link that stays inside the deck, and a deck folder that is itself a link', () => {
     const dir = tempDeck(Object.fromEntries(Object.entries(STARTER).filter(([k]) => k !== 'map.html')));
     mkdirSync(path.join(dir, 'parts'));

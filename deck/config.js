@@ -11,7 +11,9 @@
 //     "post": "post.json", "deckData": "deck-data.json",       the Read/Scroll lenses' sources, when the deck has them
 //     "checks": { "maxWords": 12, "maxSlideWords": 40 } }       what `storydeck check` asks: words in a headline, on a plain slide
 //
-// A key it does not know is refused with the keys it does, so a typo is never a silent default.
+// A key it does not know is refused with the keys it does, so a typo is never a silent default. A file name it gives
+// follows paths.js · deckPath (relative, inside the deck, nothing hidden).
+import {deckPath} from './paths.js';
 
 export const DEFAULTS = Object.freeze({
   lang: 'en',
@@ -28,16 +30,6 @@ const CHECK_KEYS = ['maxWords', 'maxSlideWords'];
 
 const isText = (v) => typeof v === 'string' && v.trim().length > 0;
 const numbers = (v, n) => Array.isArray(v) && v.length === n && v.every((x) => typeof x === 'number' && Number.isFinite(x));
-
-/** A file name inside the deck folder: relative, no `..`, no hidden segment. */
-export function deckPath(value, key) {
-  if (!isText(value)) throw new Error(`deck.json "${key}" is a file name in the deck folder, not ${JSON.stringify(value)}`);
-  const parts = value.replace(/\\/g, '/').split('/');
-  if (value.startsWith('/') || /^[a-zA-Z]:/.test(value) || parts.some((p) => p === '..' || p.startsWith('.'))) {
-    throw new Error(`deck.json "${key}": "${value}" must stay inside the deck folder (relative, no "..", no hidden files)`);
-  }
-  return parts.filter((p) => p !== '').join('/');
-}
 
 /** deck.json, read: the deck's settings with every default filled in. Throws, naming the fix, on anything it cannot use. */
 export function readConfig(json) {

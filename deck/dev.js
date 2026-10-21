@@ -8,15 +8,18 @@
 // deck never executes it. The server is for one person on one machine:
 //   · it listens on the loopback address only, and answers only requests addressed to localhost (a page on another
 //     site cannot reach it through DNS rebinding);
-//   · it only reads: GET and HEAD, the page, the reload channel, and the deck folder's own files (no hidden file,
-//     nothing outside the folder, through a symlink either);
-//   · it sends no CORS header, so another site's script cannot read what it serves.
+//   · it only reads: GET and HEAD, the page, the reload channel, and the deck folder's own files (paths.js ·
+//     servedFile: no hidden file, nothing outside the folder, through a link either);
+//   · it sends no CORS header and marks every answer same-origin only, so another site cannot read or embed it;
+//   · a request it cannot read is answered 400; nothing a request sends can stop the server.
+// A deck's own HTML runs in the page, as any page you open does: serve decks you trust.
 import http from 'node:http';
-import {watch, realpathSync, statSync, createReadStream} from 'node:fs';
+import {watch, createReadStream} from 'node:fs';
 import path from 'node:path';
 import {deckHtml} from './build.js';
 import {devClient} from './devClient.js';
-import {scriptSafe} from './page.js';
+import {scriptSafe} from './html.js';
+import {deckRoot, servedFile} from './paths.js';
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -25,7 +28,8 @@ const TYPES = {
   '.avif': 'image/avif', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.woff': 'font/woff', '.mp4': 'video/mp4',
   '.webm': 'video/webm', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.wav': 'audio/wav', '.txt': 'text/plain; charset=utf-8', '.md': 'text/plain; charset=utf-8',
 };
-const SAFE = {'x-content-type-options': 'nosniff', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer'};
+const SAFE = {'x-content-type-options': 'nosniff', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'cross-origin-resource-policy': 'same-origin'};
+const LOOPBACK = ['127.0.0.1', '::1', 'localhost'];
 const IGNORED = /(^|[\\/])(node_modules|\.[^\\/]*)([\\/]|$)/;   // dependencies and hidden files (.git, editor swap files)
 
 /** The page shown before the deck has ever built: the dev client alone, which shows why and reloads once it builds. */
@@ -38,19 +42,6 @@ const waitingPage = () => `<!doctype html>
 function allowedHost(header, port) {
   if (typeof header !== 'string') return false;
   return [`localhost:${port}`, `127.0.0.1:${port}`, `[::1]:${port}`].includes(header.toLowerCase());
-}
-
-/** A file of the deck folder for a URL path, or null: no hidden segment, nothing outside the folder (symlinks resolved). */
-function deckFile(root, pathname) {
-  let rel;
-  try { rel = decodeURIComponent(pathname); } catch { return null; }
-  if (rel.includes('\0')) return null;
-  const segs = rel.split(/[\\/]+/).filter(Boolean);
-  if (!segs.length || segs.some((s) => s.startsWith('.'))) return null;
-  let real;
-  try { real = realpathSync(path.join(root, ...segs)); } catch { return null; }
-  if (!real.startsWith(root + path.sep)) return null;
-  try { return statSync(real).isFile() ? real : null; } catch { return null; }
 }
 
 /** Listen on the first free port from `port` (up to `tries` of them); port 0 takes any free one. */
@@ -72,11 +63,13 @@ function listen(server, port, host, tries) {
 }
 
 /**
- * Serve a deck folder for editing. Options: port (4321; the next free one is taken), host (127.0.0.1 — loopback
- * only), watch (true), log (a line per build). Returns {url, port, close(), rebuild(), state()}.
+ * Serve a deck folder for editing. Options: port (4321; the next free one is taken), host (127.0.0.1, ::1 or localhost
+ * — loopback only, anything else is refused), watch (true), log (a line per build). Returns {url, port, close(),
+ * rebuild(), state()}.
  */
 export async function serveDeck(dir, {port = 4321, host = '127.0.0.1', watch: watching = true, log = () => {}, tries = 20} = {}) {
-  const root = realpathSync(path.resolve(dir));
+  if (!LOOPBACK.includes(host)) throw new Error(`storydeck dev listens on this machine only (${LOOPBACK.join(', ')}), not on ${host}`);
+  const root = deckRoot(dir);
   let version = 0, page = null, problem = null, outputs = ['index.html'];
   const clients = new Set();
   const send = (event, data) => { for (const res of clients) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
@@ -111,11 +104,12 @@ export async function serveDeck(dir, {port = 4321, host = '127.0.0.1', watch: wa
   }
 
   let listeningPort = null;
-  const server = http.createServer((req, res) => {
+  const answer = (req, res) => {
     const deny = (code, text) => { res.writeHead(code, {'content-type': 'text/plain; charset=utf-8', ...SAFE}); res.end(text); };
     if (!allowedHost(req.headers.host, listeningPort)) return deny(403, 'storydeck dev answers requests to localhost only');
     if (req.method !== 'GET' && req.method !== 'HEAD') return deny(405, 'storydeck dev only reads');
-    const {pathname} = new URL(req.url, 'http://localhost');
+    let pathname;
+    try { ({pathname} = new URL(req.url, 'http://localhost')); } catch { return deny(400, 'a request storydeck dev cannot read'); }
     if (pathname === '/' || pathname === '/index.html') {
       res.writeHead(200, {'content-type': 'text/html; charset=utf-8', ...SAFE});
       return res.end(req.method === 'HEAD' ? undefined : page ?? waitingPage());
@@ -128,18 +122,27 @@ export async function serveDeck(dir, {port = 4321, host = '127.0.0.1', watch: wa
       req.on('close', () => clients.delete(res));
       return undefined;
     }
-    const file = deckFile(root, pathname);
+    const file = servedFile(root, pathname);
     if (!file) return deny(404, 'not in the deck');
     res.writeHead(200, {'content-type': TYPES[path.extname(file).toLowerCase()] ?? 'application/octet-stream', ...SAFE});
     if (req.method === 'HEAD') return res.end();
     return createReadStream(file).on('error', () => res.destroy()).pipe(res);
+  };
+  const server = http.createServer((req, res) => {
+    try {
+      answer(req, res);
+    } catch {
+      // nothing a request sends may stop the server: answer it, or drop it if the answer had begun
+      if (res.headersSent) res.destroy(); else { res.writeHead(500, {'content-type': 'text/plain; charset=utf-8', ...SAFE}); res.end('storydeck dev could not answer that'); }
+    }
   });
+  server.on('clientError', (_, socket) => socket.destroy());
   listeningPort = await listen(server, port, host, tries);
   const keepAlive = setInterval(() => { for (const res of clients) res.write(': still here\n\n'); }, 15000);
   keepAlive.unref();
 
   return {
-    url: `http://${host === '127.0.0.1' || host === '0.0.0.0' ? '127.0.0.1' : host}:${listeningPort}/`,
+    url: `http://${host === '::1' ? '[::1]' : host}:${listeningPort}/`,
     port: listeningPort,
     rebuild,
     state: () => ({version, problem}),

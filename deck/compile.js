@@ -9,15 +9,13 @@ import {focusStep} from '../focus.js';
 import {readPieces, readStep, drawFocus, wrapStage, slideClass, focusOverlay} from '../focusHtml.js';
 import {applyTransforms} from './transforms.js';
 import {plainText} from './parse.js';
-
-const COMMENT = /<!--[\s\S]*?-->/g;
-export const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+import {esc, stripComments} from './html.js';
 
 /** A map ready to plan on: its HTML with the helpers applied and its pieces read. */
 function prepareMap(name, html, icons) {
   let drawn;
   try {
-    drawn = applyTransforms(html.replace(COMMENT, ''), {icons});
+    drawn = applyTransforms(stripComments(html), {icons});
   } catch (e) {
     throw new Error(`map "${name}": ${e.message}`, {cause: e});
   }

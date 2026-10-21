@@ -51,7 +51,7 @@ function listen(server) {
       resolve();
     });
   });
-  const until = async (pred, ms = 3000) => {
+  const until = async (pred, ms = 8000) => {   // a file watcher can be slow under a loaded machine
     const t0 = Date.now();
     while (!pred(events)) {
       if (Date.now() - t0 > ms) throw new Error(`no such event in ${JSON.stringify(events)}`);
@@ -71,7 +71,7 @@ describe('serveDeck', () => {
     expect(page).toMatchObject({status: 200, type: 'text/html; charset=utf-8'});
     expect(page.body).toContain('<meta name="storydeck-dev" content="1">');
     expect(page.body).toContain('__sdDev');
-    expect(page.headers).toMatchObject({'x-content-type-options': 'nosniff', 'cache-control': 'no-store'});
+    expect(page.headers).toMatchObject({'x-content-type-options': 'nosniff', 'cache-control': 'no-store', 'cross-origin-resource-policy': 'same-origin'});
     expect(page.headers['access-control-allow-origin']).toBeUndefined();
     expect((await get(s, '/index.html')).status).toBe(200);
     expect(await get(s, '/icons/server.svg')).toMatchObject({status: 200, type: 'image/svg+xml'});
@@ -91,14 +91,15 @@ describe('serveDeck', () => {
     expect((await get(s, '/', {method: 'PUT'})).status).toBe(405);
   });
 
-  it('serves nothing hidden, nothing outside the folder, and nothing through a link that leaves it', async () => {
+  it('serves nothing hidden, nothing outside the folder, and nothing through a link that leaves it or hides', async () => {
     const dir = tempDeck({...STARTER, '.env': 'SECRET=1', 'sub/.hidden': 'x'});
     const secret = path.join(tempDir(), 'secret.txt');
     writeFileSync(secret, 'TOP SECRET');
     symlinkSync(secret, path.join(dir, 'leak.txt'));
+    symlinkSync(path.join(dir, '.env'), path.join(dir, 'env.txt'));
     mkdirSync(path.join(dir, 'pics'));
     const s = await serve(dir);
-    for (const p of ['/.env', '/sub/.hidden', '/../package.json', '/%2e%2e/%2e%2e/etc/passwd', '/leak.txt', '/icons', '/nope.png', '/%E0%A4%A', '/a%00b', '/pics']) {
+    for (const p of ['/.env', '/sub/.hidden', '/../package.json', '/%2e%2e/%2e%2e/etc/passwd', '/leak.txt', '/env.txt', '/icons', '/nope.png', '/%E0%A4%A', '/a%00b', '/pics']) {
       const r = await get(s, p);
       expect([p, r.status]).toEqual([p, 404]);
       expect(r.body).not.toContain('SECRET');
@@ -151,6 +152,26 @@ describe('serveDeck', () => {
     await ch.until((e) => e.some((x) => x.event === 'reload' && x.data.version === 1));
     expect((await get(s, '/')).body).toContain('<title>Fixed</title>');
     ch.stop();
+  });
+
+  it('answers a request it cannot read with 400, and keeps serving', async () => {
+    const s = await serve(tempDeck(), {watch: false});
+    expect((await get(s, '//[')).status).toBe(400);
+    expect((await get(s, '/')).status).toBe(200);
+    // a request line Node itself cannot parse is dropped, and the server stays up
+    await new Promise((resolve) => {
+      const sock = net.connect(s.port, '127.0.0.1', () => sock.end('GARBAGE\r\n\r\n'));
+      sock.on('close', resolve);
+      sock.on('error', resolve);
+    });
+    expect((await get(s, '/')).status).toBe(200);
+  });
+
+  it('listens on this machine only, and names a folder that is not there', async () => {
+    await expect(serveDeck(tempDeck(), {port: 0, host: '0.0.0.0', watch: false})).rejects.toThrow(/listens on this machine only \(127\.0\.0\.1, ::1, localhost\), not on 0\.0\.0\.0/);
+    await expect(serveDeck(path.join(tempDir(), 'nope'), {port: 0, watch: false})).rejects.toThrow(/nope is not a folder — a deck is a folder with deck.json/);
+    const s = await serve(tempDeck(), {host: 'localhost', watch: false});
+    expect(s.url).toBe(`http://localhost:${s.port}/`);
   });
 
   it('takes the next free port when the one asked for is taken, and says so when none is', async () => {

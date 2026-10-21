@@ -47,6 +47,20 @@ describe('parseClicks', () => {
   });
 });
 
+describe('parseClicks, scanned once', () => {
+  it('refuses a part or a click left open, naming it', () => {
+    expect(() => parseClicks('<section data-label="A"><p>x</p>')).toThrow(/<section data-label="A"> is never closed/);
+    expect(() => parseClicks('<section data-label="A" data-map="m"><step data-in="a"><h2>x</h2></section>')).toThrow(/"A": <step data-in="a"> is never closed — end it with <\/step>/);
+    expect(() => parseClicks('<section data-label="A"><aside class="notes">x</section>')).toThrow(/<aside class="notes"> is never closed/);
+  });
+
+  it('keeps an aside that is not notes, where it is', () => {
+    const [part] = parseClicks('<section data-label="P"><aside class="callout">Look</aside><aside class="notes">Say</aside></section>');
+    expect(part.body).toBe('<aside class="callout">Look</aside>');
+    expect(part.notes).toEqual(['Say']);
+  });
+});
+
 describe('plainText and wordCount', () => {
   it('reads entities, drops inline tags without a space and leaves one for blocks', () => {
     expect(plainText('<b>One</b>FS &amp; more&nbsp;text &#65;&#x42; &bogus;')).toBe('OneFS & more text AB &bogus;');

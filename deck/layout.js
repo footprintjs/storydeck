@@ -2,22 +2,31 @@
 // It drives the built page through the video's browser port (video.js · deckStageDriver · measure), one click at a
 // time as it settles. Optional: it needs Playwright (`npm i -D playwright-core`, then `npx playwright-core install
 // chromium`); without it the check says so and the other checks still run.
+import {realpathSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import path from 'node:path';
 import {deckStageDriver} from '../video.js';
+import {packageRoot} from './assets.js';
+import {isInside} from './paths.js';
 
 const PLAYWRIGHT = 'playwright-core';   // an optional dependency: named, never imported until a layout check asks
 
 /**
  * Playwright's chromium from the project you run the command in (the current folder), then from where StoryDeck is
  * installed; null when it is not installed. Never from the deck's folder: a deck is content, and a deck someone sent
- * you must not be able to run code by carrying a node_modules of its own.
+ * you must not run code by carrying a node_modules of its own — so a project folder that is the deck (or inside it),
+ * and a StoryDeck installed inside the deck, are passed over.
  */
-export async function findChromium(cwd = process.cwd()) {
+export async function findChromium({cwd = process.cwd(), deckRoot = null} = {}) {
+  const real = (p) => { try { return realpathSync(p); } catch { return path.resolve(p); } };
+  const inDeck = (p) => deckRoot !== null && isInside(deckRoot, real(p));
   const chromiumOf = (mod) => mod?.chromium ?? mod?.default?.chromium ?? null;
-  try {
-    return chromiumOf(createRequire(path.join(path.resolve(cwd), 'noop.js'))(PLAYWRIGHT));
-  } catch { /* not in the project: look beside StoryDeck */ }
+  if (!inDeck(cwd)) {
+    try {
+      return chromiumOf(createRequire(path.join(real(cwd), 'noop.js'))(PLAYWRIGHT));
+    } catch { /* not in the project: look beside StoryDeck */ }
+  }
+  if (inDeck(packageRoot())) return null;
   try { return chromiumOf(await import(/* @vite-ignore */ PLAYWRIGHT)); } catch { return null; }
 }
 

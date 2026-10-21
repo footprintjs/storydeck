@@ -9,6 +9,8 @@
 // data-k and class are kept, and "wire" is added to its class). Class "pkt" adds a packet that a deck's CSS can run
 // along it (hidden at rest, so print, a jump and reduced motion show the plain wire).
 
+import {stripComments} from './html.js';
+
 const fixed = (v) => +v.toFixed(1);
 
 /** One wire's SVG: the element's own attributes kept, a box that holds the curve, the curve, the head, and its packet. */
@@ -42,7 +44,7 @@ export function wires(html) {
 
 /** An icon file's drawing: {viewBox, body} from a whole <svg …>…</svg>. */
 export function readIcon(name, svg) {
-  const m = /<svg\b([^>]*)>([\s\S]*)<\/svg>\s*$/.exec(svg.replace(/<!--[\s\S]*?-->/g, '').replace(/^\s*<\?xml[^>]*>/, '').trim());
+  const m = /<svg\b([^>]*)>([\s\S]*)<\/svg>\s*$/.exec(stripComments(svg).replace(/^\s*<\?xml[^>]*>/, '').trim());
   if (!m) throw new Error(`icon "${name}": an icon file is one <svg viewBox="…">…</svg>`);
   const viewBox = /\sviewBox=(["'])([^"']+)\1/.exec(m[1])?.[2];
   if (!viewBox) throw new Error(`icon "${name}": its <svg> has no viewBox — give it one (e.g. viewBox="0 0 64 64")`);

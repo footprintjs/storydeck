@@ -38,8 +38,10 @@ describe('serveMcp', () => {
   });
 
   it('answers a broken line, an unknown method and an unknown tool with errors, and skips blank lines', async () => {
-    const out = await session(tempDeck(), ['{not json', '', {id: 5, method: 'resources/list'}, {id: 6, method: 'tools/call', params: {name: 'paint'}}, {id: 7, method: 'initialize'}]);
+    const out = await session(tempDeck(), ['{not json', '', 'null', '[1]', {id: 8, method: 'tools/call', params: null}, {id: 5, method: 'resources/list'}, {id: 6, method: 'tools/call', params: {name: 'paint'}}, {id: 7, method: 'initialize'}]);
     expect(out[0]).toEqual({jsonrpc: '2.0', id: null, error: {code: -32700, message: 'Parse error'}});
+    expect(out.filter((m) => m.error?.code === -32600)).toHaveLength(2);   // null and an array are not requests
+    expect(out.find((m) => m.id === 8).result).toMatchObject({isError: true, content: [{text: expect.stringMatching(/^no tool called "undefined"/)}]});
     expect(out.find((m) => m.id === 5).error).toEqual({code: -32601, message: 'Method not found: resources/list'});
     expect(out.find((m) => m.id === 6).result).toMatchObject({isError: true, content: [{text: 'no tool called "paint" (the tools are outline, review, check, build)'}]});
     expect(out.find((m) => m.id === 7).result.protocolVersion).toBe('2025-06-18');
@@ -47,15 +49,30 @@ describe('serveMcp', () => {
 });
 
 describe('callTool', () => {
-  it('runs each tool on the deck the server was started with, or the one a call names', async () => {
-    const dir = tempDeck(), other = tempDeck({...STARTER, 'deck.json': '{"title":"Other"}'});
+  it('runs each tool on the deck the server was started with, or one a call names inside it', async () => {
+    const dir = tempDeck({...STARTER, ...Object.fromEntries(Object.entries(STARTER).map(([k, v]) => [`other/${k}`, k === 'deck.json' ? '{"title":"Other"}' : v]))});
     expect((await callTool('outline', {}, {dir})).content[0].text).toMatch(/^A request, end to end · 6 clicks/);
-    expect((await callTool('outline', {dir: other}, {dir})).content[0].text).toMatch(/^Other · 6 clicks/);
+    expect((await callTool('outline', {dir: 'other'}, {dir})).content[0].text).toMatch(/^Other · 6 clicks/);
+    expect((await callTool('outline', {dir: path.join(dir, 'other')}, {dir})).content[0].text).toMatch(/^Other · 6 clicks/);
     expect((await callTool('review', {all: true}, {dir})).content[0].text.match(/^click /gm)).toHaveLength(6);
     expect((await callTool('check', {}, {dir})).content[0].text).toBe('no problems');
     expect((await callTool('check', {layout: true}, {dir})).content[0].text).toContain('layout not checked');
     expect((await callTool('build', {}, {dir})).content[0].text).toMatch(/^✓ .*index\.html · 6 clicks/);
     expect(existsSync(path.join(dir, 'index.html'))).toBe(true);
+  });
+
+  it('refuses a deck outside the folder it was started with — by path, by "..", or through a link', async () => {
+    const dir = tempDeck(), elsewhere = tempDeck();
+    const {symlinkSync} = await import('node:fs');
+    symlinkSync(elsewhere, path.join(dir, 'door'));
+    for (const asked of [elsewhere, '..', 'door', '../../']) {
+      const r = await callTool('outline', {dir: asked}, {dir});
+      expect(r.isError).toBe(true);
+      expect(r.content[0].text).toMatch(/is outside the folder this server was started with/);
+    }
+    expect((await callTool('build', {dir: elsewhere}, {dir})).isError).toBe(true);
+    expect(existsSync(path.join(elsewhere, 'index.html'))).toBe(false);
+    expect((await callTool('outline', {dir: 'missing'}, {dir})).content[0].text).toMatch(/^no folder missing inside/);
   });
 
   it('turns a refusal into an error result with the reason', async () => {

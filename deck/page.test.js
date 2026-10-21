@@ -1,5 +1,6 @@
 import {describe, it, expect, vi} from 'vitest';
-import {deckPage, themeRuntime, scriptSafe, styleSafe} from './page.js';
+import {deckPage, themeRuntime} from './page.js';
+import {scriptSafe, styleSafe} from './html.js';
 import {compileDeck} from './compile.js';
 import {sourceOf} from './test/helpers.js';
 

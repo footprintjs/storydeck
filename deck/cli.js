@@ -1,12 +1,11 @@
 // cli — `storydeck <command> [deck folder] [--flags]` (bin.js runs it). One process per command; `dev` and `mcp`
 // keep running until stopped.
 import {spawn} from 'node:child_process';
-import {readFileSync} from 'node:fs';
 import {initDeck} from './init.js';
 import {serveDeck} from './dev.js';
 import {serveMcp} from './mcp.js';
 import {outlineTool, reviewTool, checkTool, buildTool} from './tools.js';
-import {packageRoot} from './assets.js';
+import {packageVersion} from './assets.js';
 
 export const USAGE = `storydeck — make a deck: one picture, built click by click
 
@@ -82,7 +81,7 @@ export async function runCli(argv, {stdout = process.stdout, stderr = process.st
     return 1;
   }
   const {command, dir, given, flags} = parsed;
-  if (flags.version || command === '--version' || command === '-v') { out(JSON.parse(readFileSync(`${packageRoot()}/package.json`, 'utf8')).version); return 0; }
+  if (flags.version || command === '--version' || command === '-v') { out(packageVersion()); return 0; }
   if (!command || flags.help || command === 'help' || command === '--help') { out(USAGE); return command ? 0 : 1; }
   try {
     switch (command) {
