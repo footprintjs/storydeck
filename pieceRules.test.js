@@ -1,6 +1,6 @@
 import {describe, it, expect} from 'vitest';
-import {attrValue, pieceTags, styleLength} from './pieceRules.js';
-import {readPieces} from './focusHtml.js';
+import {attrValue, pieceTags, readAttributes, styleLength, tagsWith} from './pieceRules.js';
+import {readPieces, drawFocus} from './focusHtml.js';
 import {generated} from './deck/test/helpers.js';
 
 /** readPieces as it was before pieceRules.js (one regex over the text): the oracle the one-pass reading must equal. */
@@ -68,9 +68,53 @@ describe('where a value is written', () => {
     const left = styleLength(style.value, 'left'), top = styleLength(style.value, 'top');
     expect([left.value, style.value.slice(left.at, left.at + left.length)]).toEqual([12.5, '12.5']);
     expect([top.value, style.value.slice(top.at, top.at + top.length)]).toEqual([3, '3']);
-    expect(styleLength('left:0', 'left')).toEqual({value: 0, at: 5, length: 1});
+    expect(styleLength('left:0', 'left')).toEqual({value: 0, at: 5, length: 1, unit: ''});
+    expect(styleLength('left:3px', 'left').unit).toBe('px');
     expect(styleLength('left:5em', 'left')).toBeNull();
     expect(styleLength('margin-left:5px', 'left')).toBeNull();
     expect(attrValue(at, 'id')).toBeNull();
+  });
+});
+
+/** drawFocus as it was before (one regex over the text): the oracle the one-pass drawing must equal. */
+function drawFocusBefore(html, draw) {
+  return html.replace(/<([a-zA-Z][\w-]*)\b([^>]*?)\sdata-sd-i="(\d+)"([^>]*)>/g, (_, tag, a, i, b) => draw(tag, a + b, i));
+}
+
+describe('tagsWith', () => {
+  it('finds each tag holding a rule once, with what is around the match', () => {
+    const html = '<p data-x="1">a</p><b>no</b><i title="t" data-x="2" lang="en">';
+    expect(tagsWith(html, /\sdata-x="(\d)"/).map(({start, end, tag, before, m, after}) => [html.slice(start, end), tag, before, m[1], after]))
+      .toEqual([['<p data-x="1">', 'p', '', '1', ''], ['<i title="t" data-x="2" lang="en">', 'i', ' title="t"', '2', ' lang="en"']]);
+  });
+
+  it('lets drawFocus draw exactly what its regex drew, on 4,000 generated slides, and stay linear', () => {
+    const tokens = ['<div', '<i', '<a-b', ' data-sd-i="0"', ' data-sd-i="1"', " data-sd-i='0'", ' data-sd-i="x"', ' class="c"', ' style="left:1px"', '>', '</div>', '"', ' ', 'x', '\n', '<'];
+    // drawFocus draws each tag it finds with that piece's look, so which tags it finds is the whole difference
+    for (const html of generated(tokens, {count: 4000, length: 30})) {
+      const marks = [];
+      drawFocusBefore(html, (tag, at, i) => { marks.push([tag, at, i]); return ''; });
+      const found = tagsWith(html, /\sdata-sd-i="(\d+)"/).map(({tag, before, m, after}) => [tag, before + after, m[1]]);
+      expect(found, html).toEqual(marks);
+    }
+    const t0 = performance.now();
+    const hostile = `<div data-k="a" style="left:1px;top:1px">${'<a '.repeat(1_400_000)}`;
+    const {html, pieces} = readPieces(hostile);
+    expect(drawFocus(html, {pieces: pieces.map(() => ({}))})).toContain('<a <a ');
+    expect(performance.now() - t0).toBeLessThan(1500);
+  });
+});
+
+describe('readAttributes', () => {
+  it('reads a tag\'s attributes as a browser does: names lower-cased, every kind of value, where each starts', () => {
+    const text = ' data-k="a b" STYLE=\'left:1px\' hidden x=y/z  =odd title = "t" ';
+    expect(readAttributes(text).map(({name, value, valueAt}) => [name, value, valueAt < 0 ? -1 : text.slice(valueAt, valueAt + value.length)]))
+      .toEqual([['data-k', 'a b', 'a b'], ['style', 'left:1px', 'left:1px'], ['hidden', '', -1], ['x', 'y/z', 'y/z'], ['=odd', '', -1], ['title', 't', 't']]);
+  });
+
+  it('says it cannot when a quoted value never closes — a ">" inside it ends a scan early', () => {
+    expect(readAttributes(' data-k="a" title="x')).toBeNull();
+    expect(readAttributes('')).toEqual([]);
+    expect(readAttributes(' a="1"b="2"').map((a) => a.name)).toEqual(['a', 'b']);
   });
 });

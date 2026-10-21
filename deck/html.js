@@ -20,6 +20,12 @@ export function stripComments(html) {
   for (const [start, end] of commentRanges(html)) { out += html.slice(from, start); from = end; }
   return out + html.slice(from);
 }
+/**
+ * The characters a reader cannot see that change what they see: controls (but line breaks and tabs), bidi overrides and
+ * marks, invisible separators. A deck's labels and notes may hold one to rewrite a terminal or hide what a line says.
+ * (Joiners stay: emoji and many scripts need them.)
+ */
+export const UNSEEN = /[^\P{Cc}\n\t]|[\u061C\u200B\u200E\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF\u2028\u2029]/gu;
 /** Text safe in HTML content and in a double-quoted attribute. */
 export const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 /** Code safe inside a <script> (no `</script` can close it early). */

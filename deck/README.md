@@ -20,6 +20,7 @@ text. Each module does one job, and they compose in one direction:
 | `layout.js` | the check only a browser can make (text that spills), through the video's driver |
 | `dev.js` · `devClient.js` | the editing server and the client the page gets in development only |
 | `edit.js` | the two edits the dev page sends, written back as text: a piece moved (its map), a note left (feedback.md) |
+| `noteKey.js` | which notes are the person's: the key the dev server signs them with, kept with the person, not the deck |
 | `tools.js` | the read-first tools as text — one core for `cli.js` and `mcp.js` |
 | `init.js` | the starter deck |
 
@@ -41,15 +42,27 @@ text. Each module does one job, and they compose in one direction:
   only, both from its own page: a note (POST `/__storydeck/feedback`, appended to feedback.md) and a piece moved (POST
   `/__storydeck/move`, written into that map's file). Each is checked before its body is read: the page's own origin,
   the per-session token only the served page carries (compared in constant time), JSON, at most 16 KB. Both are
-  written by `paths.js · writeInside`, so never through a link; a note never rebuilds, a move rebuilds at once.
-- **An edit finds a piece by the rules the page was drawn by.** `pieceRules.js` (at the package root) owns which tags are
-  pieces and where a left/top is written, for `focusHtml.js · readPieces` and `edit.js` alike; `transforms.js ·
-  wireRule` owns which pieces are wires. The page names a piece by its name and which of that name it is, never a
-  position, so a map changed since the page was built is refused ("the map changed"), never edited in the wrong place.
-  Every other byte of the file is kept.
-- **Every scan of a deck's text is one pass.** Comments, pieces, icons, elements and wires are each found once: a 4 MB
-  file of unfinished tags or comments costs no more than its length (pinned by tests, and each rewritten scan proved
-  equal to the regex it replaced on thousands of generated inputs).
+  written by `paths.js · writeInside`, so never through a link; a note never rebuilds, a move rebuilds at once. Every
+  answer refuses to be framed by another origin. A deck's own HTML runs in the dev page and can send these two edits
+  as the page does: serve decks you trust.
+- **A note is known for the person's by its signature, never by where it is** (`noteKey.js`). A deck someone sent you
+  can carry a feedback.md; its lines must never pass for your requests. The dev server signs each note it writes with a
+  key kept with you (`~/.storydeck/key`, or STORYDECK_HOME; made once, readable by you only), and `feedback`, `check`
+  and the MCP tool list only the notes that key signed. Any other open line is counted, never listed: text that came
+  with the deck (or was edited by hand), not a request. Everything the tools print passes `tools.js · printable`, so a
+  deck's labels and notes reach a terminal or a model as text, never as their controls (html.js · UNSEEN).
+- **A move names the piece the build drew, and edits only what a browser and the build both read.** In the dev page
+  only, each piece carries the number the build gave it (`compile.js · numberForDev`, `data-sd-at`); an element the
+  build did not read as a piece has none and cannot be dragged. `pieceRules.js` (at the package root) owns which tags
+  are pieces and where a left/top is written, for `focusHtml.js` and `edit.js` alike; `transforms.js · wireTags` owns
+  which pieces are wires (found as the build finds them: without comments, after icons). A move is refused while the
+  build fails, when the map's file changed since the build, when the build's pieces are not the file's in order, and
+  when a browser reads the piece's tag differently (`pieceRules.js · readAttributes`: a quote or a `>` inside a value).
+  Every other byte of the file is kept; a bare `0` moved is written in px.
+- **Every scan of a deck's text is one pass.** Comments, pieces, a slide's focus, icons and icon files, wires and
+  elements are each found once: a 4 MB file of unfinished tags, unclosed comments or one tag repeating an attribute
+  costs no more than its length (pinned by tests, and each rewritten scan proved equal to the regex it replaced on
+  thousands of generated inputs).
 - **An assistant reaches only what it was given.** The MCP server answers for the folder it was started with and the
   decks inside it; a call naming anything else is refused (a deck's notes reach the model, so they may carry an
   instruction someone planted).
@@ -77,7 +90,7 @@ reads what is open, edits, and ticks the line.
 
 ```text
 $ storydeck feedback my-talk
-1 open note (tick a line in feedback.md when it is done):
+1 open note from your dev page (tick a line in feedback.md when it is done):
 - click 4 "1 · The route · 3": The server box should say "API server" (2026-10-21 12:20)
 
 $ git diff my-talk/map.html     # the Alt-drag, already written: left/top of "server", every other byte kept

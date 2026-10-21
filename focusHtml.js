@@ -12,7 +12,7 @@
 // path, at that twin's turn).
 // focus.css draws the classes; call focusRuntime() once in the page, so only a forward click animates.
 
-import {attrRule as ATTR, pieceTags, styleLength} from './pieceRules.js';
+import {attrRule as ATTR, pieceTags, styleLength, tagsWith} from './pieceRules.js';
 
 /** An attribute's value in a run of attributes, single or double quoted, or null. */
 const attrOf = (at, name) => ATTR(name).exec(at)?.[2] ?? null;
@@ -92,12 +92,15 @@ function pieceLook(p, look) {
 
 /** The slide HTML (as readPieces returned it) with each piece dressed for this click's look. */
 export function drawFocus(html, look) {
-  return html.replace(/<([a-zA-Z][\w-]*)\b([^>]*?)\sdata-sd-i="(\d+)"([^>]*)>/g, (_, tag, a, i, b) => {
-    const p = look.pieces[Number(i)];
-    if (!p) throw new Error(`piece ${i} is not in this look (read the pieces and plan the look from the same HTML)`);
+  let out = '', from = 0;
+  for (const {start, end, tag, before, m, after} of tagsWith(html, /\sdata-sd-i="(\d+)"/)) {
+    const p = look.pieces[Number(m[1])];
+    if (!p) throw new Error(`piece ${m[1]} is not in this look (read the pieces and plan the look from the same HTML)`);
     const {cls, style, attrs} = pieceLook(p, look);
-    return `<${tag}${joinAttr(joinAttr(a + b, 'class', cls, ' '), 'style', style, ';')}${attrs}>`;
-  });
+    out += `${html.slice(from, start)}<${tag}${joinAttr(joinAttr(before + after, 'class', cls, ' '), 'style', style, ';')}${attrs}>`;
+    from = end;
+  }
+  return out + html.slice(from);
 }
 
 /** The pieces' HTML inside the stage the view moves (a zoom); unchanged when nothing moves the view. Put it in the map's own box. */

@@ -141,12 +141,16 @@ describe('devClient', () => {
   });
 
   describe('co-editing', () => {
-    /** The page with its token, a map on the active click: pieces a, "b x" and a second a, under a stage zoomed 2×. */
+    /**
+     * The page with its token, a map on the active click under a stage zoomed 2×: pieces a, "b x" and a second a, as the
+     * build numbered them (data-sd-at) — and an element the build did not read as a piece (no number).
+     */
     function editable() {
       const stage = page();
       document.head.insertAdjacentHTML('beforeend', '<meta name="storydeck-dev-token" content="t0k3n">');
       stage.children[2].setAttribute('data-deck-active', '');
-      stage.children[2].innerHTML = '<div class="map map-route"><div class="sd-stage" style="--sd-ts: 2;"><div data-k="a"></div><div data-k="b x"></div><div data-k="a"><span>in</span></div></div></div>';
+      stage.children[2].innerHTML = '<div class="map map-route"><div class="sd-stage" style="--sd-ts: 2;"><div data-k="a" title="x>y"></div>'
+        + '<div data-k="a" data-sd-at="0"></div><div data-k="b x" data-sd-at="1"></div><div data-k="a" data-sd-at="2"><span>in</span></div></div></div>';
       return stage;
     }
     const answer = (ok, out) => vi.fn(async () => ({ok, status: ok ? 200 : 409, json: async () => out}));
@@ -183,18 +187,18 @@ describe('devClient', () => {
       delete globalThis.fetch;
     });
 
-    it('Alt-drags a piece: it follows the pointer, and its move is sent in map px, by name and which of that name', async () => {
+    it('Alt-drags a piece: it follows the pointer, and its move is sent in map px, by the number the build gave it', async () => {
       editable();
       globalThis.fetch = answer(true, {ok: true});
       devClient();
-      const second = document.querySelectorAll('[data-k="a"]')[1];
+      const second = document.querySelector('[data-sd-at="2"]');
       pointer(second.firstChild, 'pointerdown', {altKey: true, clientX: 100, clientY: 100});
       expect(second.style.outline).toContain('dashed');
       pointer(second, 'pointermove', {clientX: 140, clientY: 90});
       expect([second.style.marginLeft, second.style.marginTop]).toEqual(['20px', '-5px']);   // the screen moved 40, -10 at 2×
       pointer(second, 'pointerup', {clientX: 140, clientY: 90});
       await settle();
-      expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({map: 'route', name: 'a', nth: 1, dx: 20, dy: -5});
+      expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({map: 'route', index: 2, name: 'a', dx: 20, dy: -5});
       expect([second.style.outline, second.style.marginLeft]).toEqual(['', '']);
       expect(document.querySelector('.sd-dev').textContent).toContain('moved a · 20, -5');
       delete globalThis.fetch;
@@ -204,7 +208,11 @@ describe('devClient', () => {
       const stage = editable();
       globalThis.fetch = answer(true, {ok: true});
       devClient();
-      const a = stage.querySelector('[data-k="a"]');
+      // an element the build did not number is no piece to move, whatever it carries
+      const unnumbered = stage.querySelector('[title]');
+      pointer(unnumbered, 'pointerdown', {altKey: true, clientX: 1, clientY: 1});
+      expect(unnumbered.style.outline).toBe('');
+      const a = stage.querySelector('[data-sd-at="0"]');
       pointer(a, 'pointerdown', {clientX: 1, clientY: 1});
       pointer(a, 'pointerup', {clientX: 50, clientY: 1});
       pointer(a, 'pointerdown', {altKey: true, clientX: 1, clientY: 1});
@@ -218,10 +226,10 @@ describe('devClient', () => {
       delete window.__sdDev;
       const plain = page();
       plain.children[2].setAttribute('data-deck-active', '');
-      plain.children[2].innerHTML = '<div class="map map-route"><div data-k="a"></div></div>';
+      plain.children[2].innerHTML = '<div class="map map-route"><div data-k="a" data-sd-at="0"></div></div>';
       devClient();
       expect([...document.querySelectorAll('.sd-dev button')].map((b) => b.textContent)).toEqual(['replay']);
-      const b = plain.querySelector('[data-k="a"]');
+      const b = plain.querySelector('[data-sd-at="0"]');
       pointer(b, 'pointerdown', {altKey: true, clientX: 1, clientY: 1});
       expect(b.style.outline).toBe('');
       delete globalThis.fetch;

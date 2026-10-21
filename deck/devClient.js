@@ -72,7 +72,7 @@ export function devClient() {
   // Alt-drag: a piece of the map follows the pointer; let go and its new place is written into the map. The deck's own
   // stage listens (pointer capture keeps the drag when the pointer leaves it), so nothing outlives the deck.
   let drag = null;
-  const first = (el) => el.getAttribute('data-k')?.trim().split(/\s+/)[0];
+  const first = (el) => el.getAttribute('data-k')?.trim().split(/\s+/)[0];   // as the build names a piece
   const scaleOf = (piece) => {
     const slide = piece.closest('section'), deckWidth = Number(stage.getAttribute('width') || 1920);
     const s = (slide?.getBoundingClientRect().width || deckWidth) / deckWidth;
@@ -81,15 +81,15 @@ export function devClient() {
   };
   const drop = (d) => { d.piece.style.outline = d.piece.style.marginLeft = d.piece.style.marginTop = ''; };
   const grab = (e) => {
-    const piece = e.altKey ? e.target.closest?.('[data-deck-active] .map [data-k]') : null;
+    // only what the build drew as a piece carries its number (data-sd-at): the server moves that piece, by that number
+    const piece = e.altKey ? e.target.closest?.('[data-deck-active] .map [data-sd-at]') : null;
     const box = piece?.closest('.map');
     const map = /(?:^|\s)map-([\w-]+)/.exec(box?.className ?? '')?.[1], name = piece && first(piece);
-    if (!map || !name) return;
+    const index = Number(piece?.getAttribute('data-sd-at'));
+    if (!map || typeof name !== 'string' || !Number.isInteger(index)) return;
     e.preventDefault();
     e.stopPropagation();
-    // the piece by its name, and which of that name it is (nth): the server finds the same one in the map's source
-    const nth = [...box.querySelectorAll('[data-k]')].filter((p) => first(p) === name).indexOf(piece);
-    drag = {piece, map, name, nth, x: e.clientX, y: e.clientY, scale: scaleOf(piece)};
+    drag = {piece, map, name, index, x: e.clientX, y: e.clientY, scale: scaleOf(piece)};
     piece.style.outline = '2px dashed #7ee2a8';
     try { piece.setPointerCapture(e.pointerId); } catch { /* no capture: the drag ends where the stage does */ }
   };
@@ -107,7 +107,7 @@ export function devClient() {
     const dx = Math.round((e.clientX - d.x) / d.scale), dy = Math.round((e.clientY - d.y) / d.scale);
     drop(d);
     if (!dx && !dy) return;
-    try { await send('move', {map: d.map, name: d.name, nth: d.nth, dx, dy}); tell(`moved ${d.name} · ${dx}, ${dy}`); } catch (err) { tell(err.message); }
+    try { await send('move', {map: d.map, index: d.index, name: d.name, dx, dy}); tell(`moved ${d.name} · ${dx}, ${dy}`); } catch (err) { tell(err.message); }
   };
   if (token && stage) {
     stage.addEventListener('pointerdown', grab, true);

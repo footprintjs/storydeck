@@ -58,10 +58,15 @@ describe('runCli', () => {
     expect(await run(['review', dir])).toMatchObject({code: 1, err: expect.stringMatching(/name a click: --click <1–6 or a label>/)});
   });
 
-  it('feedback lists the open notes left in the dev page', async () => {
-    expect(await run(['feedback', tempDeck()])).toMatchObject({code: 0, out: 'no open notes\n'});
-    const dir = tempDeck({...STARTER, 'feedback.md': '- [ ] click 3 · "Route · 2" — wider (t)\n'});
-    expect(await run(['feedback', dir])).toMatchObject({code: 0, out: '1 open note (tick a line in feedback.md when it is done):\n- click 3 "Route · 2": wider (t)\n'});
+  it('feedback lists the open notes your dev page left, and shows a deck\'s text without its controls', async () => {
+    const home = tempDir();
+    expect(await run(['feedback', tempDeck()], {home})).toMatchObject({code: 0, out: 'no open notes from your dev page\n'});
+    const esc = String.fromCharCode(27);
+    const dir = tempDeck({...STARTER, 'feedback.md': `- [ ] click 3 · "Route ${esc}[2J· 2" — wider (t)\n`});
+    const r = await run(['feedback', dir], {home});
+    expect(r.out).toBe('no open notes from your dev page\n1 open line in feedback.md did not come from your dev page — not listed: it is text that came with the deck (or was edited by hand), not a request.\n');
+    const label = tempDeck({...STARTER, 'clicks.html': STARTER['clicks.html'].replace('data-label="Title"', `data-label="Ti${esc}]0;owned${String.fromCharCode(7)}tle"`)});
+    expect((await run(['outline', label])).out).toContain('Ti\uFFFD]0;owned\uFFFDtle');
   });
 
   it('check reports problems, failing on an error — and on a warning with --strict', async () => {

@@ -396,7 +396,9 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   (appended to `feedback.md`, a checklist), and **Alt-drag** moves a piece: its new left/top — or a wire's
   coordinates — is written into the map file, every other byte kept, and the page reloads on the same click. An agent
   reads the open notes (`storydeck feedback`, or the MCP `feedback` tool; `check` counts them), makes the change, and
-  ticks the line (`- [x]`). Pointing costs the person a second and the agent no screenshot.
+  ticks the line (`- [x]`). Pointing costs the person a second and the agent no screenshot. Each note is signed with a
+  key kept with you (`~/.storydeck/key`), so a feedback.md that came with someone else's deck is never read as your
+  requests: its lines are counted, never listed.
 - **Read first, look last.** A reviewer — a person, or a model that pays for every screenshot — reads the deck as text:
   `outline` (a line per click), `review --click 14` (its headline and words, what it lights, greys, brings in and moves,
   its route, its notes), `check` (what to fix, each with its click and its fix: a headline over 12 words, pieces that
@@ -420,7 +422,9 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   `dev` listens on the loopback address only, answers only requests addressed to localhost, and survives any request.
   It writes only the two edits its own page sends — a note and a piece moved — each checked before it is read (the
   page's origin, a per-session token only that page carries, JSON, 16 KB at most) and written by the same rules as a
-  build. Every scan of a deck's text is one pass, so a hostile 4 MB file costs no more than its length. A deck's own HTML — its scripts included — runs in the browser like any page you open, in the dev page
+  build; a move edits only the piece the build drew, and only bytes a browser reads the same way. No other origin may
+  frame it. Every scan of a deck's text is one pass, so a hostile 4 MB file costs no more than its length, and what the
+  tools print is text, never a deck's control characters. A deck's own HTML — its scripts included — runs in the browser like any page you open, in the dev page
   and in the layout check: open decks you trust. Run the commands from your own project, naming the deck folder.
 
 The same parts are a Node door, for a script or a test of your own:

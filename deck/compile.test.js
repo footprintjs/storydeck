@@ -26,6 +26,15 @@ describe('compileDeck', () => {
     expect(compiled.maps.map.pieces.map((p) => p.keys[0])).toEqual(['a', 'w1', 'b', 'w2', 'c']);
   });
 
+  it('numbers each piece as the build read it in the dev page only (data-sd-at), and nowhere else', () => {
+    expect(compiled.slides.some((sl) => sl.html.includes('data-sd-at'))).toBe(false);
+    const dev = compileDeck(sourceOf({deck: {title: 'T'}, clicks: CLICKS}), {dev: true});
+    const route1 = dev.slides[1].html;
+    expect([...route1.matchAll(/data-k="(\w+)"[^>]*data-sd-at="(\d+)"/g)].map((m) => [m[1], m[2]])).toEqual([['a', '0'], ['w1', '1'], ['b', '2'], ['w2', '3'], ['c', '4']]);
+    // the same page otherwise: the dev numbers are the only difference
+    expect(route1.replace(/ data-sd-at="\d+"/g, '')).toBe(compileDeck(sourceOf({deck: {title: 'T'}, clicks: CLICKS})).slides[1].html);
+  });
+
   it('draws the chrome on every slide: kicker, headline on a map, footer with the count — escaped', () => {
     const [title, route1] = compiled.slides;
     expect(title.html).toMatch(/^<section data-label="Title" class="slide plain"><div class="head" data-chrome><div class="kicker">Hello<\/div><\/div><h1>Hi<\/h1>/);

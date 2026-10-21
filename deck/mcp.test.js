@@ -5,7 +5,7 @@ import {PassThrough} from 'node:stream';
 import path from 'node:path';
 import {serveMcp, callTool, MCP_TOOLS} from './mcp.js';
 import {STARTER} from './init.js';
-import {tempDeck, cleanDecks, sink} from './test/helpers.js';
+import {tempDeck, tempDir, cleanDecks, sink} from './test/helpers.js';
 
 afterEach(cleanDecks);
 
@@ -56,7 +56,10 @@ describe('callTool', () => {
     expect((await callTool('outline', {dir: path.join(dir, 'other')}, {dir})).content[0].text).toMatch(/^Other · 6 clicks/);
     expect((await callTool('review', {all: true}, {dir})).content[0].text.match(/^click /gm)).toHaveLength(6);
     expect((await callTool('check', {}, {dir})).content[0].text).toBe('no problems');
-    expect((await callTool('feedback', {}, {dir})).content[0].text).toBe('no open notes');
+    expect((await callTool('feedback', {}, {dir, home: tempDir()})).content[0].text).toBe('no open notes from your dev page');
+    const esc = String.fromCharCode(27);
+    const odd = tempDeck({...STARTER, 'clicks.html': STARTER['clicks.html'].replace('data-label="Title"', `data-label="Ti${esc}[2Jtle"`)});
+    expect((await callTool('outline', {}, {dir: odd})).content[0].text).toContain('Ti\uFFFD[2Jtle');
     expect((await callTool('check', {layout: true}, {dir})).content[0].text).toContain('layout not checked');
     expect((await callTool('build', {}, {dir})).content[0].text).toMatch(/^✓ .*index\.html · 6 clicks/);
     expect(existsSync(path.join(dir, 'index.html'))).toBe(true);

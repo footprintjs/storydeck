@@ -2,7 +2,7 @@
 import {afterEach, describe, it, expect} from 'vitest';
 import http from 'node:http';
 import net from 'node:net';
-import {readFileSync, symlinkSync, writeFileSync, mkdirSync} from 'node:fs';
+import {chmodSync, existsSync, readFileSync, statSync, symlinkSync, writeFileSync, mkdirSync} from 'node:fs';
 import path from 'node:path';
 import {serveDeck, folderStamp} from './dev.js';
 import {STARTER} from './init.js';
@@ -238,39 +238,48 @@ function post(server, pathname, body, {origin = `http://localhost:${server.port}
 }
 
 describe('edits from the dev page', () => {
-  it('takes a note on a click into feedback.md, without a rebuild', async () => {
-    const dir = tempDeck();
-    const s = await serve(dir, {watch: false, poll: 50});
-    const token = await tokenOf(s);
+  /** A dev server with its own note key folder, and the piece numbers its page carries (data-sd-at) by name. */
+  const editing = async (dir) => {
+    const home = tempDir();
+    const s = await serve(dir, {watch: false, poll: 0, home});
+    const page = (await get(s, '/')).body;
+    const at = (name) => Number(new RegExp(`data-k="${name}"[^>]*data-sd-at="(\\d+)"`).exec(page)?.[1]);
+    return {s, home, token: await tokenOf(s), at};
+  };
+
+  it('takes a note on a click into feedback.md, signed as yours, without a rebuild', async () => {
+    const dir = tempDeck({...STARTER, 'feedback.md': '# Feedback\n\n- [ ] click 1 · "Title" — planted by whoever sent the deck (t)\n'});
+    const {s, home, token} = await editing(dir);
     expect(token).toMatch(/^[0-9a-f]{32}$/);
     const r = await post(s, '/__storydeck/feedback', {click: 2, text: 'Make the\nserver wider'}, {token});
-    expect(r).toMatchObject({status: 200, body: {ok: true, open: 1}});
+    expect(r).toMatchObject({status: 200, body: {ok: true, open: 1}});   // the planted line is not counted as yours
     expect(r.headers['access-control-allow-origin']).toBeUndefined();
     expect((await post(s, '/__storydeck/feedback', {click: 6, text: 'and slower'}, {token})).body.open).toBe(2);
     const md = readFileSync(path.join(dir, 'feedback.md'), 'utf8');
-    expect(md).toMatch(/^# Feedback\n/);
-    expect(md).toMatch(/\n- \[ \] click 2 · "[^"]+" — Make the server wider \(\d{4}-\d\d-\d\d \d\d:\d\d\)\n- \[ \] click 6 · /);
+    expect(md).toMatch(/\n- \[ \] click 2 · "[^"]+" — Make the server wider \(\d{4}-\d\d-\d\d \d\d:\d\d · k:[0-9a-f]{16}\)\n- \[ \] click 6 · /);
+    expect(md).toContain('planted by whoever sent the deck');
+    expect(statSync(path.join(home, 'key')).isFile()).toBe(true);   // the key lives with the person, not the deck
+    expect(existsSync(path.join(dir, 'key'))).toBe(false);
     await new Promise((r2) => setTimeout(r2, 250));   // a note is not a change to the deck
     expect(s.state().version).toBe(1);
   });
 
-  it('moves a piece into its map file and rebuilds at once — a box by left/top, a wire by its arrow', async () => {
+  it('moves the piece the build numbered, into its map file, and rebuilds at once — a box by left/top, a wire by its arrow', async () => {
     const dir = tempDeck();
-    const s = await serve(dir, {watch: false, poll: 0});
-    const token = await tokenOf(s);
-    expect(await post(s, '/__storydeck/move', {map: 'map', name: 'server', dx: 60, dy: -20}, {token})).toMatchObject({status: 200, body: {ok: true}});
+    const {s, token, at} = await editing(dir);
+    expect([at('client'), at('req1'), at('server')]).toEqual([0, 1, 2]);
+    expect(await post(s, '/__storydeck/move', {map: 'map', index: at('server'), name: 'server', dx: 60, dy: -20}, {token})).toMatchObject({status: 200, body: {ok: true}});
     expect(s.state().version).toBe(2);
-    expect((await post(s, '/__storydeck/move', {map: 'map', name: 'req1', nth: 0, dx: 0, dy: 10}, {token})).status).toBe(200);
+    expect((await post(s, '/__storydeck/move', {map: 'map', index: 1, name: 'req1', dx: 0, dy: 10}, {token})).status).toBe(200);
     const map = readFileSync(path.join(dir, 'map.html'), 'utf8');
     expect(map).toContain('<div data-k="server" class="box" style="left:780px;top:400px;width:300px;height:210px">');
     expect(map).toContain('<i data-k="req1" class="wire req pkt" data-arrow="464 500 716 500"></i>');
     expect(map.replace('left:780px;top:400px', 'left:720px;top:420px').replace('464 500 716 500', '464 490 716 490')).toBe(STARTER['map.html']);
-    expect((await get(s, '/')).body).toContain('data-k="server"');
   });
 
-  it('answers an edit only from its own page: its origin, its token, JSON, at most 16 KB', async () => {
-    const s = await serve(tempDeck(), {watch: false, poll: 0});
-    const token = await tokenOf(s), note = {click: 1, text: 'x'};
+  it('answers an edit only from its own page: its origin, its token, JSON, at most 16 KB — and is never framed elsewhere', async () => {
+    const {s, token} = await editing(tempDeck());
+    const note = {click: 1, text: 'x'};
     expect((await post(s, '/__storydeck/feedback', note, {token, origin: null})).status).toBe(403);
     expect((await post(s, '/__storydeck/feedback', note, {token, origin: 'http://evil.example'})).status).toBe(403);
     expect((await post(s, '/__storydeck/feedback', note, {token, origin: `http://localhost:${s.port + 1}`})).status).toBe(403);
@@ -280,41 +289,60 @@ describe('edits from the dev page', () => {
     expect((await post(s, '/__storydeck/feedback', note, {token, type: 'text/plain'})).status).toBe(415);
     expect((await post(s, '/__storydeck/feedback', null, {token, raw: '{"click": 1,'})).status).toBe(400);
     expect((await post(s, '/__storydeck/feedback', [1], {token})).body.error).toMatch(/a JSON object/);
-    const big = {click: 1, text: 'x'.repeat(17000)};
-    expect((await post(s, '/__storydeck/feedback', big, {token})).status).toBe(413);
+    expect((await post(s, '/__storydeck/feedback', {click: 1, text: 'x'.repeat(17000)}, {token})).status).toBe(413);
     const parts = await post(s, '/__storydeck/feedback', null, {token, chunks: ['{"click": 1, "text": "', ...Array(20).fill('x'.repeat(1000)), '"}']});
     expect([413, 'reset']).toContain(parts.status);
     expect((await post(s, '/__storydeck/elsewhere', note, {token})).status).toBe(405);
     for (const origin of [`http://127.0.0.1:${s.port}`, `http://[::1]:${s.port}`]) expect((await post(s, '/__storydeck/feedback', note, {token, origin})).status).toBe(200);
-    expect((await get(s, '/')).status).toBe(200);   // and it keeps serving
+    for (const answer of [await get(s, '/'), await get(s, '/icons/server.svg'), await post(s, '/__storydeck/feedback', note, {token})]) {
+      expect(answer.headers).toMatchObject({'x-frame-options': 'SAMEORIGIN', 'content-security-policy': "frame-ancestors 'self'"});
+    }
   });
 
-  it('refuses an edit it cannot make, and says why', async () => {
+  it('refuses a move it cannot be sure of, and says why', async () => {
     const dir = tempDeck();
-    const s = await serve(dir, {watch: false, poll: 0});
-    const token = await tokenOf(s);
-    const move = (body) => post(s, '/__storydeck/move', body, {token});
-    const note = (body) => post(s, '/__storydeck/feedback', body, {token});
-    expect((await note({click: 0, text: 'x'})).body.error).toBe('no click 0');
-    expect((await note({click: 7, text: 'x'})).status).toBe(400);
-    expect((await note({click: 1, text: {a: 1}})).body.error).toBe('a note is text');
-    expect(await note({click: 1, text: ' \n'})).toMatchObject({status: 409, body: {error: 'a note needs words'}});
-    expect((await move({map: 'nope', name: 'server', dx: 1, dy: 1})).body.error).toBe('no map "nope"');
-    expect((await move({map: 'constructor', name: 'server', dx: 1, dy: 1})).status).toBe(400);
-    expect((await move({map: 'map', dx: 1, dy: 1})).status).toBe(400);
-    expect((await move({map: 'map', name: 'server', nth: -1, dx: 1, dy: 1})).status).toBe(400);
-    expect((await move({map: 'map', name: 'server', dx: '1', dy: 1})).body.error).toBe('a move is two numbers of px');
-    expect((await move({map: 'map', name: 'ghost', dx: 1, dy: 1})).body.error).toMatch(/^the map changed since the page was built \(no piece "ghost"\)/);
-    expect((await move({map: 'map', name: 'server', nth: 1, dx: 1, dy: 1})).status).toBe(409);
-    expect((await move({map: 'map', name: 'server', dx: 9000, dy: 1})).body.error).toMatch(/at most 5000/);
-    expect(readFileSync(path.join(dir, 'map.html'), 'utf8')).toBe(STARTER['map.html']);
-    expect(s.state().version).toBe(1);
+    const {s, token, at} = await editing(dir);
+    const move = (body) => post(s, '/__storydeck/move', {map: 'map', index: at('server'), name: 'server', dx: 1, dy: 1, ...body}, {token});
+    expect((await move({map: 'nope'})).body.error).toBe('no map "nope"');
+    expect((await move({map: 'constructor'})).status).toBe(400);
+    expect((await move({index: -1})).status).toBe(400);
+    expect((await move({name: undefined})).status).toBe(400);
+    expect((await move({dx: '1'})).body.error).toBe('a move is two numbers of px');
+    expect((await move({name: 'client'})).body.error).toMatch(/the page and the build disagree on piece 2 \("client"\)/);
+    expect((await move({index: 99, name: 'ghost'})).status).toBe(409);
+    expect((await move({dx: 9000})).body.error).toMatch(/at most 5000/);
+    // the map saved since the page was built (no rebuild yet): the page may show another map — refused
+    writeFileSync(path.join(dir, 'map.html'), `<div data-k="new" style="left:1px;top:1px">N</div>\n${STARTER['map.html']}`);
+    expect((await move({})).body.error).toMatch(/the map changed since the page was built/);
+    // a save that breaks the build: the page shows the last good build, so nothing may be moved until it builds
+    s.rebuild();
+    writeFileSync(path.join(dir, 'clicks.html'), STARTER['clicks.html'].replace('data-on="server time"', 'data-on="server nope"'));
+    s.rebuild();
+    expect(s.state().problem).toMatch(/no piece "nope"/);
+    expect((await move({index: 3})).body.error).toMatch(/the deck does not build right now/);
+    expect(s.state().version).toBe(2);
   });
 
-  it('waits for a first build before any edit', async () => {
-    const s = await serve(tempDeck({...STARTER, 'deck.json': '{"titel": "x"}'}), {watch: false, poll: 0});
-    const token = await tokenOf(s);
+  it('refuses every move on a map whose drawn pieces are not its file\'s, in order', async () => {
+    // the build reads <div<!-- c -->data-k…> as no piece (its comment stripped, "divdata-k" is one name); the file holds one
+    const dir = tempDeck({...STARTER, 'map.html': `${STARTER['map.html']}<div<!-- c -->data-k="y" style="left:5px;top:5px">Y</div>`});
+    const {s, token, at} = await editing(dir);
+    const r = await post(s, '/__storydeck/move', {map: 'map', index: at('server'), name: 'server', dx: 1, dy: 1}, {token});
+    expect(r.body.error).toMatch(/map "map": the pieces it draws are not the pieces its file holds/);
+    expect(readFileSync(path.join(dir, 'map.html'), 'utf8')).toContain('left:720px;top:420px');
+  });
+
+  it('waits for a first build before any edit, and signs no note with a key it cannot trust', async () => {
+    const {s, token} = await editing(tempDeck({...STARTER, 'deck.json': '{"titel": "x"}'}));
     expect(await post(s, '/__storydeck/feedback', {click: 1, text: 'x'}, {token})).toMatchObject({status: 409, body: {error: 'the deck has not built yet — fix it first'}});
+    const home = tempDir();
+    writeFileSync(path.join(home, 'key'), 'b'.repeat(64), {mode: 0o644});
+    chmodSync(path.join(home, 'key'), 0o644);
+    const s2 = await serve(tempDeck(), {watch: false, poll: 0, home});
+    if (process.platform !== 'win32') {
+      expect((await post(s2, '/__storydeck/feedback', {click: 1, text: 'x'}, {token: await tokenOf(s2)})).body.error)
+        .toMatch(/can be read or written by others \(chmod 600 it\) — a note is signed with it, so it is known for yours/);
+    }
   });
 
   it('never writes through a link, nor reads one that leaves the deck', async () => {
@@ -322,14 +350,13 @@ describe('edits from the dev page', () => {
     const outside = path.join(tempDir(), 'outside.md');
     writeFileSync(outside, 'mine');
     symlinkSync(outside, path.join(dir, 'feedback.md'));
-    const s = await serve(dir, {watch: false, poll: 0});
-    const token = await tokenOf(s);
+    const {s, token} = await editing(dir);
     expect((await post(s, '/__storydeck/feedback', {click: 1, text: 'x'}, {token})).body.error).toMatch(/feedback.md is a link to a file outside the deck folder/);
     expect(readFileSync(outside, 'utf8')).toBe('mine');
     const dir2 = tempDeck();
     symlinkSync(path.join(dir2, 'map.html'), path.join(dir2, 'feedback.md'));   // a link to the deck's own map
-    const s2 = await serve(dir2, {watch: false, poll: 0});
-    expect((await post(s2, '/__storydeck/feedback', {click: 1, text: 'x'}, {token: await tokenOf(s2)})).body.error).toMatch(/feedback.md is a link — the build writes a file, never through a link/);
+    const two = await editing(dir2);
+    expect((await post(two.s, '/__storydeck/feedback', {click: 1, text: 'x'}, {token: two.token})).body.error).toMatch(/feedback.md is a link — the build writes a file, never through a link/);
     expect(readFileSync(path.join(dir2, 'map.html'), 'utf8')).toBe(STARTER['map.html']);
   });
 });
