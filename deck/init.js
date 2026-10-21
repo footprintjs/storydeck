@@ -29,6 +29,7 @@ const MAP = `<!--
 const CLICKS = `<!--
   The deck, click by click.
   <section data-label="…" data-kicker="…">          one part of the story; without data-map it is one plain slide
+  <section … data-theme="ledger">                   optional: its slides carry data-theme, so theme.css can dress that part
   <section … data-map="map">                        a part told on map.html: every <step> inside is ONE click
     <step data-in="…" data-out="…" data-on="…" data-focus="…">
       data-in    pieces that come in (they stay)     data-out   pieces that leave

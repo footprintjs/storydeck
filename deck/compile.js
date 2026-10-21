@@ -101,7 +101,8 @@ const foot = (footer, n, total) => `<div class="foot" data-chrome><span>${esc(fo
 
 /** One click as a <deck-stage> slide. */
 function drawClick(c, i, total, {footer, area, canvas}) {
-  const open = `<section data-label="${esc(c.label)}"`;
+  // a part's theme rides on each of its slides, for the deck's theme.css ([data-theme="…"])
+  const open = `<section data-label="${esc(c.label)}"${c.part.theme ? ` data-theme="${esc(c.part.theme)}"` : ''}`;
   if (c.kind === 'plain') return `${open} class="slide plain">${head(c.part.kicker, '')}${c.inner}${foot(footer, i + 1, total)}</section>`;
   return `${open} class="slide on-map ${slideClass(c.look)}">${head(c.part.kicker, c.headline)}`
     + `<div class="map map-${c.map.name}">${wrapStage(drawFocus(c.map.html, c.look), c.look)}</div>`

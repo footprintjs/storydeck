@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **A part can have its own look: `data-theme`.** `<section … data-theme="ledger">` in clicks.html puts
+  `data-theme="ledger"` on each slide of that part (plain or on a map), so a deck's theme.css can give one part its own
+  tokens and pieces — a talk in several parts, each dressed for its subject. A theme is one lower-case name (letters,
+  digits, dashes; 40 at most), refused otherwise with the part's name. A part without one is drawn byte for byte as
+  before.
+
 ## 0.7.0 — a deck from a folder, an editing loop, co-editing and wire motion
 
 - **A packet rides its wire's curve, and a wire shows itself in.** On a `path` click, a `pkt` packet now follows the

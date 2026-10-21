@@ -58,6 +58,25 @@ describe('compileDeck', () => {
     expect(route1.html).toContain('class="wire pkt');
   });
 
+  it('puts a part\'s theme on each of its slides, plain or on a map, and only on that part\'s', () => {
+    const themed = CLICKS.replace('<section data-label="Title" data-kicker="Hello">', '<section data-label="Title" data-kicker="Hello" data-theme="cover">')
+      .replace('<section data-label="Route" data-kicker="1 · Route" data-map="map">', '<section data-label="Route" data-kicker="1 · Route" data-map="map" data-theme="ledger-2">');
+    const slides = compileDeck(sourceOf({clicks: themed})).slides;
+    const themeOf = (html) => / data-theme="([^"]*)"/.exec(html.slice(0, html.indexOf('>')))?.[1] ?? null;
+    expect(slides.map((x) => themeOf(x.html))).toEqual(['cover', 'ledger-2', 'ledger-2', null, null]);
+    expect(slides[1].html).toMatch(/^<section data-label="Route · 1" data-theme="ledger-2" class="slide on-map ">/);
+    // without one, a slide is drawn as before, byte for byte
+    const plain = compileDeck(sourceOf({clicks: CLICKS})).slides;
+    expect(slides.slice(3).map((x) => x.html)).toEqual(plain.slice(3).map((x) => x.html));
+  });
+
+  it('refuses a theme that is not one plain lower-case name, naming the part', () => {
+    for (const bad of ['', 'Ledger', 'two words', 'ledger_2', '2col', '-dash', 'ünï', 'a'.repeat(41)]) {
+      const clicks = CLICKS.replace('data-label="More" data-kicker="2 · More"', `data-label="More" data-kicker="2 · More" data-theme="${bad}"`);
+      expect(() => compileDeck(sourceOf({clicks})), bad).toThrow(/"More": data-theme=.* a theme is one lower-case name/);
+    }
+  });
+
   it('carries each map\'s state from click to click and part to part, so the picture builds up', () => {
     const more = compiled.clicks[3];
     const state = (c, k) => c.look.pieces[compiled.maps.map.pieces.findIndex((p) => p.keys[0] === k)].state;

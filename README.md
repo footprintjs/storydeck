@@ -399,6 +399,11 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   ticks the line (`- [x]`). Pointing costs the person a second and the agent no screenshot. Each note is signed with a
   key kept with you (`~/.storydeck/key`) for that deck's folder, so a feedback.md that came with someone else's deck is
   never read as your requests: its lines are counted, never listed.
+- **A part can have its own look.** `<section data-label="3 · Storage" … data-theme="ledger">` puts
+  `data-theme="ledger"` on each of that part's slides, so `theme.css` can dress it: redefine the tokens for it
+  (`[data-theme="ledger"] { --bg: …; --text: …; }`, and `:root.dark [data-theme="ledger"]` for dark) and give its pieces
+  their own style. Tokens inherit, so the chrome, the focus and every piece of that part follow. A theme is one
+  lower-case name (letters, digits and dashes); a part without one is drawn as before, byte for byte.
 - **Read first, look last.** A reviewer — a person, or a model that pays for every screenshot — reads the deck as text:
   `outline` (a line per click), `review --click 14` (its headline and words, what it lights, greys, brings in and moves,
   its route, its notes), `check` (what to fix, each with its click and its fix: a headline over 12 words, pieces that
