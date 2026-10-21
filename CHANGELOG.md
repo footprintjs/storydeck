@@ -18,8 +18,9 @@
   click in a browser for text that spills out of its box (through the video driver's new `measure(n)`; needs
   `playwright-core`). `storydeck mcp` serves the same tools to an AI assistant over stdio. `storydeck init` writes a
   starter that builds and checks clean.
-- **A deck is files, never a program — on your machine.** No deck code runs in Node, and the layout check's browser is
-  never loaded from the deck folder or from a StoryDeck inside it. A deck reads only its own files: a link out of the
+- **A deck is files, never a program — on your machine.** No deck code runs in Node; Playwright, for the layout check,
+  is loaded only from beside StoryDeck (never from the deck folder or the folder you run in), and the page is measured
+  offline (`deckStageDriver({offline: true})`). A deck reads only its own files: a link out of the
   folder, or to a hidden file, is refused. A build renames a new file into place (never writing through a link) and a
   file deck.json names never lands outside the deck; `--out` writes where you say. The dev server is loopback-only and
   survives any request; the MCP server reaches only decks inside the folder it was started with. A deck's own HTML still

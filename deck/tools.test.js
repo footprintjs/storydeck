@@ -11,13 +11,14 @@ afterEach(cleanDecks);
 /** Playwright's chromium, faked: it opens the page it is given, and every click spills once. */
 function fakeChromium(found = [{kind: 'spills', piece: 'server', text: 'Server', dx: 12, dy: 0}]) {
   const opened = [];
+  const f = {opened, routed: false};
   const page = {
     goto: vi.fn(async (url) => { opened.push(readFileSync(fileURLToPath(url), 'utf8')); }),
-    waitForFunction: vi.fn(), addStyleTag: vi.fn(),
+    waitForFunction: vi.fn(), addStyleTag: vi.fn(), route: vi.fn(async () => { f.routed = true; }),
     evaluate: vi.fn(async (fn) => (fn === measureSlide ? found : undefined)),
   };
   const browser = {newPage: async () => page, close: vi.fn()};
-  return {chromium: {launch: vi.fn(async () => browser)}, opened, browser};
+  return Object.assign(f, {chromium: {launch: vi.fn(async () => browser)}, browser});
 }
 
 describe('checkTool --layout', () => {
@@ -26,6 +27,7 @@ describe('checkTool --layout', () => {
     const r = await checkTool(tempDeck(), {layout: true, chromium: f.chromium});
     expect(f.opened[0]).toMatch(/^<!doctype html>/);
     expect(f.browser.close).toHaveBeenCalled();
+    expect(f.routed).toBe(true);   // measured offline
     expect(r).toMatchObject({errors: 0, warnings: 1});
     expect(r.text).toBe('warn  click 1 "Title" · spills: text spills out of "server" by 12 px wide ("Server") (on clicks 1–6) — shorten it, or give the box more room');
   });

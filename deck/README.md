@@ -25,8 +25,9 @@ text. Each module does one job, and they compose in one direction:
 ## Laws
 
 - **A deck is files, never a program — in Node.** No deck code runs: the dev server rebuilds in its own process from
-  the deck's files, and the browser for the layout check is never loaded from the deck folder (nor from a StoryDeck
-  installed inside it). A deck's HTML does run in the browser, as any page does.
+  the deck's files, and Playwright, for the layout check, is loaded only from beside StoryDeck (`layout.js ·
+  findChromium`) — never from the deck folder or the folder you run in. The layout check measures the page offline. A
+  deck's HTML does run in the browser, as any page does.
 - **A deck reads only its own files** (`paths.js · realInside`). Every file is read by its real path; one outside the
   folder, or a hidden one inside it, reached through a link, is refused — so a deck someone sent you cannot pull a file
   from elsewhere (or its own .env) into its page, its review or its server.

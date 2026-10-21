@@ -39,18 +39,27 @@ describe('layoutCheck', () => {
     expect(driver.close).toHaveBeenCalled();
   });
 
-  it('builds the deck-stage driver from a chromium when no driver is given', async () => {
-    const page = {goto: vi.fn(), waitForFunction: vi.fn(), addStyleTag: vi.fn(), evaluate: vi.fn(async (fn) => (fn === measureSlide ? [] : undefined))};
+  it('builds the deck-stage driver from a chromium when no driver is given — offline: only the page itself loads', async () => {
+    const page = {goto: vi.fn(), waitForFunction: vi.fn(), addStyleTag: vi.fn(), route: vi.fn(), evaluate: vi.fn(async (fn) => (fn === measureSlide ? [] : undefined))};
     const chromium = {launch: vi.fn(async () => ({newPage: async () => page, close: vi.fn()}))};
     expect(await layoutCheck('u', {clicks: clicks.slice(0, 2), chromium})).toEqual([]);
     expect(page.evaluate.mock.calls.filter(([fn]) => fn === measureSlide)).toHaveLength(2);
+    expect(page.route).toHaveBeenCalledWith('**/*', expect.any(Function));
+    expect(page.route.mock.invocationCallOrder[0]).toBeLessThan(page.goto.mock.invocationCallOrder[0]);
+    const handler = page.route.mock.calls[0][1];
+    const request = (url) => ({request: () => ({url: () => url}), continue: vi.fn(), abort: vi.fn()});
+    for (const [url, allowed] of [['file:///tmp/deck/index.html', true], ['data:image/png;base64,x', true], ['https://example.com/x', false], ['http://169.254.169.254/', false], ['ws://localhost:1', false]]) {
+      const r = request(url);
+      handler(r);
+      expect([url, r.continue.mock.calls.length, r.abort.mock.calls.length]).toEqual([url, allowed ? 1 : 0, allowed ? 0 : 1]);
+    }
   });
 
-  it('finds no chromium where playwright-core is not installed', async () => {
-    expect(await findChromium({cwd: tempDir()})).toBeNull();
+  it('finds no chromium where playwright-core is not installed beside StoryDeck', async () => {
+    expect(await findChromium()).toBeNull();
   });
 
-  it('never loads Playwright from the deck folder, even when you run inside it', async () => {
+  it('never loads Playwright from the folder you run in (a deck someone sent you, or the folder around it)', async () => {
     const {mkdirSync, writeFileSync, existsSync, realpathSync} = await import('node:fs');
     const path = (await import('node:path')).default;
     const deck = realpathSync(tempDir());
@@ -59,11 +68,14 @@ describe('layoutCheck', () => {
     const marker = path.join(deck, 'ran.txt');
     writeFileSync(path.join(pkg, 'package.json'), '{"name":"playwright-core","main":"index.js"}');
     writeFileSync(path.join(pkg, 'index.js'), `require('fs').writeFileSync(${JSON.stringify(marker)}, 'ran'); module.exports = {chromium: {planted: true}};`);
-    expect(await findChromium({cwd: deck, deckRoot: deck})).toBeNull();
-    expect(await findChromium({cwd: path.join(deck, 'node_modules'), deckRoot: deck})).toBeNull();
+    const before = process.cwd();
+    process.chdir(deck);
+    try {
+      expect(await findChromium()).toBeNull();
+    } finally {
+      process.chdir(before);
+    }
     expect(existsSync(marker)).toBe(false);
-    // the same folder as an ordinary project (not the deck): its own install is what you meant
-    expect(await findChromium({cwd: deck})).toEqual({planted: true});
   });
 });
 

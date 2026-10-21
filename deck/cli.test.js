@@ -72,7 +72,7 @@ describe('runCli', () => {
   it('check --layout says how to get the browser when it is not installed, and runs the other checks', async () => {
     const r = await run(['check', tempDeck(), '--layout']);
     expect(r.code).toBe(0);
-    expect(r.out).toContain('no problems\nlayout not checked: it needs Playwright — npm i -D playwright-core');
+    expect(r.out).toContain('no problems\nlayout not checked: it needs Playwright installed beside StoryDeck — npm i -D footprint-storydeck playwright-core');
   });
 
   it('a build that cannot be made stops with the reason', async () => {

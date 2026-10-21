@@ -46,6 +46,6 @@ export function renderVideo(options: {
   work?: string; log?: (line: string) => void;
 }): Promise<{ video: string; length: number; cues: number; chapters: Chapters; plan: PlannedClick[] }>;
 /** The driver for storydeck's <deck-stage> pages, with Playwright's `chromium`. */
-export function deckStageDriver(options: { chromium: unknown; executablePath?: string; viewport?: { width: number; height: number }; hide?: string[] }): DeckStageDriver;
+export function deckStageDriver(options: { chromium: unknown; executablePath?: string; viewport?: { width: number; height: number }; hide?: string[]; /** refuse every request but the page's own file and inline data */ offline?: boolean }): DeckStageDriver;
 /** Runs in the page: what spills on the slide shown, its animations finished first (deckStageDriver · measure). */
 export function measureSlide(): SlideSpill[];

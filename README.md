@@ -394,16 +394,17 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   `outline` (a line per click), `review --click 14` (its headline and words, what it lights, greys, brings in and moves,
   its route, its notes), `check` (what to fix, each with its click and its fix: a headline over 12 words, pieces that
   light just by coming in, a click that changes nothing, a piece never shown, clicks without notes). `check --layout`
-  opens the page in a browser and finds text that spills out of its box (it needs `playwright-core`; without it, it says
-  so and the other checks run). `mcp` serves the same tools to an AI assistant:
+  opens the page in a browser, offline, and finds text that spills out of its box (it needs Playwright installed beside
+  StoryDeck: `npm i -D footprint-storydeck playwright-core`; without it, it says so and the other checks run). `mcp` serves the same tools to an AI assistant:
   `claude mcp add storydeck -- npx footprint-storydeck mcp my-talk`.
 - **The helpers a diagram needs.** `<i data-k="w1" class="wire pkt" data-arrow="252 352 318 352"></i>` is a wire (an
   SVG arrow, with an optional bend; class `pkt` adds a packet that rides it on a `path` click, at its turn).
   `<i class="ic" data-icon="server"></i>` is `icons/server.svg`. `deck.css` styles the chrome (kicker, headline, footer
   and count), wires, packets, icons and the theme toggle from the token contract, every rule `:where()`, so your
   theme wins.
-- **A deck is files, never a program — on your machine.** No deck code runs in Node: no build script, no deck module,
-  and the browser for `check --layout` is never loaded from the deck folder (nor from a copy of StoryDeck inside it).
+- **A deck is files, never a program — on your machine.** No deck code runs in Node: no build script, no deck module.
+  Playwright, for `check --layout`, is loaded only from beside StoryDeck — never from the deck folder or the folder you
+  run in — and the page is measured offline, so a deck's own scripts cannot reach the network from your machine.
   A deck reads only its own files: a link that leaves the folder, or points at a hidden file (`.env`), is refused, so
   a deck someone sent you cannot pull a file from elsewhere into its page, its review or its server. A build renames a
   new file into place, so it never writes through a link, and a file deck.json names never lands outside the deck.

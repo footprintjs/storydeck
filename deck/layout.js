@@ -1,33 +1,24 @@
 // layout — the check only a browser can make: text that spills out of its box, and lit pieces pushed off the slide.
 // It drives the built page through the video's browser port (video.js · deckStageDriver · measure), one click at a
-// time as it settles. Optional: it needs Playwright (`npm i -D playwright-core`, then `npx playwright-core install
-// chromium`); without it the check says so and the other checks still run.
-import {realpathSync} from 'node:fs';
-import {createRequire} from 'node:module';
-import path from 'node:path';
+// time as it settles, offline. Optional: it needs Playwright installed beside StoryDeck (`npm i -D footprint-storydeck
+// playwright-core`, then `npx playwright-core install chromium`); without it the check says so and the others run.
 import {deckStageDriver} from '../video.js';
-import {packageRoot} from './assets.js';
-import {isInside} from './paths.js';
 
 const PLAYWRIGHT = 'playwright-core';   // an optional dependency: named, never imported until a layout check asks
 
 /**
- * Playwright's chromium from the project you run the command in (the current folder), then from where StoryDeck is
- * installed; null when it is not installed. Never from the deck's folder: a deck is content, and a deck someone sent
- * you must not run code by carrying a node_modules of its own — so a project folder that is the deck (or inside it),
- * and a StoryDeck installed inside the deck, are passed over.
+ * Playwright's chromium, found the way StoryDeck finds its own dependencies — beside it, where it is installed — or
+ * null when it is not there. Never from the deck's folder or the folder you run in: those may hold files someone sent
+ * you, and a module found there would run as you. Loading a package installed beside StoryDeck trusts nothing more
+ * than StoryDeck itself, which is already running.
  */
-export async function findChromium({cwd = process.cwd(), deckRoot = null} = {}) {
-  const real = (p) => { try { return realpathSync(p); } catch { return path.resolve(p); } };
-  const inDeck = (p) => deckRoot !== null && isInside(deckRoot, real(p));
-  const chromiumOf = (mod) => mod?.chromium ?? mod?.default?.chromium ?? null;
-  if (!inDeck(cwd)) {
-    try {
-      return chromiumOf(createRequire(path.join(real(cwd), 'noop.js'))(PLAYWRIGHT));
-    } catch { /* not in the project: look beside StoryDeck */ }
+export async function findChromium() {
+  try {
+    const mod = await import(/* @vite-ignore */ PLAYWRIGHT);
+    return mod?.chromium ?? mod?.default?.chromium ?? null;
+  } catch {
+    return null;
   }
-  if (inDeck(packageRoot())) return null;
-  try { return chromiumOf(await import(/* @vite-ignore */ PLAYWRIGHT)); } catch { return null; }
 }
 
 /** Click numbers as short runs: 3–17, 29, 31–37. */
@@ -64,11 +55,12 @@ export function layoutProblems(found, clicks) {
 }
 
 /**
- * Open a built page and measure every click. `driver` is the browser port (deckStageDriver({chromium})), or pass
- * `chromium`. Returns the problems, as check.js reports them.
+ * Open a built page and measure every click. `driver` is the browser port, or pass `chromium` and the deck-stage driver
+ * is made offline: the page loads nothing but itself, so a deck's own scripts cannot reach the network from your
+ * machine while it is measured. Returns the problems, as check.js reports them.
  */
 export async function layoutCheck(url, {clicks, driver, chromium}) {
-  const port = driver ?? deckStageDriver({chromium});
+  const port = driver ?? deckStageDriver({chromium, offline: true});   // the page is whole; it needs no network
   const found = [];
   await port.open(url);
   try {

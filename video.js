@@ -189,15 +189,18 @@ async function render({ url, plan, out, name, driver, run, fps, maxEntrance, cha
 /**
  * The driver for storydeck's <deck-stage> pages, with Playwright (pass its `chromium`). A click is made
  * forward — a jump to the click before it, then one step on — and `hide` keeps the room's chrome out of
- * the frame (the deck's toolbar always; key hints and panels by selector).
+ * the frame (the deck's toolbar always; key hints and panels by selector). `offline` refuses every request that
+ * is not the page's own file or inline data (the layout check measures a deck that way).
  */
-export function deckStageDriver({ chromium, executablePath, viewport = { width: 1920, height: 1080 }, hide = ['.fs-btn', '.notes-panel', '.train-panel'] }) {
+export function deckStageDriver({ chromium, executablePath, viewport = { width: 1920, height: 1080 }, hide = ['.fs-btn', '.notes-panel', '.train-panel'], offline = false }) {
   let browser, page;
   const settle = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   return {
     async open(url) {
       browser = await chromium.launch(executablePath ? { executablePath } : {});
       page = await browser.newPage({ viewport, reducedMotion: 'no-preference' });
+      // offline: the page loads only itself (a file, and what it carries inline); any network request is refused
+      if (offline) await page.route('**/*', (route) => (/^(file|data|blob|about):/.test(route.request().url()) ? route.continue() : route.abort()));
       await page.goto(url);
       await page.waitForFunction(() => customElements.get('deck-stage') && document.querySelector('deck-stage')?.shadowRoot && document.fonts.status === 'loaded');
       if (hide.length) await page.addStyleTag({ content: `${hide.join(',')}{display:none!important}` });

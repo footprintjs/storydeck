@@ -9,7 +9,6 @@ import {loadDeck, buildDeck, deckHtml} from './build.js';
 import {outline, reviewClick} from './review.js';
 import {checkDeck, failure, formatProblems} from './check.js';
 import {findChromium, layoutCheck} from './layout.js';
-import {deckRoot} from './paths.js';
 
 const kb = (n) => `${Math.round(n / 1024)} KB`;
 
@@ -41,9 +40,9 @@ export async function checkTool(dir, {layout = false, chromium} = {}) {
   const problems = checkDeck(compiled);
   let note = '';
   if (layout) {
-    const browser = chromium ?? (await findChromium({deckRoot: deckRoot(dir)}));   // never from the deck folder
+    const browser = chromium ?? (await findChromium());   // beside StoryDeck only: never from the deck or the folder you run in
     if (!browser) {
-      note = '\nlayout not checked: it needs Playwright — npm i -D playwright-core, then npx playwright-core install chromium';
+      note = '\nlayout not checked: it needs Playwright installed beside StoryDeck — npm i -D footprint-storydeck playwright-core, then npx playwright-core install chromium';
     } else {
       const work = mkdtempSync(path.join(tmpdir(), 'storydeck-layout-'));
       try {
