@@ -26,6 +26,10 @@
   file deck.json names never lands outside the deck; `--out` writes where you say. The dev server is loopback-only and
   survives any request; the MCP server reaches only decks inside the folder it was started with. A deck's own HTML still
   runs in the browser, like any page: open decks you trust.
+- **`zoom` is a camera, so it goes with a mover.** A click can close in while its parts fly apart (`zoom apart`) or step
+  aside (`zoom left`): the camera frames the subject where the mover leaves it, and a blur frames it there too. A new
+  strategy kind, `camera` (one a click); a deck's own camera gets the same context. `zoom` alone draws exactly as before.
+  A deck's own mover that moves the view itself (returns `stage`) still may, but not with a camera on the same click.
 - `footprint-storydeck/deck` exports the same parts for a script; `deckStageDriver` gains `measure(n)`, and
   `measureSlide` is exported from `footprint-storydeck/video`.
 

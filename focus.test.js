@@ -147,13 +147,13 @@ describe('focus · strategies', () => {
   });
 
   it('a click takes one strategy of each kind, from the built-ins or the deck\'s own', () => {
-    expect(() => focusStep(null, { ...lit, focus: 'zoom left' }, deck)).toThrow(/one mover at most.*"zoom" and "left"/);
+    expect(() => focusStep(null, { ...lit, focus: 'left right' }, deck)).toThrow(/one mover at most.*"left" and "right"/);
     expect(() => focusStep(null, { ...lit, focus: 'spin' }, deck)).toThrow(/no focus strategy "spin" \(there are grey, hide, keep, zoom, left, right, up, down, place, apart, path, blur\)/);
     const tilt = { kind: 'mover', place: ({ subject }) => ({ subject: { o: [subject.x, subject.y], s: 2, t: [0, 0] } }) };
     const look = focusStep(null, { ...lit, focus: 'tilt' }, { ...deck, strategies: { tilt } }).look;
     expect(look.strategies).toEqual(['tilt']);
     expect(look.pieces[1].move.s).toBe(2);
-    expect(() => focusStep(null, { ...lit, focus: 'odd' }, { ...deck, strategies: { odd: { kind: 'paint' } } })).toThrow(/a look, a mover, an overlay or an order/);
+    expect(() => focusStep(null, { ...lit, focus: 'odd' }, { ...deck, strategies: { odd: { kind: 'paint' } } })).toThrow(/a look, a camera, a mover, an overlay or an order/);
     expect(Object.keys(FOCUS)).toEqual(['grey', 'hide', 'keep', 'zoom', 'left', 'right', 'up', 'down', 'place', 'apart', 'path', 'blur']);
   });
 });
@@ -458,7 +458,7 @@ describe('focus · apart: the exploded view', () => {
   it('is a mover: a click with two movers is refused, naming the fix; so are groups it cannot read', () => {
     const at = (focus, options = {}) => () => planFocus([all, { focus, options }], fig);
     expect(at('apart place', { apart: groups, groups: 'lid: 1 1' })).toThrow(/a click takes one mover at most: "apart" and "place" are both movers — keep one, and give the other a click of its own/);
-    expect(at('zoom apart', { apart: groups })).toThrow(/"zoom" and "apart" are both movers/);
+    expect(at('left apart', { apart: groups })).toThrow(/"left" and "apart" are both movers/);
     expect(at('apart')).toThrow(/focus "apart": give groups, 'names: dx dy \[scale\] \| …' \(data-focus-apart, or the option apart\)/);
     expect(at('apart', { apart: 'lid: 0 -120 1 @ 10 10' })).toThrow(/focus "apart": a group is 'names: dx dy \[scale\]', not "lid: 0 -120 1 @ 10 10"/);
     expect(at('apart', { apart: 'lids: 0 -120' })).toThrow(/focus group: no piece "lids"/);
@@ -476,5 +476,68 @@ describe('focus · apart: the exploded view', () => {
     expect(mine(7)).toThrow(/focus "mine": spring is \{stagger\}, the ms between two groups — not 7/);
     expect(mine({ stagger: -1 })).toThrow(/focus "mine": stagger is .* not -1/);
     expect(mine(Object.freeze({ stagger: 10 }))().looks[1].apart).toEqual({ stagger: 10, groups: [{ names: ['lid'], to: 1, was: 0 }] });
+  });
+});
+
+describe('focus · the camera: zoom goes with a mover', () => {
+  // a figure of three parts in a row, apart from one another
+  const parts = [
+    { keys: ['lid'], box: { x: 800, y: 300, w: 300, h: 100 } },
+    { keys: ['core'], box: { x: 800, y: 450, w: 300, h: 100 } },
+    { keys: ['base'], box: { x: 800, y: 600, w: 300, h: 100 } },
+  ];
+  const fig = { pieces: parts, area: [0, 200, 1920, 1000] };
+  const all = { in: ['*'] };
+
+  it('zoom is a camera: with apart on one click, the view closes in on the part where it flies to', () => {
+    const { looks } = planFocus([all, { on: ['lid'], focus: 'zoom apart', options: { apart: 'lid: 0 -100' } }], fig);
+    const look = looks[1];
+    expect(look.strategies).toEqual(['zoom', 'apart']);
+    expect(look.apart.groups).toEqual([{ names: ['lid'], to: 1, was: 0 }]);
+    expect(look.pieces[0].move).toMatchObject({ dx: 0, dy: -100 });
+    // the frame follows the lid to where apart takes it: its centre (950, 250) lands at the area's centre
+    const s = look.stage.move.s;
+    expect(950 * s + look.stage.move.x).toBeCloseTo(960, 5);
+    expect(250 * s + look.stage.move.y).toBeCloseTo(600, 5);
+    // without apart the same zoom frames the lid where it stands
+    const still = planFocus([all, { on: ['lid'], focus: 'zoom' }], fig).looks[1].stage.move;
+    expect(350 * still.s + still.y).toBeCloseTo(600, 5);
+  });
+
+  it('with a side mover, the view closes in on the subject where it grows to, and the blur frames it there', () => {
+    const one = focusStep(null, { in: ['*'], on: ['core'], quiet: true, focus: 'zoom left blur' }, fig).look;   // quiet: the rest comes in greyed
+    expect(one.strategies).toEqual(['zoom', 'left', 'blur']);
+    const grown = one.pieces[1].move;
+    expect(grown).toBeTruthy();
+    // the core's centre, moved by left, then by the view: at the area's centre
+    const [cx, cy] = [950 + grown.dx, 500 + grown.dy];
+    expect(cx * one.stage.move.s + one.stage.move.x).toBeCloseTo(960, 5);
+    expect(cy * one.stage.move.s + one.stage.move.y).toBeCloseTo(600, 5);
+    const [x, y, w, h] = one.overlay.rects[0];
+    expect(x + w / 2).toBeCloseTo(960, 0);
+    expect(y + h / 2).toBeCloseTo(600, 0);
+  });
+
+  it('a zoom alone is drawn as before: the subject where it stands', () => {
+    const one = focusStep(null, { in: ['*'], on: ['base'], quiet: true, focus: 'zoom' }, fig).look;
+    expect(one.strategies).toEqual(['zoom']);
+    expect(950 * one.stage.move.s + one.stage.move.x).toBeCloseTo(960, 5);
+    expect(650 * one.stage.move.s + one.stage.move.y).toBeCloseTo(600, 5);
+  });
+
+  it('one camera a click, and one view move: a mover of the deck\'s own that moves the view goes without zoom', () => {
+    const near = { kind: 'camera', place: () => ({ stage: { o: [0, 0], s: 2, t: [0, 0] } }) };
+    expect(() => focusStep(null, { in: ['*'], focus: 'zoom near' }, { ...fig, strategies: { near } })).toThrow(/a click takes one camera at most: "zoom" and "near" are both cameras/);
+    const pan = { kind: 'mover', place: () => ({ stage: { o: [0, 0], s: 1, t: [10, 0] } }) };
+    expect(() => focusStep(null, { in: ['*'], focus: 'zoom pan' }, { ...fig, strategies: { pan } })).toThrow(/a click moves the view once: "pan" moves it and so does "zoom" — keep one/);
+    expect(focusStep(null, { in: ['*'], focus: 'pan' }, { ...fig, strategies: { pan } }).look.stage.move).toEqual({ s: 1, x: 10, y: 0 });
+    // a camera of the deck's own frames what the mover left, too
+    const look = focusStep(null, { in: ['*'], on: ['lid'], focus: 'near' }, { ...fig, strategies: { near } }).look;
+    expect(look.stage.move).toEqual({ s: 2, x: 0, y: 0 });
+  });
+
+  it('a camera with nothing to frame leaves the view where it is', () => {
+    const none = focusStep(null, { in: ['lid'], on: [], quiet: true, focus: 'zoom' }, fig).look;
+    expect(none.stage).toBeNull();
   });
 });

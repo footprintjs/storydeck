@@ -96,7 +96,7 @@ decision every click makes again, so it is data on the click, and the library do
 | Kind | Strategies | What happens |
 |---|---|---|
 | look | `grey` (default) · `hide` · `keep` | how the context looks: greyed in place, hidden, or left as it is |
-| mover | `zoom` | the view closes in on the subject (`share`, `most`) |
+| camera | `zoom` | the view closes in on the subject — where the click's mover leaves it (`share`, `most`): so a click can close in while its parts fly apart (`zoom apart`) or step aside (`zoom left`) |
 | mover | `left` · `right` · `up` · `down` | the context steps aside that way, smaller (`scale`), and the subject grows into the room it leaves (`grow`, `fill`, `gap`, `align`; `move: 'aside'` keeps the subject where it is) |
 | mover | `place` | named groups moved by the amounts you give (`groups: 'page floor: -90 -200 0.5 \| tl: 0 -230 1.1 @ 960 968'`): a layout you art-direct, still animated from wherever the last click left it |
 | mover | `apart` | the exploded view: named groups fly apart along the vectors you give (`apart: 'lid: 0 -120 \| core: 160 0 \| base: 0 120 1.1'`), one spring each, `stagger` ms apart (35), and come back together on a later click without it — the last one out is the first one back |
@@ -139,8 +139,9 @@ The order is what the library keeps; where the parts go is yours — vectors tha
 each part its own way out. The click after a close keeps the closing groups on their springs one click more, so a
 quick click lets them settle from wherever they are. A line or connector that carries a group's name
 (`data-k="wire core"`) moves with that group, keeping its place against it. `apart` is a mover, so it goes with a look (the rest
-greyed), an overlay and an order, and a click that also asks for `place` is refused, naming the fix; across clicks
-the two compose: the parts fly out from the layout `place` left, and back into it.
+greyed), a camera (`zoom apart`: the view closes in on the subject where it flies to), an overlay and an order, and a
+click that also asks for `place` is refused, naming the fix; across clicks the two compose: the parts fly out from the
+layout `place` left, and back into it.
 
 The springs run in `focusRuntime` (the Watch lens, `SlideDeck`, installs it; a built page inlines it), each deck on
 the page its own, played as Web Animations of the same `translate`/`scale` every mover uses (so a piece's own

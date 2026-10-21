@@ -66,9 +66,14 @@ export interface FocusRoute { readonly names: readonly string[]; readonly step: 
  */
 export interface FocusSpring { readonly stagger: number }
 
-/** A focus strategy: a look (how the context looks), a mover (where things go), an overlay (what lies over the slide) or an order (how the subject comes on). */
+/**
+ * A focus strategy: a look (how the context looks), a camera (where the view goes — it frames the subject where the
+ * click's mover leaves it), a mover (where things go), an overlay (what lies over the slide) or an order (how the
+ * subject comes on). One of each kind a click.
+ */
 export type FocusStrategy =
   | { readonly name?: string; readonly kind: 'look'; readonly look: 'grey' | 'hide' | 'keep' }
+  | { readonly name?: string; readonly kind: 'camera'; place(ctx: FocusContext): { stage?: FocusGroup } }
   | { readonly name?: string; readonly kind: 'mover'; place(ctx: FocusContext): { stage?: FocusGroup; subject?: FocusGroup; context?: FocusGroup; groups?: { names: readonly string[]; g: FocusGroup | null }[]; spring?: FocusSpring } }
   | { readonly name?: string; readonly kind: 'overlay'; cover(ctx: { subjectOnSlide: FocusBox | null; canvas: { w: number; h: number }; options: Readonly<Record<string, unknown>> }): { rects: number[][]; label?: string; out?: number[][] } | null }
   | { readonly name?: string; readonly kind: 'order'; route(ctx: { names: readonly string[]; options: Readonly<Record<string, unknown>> }): FocusRoute };

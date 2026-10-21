@@ -2,12 +2,13 @@
 //
 // A slide of this kind is drawn once: a set of named PIECES that keep their places (a diagram, a page,
 // a timeline). Each CLICK says which pieces are there and which ones it is about — its SUBJECT; the
-// rest of what is shown is the CONTEXT. A FOCUS STRATEGY says how the two are shown. There are four
+// rest of what is shown is the CONTEXT. A FOCUS STRATEGY says how the two are shown. There are five
 // kinds, and a click takes one of each at most:
 //
 //   look     how the context looks     grey (greyed in place — the default) · hide · keep
-//   mover    where things go           zoom (the view closes in on the subject) ·
-//                                      left · right · up · down (the context steps aside that way, smaller,
+//   camera   where the view goes       zoom (the view closes in on the subject, where the mover leaves it — so a
+//                                      click can close in while its parts fly apart or step aside)
+//   mover    where things go           left · right · up · down (the context steps aside that way, smaller,
 //                                      and the subject grows into the room it leaves) ·
 //                                      place (named groups moved by the amounts you give — a layout you
 //                                      art-direct, still animated from wherever the last click left it) ·
@@ -31,7 +32,7 @@
 // slide (p' = s·p + [x, y]; the identity unless the map is drawn scaled or shifted); `area` is the part
 // of the slide (slide pixels) where moved things may go — below a headline, above a footer.
 
-const KINDS = ['look', 'mover', 'overlay', 'order'];
+const KINDS = ['look', 'camera', 'mover', 'overlay', 'order'];
 
 /** A box {x, y, w, h} around a list of boxes (null for none). */
 function union(boxes) {
@@ -116,8 +117,11 @@ export const FOCUS = Object.freeze({
   grey: Object.freeze({name: 'grey', kind: 'look', look: 'grey'}),
   hide: Object.freeze({name: 'hide', kind: 'look', look: 'hide'}),
   keep: Object.freeze({name: 'keep', kind: 'look', look: 'keep'}),
-  /** The view closes in on the subject, so it fills `share` (0.7) of the area, never closer than `most` (2.5×). */
-  zoom: Object.freeze({name: 'zoom', kind: 'mover', place({subject, area, options}) {
+  /**
+   * The view closes in on the subject — where the click's mover leaves it — so it fills `share` (0.7) of the area,
+   * never closer than `most` (2.5×). A camera, not a mover: it goes with left/right/up/down, place and apart.
+   */
+  zoom: Object.freeze({name: 'zoom', kind: 'camera', place({subject, area, options}) {
     if (!subject) return {};
     const k = clamp(num(options.share, .7) * Math.min(area.w / Math.max(subject.w, 1), area.h / Math.max(subject.h, 1)), 1, num(options.most, 2.5));
     return {stage: toCentre(subject, k, centre(area))};
@@ -188,7 +192,7 @@ function pick(focus, strategies) {
   for (const {strategy, options} of focus) {
     const s = all[strategy];
     if (!s) throw new Error(`no focus strategy "${strategy}" (there are ${Object.keys(all).join(', ')})`);
-    if (!KINDS.includes(s.kind)) throw new Error(`focus strategy "${strategy}" has kind ${JSON.stringify(s.kind)}: a strategy is a look, a mover, an overlay or an order`);
+    if (!KINDS.includes(s.kind)) throw new Error(`focus strategy "${strategy}" has kind ${JSON.stringify(s.kind)}: a strategy is a look, a camera, a mover, an overlay or an order`);
     if (byKind[s.kind]) throw new Error(`a click takes one ${s.kind} at most: "${byKind[s.kind].name}" and "${strategy}" are both ${s.kind}s — keep one, and give the other a click of its own`);
     byKind[s.kind] = {s: {...s, name: s.name ?? strategy}, options, name: strategy};
   }
@@ -297,10 +301,16 @@ export function focusStep(prev, step, deck) {
     if (spring && g) springOf.set(i, l.join(' ')); else springOf.delete(i);
   }
   const springGroups = [...new Map((spring ? placed.groups ?? [] : []).filter(x => x.g).map(x => [x.names.join(' '), [...x.names]]))];
-  const stage = placed.stage ? {s: round(placed.stage.s, 4), x: round(placed.stage.o[0] * (1 - placed.stage.s) + placed.stage.t[0]), y: round(placed.stage.o[1] * (1 - placed.stage.s) + placed.stage.t[1])} : null;
   const groupOf = i => { const k = inGroup.get(i); return k === 'subject' ? placed.subject : k === 'context' ? placed.context : k?.g ?? null; };
   const moves = pieces.map((p, i) => states[i] === 'gone' ? null : placePiece(groupOf(i), p.box));
-  const ends = subject && (placed.stage ?? placed.subject) ? moveBox(placed.stage ?? placed.subject, subject) : subject;
+  // The camera frames the subject where the mover leaves it (each piece moved by its group). A deck's own mover that
+  // moves the view itself (returns `stage`) is the only view move of its click: with a camera too, the click is refused.
+  if (placed.stage && chosen.camera) throw new Error(`a click moves the view once: "${chosen.mover.name}" moves it and so does "${chosen.camera.name}" — keep one`);
+  const moved = union(subjectIdx.map(i => { const g = groupOf(i), b = pieces[i].box; return g && b ? moveBox(g, b) : b; }));
+  const viewMove = placed.stage ?? (chosen.camera ? chosen.camera.s.place({subject: moved, context, area, view, canvas, boxOf, options: chosen.camera.options})?.stage ?? null : null);
+  const stage = viewMove ? {s: round(viewMove.s, 4), x: round(viewMove.o[0] * (1 - viewMove.s) + viewMove.t[0]), y: round(viewMove.o[1] * (1 - viewMove.s) + viewMove.t[1])} : null;
+  const ends = chosen.camera ? (moved && viewMove ? moveBox(viewMove, moved) : moved)
+    : subject && (placed.stage ?? placed.subject) ? moveBox(placed.stage ?? placed.subject, subject) : subject;
   const subjectOnSlide = ends ? {x: ends.x * view.s + view.x, y: ends.y * view.s + view.y, w: ends.w * view.s, h: ends.h * view.s} : null;
   const cover = chosen.overlay ? chosen.overlay.s.cover({subjectOnSlide, canvas, options: chosen.overlay.options}) : null;
   const looks = pieces.map((_, i) => states[i] === 'dim' ? look : null);
