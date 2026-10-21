@@ -10,7 +10,7 @@ import {readPieces, readStep, drawFocus, wrapStage, slideClass, focusOverlay} fr
 import {applyTransforms} from './transforms.js';
 import {plainText} from './parse.js';
 import {esc, stripComments} from './html.js';
-import {tagsWith} from '../pieceRules.js';
+import {readAttributes, tagsWith} from '../pieceRules.js';
 
 /**
  * In the dev page only: each piece keeps the number the build gave it (data-sd-at, beside the data-sd-i drawFocus
@@ -31,9 +31,14 @@ function numberForDev(html) {
  * and the dev page moves a piece by them — one written by hand would name a piece that is not the one shown.
  */
 function refuseOwnNumbers(where, html) {
-  // anywhere in a tag, however it is joined to the rest (a browser takes <div/data-sd-at> and x="1"data-sd-at too)
-  const own = tagsWith(stripComments(html), /data-sd-[\w-]*/i)[0];
-  if (own) throw new Error(`${where}: ${own.m[0]} is StoryDeck's own attribute (it numbers the pieces) — remove it from <${own.tag}>`);
+  for (const t of tagsWith(stripComments(html), /(?:)/)) {
+    // its attributes as a browser reads them, however each is joined to the rest (<div/data-sd-at>, x="1"data-sd-at);
+    // a tag a browser reads past its ">" is judged by its whole text
+    const attrs = readAttributes(t.after);
+    const own = attrs ? attrs.find((a) => a.name.startsWith('data-sd-')) : null;
+    const name = own ? t.after.slice(own.at, own.at + own.name.length) : attrs ? null : /data-sd-[\w-]*/i.exec(t.after)?.[0];
+    if (name) throw new Error(`${where}: ${name} is StoryDeck's own attribute (it numbers the pieces) — remove it from <${t.tag}>`);
+  }
 }
 
 /** A map ready to plan on: its HTML with the helpers applied and its pieces read (`dev`: numbered for the dev page). */

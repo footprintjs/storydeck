@@ -36,6 +36,9 @@ describe('compileDeck', () => {
     for (const tag of ['<div/data-sd-at="0" data-k="f" style="left:1px;top:1px">', '<div x="1"data-sd-at="0" data-k="f" style="left:1px;top:1px">']) {
       expect(() => compileDeck(sourceOf({clicks: CLICKS, maps: {map: `${MAP}${tag}F</div>`}})), tag).toThrow(/data-sd-at is StoryDeck's own attribute/);
     }
+    // only an attribute of that name: a deck may write about StoryDeck in a value or in its text
+    const about = `${MAP}<div data-k="f" title="how data-sd-at numbers pieces" style="left:1px;top:1px">data-sd-at="0"</div>`;
+    expect(() => compileDeck(sourceOf({clicks: CLICKS, maps: {map: about}}))).not.toThrow();
   });
 
   it('numbers each piece as the build read it in the dev page only (data-sd-at), and nowhere else', () => {
