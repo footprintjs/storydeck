@@ -44,8 +44,10 @@ function noChange(c, prev) {
 function neverShown(compiled) {
   const out = [];
   for (const [map, {pieces}] of Object.entries(compiled.maps)) {
+    const told = compiled.clicks.filter((c) => c.map === map);
+    if (!told.length) continue;   // a map no part is told on is not part of this deck
     const shown = new Set();
-    for (const c of compiled.clicks) if (c.map === map) c.look.pieces.forEach((p, i) => { if (p.state !== 'gone') shown.add(i); });
+    for (const c of told) c.look.pieces.forEach((p, i) => { if (p.state !== 'gone') shown.add(i); });
     const hidden = pieces.map((_, i) => i).filter((i) => !shown.has(i));
     // A piece that steps aside for its lit twin is "gone" while its twin shows, yet it is part of the picture.
     const real = hidden.filter((i) => !pieces[i].twin?.length);

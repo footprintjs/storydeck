@@ -40,7 +40,7 @@ export async function checkTool(dir, {layout = false, chromium} = {}) {
   const problems = checkDeck(compiled);
   let note = '';
   if (layout) {
-    const browser = chromium ?? (await findChromium(dir));
+    const browser = chromium ?? (await findChromium());   // from the project you run in, never from the deck folder
     if (!browser) {
       note = '\nlayout not checked: it needs Playwright — npm i -D playwright-core, then npx playwright-core install chromium';
     } else {

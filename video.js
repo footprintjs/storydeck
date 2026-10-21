@@ -248,7 +248,7 @@ export function deckStageDriver({ chromium, executablePath, viewport = { width: 
 /** Runs in the page: what spills on the slide shown (see deckStageDriver · measure). */
 export function measureSlide() {
   const stage = document.querySelector('deck-stage');
-  for (const a of [...document.getAnimations(), ...(stage?.shadowRoot?.getAnimations() ?? [])]) {
+  for (const a of [...(document.getAnimations?.() ?? []), ...(stage?.shadowRoot?.getAnimations?.() ?? [])]) {
     try { a.finish(); } catch { /* an endless animation has no end */ }
   }
   const slide = stage ? [...stage.children].filter((s) => s.tagName === 'SECTION')[stage.index] : null;
@@ -262,7 +262,7 @@ export function measureSlide() {
   const shown = (el) => {
     for (let e = el; e && e !== slide; e = e.parentElement) {
       const cs = getComputedStyle(e);
-      if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) < 0.05) return false;
+      if (cs.display === 'none' || cs.visibility === 'hidden' || (cs.opacity !== '' && Number(cs.opacity) < 0.05)) return false;
     }
     return true;
   };

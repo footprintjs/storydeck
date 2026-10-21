@@ -1,6 +1,6 @@
 ---
 name: storydeck
-description: Build, focus, narrate and film talks and posts with StoryDeck — one source shown as a Read article, a Scroll story or a Watch deck; per-click focus on a diagram (grey, zoom, left/right, place, apart — the exploded view, blur, path); a tour that shows a deck's point while nobody is using it; narration from the speaker notes (a clip per click in a voice, cached by its words; notes, presenter and listen mode in the page; captions and chapters); a narrated video for YouTube; and a PowerPoint file (.pptx: a slide per click, its picture, notes and clip). Use when creating or editing a StoryDeck post or deck, adding focus to a diagram slide, voicing a talk, rendering a talk as a video, or exporting it to PowerPoint.
+description: Build, focus, narrate and film talks and posts with StoryDeck — one source shown as a Read article, a Scroll story or a Watch deck; per-click focus on a diagram (grey, zoom, left/right, place, apart — the exploded view, blur, path); a tour that shows a deck's point while nobody is using it; narration from the speaker notes (a clip per click in a voice, cached by its words; notes, presenter and listen mode in the page; captions and chapters); a narrated video for YouTube; and a PowerPoint file (.pptx: a slide per click, its picture, notes and clip). A deck can be a folder (deck.json, clicks.html, maps, theme.css, icons/) that `storydeck` builds into one page, serves for editing with a reload on the same click, and reads back as text (outline, review a click, check). Use when creating or editing a StoryDeck post or deck, adding focus to a diagram slide, voicing a talk, rendering a talk as a video, or exporting it to PowerPoint.
 ---
 
 # StoryDeck: one source, many lenses — and a deck that tells itself
@@ -28,12 +28,33 @@ are footprint-narration's, a package StoryDeck depends on and shares with footpr
 | those clips carried inside one page (`embedClips`) | `footprint-storydeck/voice` | **Node only** |
 | the deck as a narrated video | `footprint-storydeck/video` (+ ffmpeg 5.0 or newer on the path, Playwright's `chromium` passed in) | **Node only** |
 | the deck as PowerPoint (.pptx): a slide per click, its picture, notes and clip | `footprint-storydeck/pptx` — `exportPptx` (the same driver as the video; no ffmpeg; `npm i footprintjs` beside it, an optional peer) | **Node only** |
+| a deck from a folder: one page, a dev server that reloads on the same click, the deck read back as text | the `storydeck` command (`npx footprint-storydeck init · dev · outline · review · check · build · mcp`); `footprint-storydeck/deck` for scripts | **Node only** |
 
 Never import `footprint-storydeck/voice`, `footprint-storydeck/video`, `footprint-storydeck/pptx` or `footprint-narration/voice` into browser code: they use `node:fs`
 and child processes.
 The main entry (`footprint-storydeck`) re-exports only what runs anywhere.
 
 ## Recipes
+
+**Make or edit a deck: a folder, not a build script.** Never write a build script for a deck: the library builds the
+folder. Read first, look last — an outline and a click's review cost a fraction of a screenshot.
+
+```bash
+npx footprint-storydeck init my-talk            # a starter: deck.json, clicks.html, map.html, theme.css, icons/
+npx footprint-storydeck outline my-talk         # the whole deck, a line per click — read this before editing
+npx footprint-storydeck review my-talk --click 3    # one click: headline (words), focus, route, lit, greyed, enters, moves, notes
+npx footprint-storydeck check my-talk           # what to fix, each with its click and its fix (--layout: text that spills, in a browser)
+npx footprint-storydeck build my-talk           # my-talk/index.html, self-contained
+npx footprint-storydeck dev my-talk             # for the person: a save reloads on the same click and replays it
+```
+
+In clicks.html, a `<section data-label data-kicker>` is a plain slide; with `data-map="map"` each `<step>` in it is one
+click on map.html (`data-in`, `data-out`, `data-on`, `data-quiet`, `data-focus` and `data-focus-*`), holding only its
+`<h2>` and `<aside class="notes">` — anything else in a step is refused, naming where it goes (a piece on the map). On
+a map, `<i data-k="w" class="wire pkt" data-arrow="x1 y1 x2 y2 [bend]"></i>` is a wire with a packet and
+`<i class="ic" data-icon="name"></i>` is icons/name.svg. A piece that comes in lights unless the click is `data-quiet`
+(`check` warns: `lit-on-entry`). For an assistant: `claude mcp add storydeck -- npx footprint-storydeck mcp my-talk`
+gives it outline, review, check and build as tools.
 
 **Focus a diagram, click by click.** Every element with `data-k="name …"` and an inline `left/top`
 (`width/height`) is a piece. A click names its subject (`on`) and a strategy; the rest is context.
@@ -147,5 +168,7 @@ It is pictures + notes + sound, not editable PowerPoint shapes.
 ## Verify
 
 - `npx vitest run` in the StoryDeck repo (coverage thresholds enforced).
-- In a deck: the build's `voiced N of M` count; listen mode (L) plays a clip and moves on; screenshots of every
-  click before and after a change; a video strip's `timeline.json` and `captions.srt` before and after.
+- A deck folder: `storydeck check` says `no problems` (and `check --layout` where Playwright is installed); `storydeck
+  outline` before and after a change; a screenshot only to confirm a look the text cannot show.
+- In a deck: the build's `voiced N of M` count; listen mode (L) plays a clip and moves on; a video strip's
+  `timeline.json` and `captions.srt` before and after.

@@ -3,6 +3,7 @@ import { afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 
 afterEach(() => {
+  if (typeof document === 'undefined') return;   // a test file in the node environment (deck/ servers and files)
   cleanup();
   document.documentElement.className = '';
   try { localStorage.clear(); } catch (_) {}
@@ -26,7 +27,7 @@ global.IntersectionObserver = class {
   disconnect() {}
 };
 
-if (!navigator.clipboard) {
+if (typeof navigator !== 'undefined' && !navigator.clipboard) {
   Object.defineProperty(navigator, 'clipboard', {
     value: { writeText: vi.fn(() => Promise.resolve()) },
     configurable: true,

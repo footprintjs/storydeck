@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased — a deck from a folder, and an editing loop
+
+- **`storydeck`: a deck is a folder, and the library builds it.** deck.json, clicks.html (a `<section>` per part; on a
+  map, a `<step>` per click), the maps, theme.css and icons/ become one self-contained page (`storydeck build`): every
+  stylesheet and runtime inlined, notes, presenter and listen mode, a light/dark toggle (T), no network request. No
+  build script per deck: a 37-click talk's own script is replaced, and its slides come out byte for byte. Built-in
+  helpers: `data-arrow` wires (with a packet, class `pkt`, that rides the wire at its turn on a `path` click) and
+  `data-icon` icons. New `footprint-storydeck/deck.css`: the page's chrome, wires, packets, icons and toggle, every rule
+  `:where()` so a deck's theme wins.
+- **`storydeck dev`: one page in development and in the room.** It serves the page `build` writes, plus a dev client: a
+  save rebuilds (milliseconds), reloads on the same click and plays it again; a save that breaks the build shows why over
+  the last good page. Loopback only, localhost requests only, read-only, nothing hidden or outside the deck folder.
+- **Read first, look last.** `storydeck outline` (a line per click), `review --click n` (headline and words, focus, route,
+  lit, greyed, what enters, leaves and moves, notes) and `check` (headline words, pieces lit by coming in, clicks that
+  change nothing, pieces never shown, missing notes — each with its click and its fix). `check --layout` measures each
+  click in a browser for text that spills out of its box (through the video driver's new `measure(n)`; needs
+  `playwright-core`). `storydeck mcp` serves the same tools to an AI assistant over stdio. `storydeck init` writes a
+  starter that builds and checks clean.
+- **A deck is files, never a program.** Nothing in a deck folder runs; a deck reads only its own files (a link out of the
+  folder is refused); a build never writes through a link or outside the deck; the layout check's browser comes from the
+  project, never from the deck folder.
+- `footprint-storydeck/deck` exports the same parts for a script; `deckStageDriver` gains `measure(n)`, and
+  `measureSlide` is exported from `footprint-storydeck/video`.
+
 ## 0.6.0 — a figure in any framework, and compiled JavaScript
 
 - **`StoryFigure`: the Scroll lens drives a figure it does not know how to draw.** A section's `figure` may

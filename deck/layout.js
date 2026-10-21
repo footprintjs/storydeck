@@ -6,15 +6,19 @@ import {createRequire} from 'node:module';
 import path from 'node:path';
 import {deckStageDriver} from '../video.js';
 
-/** Playwright's chromium, found from the deck's folder first, then from here; null when it is not installed. */
-export async function findChromium(fromDir = process.cwd()) {
+const PLAYWRIGHT = 'playwright-core';   // an optional dependency: named, never imported until a layout check asks
+
+/**
+ * Playwright's chromium from the project you run the command in (the current folder), then from where StoryDeck is
+ * installed; null when it is not installed. Never from the deck's folder: a deck is content, and a deck someone sent
+ * you must not be able to run code by carrying a node_modules of its own.
+ */
+export async function findChromium(cwd = process.cwd()) {
   const chromiumOf = (mod) => mod?.chromium ?? mod?.default?.chromium ?? null;
-  for (const base of [path.resolve(fromDir), process.cwd()]) {
-    try {
-      return chromiumOf(createRequire(path.join(base, 'noop.js'))('playwright-core'));
-    } catch { /* not here: look on */ }
-  }
-  try { return chromiumOf(await import('playwright-core')); } catch { return null; }
+  try {
+    return chromiumOf(createRequire(path.join(path.resolve(cwd), 'noop.js'))(PLAYWRIGHT));
+  } catch { /* not in the project: look beside StoryDeck */ }
+  try { return chromiumOf(await import(/* @vite-ignore */ PLAYWRIGHT)); } catch { return null; }
 }
 
 /** Click numbers as short runs: 3–17, 29, 31–37. */
