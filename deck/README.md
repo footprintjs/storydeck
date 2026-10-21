@@ -52,8 +52,9 @@ text. Each module does one job, and they compose in one direction:
   with the deck (or was edited by hand), not a request. A signature vouches for the person's words only — the click,
   the text, the time — never the click's label, which is the deck's text: it stays in the line for a reader of the
   file, and is never listed. Everything the tools print passes `tools.js · printable`, so a deck's labels and notes
-  reach a terminal or a model as text, never as what a reader cannot see (html.js · UNSEEN: controls, bidi marks,
-  invisible fillers, Unicode tag characters, a run of selectors or joiners).
+  reach a terminal or a model as text, never as what a reader cannot see (html.js · UNSEEN, an allow-list: visible
+  letters, marks, numbers, punctuation, symbols and spaces; a joiner or presentation selector only where an emoji
+  needs it — so controls, bidi marks, fillers, Unicode tag characters and private code points are out).
 - **A move names the piece the build drew, and edits only what a browser and the build both read.** In the dev page
   only, each piece carries the number the build gave it (`compile.js · numberForDev`, `data-sd-at`); an element the
   build did not read as a piece has none and cannot be dragged. `pieceRules.js` (at the package root) owns which tags

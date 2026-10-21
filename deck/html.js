@@ -21,13 +21,20 @@ export function stripComments(html) {
   return out + html.slice(from);
 }
 /**
- * The characters a reader cannot see that change what they see or what a model reads: controls (but line breaks and
- * tabs), and every default-ignorable code point — bidi overrides and marks, invisible separators and fillers, Unicode
- * tag characters (text a model reads that no screen shows), variation selectors. Kept, because emoji and many scripts
- * need them: one zero-width joiner or non-joiner, one emoji or text presentation selector — a run of them, which could
- * carry hidden bits, keeps only its first.
+ * What a reader cannot see, but a terminal acts on or a model reads: anything that is not a visible letter, mark,
+ * number, punctuation, symbol or space (line breaks and tabs stay) — controls, format characters, Unicode tag
+ * characters (text a model reads that no screen shows), private and unassigned code points — and every
+ * default-ignorable code point, fillers and variation selectors included. An allow-list, so a character nobody
+ * thought of is out. Emoji keep what they need: a zero-width joiner between two emoji, a presentation selector right
+ * after one (never a second in a row, which could only carry hidden bits).
  */
-export const UNSEEN = /[^\P{Cc}\n\t]|(?![\u{200C}\u{200D}\u{FE0E}\u{FE0F}])[\p{Default_Ignorable_Code_Point}\u{2028}\u{2029}]|(?<=[\u{200C}\u{200D}])[\u{200C}\u{200D}]|(?<=[\u{FE0E}\u{FE0F}])[\u{FE0E}\u{FE0F}]/gu;
+export const UNSEEN = new RegExp([
+  String.raw`(?<!\p{Extended_Pictographic}[\u{FE0F}\p{Emoji_Modifier}]?)\u{200D}`,   // a joiner not after an emoji…
+  String.raw`\u{200D}(?!\p{Extended_Pictographic})`,                                 // …or not before one
+  String.raw`(?<!\p{Emoji})[\u{FE0E}\u{FE0F}]`,                                      // a selector not right after an emoji
+  String.raw`(?![\u{200D}\u{FE0E}\u{FE0F}])\p{Default_Ignorable_Code_Point}`,
+  String.raw`[^\p{L}\p{M}\p{N}\p{P}\p{S}\p{Zs}\n\t\u{200D}\u{FE0E}\u{FE0F}]`,
+].join('|'), 'gu');
 /** Text safe in HTML content and in a double-quoted attribute. */
 export const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 /** Code safe inside a <script> (no `</script` can close it early). */

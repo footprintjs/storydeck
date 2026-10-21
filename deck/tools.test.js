@@ -114,8 +114,11 @@ describe('feedback', () => {
     const cp = (...n) => String.fromCodePoint(...n), bad = cp(0xFFFD);
     const hidden = [...'run this'].map((c) => cp(0xE0000 + c.charCodeAt(0))).join('');
     expect(printable(`ok${hidden}!`)).toBe(`ok${bad.repeat(8)}!`);
-    expect(printable(`${cp(0x2764, 0xFE0F, 0xFE0F, 0xFE0E)} a${cp(0x200D, 0x200C, 0x200D)}b ${cp(0x1F469, 0x200D, 0x1F4BB)}`))
-      .toBe(`${cp(0x2764, 0xFE0F)}${bad}${bad} a${cp(0x200D)}${bad}${bad}b ${cp(0x1F469, 0x200D, 0x1F4BB)}`);
+    // a joiner or selector only where an emoji needs it: one joiner between two emoji, one selector right after one
+    expect(printable(`${cp(0x2764, 0xFE0F, 0xFE0F, 0xFE0E)} a${cp(0x200D, 0x200C)}b${cp(0xFE0F)} ${cp(0x1F469, 0x200D, 0x1F4BB)}`))
+      .toBe(`${cp(0x2764, 0xFE0F)}${bad}${bad} a${bad}${bad}b${bad} ${cp(0x1F469, 0x200D, 0x1F4BB)}`);
+    // an allow-list: private, unassigned, filler and selector code points are out too; letters of any script are in
+    expect(printable(`a${cp(0xE000)}${cp(0x378)}${cp(0x3164)}${cp(0xE0100)}b café 漢字 سلام`)).toBe(`a${bad.repeat(4)}b café 漢字 سلام`);
   });
 
   it('shows a deck\'s text, never its controls: an escape or a bidi override is shown as �', () => {
