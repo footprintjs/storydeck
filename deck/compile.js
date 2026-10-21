@@ -101,7 +101,8 @@ const foot = (footer, n, total) => `<div class="foot" data-chrome><span>${esc(fo
 
 /** One click as a <deck-stage> slide. */
 function drawClick(c, i, total, {footer, area, canvas}) {
-  const open = `<section data-label="${esc(c.label)}"`;
+  // a part's theme rides on each of its slides, for the deck's theme.css ([data-theme="…"])
+  const open = `<section data-label="${esc(c.label)}"${c.part.theme ? ` data-theme="${esc(c.part.theme)}"` : ''}`;
   if (c.kind === 'plain') return `${open} class="slide plain">${head(c.part.kicker, '')}${c.inner}${foot(footer, i + 1, total)}</section>`;
   return `${open} class="slide on-map ${slideClass(c.look)}">${head(c.part.kicker, c.headline)}`
     + `<div class="map map-${c.map.name}">${wrapStage(drawFocus(c.map.html, c.look), c.look)}</div>`
@@ -139,7 +140,7 @@ export function compileDeck(source, {dev = false} = {}) {
       notes: {slide: c.part.label, step: k, steps: partClicks.length - 1, now: c.notes, earlier: partClicks.slice(0, k).flatMap((x) => x.notes)}};
   });
   checkPost(source.post, new Set(slides.map((s) => s.label)));
-  const clicks = planned.map((c, i) => ({n: i + 1, label: c.label, part: c.part.label, kicker: c.part.kicker, kind: c.kind,
+  const clicks = planned.map((c, i) => ({n: i + 1, label: c.label, part: c.part.label, kicker: c.part.kicker, theme: c.part.theme ?? null, kind: c.kind,
     map: c.kind === 'map' ? c.map.name : null, headline: plainText(c.headline), notes: c.notes,
     ...(c.kind === 'map' ? {step: c.step, look: c.look, stepIndex: c.stepIndex, steps: c.steps} : {text: plainText(c.inner)})}));
   return {config, title: config.title, themeCss: source.themeCss ?? '', slides, clicks, maps: Object.fromEntries(Object.values(maps).map((m) => [m.name, {pieces: m.pieces}]))};

@@ -28,6 +28,10 @@ describe('outline', () => {
 describe('reviewClick', () => {
   it('reads a plain slide: its words and notes', () => {
     expect(reviewClick(compiled, 1)).toBe('click 1 of 7 · "Title" (plain slide)\ntext (11 words): "A deck about three boxes and the wires between them all"\nnotes (1, 2 words): "Hello there."');
+    // a part's theme ends the first line, so a reviewer reading text knows which look the click wears
+    const themed = compileDeck(sourceOf({clicks: '<section data-label="Cover" data-theme="cover"><h1>Hi</h1></section><section data-label="M" data-map="map" data-theme="ledger"><step data-in="a"><h2>A</h2></step></section>', theme: '[data-theme="cover"],[data-theme="ledger"]{}'}));
+    expect(reviewClick(themed, 1).split('\n')[0]).toBe('click 1 of 2 · "Cover" (plain slide) · theme cover');
+    expect(reviewClick(themed, 2).split('\n')[0]).toBe('click 2 of 2 · "M · 1" (map "map", step 1 of 1) · theme ledger');
   });
 
   it('reads a path click: the route in its order, what enters, and that it has no notes', () => {

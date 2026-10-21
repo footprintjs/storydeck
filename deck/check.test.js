@@ -21,6 +21,18 @@ describe('checkDeck', () => {
     expect(p[1].message).toMatch(/^the headline is 4 words \(at most 3\)/);
   });
 
+  it('theme-unstyled: a part theme that theme.css never selects, once per theme — and not when it does', () => {
+    const clicks = '<section data-label="Cover" data-theme="ledgr"><p>Hi</p></section><section data-label="M" data-map="map" data-theme="ledgr"><step data-in="*"><h2>All</h2></step></section>';
+    const p = check(clicks, {theme: '[data-theme="ledger"] { --bg: #eef; }'});
+    expect(rules(p).filter((r) => r.includes('theme'))).toEqual(['warn theme-unstyled 1']);
+    expect(p.find((x) => x.rule === 'theme-unstyled').message).toBe('part "Cover" asks for data-theme="ledgr", which theme.css never selects — fix the name, or give it its tokens there ([data-theme="ledgr"] { --bg: …; })');
+    for (const theme of ['[data-theme="ledgr"]{}', "section[data-theme='ledgr' i] .x{}", ':root.dark [ data-theme = ledgr ] {}']) {
+      expect(rules(check(clicks, {theme})).some((r) => r.includes('theme')), theme).toBe(false);
+    }
+    // a part without a theme asks for nothing
+    expect(rules(check('<section data-label="P"><p>Hi</p></section>')).some((r) => r.includes('theme'))).toBe(false);
+  });
+
   it('lit-on-entry: pieces that come in lit though the click is about others — and not when quiet, or about everything', () => {
     const p = check('<section data-label="M" data-map="map"><step data-in="a b" data-on="a"><h2>A</h2></step></section>');
     expect(rules(p)).toContain('warn lit-on-entry 1');

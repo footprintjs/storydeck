@@ -7,6 +7,8 @@
 //     </step>
 //   </section>
 //   <section data-label="Summary" data-kicker="Summary">…any slide HTML…</section>  a plain slide: one click
+//   <section … data-theme="ledger">                                                  a part dressed its own way: each of its
+//                                                                                    slides carries data-theme for theme.css
 //
 // A part is strict about what it holds, so nothing an author wrote is dropped without a word: a step holds its
 // headline and its notes, and anything else in it is refused, naming where it goes instead (on the map). The file is
@@ -85,6 +87,17 @@ const without = (html, ranges) => ranges.reduceRight((out, r) => out.slice(0, r.
 
 const where = (label) => `"${label}"`;
 
+/** A theme is one lower-case name, so it is safe as an attribute and plain to select in CSS ([data-theme="ledger"]). */
+const THEME = /^[a-z][a-z0-9-]{0,39}$/;
+
+/** A part's theme (data-theme), or null: its slides carry it, so the deck's theme.css can dress that part its own way. */
+function themeOf(label, attrs) {
+  const theme = attrOf(attrs, 'data-theme');
+  if (theme === null) return null;
+  if (!THEME.test(theme)) throw new Error(`${where(label)}: data-theme="${theme}" — a theme is one lower-case name (letters, digits and dashes, at most 40), such as "ledger"`);
+  return theme;
+}
+
 /** One click on a map: its attributes (for focus.js · readStep), its headline (HTML) and its notes. */
 function readMapStep(label, k, attrs, inner) {
   const {html, notes} = takeNotes(inner);
@@ -117,10 +130,11 @@ export function parseClicks(html) {
     seen.add(label);
     const kicker = attrOf(attrs, 'data-kicker') ?? '';
     const map = attrOf(attrs, 'data-map');
+    const theme = themeOf(label, attrs);
     if (map === null) {
       if (/<step\b/i.test(body)) throw new Error(`${where(label)} has <step> clicks but no data-map — name the map they are told on (data-map="map")`);
       const {html: inner, notes} = takeNotes(body);
-      parts.push({label, kicker, map: null, body: inner, notes});
+      parts.push({label, kicker, theme, map: null, body: inner, notes});
       continue;
     }
     if (!map.trim()) throw new Error(`${where(label)}: data-map is empty — name a map (a file in the deck, e.g. data-map="map")`);
@@ -129,7 +143,7 @@ export function parseClicks(html) {
     if (!steps.length) throw new Error(`${where(label)} is told on map "${map}" but has no <step> — a map part is one click per <step>`);
     const outside = plainText(takeNotes(without(body, steps)).html);
     if (outside) throw new Error(`${where(label)}: "${outside.slice(0, 60)}" is outside every <step> — put a headline or notes inside the step they belong to`);
-    parts.push({label, kicker, map: map.trim(), steps: steps.map(({attrs: a, inner}, k) => readMapStep(label, k, a, inner))});
+    parts.push({label, kicker, theme, map: map.trim(), steps: steps.map(({attrs: a, inner}, k) => readMapStep(label, k, a, inner))});
   }
   if (!parts.length) throw new Error('the clicks file has no <section> — a deck is one <section data-label="…"> per part');
   return parts;
