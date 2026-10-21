@@ -266,7 +266,8 @@ describe('focusHtml · a path, in focus.css', () => {
     expect(rule('.sd-path.sd-enter')).toBe('--sd-a-state: sdEnter .6s var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) var(--sd-turn) both;');
     expect(rule('.sd-path.sd-arrive')).toBe('--sd-a-state: sdArrive .6s ease var(--sd-turn) both;');
     expect(rule(':where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-path-line')).toBe('animation: sdArrive .5s ease var(--sd-turn) both;');
-    expect(rule('.sd-twin-turn.sd-leave')).toBe('--sd-a-state: sdLeave .45s ease var(--sd-turn) both;');   // a twin goes at its twin's turn
+    // a twin goes at its twin's turn — later by --sd-twin-lag when a stylesheet asks (deck.css: a wire, while its twin sweeps in)
+    expect(rule('.sd-twin-turn.sd-leave')).toBe('--sd-a-state: sdLeave .45s ease calc(var(--sd-turn) + var(--sd-twin-lag, 0s)) both;');
     expect(rule('.sd-hot-in')).toBe('--sd-a-hot: sdRing .6s var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) calc(.3s + var(--sd-turn, 0s)) both;');   // the ring, .3 s after its turn
   });
 

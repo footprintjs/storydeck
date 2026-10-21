@@ -147,8 +147,12 @@ describe('a packet on the curve, a wire shown in', () => {
     expect([angle('0 0 100 0'), angle('0 0 0 100'), angle('0 0 -100 0'), angle('0 0 0 -100'), angle('0 0 100 100')]).toEqual([90, 180, -90, 0, 135]);
     const t = css();
     expect(t).not.toMatch(/stroke-dash|pathLength/);   // a theme's dashes are its own
-    expect(t).toMatch(/:where\(svg\.wire\.sd-enter\) \{ --sd-a-more: sdReveal [^}]*var\(--sd-delay, 0s\) both; \}/);
-    expect(t).toMatch(/:where\(svg\.wire\.sd-path\.sd-enter\) \{ --sd-a-more: sdReveal [^}]*var\(--sd-turn, 0s\) both; \}/);
+    expect(t).toMatch(/:where\(svg\.wire\.sd-enter:not\(\.sd-hot, \.sd-hot-in\)\) \{ --sd-a-more: sdReveal [^}]*var\(--sd-delay, 0s\) both; \}/);
+    expect(t).toMatch(/:where\(svg\.wire\.sd-path\.sd-enter:not\(\.sd-hot, \.sd-hot-in\)\) \{ --sd-a-more: sdReveal [^}]*var\(--sd-turn, 0s\) both; \}/);
+    // a highlighted wire is never masked (its ring is drawn outside its box); a wire stepping aside waits for the sweep
+    expect(t).toMatch(/:where\(svg\.wire\.sd-enter:not\(\.sd-hot, \.sd-hot-in\)\) \{\n\s+-webkit-mask-image/);
+    expect(t).toContain(':where(svg.wire.sd-twin-turn) { --sd-twin-lag: .3s; }');
+    expect(readFileSync(path.join(process.cwd(), 'focus.css'), 'utf8')).toContain('sdLeave .45s ease calc(var(--sd-turn) + var(--sd-twin-lag, 0s)) both');
     expect(readFileSync(path.join(process.cwd(), 'focus.css'), 'utf8')).toContain('var(--sd-a-path, sdNone 0s), var(--sd-a-more, sdNone 0s); }');
     expect(wires('<i data-k="w" data-arrow="0 0 9 9"></i>')).not.toContain('pathLength');
   });

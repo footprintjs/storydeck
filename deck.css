@@ -60,9 +60,11 @@
   :where([data-deck-active].sd-focus-new:not([data-sd-instant]):not([data-deck-static])) :where(.sd-path) :where(.pkt) {
     animation-delay: calc(var(--sd-path-delay, 0s) + .4s);
   }
-  :where(svg.wire.sd-enter) { --sd-a-more: sdReveal .6s cubic-bezier(.4, 0, .2, 1) var(--sd-delay, 0s) both; }
-  :where(svg.wire.sd-path.sd-enter) { --sd-a-more: sdReveal .6s cubic-bezier(.4, 0, .2, 1) var(--sd-turn, 0s) both; }
-  :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) :where(svg.wire.sd-enter) {
+  /* a highlighted wire keeps its ring, drawn outside its box where no mask paints: it just fades in */
+  :where(svg.wire.sd-enter:not(.sd-hot, .sd-hot-in)) { --sd-a-more: sdReveal .6s cubic-bezier(.4, 0, .2, 1) var(--sd-delay, 0s) both; }
+  :where(svg.wire.sd-path.sd-enter:not(.sd-hot, .sd-hot-in)) { --sd-a-more: sdReveal .6s cubic-bezier(.4, 0, .2, 1) var(--sd-turn, 0s) both; }
+  :where(svg.wire.sd-twin-turn) { --sd-twin-lag: .3s; }   /* the wire it hands over to sweeps in: it leaves as the sweep nears the tip */
+  :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) :where(svg.wire.sd-enter:not(.sd-hot, .sd-hot-in)) {
     -webkit-mask-image: linear-gradient(var(--sd-angle, 90deg), #000 var(--sd-reveal), transparent calc(var(--sd-reveal) + 12%));
     mask-image: linear-gradient(var(--sd-angle, 90deg), #000 var(--sd-reveal), transparent calc(var(--sd-reveal) + 12%));
   }
