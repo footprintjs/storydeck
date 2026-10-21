@@ -37,20 +37,36 @@
 :where(svg.wire path) { fill: none; stroke: currentColor; stroke-width: 4; stroke-linecap: round; }
 :where(svg.wire path.head) { fill: currentColor; stroke: none; }
 
-/* a wire's packet (class "pkt"): hidden at rest, so print, a jump and reduced motion show the plain wire. On a
-   forward `path` click it rides the wire once, at the wire's turn (and .4 s later under a new blur, as the path does). */
-:where(svg.wire .pkt) { opacity: 0; fill: var(--sd-glow, currentColor); stroke: none; }
-@keyframes sdPkt {
-  0% { opacity: 0; transform: translate(0, 0); }
-  15%, 80% { opacity: 1; }
-  100% { opacity: 0; transform: translate(var(--pdx), var(--pdy)); }
+/* a wire's packet (class "pkt"): hidden at rest (print, a jump, reduced motion show the plain wire). On a forward path
+   click it rides the curve once, at the wire's turn: --sd-t runs 0 → 1 and it stands at B(t) = 2(1-t)t·C + t²·E from
+   its start (C: --cdx/--cdy, E: --pdx/--pdy, from transforms.js). */
+@property --sd-t { syntax: '<number>'; inherits: false; initial-value: 0; }
+:where(svg.wire .pkt) {
+  opacity: 0; fill: var(--sd-glow, currentColor); stroke: none;
+  transform: translate(calc(var(--cdx) * 2 * (1 - var(--sd-t)) * var(--sd-t) + var(--pdx) * var(--sd-t) * var(--sd-t)),
+    calc(var(--cdy) * 2 * (1 - var(--sd-t)) * var(--sd-t) + var(--pdy) * var(--sd-t) * var(--sd-t)));
 }
+@keyframes sdPkt { from { --sd-t: 0; } to { --sd-t: 1; } }
+@keyframes sdPktShow { 0%, 100% { opacity: 0; } 15%, 80% { opacity: 1; } }
+/* a wire that comes in shows itself start to tip behind a sweeping soft edge (a mask: a theme's dashes stay), square to
+   its run (--sd-angle) — its curve's control point sits halfway along the run, so the curve shows in drawing order. It
+   is the piece's own animation (focus.css · --sd-a-more): at its turn on a path, after a new blur. */
+@property --sd-reveal { syntax: '<percentage>'; inherits: false; initial-value: 100%; }
+@keyframes sdReveal { from { --sd-reveal: -12%; } }
 @media screen and (prefers-reduced-motion: no-preference) {
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) :where(.sd-path) :where(.pkt) {
-    animation: sdPkt .6s ease-in-out var(--sd-path-delay, 0s) both;
+    animation: sdPkt .6s ease-in-out var(--sd-path-delay, 0s) both, sdPktShow .6s linear var(--sd-path-delay, 0s) both;
   }
   :where([data-deck-active].sd-focus-new:not([data-sd-instant]):not([data-deck-static])) :where(.sd-path) :where(.pkt) {
     animation-delay: calc(var(--sd-path-delay, 0s) + .4s);
+  }
+  /* a highlighted wire keeps its ring, drawn outside its box where no mask paints: it just fades in */
+  :where(svg.wire.sd-enter:not(.sd-hot, .sd-hot-in)) { --sd-a-more: sdReveal .6s cubic-bezier(.4, 0, .2, 1) var(--sd-delay, 0s) both; }
+  :where(svg.wire.sd-path.sd-enter:not(.sd-hot, .sd-hot-in)) { --sd-a-more: sdReveal .6s cubic-bezier(.4, 0, .2, 1) var(--sd-turn, 0s) both; }
+  :where(svg.wire.sd-twin-turn) { --sd-twin-lag: .3s; }   /* the wire it hands over to sweeps in: it leaves as the sweep nears the tip */
+  :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) :where(svg.wire.sd-enter:not(.sd-hot, .sd-hot-in)) {
+    -webkit-mask-image: linear-gradient(var(--sd-angle, 90deg), #000 var(--sd-reveal), transparent calc(var(--sd-reveal) + 12%));
+    mask-image: linear-gradient(var(--sd-angle, 90deg), #000 var(--sd-reveal), transparent calc(var(--sd-reveal) + 12%));
   }
 }
 

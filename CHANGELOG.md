@@ -2,6 +2,16 @@
 
 ## Unreleased — a deck from a folder, an editing loop, and co-editing
 
+- **A packet rides its wire's curve, and a wire shows itself in.** On a `path` click, a `pkt` packet now follows the
+  wire's quadratic curve (it crossed a bent wire in a straight line, up to 78 px off it); in Chromium, Firefox and
+  WebKit it stays within 0.15 px of the drawn line. CSS only: one registered number, `--sd-t`, runs 0 → 1 and the
+  packet stands at B(t) from the control point and end each wire gives it (`--cdx`/`--cdy`, beside `--pdx`/`--pdy`).
+  A wire that comes in shows itself from start to tip behind a sweeping soft edge — a mask, so a theme's dashes and
+  colours stay as they are — at its own moment (its turn on a path, after a new blur); a highlighted wire just fades
+  in, so its ring (drawn outside its box) shows. focus.css gains one more animation slot a stylesheet may give a piece,
+  `--sd-a-more`, and `--sd-twin-lag`, so a wire stepping aside for its twin leaves as the twin's sweep nears the tip.
+  Reduced motion, a jump and print show the plain wire.
+
 - **`storydeck`: a deck is a folder, and the library builds it.** deck.json, clicks.html (a `<section>` per part; on a
   map, a `<step>` per click), the maps, theme.css and icons/ become one self-contained page (`storydeck build`): every
   stylesheet and runtime inlined, notes, presenter and listen mode, a light/dark toggle (T), no network request. No
