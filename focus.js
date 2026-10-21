@@ -64,7 +64,8 @@ function areaOnMap([x0, y0, x1, y1], v) {
  * the click lights, and the rest shown); move: 'aside' moves only the context (the subject stays put).
  */
 function aside(side) {
-  return Object.freeze({name: side, kind: 'mover', place({subject, context, area, view, options}) {
+  // withCamera false: it keeps the context in view beside the subject, which a camera closing in would push off the slide
+  return Object.freeze({name: side, kind: 'mover', withCamera: false, place({subject, context, area, view, options}) {
     if (!context || !subject) return {};
     const s = num(options.scale, .6), gap = num(options.gap, 40) / (view?.s ?? 1), grow = num(options.grow, 1.4), fill = num(options.fill, .9);
     const w = context.w * s, h = context.h * s, a = area, align = options.align ?? 'center';
@@ -309,9 +310,10 @@ export function focusStep(prev, step, deck) {
   // that steps the context aside to keep it in view beside the subject, which a camera closing in would push off the
   // slide.
   if (chosen.camera && placed.stage) throw new Error(`a click moves the view once: "${chosen.mover.name}" moves it and so does "${chosen.camera.name}" — keep one`);
-  if (chosen.camera && placed.context) throw new Error(`"${chosen.camera.name}" closes in on the subject, and "${chosen.mover.name}" keeps the context in view beside it — together they push the context off the slide: keep one, and give the other a click of its own`);
+  if (chosen.camera && chosen.mover?.s.withCamera === false) throw new Error(`"${chosen.camera.name}" closes in on the subject, and "${chosen.mover.name}" keeps the context in view beside it — together they push the context off the slide: keep one, and give the other a click of its own`);
   const movedBox = i => { const g = groupOf(i), b = pieces[i].box; return g && b ? moveBox(g, b) : b; };
-  const moved = union(subjectIdx.map(movedBox));
+  // The whole subject moved as one group (a side mover): the group's own arithmetic, exactly as before; else piece by piece.
+  const moved = subject && placed.subject && subjectIdx.every(i => groupOf(i) === placed.subject) ? moveBox(placed.subject, subject) : union(subjectIdx.map(movedBox));
   const cameraSees = {subject: moved, context: union(contextIdx.map(movedBox)), area, view, canvas,
     boxOf: l => union(all.filter(i => states[i] !== 'gone' && has(i, known(names([].concat(l)), 'focus group: '))).map(movedBox))};
   const viewMove = placed.stage ?? (chosen.camera ? chosen.camera.s.place({...cameraSees, options: chosen.camera.options})?.stage ?? null : null);

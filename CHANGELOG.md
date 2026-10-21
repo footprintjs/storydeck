@@ -32,8 +32,9 @@
   as before, its `subject`/`aside` options included. Refused, naming the fix: a camera with `left`/`right`/`up`/`down`
   (they keep the context in view beside the subject, which closing in would push off the slide), and a camera with a
   deck's own mover that moves the view itself.
-- **A blur frames the subject where it ends up.** On an `apart` or `place` click, the blur's frame now follows the
-  subject to where its group moved it (before, it framed where the subject stood). Other clicks are unchanged.
+- **A blur frames the subject where it ends up.** On an `apart` or `place` click, the subject's box in the plan
+  (`look.subject`) and the blur's frame now follow the subject to where its group moved it (before, they kept where it
+  stood). Other clicks are unchanged.
 - `footprint-storydeck/deck` exports the same parts for a script; `deckStageDriver` gains `measure(n)`, and
   `measureSlide` is exported from `footprint-storydeck/video`.
 
