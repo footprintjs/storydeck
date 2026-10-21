@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — a deck from a folder, an editing loop, and co-editing
+## 0.7.0 — a deck from a folder, an editing loop, co-editing and wire motion
 
 - **A packet rides its wire's curve, and a wire shows itself in.** On a `path` click, a `pkt` packet now follows the
   wire's quadratic curve (it crossed a bent wire in a straight line, up to 78 px off it); in Chromium, Firefox and
