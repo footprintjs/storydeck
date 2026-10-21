@@ -17,9 +17,9 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(ROOT, 'dist');
 
-/** The library's source files: the root's modules and content/, never a test or a config. */
+/** The library's source files: the root's modules, content/ and deck/, never a test or a config. */
 const isSource = (name) => /\.(js|jsx)$/.test(name) && !/\.test\.(js|jsx)$/.test(name) && !/^vitest\./.test(name);
-const SOURCES = ['', 'content'].flatMap((dir) =>
+const SOURCES = ['', 'content', 'deck'].flatMap((dir) =>
   readdirSync(path.join(ROOT, dir), { withFileTypes: true })
     .filter((e) => e.isFile() && isSource(e.name))
     .map((e) => path.join(dir, e.name)),

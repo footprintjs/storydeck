@@ -187,17 +187,46 @@ async function render({ url, plan, out, name, driver, run, fps, maxEntrance, cha
 }
 
 /**
+ * How a browser runs a page it must keep off the network (deckStageDriver's `offline`), in layers, since no one of
+ * them stops everything: no name resolves (no DNS leaves the machine), WebRTC sends no UDP of its own, the browser does
+ * no background networking; the page's context is offline with service workers blocked; the context's route refuses
+ * every request that is not the page's own file or inline data — for every page of the context, popups included — and
+ * its WebSockets are closed; and any other page the deck opens is closed at once.
+ */
+export const OFFLINE = Object.freeze({
+  args: Object.freeze(['--host-resolver-rules=MAP * ~NOTFOUND', '--force-webrtc-ip-handling-policy=disable_non_proxied_udp',
+    '--disable-background-networking', '--no-pings']),
+  context: Object.freeze({ offline: true, serviceWorkers: 'block' }),
+});
+
+/** The requests an offline page may make: its own file (`page`, without its #fragment) and what it carries inline. */
+export function offlineAllows(page, url) {
+  const strip = (u) => u.split('#')[0];
+  return /^(data|blob|about):/.test(url) || strip(url) === strip(page);
+}
+
+/**
  * The driver for storydeck's <deck-stage> pages, with Playwright (pass its `chromium`). A click is made
  * forward — a jump to the click before it, then one step on — and `hide` keeps the room's chrome out of
- * the frame (the deck's toolbar always; key hints and panels by selector).
+ * the frame (the deck's toolbar always; key hints and panels by selector). `offline` keeps the page off the network
+ * (OFFLINE: it loads only its own file and inline data — the layout check measures a deck that way).
  */
-export function deckStageDriver({ chromium, executablePath, viewport = { width: 1920, height: 1080 }, hide = ['.fs-btn', '.notes-panel', '.train-panel'] }) {
+export function deckStageDriver({ chromium, executablePath, viewport = { width: 1920, height: 1080 }, hide = ['.fs-btn', '.notes-panel', '.train-panel'], offline = false }) {
   let browser, page;
   const settle = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   return {
     async open(url) {
-      browser = await chromium.launch(executablePath ? { executablePath } : {});
-      page = await browser.newPage({ viewport, reducedMotion: 'no-preference' });
+      browser = await chromium.launch({ ...(executablePath ? { executablePath } : {}), ...(offline ? { args: [...OFFLINE.args] } : {}) });
+      if (offline) {
+        const context = await browser.newContext({ viewport, reducedMotion: 'no-preference', ...OFFLINE.context });
+        await context.route('**/*', (route) => (offlineAllows(url, route.request().url()) ? route.continue() : route.abort()));
+        if (typeof context.routeWebSocket !== 'function') throw new Error('offline needs Playwright 1.48 or newer (context.routeWebSocket closes WebSockets)');
+        await context.routeWebSocket(/.*/, (ws) => ws.close());
+        page = await context.newPage();
+        context.on('page', (other) => { if (other !== page) other.close().catch(() => {}); });   // a popup the deck opens
+      } else {
+        page = await browser.newPage({ viewport, reducedMotion: 'no-preference' });
+      }
       await page.goto(url);
       await page.waitForFunction(() => customElements.get('deck-stage') && document.querySelector('deck-stage')?.shadowRoot && document.fonts.status === 'loaded');
       if (hide.length) await page.addStyleTag({ content: `${hide.join(',')}{display:none!important}` });
@@ -231,6 +260,58 @@ export function deckStageDriver({ chromium, executablePath, viewport = { width: 
     }),
     async seek(ms) { await page.evaluate((t) => { for (const a of window.__sdFrozen ?? []) a.currentTime = t; }, ms); await settle(); },
     shot: (file) => page.screenshot({ path: file }),
+    /**
+     * Click n (1-based) as it settles, measured: jump there (a jump lands at once), finish what still moves, and
+     * report text that spills out of its box and lit pieces outside the slide — [{kind, piece, text, dx, dy}] (the
+     * layout check, deck/layout.js, reads it).
+     */
+    async measure(n) {
+      await page.evaluate((i) => document.querySelector('deck-stage').goTo(i), n - 1);
+      await settle();
+      return page.evaluate(measureSlide);
+    },
     close: () => browser?.close(),
   };
+}
+
+/** Runs in the page: what spills on the slide shown (see deckStageDriver · measure). */
+export function measureSlide() {
+  const stage = document.querySelector('deck-stage');
+  for (const a of [...(document.getAnimations?.() ?? []), ...(stage?.shadowRoot?.getAnimations?.() ?? [])]) {
+    try { a.finish(); } catch { /* an endless animation has no end */ }
+  }
+  const slide = stage ? [...stage.children].filter((s) => s.tagName === 'SECTION')[stage.index] : null;
+  if (!slide) return [];
+  const W = Number(stage.getAttribute('width') || 1920), H = Number(stage.getAttribute('height') || 1080);
+  const box = slide.getBoundingClientRect(), scale = box.width / W || 1;
+  // A piece by its first data-k name; an element outside every piece by its class (".kicker") or its tag.
+  const pieceOf = (el) => el.closest('[data-k]')?.getAttribute('data-k')?.trim().split(/\s+/)[0]
+    ?? (el.classList.length ? `.${el.classList[0]}` : el.tagName.toLowerCase());
+  const textOf = (el) => (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  const shown = (el) => {
+    for (let e = el; e && e !== slide; e = e.parentElement) {
+      const cs = getComputedStyle(e);
+      if (cs.display === 'none' || cs.visibility === 'hidden' || (cs.opacity !== '' && Number(cs.opacity) < 0.05)) return false;
+    }
+    return true;
+  };
+  const out = [];
+  for (const el of slide.querySelectorAll('*')) {
+    if (el.namespaceURI === 'http://www.w3.org/2000/svg') continue;   // a drawing sizes itself by its viewBox
+    if (![...el.childNodes].some((c) => c.nodeType === 3 && c.textContent.trim())) continue;
+    const cs = getComputedStyle(el);
+    if (cs.display === 'inline' || cs.overflowX === 'auto' || cs.overflowX === 'scroll' || el.clientWidth === 0 || !shown(el)) continue;
+    // A glyph's own overhang (a tight line-height, an italic) is not a spill: a line spills by most of a line.
+    const size = parseFloat(cs.fontSize) || 16;
+    const dx = el.scrollWidth - el.clientWidth, dy = el.scrollHeight - el.clientHeight;
+    if (dx > 2 || dy > Math.max(2, size * 0.35)) out.push({ kind: 'spills', piece: pieceOf(el), text: textOf(el), dx: dx > 2 ? dx : 0, dy: dy > Math.max(2, size * 0.35) ? dy : 0 });
+  }
+  for (const el of slide.querySelectorAll('.sd-on, [data-chrome]')) {
+    if (!shown(el)) continue;
+    const r = el.getBoundingClientRect();
+    const x0 = (r.left - box.left) / scale, y0 = (r.top - box.top) / scale, x1 = (r.right - box.left) / scale, y1 = (r.bottom - box.top) / scale;
+    const dx = Math.max(0, -x0, x1 - W), dy = Math.max(0, -y0, y1 - H);
+    if (dx > 2 || dy > 2) out.push({ kind: 'outside', piece: pieceOf(el), text: textOf(el), dx: Math.round(dx), dy: Math.round(dy) });
+  }
+  return out;
 }

@@ -365,6 +365,66 @@ is validated against them. Limits: a clip is embedded as it is (a .wav as voiced
 mono — convert to .m4a to shrink a long talk); no ZIP64, so a file stays under 4 GB; the slides advance by
 themselves when the show's "use timings" is on (PowerPoint's default).
 
+## A deck from a folder: `storydeck`
+
+Building a talk by hand meant writing a build script for it: reading the maps, planning each click's focus,
+wrapping the slides, inlining every runtime. That script was the same for every deck, and it was where an editing
+session spent its time. So a deck is now a **folder**, and the library builds it:
+
+```
+my-talk/
+  deck.json      { "title": "A request, end to end" }   — and footer, area, checks when you need them
+  clicks.html    a <section> per part; on a map, a <step> per click (data-in, data-on, data-focus, <h2>, notes)
+  map.html       the picture: every data-k element with an inline left/top/width/height is a piece
+  theme.css      tokens (light, :root.dark) and the look of your pieces
+  icons/*.svg    drawn identities, used as <i class="ic" data-icon="server"></i>
+```
+
+```bash
+npx footprint-storydeck init my-talk      # a starter deck that builds and checks clean
+npx footprint-storydeck dev my-talk       # live preview: a save rebuilds, reloads on the same click, plays it again
+npx footprint-storydeck build my-talk     # my-talk/index.html — one page, every runtime inside, no network request
+```
+
+- **One page, in development and in the room.** `dev` serves the very page `build` writes, with a small dev client
+  added: a save reloads on the click you were on and plays that click again (*replay on save*), a save that breaks the
+  build shows why over the last good page, and a bar names the click you are on. Nothing of it ships. The page keeps the
+  keys a talk needs: ← → Space step, **T** light/dark, **N** notes, **P** presenter window, **L** read aloud.
+- **Read first, look last.** A reviewer — a person, or a model that pays for every screenshot — reads the deck as text:
+  `outline` (a line per click), `review --click 14` (its headline and words, what it lights, greys, brings in and moves,
+  its route, its notes), `check` (what to fix, each with its click and its fix: a headline over 12 words, pieces that
+  light just by coming in, a click that changes nothing, a piece never shown, clicks without notes). `check --layout`
+  opens the page in a browser, offline, and finds text that spills out of its box (it needs Playwright installed beside
+  StoryDeck: `npm i -D footprint-storydeck playwright-core`; without it, it says so and the other checks run). `mcp` serves the same tools to an AI assistant:
+  `claude mcp add storydeck -- npx footprint-storydeck mcp my-talk`.
+- **The helpers a diagram needs.** `<i data-k="w1" class="wire pkt" data-arrow="252 352 318 352"></i>` is a wire (an
+  SVG arrow, with an optional bend; class `pkt` adds a packet that rides it on a `path` click, at its turn).
+  `<i class="ic" data-icon="server"></i>` is `icons/server.svg`. `deck.css` styles the chrome (kicker, headline, footer
+  and count), wires, packets, icons and the theme toggle from the token contract, every rule `:where()`, so your
+  theme wins.
+- **A deck is files, never a program — on your machine.** No deck code runs in Node: no build script, no deck module.
+  Playwright (1.48 or newer), for `check --layout`, is loaded only from beside StoryDeck — never from the deck folder or
+  the folder you run in — and the page is measured offline: no name resolves, the browser context is offline and routed
+  to the page's own file, and WebSockets and popups are closed. A hostile test deck's fetch, WebSocket, popup, beacon,
+  worker, service worker, WebRTC, form and navigation all failed to reach a local server.
+  A deck reads only its own files: a link that leaves the folder, or points at a hidden file (`.env`), is refused, so
+  a deck someone sent you cannot pull a file from elsewhere into its page, its review or its server. A build renames a
+  new file into place, so it never writes through a link, and a file deck.json names never lands outside the deck.
+  `dev` listens on the loopback address only, answers only requests addressed to localhost, only reads, and survives
+  any request. A deck's own HTML — its scripts included — runs in the browser like any page you open, in the dev page
+  and in the layout check: open decks you trust. Run the commands from your own project, naming the deck folder.
+
+The same parts are a Node door, for a script or a test of your own:
+
+```js
+import { loadDeck, buildDeck, reviewClick, checkDeck, serveDeck } from 'footprint-storydeck/deck';
+
+const { compiled } = loadDeck('my-talk');
+console.log(reviewClick(compiled, 3));      // click 3 of 6 · "1 · The route · 2" (map "map", step 2 of 3) …
+console.log(checkDeck(compiled));           // [{ level, rule, click, label, message }]
+buildDeck('my-talk');                       // { file, bytes, slides, clicks, ms }
+```
+
 ## Faster edits — what making one talk taught us
 
 - **Cache by content, not by position.** A clip is keyed by its words and settings: inserting or removing a
@@ -375,6 +435,12 @@ themselves when the show's "use timings" is on (PowerPoint's default).
   (0.48–0.70 s spaced out, 0.24–0.28 s as written) — fix, re-voice those clips, measure again.
 - **One source, several builds.** The room's build carries the presenter's voice and a live demo; the public
   one (slides page, video) leaves both out — a build switch over the same parts, never a second copy.
+- **Read a click before you look at it.** On a 37-click talk ported to a deck folder (its 12 KB build script no longer
+  needed; the library rebuilds its 37 slides byte for byte), a rebuild after a save takes about 6.5 ms, and reviewing a click as
+  text costs about 154 tokens against about 1,844 for a screenshot of it — the whole deck about 5,800 tokens as text, about
+  68,000 as screenshots. Measured with `node bench/devloop.mjs <deck>` (an Apple M5 Pro, Node 24); text tokens are
+  estimated as characters ÷ 4 and a screenshot's by Anthropic's image formula (width × height ÷ 750, at 1568 × 882), not a
+  model run. The layout check found a word spilling 17 px out of its box on 24 of those clicks, which the earlier screenshot checks had missed.
 
 ## Quick start
 
@@ -396,7 +462,8 @@ export default function App({ post }) {
 ```
 
 `PostView` renders the Read · Scroll · Watch toggle and each lens. Bring your own `post` (see
-**Authoring**). Requires `react`/`react-dom` (peer) and a slide runtime for Watch (a
+**Authoring**). For a talk on its own page, start from a folder instead: `npx footprint-storydeck init my-talk`, then
+`npx footprint-storydeck dev my-talk` (see **A deck from a folder**). Requires `react`/`react-dom` (peer) and a slide runtime for Watch (a
 `deck-stage.js` web component served at `${basePath}/deck-stage.js` — it ships as `footprint-storydeck/deck-stage.js`).
 
 **For agents:** a skill ships in the package — `plugin/skills/storydeck/SKILL.md` (which door for which job,
@@ -459,6 +526,7 @@ const { theme, toggle, setTheme } = useTheme();   // flips an html class + persi
 | `embedClips` | `footprint-storydeck/voice` (Node only): a deck's clips inside one page; the clip cache, the voice port and its local-kit adapter are `footprint-narration/voice`'s |
 | `renderVideo` · `planVideo` · `deckStageDriver` · `ffmpegMajor` | `footprint-storydeck/video` (Node only, ffmpeg 5.0+): the deck as a narrated video, with captions and chapters |
 | `exportPptx` · `pptxParts` · `zip` · `unzip` · `checkPptx` | `footprint-storydeck/pptx` (Node only): the deck as a PowerPoint file — a slide per click, its picture, notes and clip — through a footprintjs flowchart that records why |
+| `loadDeck` · `buildDeck` · `serveDeck` · `outline` · `reviewClick` · `checkDeck` · `layoutCheck` · `initDeck` · `serveMcp` · `runCli` | `footprint-storydeck/deck` (Node only): a deck folder made into one page, served for editing, read back as text — the `storydeck` command (also `npx footprint-storydeck`); its page's base styles are `footprint-storydeck/deck.css` |
 
 The package ships compiled JavaScript (`dist/`, built by `npm run build`: each source file compiled on its
 own, JSX turned into `react/jsx-runtime` calls, every relative import given its `.js`, `'use client'` kept), so
@@ -474,7 +542,7 @@ npm test        # vitest
 npm run test:cov
 ```
 
-317 tests (and 2 that run where LibreOffice or the ECMA-376 schemas are found) · ~99% lines · coverage thresholds enforced (90% statements, 85% branches, 90% functions, 95% lines).
+438 tests (and 2 that run where LibreOffice or the ECMA-376 schemas are found) · ~99% lines · coverage thresholds enforced (90% statements, 85% branches, 90% functions, 95% lines).
 
 ## License
 
