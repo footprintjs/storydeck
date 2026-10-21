@@ -279,10 +279,11 @@ export function focusStep(prev, step, deck) {
   twinOff.forEach(i => { states[i] = 'gone'; });
   const chosen = pick(readFocus(step.focus, step.options), strategies);
   const look = chosen.look?.s.look ?? 'grey';
-  // Movers first: where the subject and the context go. Then the overlay, around the subject where it ends up.
-  // By default the subject is what the click lights and the context the rest shown; a mover's `subject` and
-  // `aside` options name the two groups instead (a lit page can still step aside for the timeline it holds).
-  const all = pieces.map((_, i) => i), mo = chosen.mover?.options ?? {};
+  // Movers first: where the subject and the context go. Then the camera, then the overlay, around the subject where it
+  // ends up. By default the subject is what the click lights and the context the rest shown; a mover's `subject` and
+  // `aside` options (or, with no mover, the camera's) name the two groups instead (a lit page can still step aside for
+  // the timeline it holds).
+  const all = pieces.map((_, i) => i), mo = chosen.mover?.options ?? chosen.camera?.options ?? {};
   const group = (v, what) => (v === undefined || v === null || v === '' ? null : known(names([].concat(v)), `focus ${what}: `));
   const grows = group(mo.subject, 'subject'), asides = group(mo.aside, 'aside');
   const subjectIdx = grows ? all.filter(i => states[i] !== 'gone' && has(i, grows)) : all.filter(i => states[i] === 'on');
@@ -303,14 +304,20 @@ export function focusStep(prev, step, deck) {
   const springGroups = [...new Map((spring ? placed.groups ?? [] : []).filter(x => x.g).map(x => [x.names.join(' '), [...x.names]]))];
   const groupOf = i => { const k = inGroup.get(i); return k === 'subject' ? placed.subject : k === 'context' ? placed.context : k?.g ?? null; };
   const moves = pieces.map((p, i) => states[i] === 'gone' ? null : placePiece(groupOf(i), p.box));
-  // The camera frames the subject where the mover leaves it (each piece moved by its group). A deck's own mover that
-  // moves the view itself (returns `stage`) is the only view move of its click: with a camera too, the click is refused.
-  if (placed.stage && chosen.camera) throw new Error(`a click moves the view once: "${chosen.mover.name}" moves it and so does "${chosen.camera.name}" — keep one`);
-  const moved = union(subjectIdx.map(i => { const g = groupOf(i), b = pieces[i].box; return g && b ? moveBox(g, b) : b; }));
-  const viewMove = placed.stage ?? (chosen.camera ? chosen.camera.s.place({subject: moved, context, area, view, canvas, boxOf, options: chosen.camera.options})?.stage ?? null : null);
+  // The camera sees the click as the mover leaves it: every box moved by its group. Two things a camera never shares
+  // a click with: a deck's own mover that moves the view itself (returns `stage`) — the view moves once — and a mover
+  // that steps the context aside to keep it in view beside the subject, which a camera closing in would push off the
+  // slide.
+  if (chosen.camera && placed.stage) throw new Error(`a click moves the view once: "${chosen.mover.name}" moves it and so does "${chosen.camera.name}" — keep one`);
+  if (chosen.camera && placed.context) throw new Error(`"${chosen.camera.name}" closes in on the subject, and "${chosen.mover.name}" keeps the context in view beside it — together they push the context off the slide: keep one, and give the other a click of its own`);
+  const movedBox = i => { const g = groupOf(i), b = pieces[i].box; return g && b ? moveBox(g, b) : b; };
+  const moved = union(subjectIdx.map(movedBox));
+  const cameraSees = {subject: moved, context: union(contextIdx.map(movedBox)), area, view, canvas,
+    boxOf: l => union(all.filter(i => states[i] !== 'gone' && has(i, known(names([].concat(l)), 'focus group: '))).map(movedBox))};
+  const viewMove = placed.stage ?? (chosen.camera ? chosen.camera.s.place({...cameraSees, options: chosen.camera.options})?.stage ?? null : null);
   const stage = viewMove ? {s: round(viewMove.s, 4), x: round(viewMove.o[0] * (1 - viewMove.s) + viewMove.t[0]), y: round(viewMove.o[1] * (1 - viewMove.s) + viewMove.t[1])} : null;
-  const ends = chosen.camera ? (moved && viewMove ? moveBox(viewMove, moved) : moved)
-    : subject && (placed.stage ?? placed.subject) ? moveBox(placed.stage ?? placed.subject, subject) : subject;
+  // The overlay frames the subject where it ends up: moved by its group, then by the view.
+  const ends = moved && viewMove ? moveBox(viewMove, moved) : moved;
   const subjectOnSlide = ends ? {x: ends.x * view.s + view.x, y: ends.y * view.s + view.y, w: ends.w * view.s, h: ends.h * view.s} : null;
   const cover = chosen.overlay ? chosen.overlay.s.cover({subjectOnSlide, canvas, options: chosen.overlay.options}) : null;
   const looks = pieces.map((_, i) => states[i] === 'dim' ? look : null);

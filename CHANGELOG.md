@@ -26,10 +26,14 @@
   file deck.json names never lands outside the deck; `--out` writes where you say. The dev server is loopback-only and
   survives any request; the MCP server reaches only decks inside the folder it was started with. A deck's own HTML still
   runs in the browser, like any page: open decks you trust.
-- **`zoom` is a camera, so it goes with a mover.** A click can close in while its parts fly apart (`zoom apart`) or step
-  aside (`zoom left`): the camera frames the subject where the mover leaves it, and a blur frames it there too. A new
-  strategy kind, `camera` (one a click); a deck's own camera gets the same context. `zoom` alone draws exactly as before.
-  A deck's own mover that moves the view itself (returns `stage`) still may, but not with a camera on the same click.
+- **`zoom` is a camera, so it goes with a mover.** A click can close in while its parts fly apart (`zoom apart`) or move
+  (`zoom place`): the camera frames the subject where the mover leaves it. A new strategy kind, `camera` (one a click);
+  a camera sees the click as the mover leaves it (subject, context and named groups moved). `zoom` alone draws exactly
+  as before, its `subject`/`aside` options included. Refused, naming the fix: a camera with `left`/`right`/`up`/`down`
+  (they keep the context in view beside the subject, which closing in would push off the slide), and a camera with a
+  deck's own mover that moves the view itself.
+- **A blur frames the subject where it ends up.** On an `apart` or `place` click, the blur's frame now follows the
+  subject to where its group moved it (before, it framed where the subject stood). Other clicks are unchanged.
 - `footprint-storydeck/deck` exports the same parts for a script; `deckStageDriver` gains `measure(n)`, and
   `measureSlide` is exported from `footprint-storydeck/video`.
 

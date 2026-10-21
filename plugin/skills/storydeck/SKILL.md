@@ -77,7 +77,8 @@ const slides = looks.map(look => `<section class="${slideClass(look)}"><div clas
 ```
 
 Strategies, one of each kind at most: look `grey` (default) · `hide` · `keep`; camera `zoom` (it frames the subject
-where the mover leaves it, so `zoom apart` and `zoom left` work on one click); mover `left` ·
+where the mover leaves it, so `zoom apart` and `zoom place` work on one click; `zoom left` is refused — a side mover
+keeps the context in view, which closing in would push off the slide); mover `left` ·
 `right` · `up` · `down` · `place` (named groups moved by amounts you art-direct) · `apart` (the exploded view:
 `data-focus-apart="lid: 0 -120 | core: 160 0"`, a spring per group `data-focus-stagger` ms apart, back together on a
 later click without it; a line carrying a group's name moves with it; `apart place` on one click is refused — give

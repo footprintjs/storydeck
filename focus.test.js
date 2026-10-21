@@ -504,18 +504,42 @@ describe('focus · the camera: zoom goes with a mover', () => {
     expect(350 * still.s + still.y).toBeCloseTo(600, 5);
   });
 
-  it('with a side mover, the view closes in on the subject where it grows to, and the blur frames it there', () => {
-    const one = focusStep(null, { in: ['*'], on: ['core'], quiet: true, focus: 'zoom left blur' }, fig).look;   // quiet: the rest comes in greyed
-    expect(one.strategies).toEqual(['zoom', 'left', 'blur']);
-    const grown = one.pieces[1].move;
-    expect(grown).toBeTruthy();
-    // the core's centre, moved by left, then by the view: at the area's centre
-    const [cx, cy] = [950 + grown.dx, 500 + grown.dy];
-    expect(cx * one.stage.move.s + one.stage.move.x).toBeCloseTo(960, 5);
-    expect(cy * one.stage.move.s + one.stage.move.y).toBeCloseTo(600, 5);
+  it('a blur frames the subject where it ends up — flown by apart, and then by the view', () => {
+    const one = planFocus([all, { on: ['lid'], focus: 'zoom apart blur', options: { apart: 'lid: 0 -100' } }], fig).looks[1];
+    expect(one.strategies).toEqual(['zoom', 'apart', 'blur']);
     const [x, y, w, h] = one.overlay.rects[0];
-    expect(x + w / 2).toBeCloseTo(960, 0);
+    expect(x + w / 2).toBeCloseTo(960, 0);   // the lid, centred by the camera
     expect(y + h / 2).toBeCloseTo(600, 0);
+    // without the camera, the frame still follows the lid to where it flew (250 = its centre, 100 px up)
+    const [, y2, , h2] = planFocus([all, { on: ['lid'], focus: 'apart blur', options: { apart: 'lid: 0 -100' } }], fig).looks[1].overlay.rects[0];
+    expect(y2 + h2 / 2).toBeCloseTo(250, 0);
+    // and so does place's
+    const [, y3, , h3] = planFocus([all, { on: ['lid'], focus: 'place blur', options: { groups: 'lid: 0 -100' } }], fig).looks[1].overlay.rects[0];
+    expect(y3 + h3 / 2).toBeCloseTo(250, 0);
+  });
+
+  it('refuses a camera with a mover that keeps the context in view beside the subject — together they push it off the slide', () => {
+    for (const side of ['left', 'right', 'up', 'down']) {
+      expect(() => focusStep(null, { in: ['*'], on: ['core'], quiet: true, focus: `zoom ${side}` }, fig))
+        .toThrow(new RegExp(`"zoom" closes in on the subject, and "${side}" keeps the context in view beside it — together they push the context off the slide: keep one, and give the other a click of its own`));
+    }
+    // a side mover alone, and a zoom alone, are both as before
+    expect(focusStep(null, { in: ['*'], on: ['core'], quiet: true, focus: 'left' }, fig).look.strategies).toEqual(['left']);
+  });
+
+  it('takes the subject and aside options from the camera when the click has no mover', () => {
+    const named = planFocus([all, { on: ['lid'], focus: 'zoom', options: { subject: 'base' } }], fig).looks[1].stage.move;
+    expect(650 * named.s + named.y).toBeCloseTo(600, 5);   // the base's centre, at the area's centre
+    expect(() => planFocus([all, { on: ['lid'], focus: 'zoom', options: { subject: 'nope' } }], fig)).toThrow(/focus subject: no piece "nope"/);
+  });
+
+  it('shows a camera the click as the mover leaves it: the subject, the context and named groups moved', () => {
+    const seen = [];
+    const probe = { kind: 'camera', place: (ctx) => { seen.push({ subject: ctx.subject, context: ctx.context, lid: ctx.boxOf(['lid']) }); return {}; } };
+    planFocus([all, { on: ['core'], focus: 'probe apart', options: { apart: 'lid: 0 -100 | base: 0 100' } }], { ...fig, strategies: { probe } });
+    expect(seen[0].subject).toEqual({ x: 800, y: 450, w: 300, h: 100 });
+    expect(seen[0].lid).toEqual({ x: 800, y: 200, w: 300, h: 100 });
+    expect(seen[0].context).toEqual({ x: 800, y: 200, w: 300, h: 600 });   // the lid 100 up, the base 100 down
   });
 
   it('a zoom alone is drawn as before: the subject where it stands', () => {
@@ -536,7 +560,7 @@ describe('focus · the camera: zoom goes with a mover', () => {
     expect(look.stage.move).toEqual({ s: 2, x: 0, y: 0 });
   });
 
-  it('a camera with nothing to frame leaves the view where it is', () => {
+  it('a camera with nothing to frame does not move the view', () => {
     const none = focusStep(null, { in: ['lid'], on: [], quiet: true, focus: 'zoom' }, fig).look;
     expect(none.stage).toBeNull();
   });

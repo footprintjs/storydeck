@@ -96,7 +96,7 @@ decision every click makes again, so it is data on the click, and the library do
 | Kind | Strategies | What happens |
 |---|---|---|
 | look | `grey` (default) · `hide` · `keep` | how the context looks: greyed in place, hidden, or left as it is |
-| camera | `zoom` | the view closes in on the subject — where the click's mover leaves it (`share`, `most`): so a click can close in while its parts fly apart (`zoom apart`) or step aside (`zoom left`) |
+| camera | `zoom` | the view closes in on the subject — where the click's mover leaves it (`share`, `most`): so a click can close in while its parts fly apart (`zoom apart`) or move (`zoom place`). With `left`/`right`/`up`/`down`, which keep the context in view beside the subject, it is refused |
 | mover | `left` · `right` · `up` · `down` | the context steps aside that way, smaller (`scale`), and the subject grows into the room it leaves (`grow`, `fill`, `gap`, `align`; `move: 'aside'` keeps the subject where it is) |
 | mover | `place` | named groups moved by the amounts you give (`groups: 'page floor: -90 -200 0.5 \| tl: 0 -230 1.1 @ 960 968'`): a layout you art-direct, still animated from wherever the last click left it |
 | mover | `apart` | the exploded view: named groups fly apart along the vectors you give (`apart: 'lid: 0 -120 \| core: 160 0 \| base: 0 120 1.1'`), one spring each, `stagger` ms apart (35), and come back together on a later click without it — the last one out is the first one back |
@@ -179,8 +179,8 @@ const slides = looks.map(look => `<section class="${slideClass(look)}">`
 
 Pieces don't nest, so each one greys and moves on its own; a mover keeps every group's shape (the
 pieces of the subject move together, around the subject's centre) and composes with a piece's own
-transform (it uses CSS `translate`/`scale`, not `transform`). A mover's `aside` and `subject` options
-name its two groups when they are not simply the greyed and the lit pieces, and `data-twin="name"` makes
+transform (it uses CSS `translate`/`scale`, not `transform`). A mover's `aside` and `subject` options (or, on a
+click with no mover, the camera's) name its two groups when they are not simply the greyed and the lit pieces, and `data-twin="name"` makes
 a piece (a dashed wire under a solid one) step aside while its twin is lit. A piece that leaves fades out
 from how it looked and where it stood; a blur that moves to another subject stays, and only its frame is
 new; overlapping holes stay clear, and nothing outside the `area` is blurred.
