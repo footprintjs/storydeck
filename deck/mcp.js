@@ -10,7 +10,7 @@
 import {realpathSync} from 'node:fs';
 import path from 'node:path';
 import {createInterface} from 'node:readline';
-import {outlineTool, reviewTool, checkTool, buildTool} from './tools.js';
+import {outlineTool, reviewTool, checkTool, buildTool, feedbackTool} from './tools.js';
 import {packageVersion} from './assets.js';
 import {deckRoot, isInside} from './paths.js';
 
@@ -21,6 +21,8 @@ export const MCP_TOOLS = Object.freeze([
     inputSchema: {type: 'object', properties: {dir: DIR}}},
   {name: 'review', description: 'One click as text: where it is, its headline (and word count), what it lights, greys, brings in, moves and says (notes). Give click (a number or a label), or all: true.',
     inputSchema: {type: 'object', properties: {dir: DIR, click: {type: 'string', description: 'a click number (1-based) or label'}, all: {type: 'boolean', description: 'every click'}}}},
+  {name: 'feedback', description: 'The notes a person left on clicks in the dev page (feedback.md), the open ones: what to change, click by click. Tick a line (- [x]) in feedback.md when it is done.',
+    inputSchema: {type: 'object', properties: {dir: DIR}}},
   {name: 'check', description: 'What to fix, worst first, each with its click and its fix (headline words, pieces lit by coming in, clicks that change nothing, pieces never shown, missing notes). layout: true also opens the page in a browser to find text that spills.',
     inputSchema: {type: 'object', properties: {dir: DIR, layout: {type: 'boolean', description: 'measure the built page in a browser (needs playwright-core)'}}}},
   {name: 'build', description: 'Write the deck\'s self-contained page (deck.json "out", index.html by default) and say what was written.',
@@ -45,6 +47,7 @@ export async function callTool(name, args = {}, {dir = '.'} = {}) {
     args ??= {};
     switch (name) {
       case 'outline': return {content: [{type: 'text', text: outlineTool(deck)}]};
+      case 'feedback': return {content: [{type: 'text', text: feedbackTool(deck)}]};
       case 'review': return {content: [{type: 'text', text: reviewTool(deck, {click: args.click === undefined ? undefined : String(args.click), all: args.all === true})}]};
       case 'check': {
         const r = await checkTool(deck, {layout: args.layout === true});
@@ -74,7 +77,7 @@ export function serveMcp({dir = '.', input = process.stdin, output = process.std
     if (id === undefined) return undefined;   // a notification (initialized, cancelled): nothing to answer
     if (method === 'initialize') {
       return send({id, result: {protocolVersion: params.protocolVersion ?? '2025-06-18', capabilities: {tools: {}}, serverInfo: {name: 'storydeck', version},
-        instructions: 'Read first, look last: outline (the whole deck) → review a click (what it shows, as text) → edit the deck files → check (what to fix) → build. A person previews with `storydeck dev`.'}});
+        instructions: 'Read first, look last: outline (the whole deck) → feedback (what the person asked for) → review a click (what it shows, as text) → edit the deck files → check (what to fix) → build. A person previews with `storydeck dev`, where they leave notes and move pieces.'}});
     }
     if (method === 'ping') return send({id, result: {}});
     if (method === 'tools/list') return send({id, result: {tools: MCP_TOOLS}});

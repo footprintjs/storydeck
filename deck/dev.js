@@ -5,21 +5,29 @@
 //   await dev.close();
 //
 // A rebuild reads the deck's files again and compiles them in this process — no deck code runs, so serving a
-// deck never executes it. The server is for one person on one machine:
+// deck never executes it. Co-editing: in the page a person can leave a note on a click (into feedback.md, a checklist
+// the agent reads) and Alt-drag a piece (its left/top, or its wire's coordinates, written into its map). Those are the
+// only two writes, each one checked: the page's own origin, the page's own token, JSON, small. The server is for one
+// person on one machine:
 //   · it listens on the loopback address only, and answers only requests addressed to localhost (a page on another
 //     site cannot reach it through DNS rebinding);
-//   · it only reads: GET and HEAD, the page, the reload channel, and the deck folder's own files (paths.js ·
-//     servedFile: no hidden file, nothing outside the folder, through a link either);
+//   · it reads the page, the reload channel and the deck folder's own files (paths.js · servedFile: no hidden file,
+//     nothing outside the folder, through a link either), and writes only the two edits above (paths.js · writeInside);
 //   · it sends no CORS header and marks every answer same-origin only, so another site cannot read or embed it;
 //   · a request it cannot read is answered 400; nothing a request sends can stop the server.
 // A deck's own HTML runs in the page, as any page you open does: serve decks you trust.
 import http from 'node:http';
+import {randomBytes, timingSafeEqual} from 'node:crypto';
 import {watch, createReadStream, readdirSync, lstatSync} from 'node:fs';
 import path from 'node:path';
 import {deckHtml} from './build.js';
 import {devClient} from './devClient.js';
 import {scriptSafe} from './html.js';
-import {deckRoot, servedFile} from './paths.js';
+import {deckRoot, servedFile, presence, writeInside} from './paths.js';
+import {deckFileText, mapFile} from './source.js';
+import {FEEDBACK, nudgePiece, feedbackLine, appendFeedback, readFeedback} from './edit.js';
+
+const MAX_BODY = 16 * 1024;
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -31,6 +39,12 @@ const TYPES = {
 const SAFE = {'x-content-type-options': 'nosniff', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'cross-origin-resource-policy': 'same-origin'};
 const LOOPBACK = ['127.0.0.1', '::1', 'localhost'];
 const IGNORED = /(^|[\\/])(node_modules|\.[^\\/]*)([\\/]|$)/;   // dependencies and hidden files (.git, editor swap files)
+
+/** When a note was left, in the person's own clock: "2026-10-21 14:05". */
+function localStamp(d) {
+  const two = (v) => String(v).padStart(2, '0');
+  return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${two(d.getHours())}:${two(d.getMinutes())}`;
+}
 
 /**
  * The deck folder's stamp: every file it holds (not hidden, not a dependency, not its own output) with its size and
@@ -55,8 +69,8 @@ export function folderStamp(root, outputs = []) {
 }
 
 /** The page shown before the deck has ever built: the dev client alone, which shows why and reloads once it builds. */
-const waitingPage = () => `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="storydeck-dev" content="0"><title>storydeck dev</title></head>
+const waitingPage = (token) => `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="storydeck-dev" content="0"><meta name="storydeck-dev-token" content="${token}"><title>storydeck dev</title></head>
 <body style="background:#0f1216"><script>(${scriptSafe(devClient)})();</script></body></html>
 `;
 
@@ -93,7 +107,9 @@ function listen(server, port, host, tries) {
 export async function serveDeck(dir, {port = 4321, host = '127.0.0.1', watch: watching = true, poll = 1000, log = () => {}, tries = 20} = {}) {
   if (!LOOPBACK.includes(host)) throw new Error(`storydeck dev listens on this machine only (${LOOPBACK.join(', ')}), not on ${host}`);
   const root = deckRoot(dir);
-  let version = 0, page = null, problem = null, outputs = ['index.html'], stamp = null;
+  // feedback.md is written by the page itself: a note never rebuilds the deck
+  let version = 0, page = null, problem = null, outputs = ['index.html', FEEDBACK], stamp = null, current = null;
+  const token = randomBytes(16).toString('hex');   // only the page this server serves can read it
   const clients = new Set();
   const send = (event, data) => { for (const res of clients) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
 
@@ -101,11 +117,12 @@ export async function serveDeck(dir, {port = 4321, host = '127.0.0.1', watch: wa
     const t0 = performance.now();
     stamp = folderStamp(root, outputs);   // what this build read: a later stamp that differs is a save
     try {
-      const {compiled, html} = deckHtml(root, {dev: {client: devClient, version: version + 1}});
+      const {compiled, html} = deckHtml(root, {dev: {client: devClient, version: version + 1, token}});
       version += 1;
       page = html;
       problem = null;
-      outputs = [compiled.config.out, compiled.config.deckData].filter(Boolean);
+      current = compiled;
+      outputs = [compiled.config.out, compiled.config.deckData, FEEDBACK].filter(Boolean);
       const ms = Math.round(performance.now() - t0);
       log(`built ${compiled.clicks.length} clicks in ${ms} ms`);
       send('reload', {version, ms});
@@ -127,20 +144,83 @@ export async function serveDeck(dir, {port = 4321, host = '127.0.0.1', watch: wa
       const name = file ? String(file).replace(/\\/g, '/') : null;
       if (name && (IGNORED.test(name) || outputs.includes(name))) return;   // its own output, a dependency, a hidden file
       clearTimeout(timer);
-      timer = setTimeout(rebuild, 40);   // one rebuild for the burst of events a save makes
+      // one rebuild for the burst of events a save makes — and none when the folder is as the last build read it (an
+      // edit from the page has already rebuilt)
+      timer = setTimeout(() => { if (folderStamp(root, outputs) !== stamp) rebuild(); }, 40);
     });
   }
 
   let listeningPort = null;
+  /** The two edits the page may send: a note on a click, and a piece moved. */
+  const write = async (pathname, body) => {
+    if (!current) return [409, {error: 'the deck has not built yet — fix it first'}];
+    if (pathname === '/__storydeck/feedback') {
+      const n = body.click;
+      if (!Number.isInteger(n) || n < 1 || n > current.clicks.length) return [400, {error: `no click ${JSON.stringify(n)}`}];
+      if (typeof body.text !== 'string') return [400, {error: 'a note is text'}];
+      const line = feedbackLine({n, label: current.clicks[n - 1].label, text: body.text, at: localStamp(new Date())});
+      const file = path.join(root, FEEDBACK);
+      const before = presence(file) === 'missing' ? '' : deckFileText(root, FEEDBACK);
+      const after = appendFeedback(before, line);
+      writeInside(root, file, after);
+      log(`noted on click ${n}`);
+      return [200, {ok: true, open: readFeedback(after).filter((f) => !f.done).length}];
+    }
+    const {map, name, nth = 0, dx, dy} = body;
+    if (typeof map !== 'string' || !Object.hasOwn(current.maps, map)) return [400, {error: `no map ${JSON.stringify(map)}`}];
+    if (typeof name !== 'string' || !name || !Number.isInteger(nth) || nth < 0) return [400, {error: 'name the piece moved (and which of that name)'}];
+    if (typeof dx !== 'number' || typeof dy !== 'number') return [400, {error: 'a move is two numbers of px'}];
+    const file = mapFile(current.config, map);
+    writeInside(root, path.join(root, file), nudgePiece(deckFileText(root, file), {name, nth}, dx, dy));
+    log(`moved "${name}" by ${dx}, ${dy} in ${file}`);
+    rebuild();   // at once, so the page reloads on the new place without waiting for the watcher
+    return [200, {ok: true}];
+  };
+
+  /** A write request, checked: the page's own origin and token, JSON, at most 16 KB. */
+  const edit = (req, res, pathname) => {
+    const reply = (code, body) => { res.writeHead(code, {'content-type': 'application/json; charset=utf-8', ...SAFE}); res.end(JSON.stringify(body)); };
+    const own = [`http://localhost:${listeningPort}`, `http://127.0.0.1:${listeningPort}`, `http://[::1]:${listeningPort}`];
+    if (!own.includes(String(req.headers.origin ?? '').toLowerCase())) return reply(403, {error: 'an edit comes from the dev page itself'});
+    const sent = Buffer.from(String(req.headers['x-storydeck-token'] ?? '')), mine = Buffer.from(token);
+    if (sent.length !== mine.length || !timingSafeEqual(sent, mine)) return reply(403, {error: 'an edit carries the dev page\'s token'});
+    if (!/^application\/json\b/i.test(String(req.headers['content-type'] ?? ''))) return reply(415, {error: 'an edit is JSON'});
+    // too big: answered once, and the connection closed after the answer (the rest of the body is never kept)
+    const tooBig = () => { res.setHeader('connection', 'close'); reply(413, {error: 'an edit is at most 16 KB'}); };
+    if (Number(req.headers['content-length']) > MAX_BODY) return tooBig();
+    const chunks = [];
+    let size = 0;
+    req.on('data', (c) => {
+      if (size > MAX_BODY) return;
+      size += c.length;
+      if (size > MAX_BODY) { chunks.length = 0; tooBig(); return; }
+      chunks.push(c);
+    });
+    req.on('end', () => {
+      if (size > MAX_BODY) return;
+      let body;
+      try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return reply(400, {error: 'an edit is JSON'}); }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return reply(400, {error: 'an edit is a JSON object'});
+      write(pathname, body).then(([code, out]) => reply(code, out), (e) => reply(409, {error: e.message}));
+    });
+    return undefined;
+  };
+
   const answer = (req, res) => {
     const deny = (code, text) => { res.writeHead(code, {'content-type': 'text/plain; charset=utf-8', ...SAFE}); res.end(text); };
     if (!allowedHost(req.headers.host, listeningPort)) return deny(403, 'storydeck dev answers requests to localhost only');
-    if (req.method !== 'GET' && req.method !== 'HEAD') return deny(405, 'storydeck dev only reads');
+    if (req.method === 'POST') {
+      let edited;
+      try { edited = new URL(req.url, 'http://localhost').pathname; } catch { return deny(400, 'a request storydeck dev cannot read'); }
+      if (edited === '/__storydeck/feedback' || edited === '/__storydeck/move') return edit(req, res, edited);
+      return deny(405, 'storydeck dev takes two edits only: a note, and a piece moved');
+    }
+    if (req.method !== 'GET' && req.method !== 'HEAD') return deny(405, 'storydeck dev only reads, and takes two edits from its page');
     let pathname;
     try { ({pathname} = new URL(req.url, 'http://localhost')); } catch { return deny(400, 'a request storydeck dev cannot read'); }
     if (pathname === '/' || pathname === '/index.html') {
       res.writeHead(200, {'content-type': 'text/html; charset=utf-8', ...SAFE});
-      return res.end(req.method === 'HEAD' ? undefined : page ?? waitingPage());
+      return res.end(req.method === 'HEAD' ? undefined : page ?? waitingPage(token));
     }
     if (pathname === '/__storydeck/events') {
       res.writeHead(200, {'content-type': 'text/event-stream', ...SAFE, connection: 'keep-alive'});

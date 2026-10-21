@@ -1,5 +1,7 @@
 import {describe, it, expect} from 'vitest';
 import {wires, icons, readIcon, applyTransforms} from './transforms.js';
+import {stripComments} from './html.js';
+import {generated} from './test/helpers.js';
 
 describe('wires', () => {
   it('draws a straight wire in a box that holds it, with its head, keeping the element\'s attributes', () => {
@@ -62,5 +64,27 @@ describe('icons', () => {
     expect(out).toMatch(/^<svg viewBox="0 0 8 8"/);
     expect(out).toContain('class="wire"');
     expect(applyTransforms('<p>plain</p>')).toBe('<p>plain</p>');
+  });
+});
+
+describe('reading an icon file', () => {
+  /** readIcon as it was before: one regex over the file — the oracle the one-pass reading must equal. */
+  function readIconBefore(svg) {
+    const m = /<svg\b([^>]*)>([\s\S]*)<\/svg>\s*$/.exec(stripComments(svg).replace(/^\s*<\?xml[^>]*>/, '').trim());
+    const viewBox = m && /\sviewBox=(["'])([^"']+)\1/.exec(m[1])?.[2];
+    return m && viewBox ? {viewBox, body: m[2].trim()} : null;
+  }
+  const read = (svg) => { try { return readIcon('x', svg); } catch { return null; } };
+
+  it('reads exactly what the one regex read, on 4,000 generated files', () => {
+    const tokens = ['<svg', '>', '</svg>', ' viewBox="0 0 1 1"', " viewBox='2'", '<!--', '-->', '<?xml v?>', ' ', '\n', 'x', '<', '/', 'svg', '<svgx'];
+    for (const svg of generated(tokens, {count: 4000, length: 20})) expect(read(svg), svg).toEqual(readIconBefore(svg));
+  });
+
+  it('stays linear on a file of unfinished tags (the one regex took minutes on 4 MB)', () => {
+    const t0 = performance.now();
+    expect(() => readIcon('x', '<svg>'.repeat(800_000))).toThrow(/an icon file is one <svg/);
+    expect(() => readIcon('x', `${'<svg>'.repeat(800_000)}</svg>`)).toThrow(/has no viewBox/);
+    expect(performance.now() - t0).toBeLessThan(1500);
   });
 });

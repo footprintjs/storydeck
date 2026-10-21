@@ -139,4 +139,92 @@ describe('devClient', () => {
     document.querySelector('.sd-dev input').dispatchEvent(new Event('change'));
     expect(channels).toHaveLength(0);
   });
+
+  describe('co-editing', () => {
+    /** The page with its token, a map on the active click: pieces a, "b x" and a second a, under a stage zoomed 2×. */
+    function editable() {
+      const stage = page();
+      document.head.insertAdjacentHTML('beforeend', '<meta name="storydeck-dev-token" content="t0k3n">');
+      stage.children[2].setAttribute('data-deck-active', '');
+      stage.children[2].innerHTML = '<div class="map map-route"><div class="sd-stage" style="--sd-ts: 2;"><div data-k="a"></div><div data-k="b x"></div><div data-k="a"><span>in</span></div></div></div>';
+      return stage;
+    }
+    const answer = (ok, out) => vi.fn(async () => ({ok, status: ok ? 200 : 409, json: async () => out}));
+    const settle = () => new Promise((r) => setTimeout(r, 0));
+    const pointer = (target, type, init) => target.dispatchEvent(new MouseEvent(type, {bubbles: true, cancelable: true, ...init}));
+
+    it('leaves a note on this click: the page\'s token, JSON, and how many notes are open', async () => {
+      editable();
+      globalThis.fetch = answer(true, {ok: true, open: 2});
+      vi.spyOn(window, 'prompt').mockReturnValue('Make the server wider');
+      devClient();
+      const note = [...document.querySelectorAll('.sd-dev button')].find((b) => b.textContent === 'note');
+      note.click();
+      await settle();
+      expect(window.prompt).toHaveBeenCalledWith('A note on click 3');
+      const [url, init] = fetch.mock.calls[0];
+      expect([url, init.method, init.headers]).toEqual(['/__storydeck/feedback', 'POST', {'content-type': 'application/json', 'x-storydeck-token': 't0k3n'}]);
+      expect(JSON.parse(init.body)).toEqual({click: 3, text: 'Make the server wider'});
+      expect(document.querySelector('.sd-dev').textContent).toContain('noted · 2 open');
+      window.prompt.mockReturnValue('  ');
+      note.click();
+      expect(fetch).toHaveBeenCalledTimes(1);   // no words, no note
+      delete globalThis.fetch;
+    });
+
+    it('shows the server\'s reason when an edit is refused', async () => {
+      editable();
+      globalThis.fetch = answer(false, {error: 'the map changed since the page was built'});
+      vi.spyOn(window, 'prompt').mockReturnValue('x');
+      devClient();
+      [...document.querySelectorAll('.sd-dev button')].find((b) => b.textContent === 'note').click();
+      await settle();
+      expect(document.querySelector('.sd-dev').textContent).toContain('the map changed since the page was built');
+      delete globalThis.fetch;
+    });
+
+    it('Alt-drags a piece: it follows the pointer, and its move is sent in map px, by name and which of that name', async () => {
+      editable();
+      globalThis.fetch = answer(true, {ok: true});
+      devClient();
+      const second = document.querySelectorAll('[data-k="a"]')[1];
+      pointer(second.firstChild, 'pointerdown', {altKey: true, clientX: 100, clientY: 100});
+      expect(second.style.outline).toContain('dashed');
+      pointer(second, 'pointermove', {clientX: 140, clientY: 90});
+      expect([second.style.marginLeft, second.style.marginTop]).toEqual(['20px', '-5px']);   // the screen moved 40, -10 at 2×
+      pointer(second, 'pointerup', {clientX: 140, clientY: 90});
+      await settle();
+      expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({map: 'route', name: 'a', nth: 1, dx: 20, dy: -5});
+      expect([second.style.outline, second.style.marginLeft]).toEqual(['', '']);
+      expect(document.querySelector('.sd-dev').textContent).toContain('moved a · 20, -5');
+      delete globalThis.fetch;
+    });
+
+    it('ignores a drag without Alt, one that ends where it began, a cancelled one — and every drag on a page without its token', () => {
+      const stage = editable();
+      globalThis.fetch = answer(true, {ok: true});
+      devClient();
+      const a = stage.querySelector('[data-k="a"]');
+      pointer(a, 'pointerdown', {clientX: 1, clientY: 1});
+      pointer(a, 'pointerup', {clientX: 50, clientY: 1});
+      pointer(a, 'pointerdown', {altKey: true, clientX: 1, clientY: 1});
+      pointer(a, 'pointerup', {clientX: 1, clientY: 1});
+      pointer(a, 'pointerdown', {altKey: true, clientX: 1, clientY: 1});
+      pointer(a, 'pointercancel', {});
+      expect(a.style.outline).toBe('');
+      pointer(a, 'pointerup', {clientX: 90, clientY: 1});
+      expect(fetch).not.toHaveBeenCalled();
+      // a page that carries no token has no note button and no drag
+      delete window.__sdDev;
+      const plain = page();
+      plain.children[2].setAttribute('data-deck-active', '');
+      plain.children[2].innerHTML = '<div class="map map-route"><div data-k="a"></div></div>';
+      devClient();
+      expect([...document.querySelectorAll('.sd-dev button')].map((b) => b.textContent)).toEqual(['replay']);
+      const b = plain.querySelector('[data-k="a"]');
+      pointer(b, 'pointerdown', {altKey: true, clientX: 1, clientY: 1});
+      expect(b.style.outline).toBe('');
+      delete globalThis.fetch;
+    });
+  });
 });

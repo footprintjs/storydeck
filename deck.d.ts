@@ -148,9 +148,12 @@ export interface DeckServer {
 }
 /**
  * Serve a deck folder for editing: a save rebuilds, and the page reloads on the same click. Loopback only (host
- * 127.0.0.1, ::1 or localhost; anything else is refused), requests addressed to localhost only, read-only.
+ * 127.0.0.1, ::1 or localhost; anything else is refused), requests addressed to localhost only. It reads, and takes
+ * two edits from its own page (its origin and its per-session token, JSON, at most 16 KB): a note on a click, appended
+ * to feedback.md, and a piece moved by Alt-drag, written into its map file. `poll` (ms, 0 for none) compares the
+ * folder's stamp so a save the watcher missed still rebuilds.
  */
-export function serveDeck(dir: string, options?: { port?: number; host?: '127.0.0.1' | '::1' | 'localhost'; watch?: boolean; log?: (line: string) => void; tries?: number }): Promise<DeckServer>;
+export function serveDeck(dir: string, options?: { port?: number; host?: '127.0.0.1' | '::1' | 'localhost'; watch?: boolean; poll?: number; log?: (line: string) => void; tries?: number }): Promise<DeckServer>;
 
 /** Write the starter deck into a new or empty folder. */
 export function initDeck(dir: string): { dir: string; files: string[] };

@@ -1,5 +1,6 @@
 import {describe, it, expect} from 'vitest';
-import {elements, esc, stripComments, scriptSafe, styleSafe} from './html.js';
+import {commentRanges, elements, esc, stripComments, scriptSafe, styleSafe} from './html.js';
+import {generated} from './test/helpers.js';
 
 describe('elements', () => {
   it('finds each element of a tag in order, with its attributes, inside and place', () => {
@@ -31,5 +32,26 @@ describe('the string rules', () => {
     expect(stripComments('a<!-- b\n -->c<!--d-->')).toBe('ac');
     expect(scriptSafe('x</ScRiPt>y')).toBe('x<\\/ScRiPt>y');
     expect(styleSafe('x</STYLE>y')).toBe('x<\\/STYLE>y');
+  });
+});
+
+describe('comments', () => {
+  it('finds each comment once, in order; one never closed ends the search', () => {
+    const html = 'a<!-- b -->c<!---->d<!--> e -->f<!-- open';
+    expect(commentRanges(html).map(([a, b]) => html.slice(a, b))).toEqual(['<!-- b -->', '<!---->', '<!--> e -->']);
+    expect(stripComments(html)).toBe('acdf<!-- open');
+  });
+
+  it('strips exactly what the one regex stripped, on 4,000 generated texts', () => {
+    for (const html of generated(['<!--', '-->', '<!-->', '-', '>', '<', '!', 'a', '\n'], {count: 4000, length: 30})) {
+      expect(stripComments(html), html).toBe(html.replace(/<!--[\s\S]*?-->/g, ''));
+    }
+  });
+
+  it('stays linear on a file of unclosed comments (the one regex took minutes on 4 MB)', () => {
+    const t0 = performance.now();
+    expect(stripComments('<!--'.repeat(1_000_000)).length).toBe(4_000_000);
+    expect(stripComments('<!-- -->'.repeat(500_000))).toBe('');
+    expect(performance.now() - t0).toBeLessThan(1500);
   });
 });

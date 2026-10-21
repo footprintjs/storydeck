@@ -1,9 +1,25 @@
 // html — the few string rules every deck module shares about HTML: one owner each, so they cannot drift.
 
-/** An HTML comment, anywhere. */
-export const COMMENT = /<!--[\s\S]*?-->/g;
+/**
+ * Where the HTML comments are, [start, end) each, in order — one pass: a "<!--" with no "-->" after it ends the search
+ * (no later one can close either), so a file of unclosed comments costs no more than its length.
+ */
+export function commentRanges(html) {
+  const out = [];
+  for (let from = 0; ;) {
+    const start = html.indexOf('<!--', from);
+    const end = start < 0 ? -1 : html.indexOf('-->', start + 4);
+    if (end < 0) return out;
+    out.push([start, end + 3]);
+    from = end + 3;
+  }
+}
 /** HTML without its comments. */
-export const stripComments = (html) => html.replace(COMMENT, '');
+export function stripComments(html) {
+  let out = '', from = 0;
+  for (const [start, end] of commentRanges(html)) { out += html.slice(from, start); from = end; }
+  return out + html.slice(from);
+}
 /** Text safe in HTML content and in a double-quoted attribute. */
 export const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 /** Code safe inside a <script> (no `</script` can close it early). */

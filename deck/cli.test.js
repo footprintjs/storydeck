@@ -58,6 +58,12 @@ describe('runCli', () => {
     expect(await run(['review', dir])).toMatchObject({code: 1, err: expect.stringMatching(/name a click: --click <1–6 or a label>/)});
   });
 
+  it('feedback lists the open notes left in the dev page', async () => {
+    expect(await run(['feedback', tempDeck()])).toMatchObject({code: 0, out: 'no open notes\n'});
+    const dir = tempDeck({...STARTER, 'feedback.md': '- [ ] click 3 · "Route · 2" — wider (t)\n'});
+    expect(await run(['feedback', dir])).toMatchObject({code: 0, out: '1 open note (tick a line in feedback.md when it is done):\n- click 3 "Route · 2": wider (t)\n'});
+  });
+
   it('check reports problems, failing on an error — and on a warning with --strict', async () => {
     expect(await run(['check', tempDeck()])).toMatchObject({code: 0, out: 'no problems\n'});
     const warned = tempDeck({...STARTER, 'deck.json': '{"title":"T","checks":{"maxWords":2}}'});

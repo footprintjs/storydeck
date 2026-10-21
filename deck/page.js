@@ -47,7 +47,7 @@ export function deckPage(compiled, assets, {dev = null} = {}) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="footprint-storydeck ${esc(assets.version)}">
 <title>${esc(config.title)}</title>
-${config.description ? `<meta name="description" content="${esc(config.description)}">\n` : ''}${dev ? `<meta name="storydeck-dev" content="${Number(dev.version)}">\n` : ''}<script>${THEME_FIRST}</script>
+${config.description ? `<meta name="description" content="${esc(config.description)}">\n` : ''}${dev ? `<meta name="storydeck-dev" content="${Number(dev.version)}">\n` : ''}${dev?.token ? `<meta name="storydeck-dev-token" content="${esc(dev.token)}">\n` : ''}<script>${THEME_FIRST}</script>
 <style>${styleSafe(css)}</style>
 </head>
 <body>

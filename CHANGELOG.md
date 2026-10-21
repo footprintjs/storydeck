@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — a deck from a folder, and an editing loop
+## Unreleased — a deck from a folder, an editing loop, and co-editing
 
 - **`storydeck`: a deck is a folder, and the library builds it.** deck.json, clicks.html (a `<section>` per part; on a
   map, a `<step>` per click), the maps, theme.css and icons/ become one self-contained page (`storydeck build`): every
@@ -12,6 +12,18 @@
 - **`storydeck dev`: one page in development and in the room.** It serves the page `build` writes, plus a dev client: a
   save rebuilds (milliseconds), reloads on the same click and plays it again; a save that breaks the build shows why over
   the last good page. Loopback only, localhost requests only, read-only, nothing hidden or outside the deck folder.
+- **Co-editing: the person points, the agent edits.** In `storydeck dev`, **note** leaves a note on the click you are on
+  (appended to `feedback.md`, a checklist with the click, its label and the time), and **Alt-drag** moves a piece of the
+  map: its inline left/top, or a wire's `data-arrow`, is written into the map file — every other byte kept — and the
+  page reloads on the same click. `storydeck feedback` (and the MCP `feedback` tool) lists the open notes; `check`
+  counts them. The server takes these two edits only from its own page: its origin, a per-session token only that page
+  carries, JSON, 16 KB at most; written never through a link. A piece is found by its name (and which of that name),
+  by the same rules the page was drawn by, so a map changed since the page was built is refused, never edited in the
+  wrong place.
+- **Every scan of a deck's text is one pass.** Stripping comments, reading a map's pieces (`readPieces`, also on
+  `footprint-storydeck/focus-html`) and reading an icon file were quadratic on unfinished tags or comments: a hostile
+  4 MB file took minutes. Each now reads in one pass, proved equal to the regex it replaced on thousands of generated
+  inputs, with one deliberate difference: a tag ends at its first `>`, so a `data-k` name holding `>` is not read.
 - **Read first, look last.** `storydeck outline` (a line per click), `review --click n` (headline and words, focus, route,
   lit, greyed, what enters, leaves and moves, notes) and `check` (headline words, pieces lit by coming in, clicks that
   change nothing, pieces never shown, missing notes — each with its click and its fix). `check --layout` measures each

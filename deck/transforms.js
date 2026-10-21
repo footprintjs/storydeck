@@ -37,19 +37,26 @@ function wireSvg(attrs, spec) {
   return `<svg${at} style="left:${f(X)}px;top:${f(Y)}px;width:${f(W)}px;height:${f(H)}px" viewBox="0 0 ${f(W)} ${f(H)}" aria-hidden="true"><path d="${d}"/>${head}${pkt}</svg>`;
 }
 
+/**
+ * A wire as written, <i … data-arrow="…" …></i>: the one rule, so what wires() draws is what an edit moves (edit.js).
+ * [^<>]: an attempt ends at the next tag, so a deck of unfinished <i …> stays a linear scan.
+ */
+export const wireRule = (flags = 'g') => new RegExp(String.raw`<i\b([^<>]*?)\sdata-arrow="([^"<>]+)"([^<>]*)><\/i>`, flags);
+
 /** Every <i data-arrow="…"></i> as its wire. */
 export function wires(html) {
-  // [^<>]: an attempt ends at the next tag, so a deck of unfinished <i …> stays a linear scan
-  return html.replace(/<i\b([^<>]*?)\sdata-arrow="([^"<>]+)"([^<>]*)><\/i>/g, (_, a, spec, b) => wireSvg(a + b, spec));
+  return html.replace(wireRule(), (_, a, spec, b) => wireSvg(a + b, spec));
 }
 
 /** An icon file's drawing: {viewBox, body} from a whole <svg …>…</svg>. */
 export function readIcon(name, svg) {
-  const m = /<svg\b([^>]*)>([\s\S]*)<\/svg>\s*$/.exec(stripComments(svg).replace(/^\s*<\?xml[^>]*>/, '').trim());
-  if (!m) throw new Error(`icon "${name}": an icon file is one <svg viewBox="…">…</svg>`);
-  const viewBox = /\sviewBox=(["'])([^"']+)\1/.exec(m[1])?.[2];
+  const text = stripComments(svg).replace(/^\s*<\?xml[^>]*>/, '').trim();
+  // its first <svg …> and the </svg> that ends the file, each found once: a file of unfinished tags stays linear
+  const start = text.search(/<svg\b/), open = start < 0 ? -1 : text.indexOf('>', start), close = text.length - '</svg>'.length;
+  if (open < 0 || !text.endsWith('</svg>') || close <= open) throw new Error(`icon "${name}": an icon file is one <svg viewBox="…">…</svg>`);
+  const viewBox = /\sviewBox=(["'])([^"']+)\1/.exec(text.slice(start + 4, open))?.[2];
   if (!viewBox) throw new Error(`icon "${name}": its <svg> has no viewBox — give it one (e.g. viewBox="0 0 64 64")`);
-  return {viewBox, body: m[2].trim()};
+  return {viewBox, body: text.slice(open + 1, close).trim()};
 }
 
 /** Every <i … data-icon="name"></i> as that icon's SVG, keeping the element's other attributes. */

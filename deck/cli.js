@@ -4,17 +4,19 @@ import {spawn} from 'node:child_process';
 import {initDeck} from './init.js';
 import {serveDeck} from './dev.js';
 import {serveMcp} from './mcp.js';
-import {outlineTool, reviewTool, checkTool, buildTool} from './tools.js';
+import {outlineTool, reviewTool, checkTool, buildTool, feedbackTool} from './tools.js';
 import {packageVersion} from './assets.js';
 
 export const USAGE = `storydeck — make a deck: one picture, built click by click
 
   storydeck init <folder>              a starter deck to edit (refuses a folder that holds files)
   storydeck dev [folder] [--port 4321] [--open]
-                                       live preview: a save rebuilds, reloads on the same click and plays it again
+                                       live preview: a save rebuilds, reloads on the same click and plays it again;
+                                       in the page, "note" leaves a note on a click and Alt-drag moves a piece
   storydeck outline [folder]           the whole deck, one line per click
   storydeck review [folder] --click <n|label> | --all
                                        one click as text: what it says, lights, greys and moves
+  storydeck feedback [folder]          the notes a person left on clicks in the dev page (open ones)
   storydeck check [folder] [--layout] [--strict]
                                        what to fix, each with its click (--layout: a browser finds text that spills;
                                        --strict: a warning fails too)
@@ -96,6 +98,9 @@ export async function runCli(argv, {stdout = process.stdout, stderr = process.st
         return 0;
       case 'outline':
         out(outlineTool(dir));
+        return 0;
+      case 'feedback':
+        out(feedbackTool(dir));
         return 0;
       case 'review':
         out(reviewTool(dir, {click: flags.click, all: flags.all}));

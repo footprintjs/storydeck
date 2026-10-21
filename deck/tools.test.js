@@ -1,10 +1,12 @@
 // @vitest-environment node
 import {afterEach, describe, it, expect, vi} from 'vitest';
-import {readFileSync} from 'node:fs';
+import {readFileSync, symlinkSync, writeFileSync} from 'node:fs';
+import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {checkTool, outlineTool, reviewTool, buildTool} from './tools.js';
+import {checkTool, outlineTool, reviewTool, buildTool, feedbackTool} from './tools.js';
+import {STARTER} from './init.js';
 import {measureSlide} from '../video.js';
-import {tempDeck, cleanDecks} from './test/helpers.js';
+import {tempDeck, tempDir, cleanDecks} from './test/helpers.js';
 
 afterEach(cleanDecks);
 
@@ -59,5 +61,33 @@ describe('the read-first tools', () => {
     expect(buildTool(dir)).toMatch(/^✓ .* · 6 clicks · \d+ KB · \d+ ms$/);
     expect(buildTool(tempDeck({...JSON.parse('{}'), 'deck.json': '{"title":"T","deckData":"deck-data.json"}', 'clicks.html': '<section data-label="P"><p>x</p></section>'})))
       .toMatch(/ · .*deck-data\.json$/);
+  });
+});
+
+describe('feedback', () => {
+  const NOTES = '# Feedback\n\n- [x] click 2 · "Route" — wider (t1)\n- [ ] click 4 · "Back" — slower (t2)\nsome prose\n- [ ] click 5 · "Back · 2" — a (b) (t3)\n';
+
+  it('lists the open notes a person left, and check names how many are open', async () => {
+    const dir = tempDeck({...STARTER, 'feedback.md': NOTES});
+    expect(feedbackTool(dir)).toBe('2 open notes (tick a line in feedback.md when it is done):\n- click 4 "Back": slower (t2)\n- click 5 "Back · 2": a (b) (t3)');
+    const r = await checkTool(dir);
+    expect(r).toMatchObject({errors: 0, warnings: 0});
+    expect(r.text).toContain('2 open notes from the dev page — storydeck feedback lists them');
+  });
+
+  it('says so when there are none — no file, or every note ticked', async () => {
+    expect(feedbackTool(tempDeck())).toBe('no open notes');
+    const done = tempDeck({...STARTER, 'feedback.md': NOTES.replaceAll('- [ ]', '- [x]')});
+    expect(feedbackTool(done)).toBe('no open notes');
+    expect((await checkTool(done)).text).toBe('no problems');
+  });
+
+  it('never reads a feedback.md that is a link out of the deck — check reports it as an error', async () => {
+    const outside = path.join(tempDir(), 'notes.md');
+    writeFileSync(outside, NOTES);
+    const dir = tempDeck();
+    symlinkSync(outside, path.join(dir, 'feedback.md'));
+    expect(() => feedbackTool(dir)).toThrow(/feedback.md is a link to a file outside the deck folder/);
+    expect(await checkTool(dir)).toMatchObject({errors: 1, text: expect.stringMatching(/feedback: feedback.md is a link to a file outside/)});
   });
 });

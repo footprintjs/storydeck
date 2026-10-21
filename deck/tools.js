@@ -9,7 +9,23 @@ import {loadDeck, buildDeck, deckHtml} from './build.js';
 import {outline, reviewClick} from './review.js';
 import {checkDeck, failure, formatProblems} from './check.js';
 import {findChromium, layoutCheck} from './layout.js';
-import {deckRoot} from './paths.js';
+import {deckRoot, presence} from './paths.js';
+import {deckFileText} from './source.js';
+import {FEEDBACK, readFeedback} from './edit.js';
+
+/** The notes a person left on clicks in the dev page (feedback.md), read: [{done, n, label, text, at}]. */
+export function deckFeedback(dir) {
+  const root = deckRoot(dir);
+  return presence(path.join(root, FEEDBACK)) === 'missing' ? [] : readFeedback(deckFileText(root, FEEDBACK));
+}
+
+/** The open notes, as text: what a person asked for, click by click. */
+export function feedbackTool(dir) {
+  const open = deckFeedback(dir).filter((f) => !f.done);
+  if (!open.length) return 'no open notes';
+  return `${open.length} open note${open.length === 1 ? '' : 's'} (tick a line in ${FEEDBACK} when it is done):\n`
+    + open.map((f) => `- click ${f.n} "${f.label}": ${f.text}${f.at ? ` (${f.at})` : ''}`).join('\n');
+}
 
 const kb = (n) => `${Math.round(n / 1024)} KB`;
 
@@ -39,6 +55,12 @@ export async function checkTool(dir, {layout = false, chromium} = {}) {
     return {text: formatProblems(failure(e)), errors: 1, warnings: 0};
   }
   const problems = checkDeck(compiled);
+  try {
+    const open = deckFeedback(dir).filter((f) => !f.done).length;
+    if (open) problems.push({level: 'info', rule: 'feedback', click: null, label: null, message: `${open} open note${open === 1 ? '' : 's'} from the dev page — storydeck feedback lists ${open === 1 ? 'it' : 'them'}`});
+  } catch (e) {
+    problems.push({level: 'error', rule: 'feedback', click: null, label: null, message: e.message});   // a feedback.md it may not read
+  }
   let note = '';
   if (layout) {
     // beside StoryDeck only: never from the deck or the folder you run in, nor from a StoryDeck inside the deck

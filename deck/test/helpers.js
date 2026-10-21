@@ -51,3 +51,18 @@ export function sink() {
   const chunks = [];
   return {write: (t) => { chunks.push(String(t)); return true; }, text: () => chunks.join('')};
 }
+
+/**
+ * `count` texts made of `tokens`, each 1 to `length` of them, from a seeded stream: the same texts on every run. For
+ * proving a rewritten scan reads exactly what the one it replaced read.
+ */
+export function generated(tokens, {count, seed = 7, length = 40}) {
+  let s = seed;
+  const next = () => {
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  return Array.from({length: count}, () => Array.from({length: 1 + Math.floor(next() * length)}, () => tokens[Math.floor(next() * tokens.length)]).join(''));
+}
