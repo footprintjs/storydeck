@@ -12,8 +12,7 @@
 // path, at that twin's turn).
 // focus.css draws the classes; call focusRuntime() once in the page, so only a forward click animates.
 
-const PIECE = attr => new RegExp(`<([a-zA-Z][\\w-]*)\\b([^>]*?)\\s${attr}=(["'])(.*?)\\3([^>]*)>`, 'g');
-const ATTR = name => new RegExp(`\\s${name}=(["'])(.*?)\\1`);
+import {attrRule as ATTR, pieceTags, styleLength, tagsWith} from './pieceRules.js';
 
 /** An attribute's value in a run of attributes, single or double quoted, or null. */
 const attrOf = (at, name) => ATTR(name).exec(at)?.[2] ?? null;
@@ -24,27 +23,26 @@ function joinAttr(at, name, add, sep) {
 }
 
 /** A CSS length in px (or a bare 0) from an inline style, or null. */
-function px(style, prop) {
-  const m = new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*(-?[\\d.]+)(px)?\\s*(?:;|$)`).exec(style);
-  return m && (m[2] || Number(m[1]) === 0) ? Number(m[1]) : null;
-}
+const px = (style, prop) => styleLength(style, prop)?.value ?? null;
 
 /**
  * The pieces of a slide: every element carrying `attr` (data-k) — its names, its box when its inline style
  * places it, its twin. Returns {html, pieces}: the same HTML with each piece numbered (data-sd-i), and the
- * pieces in order.
+ * pieces in order. Which tags are pieces is pieceRules.js · pieceTags, read in one pass.
  */
 export function readPieces(html, {attr = 'data-k'} = {}) {
   const pieces = [];
-  const out = html.replace(PIECE(attr), (_, tag, a, q, k, b) => {
-    const at = a + b, style = attrOf(at, 'style') ?? '';
+  let out = '', from = 0;
+  for (const {start, end, tag, before, quote: q, value: k, after} of pieceTags(html, attr)) {
+    const at = before + after, style = attrOf(at, 'style') ?? '';
     const attrPx = name => { const v = attrOf(at, name); return v !== null && /^[\d.]+$/.test(v) ? Number(v) : null; };
     const x = px(style, 'left'), y = px(style, 'top'), w = px(style, 'width') ?? attrPx('width'), h = px(style, 'height') ?? attrPx('height');
     const twin = attrOf(at, 'data-twin')?.trim().split(/\s+/);
     pieces.push({keys: k.trim().split(/\s+/), box: x === null || y === null ? null : {x, y, w: w ?? 0, h: h ?? 0}, ...(twin ? {twin} : {})});
-    return `<${tag}${a} ${attr}=${q}${k}${q} data-sd-i="${pieces.length - 1}"${b}>`;
-  });
-  return {html: out, pieces};
+    out += `${html.slice(from, start)}<${tag}${before} ${attr}=${q}${k}${q} data-sd-i="${pieces.length - 1}"${after}>`;
+    from = end;
+  }
+  return {html: out + html.slice(from), pieces};
 }
 
 /**
@@ -94,12 +92,15 @@ function pieceLook(p, look) {
 
 /** The slide HTML (as readPieces returned it) with each piece dressed for this click's look. */
 export function drawFocus(html, look) {
-  return html.replace(/<([a-zA-Z][\w-]*)\b([^>]*?)\sdata-sd-i="(\d+)"([^>]*)>/g, (_, tag, a, i, b) => {
-    const p = look.pieces[Number(i)];
-    if (!p) throw new Error(`piece ${i} is not in this look (read the pieces and plan the look from the same HTML)`);
+  let out = '', from = 0;
+  for (const {start, end, tag, before, m, after} of tagsWith(html, /\sdata-sd-i="(\d+)"/)) {
+    const p = look.pieces[Number(m[1])];
+    if (!p) throw new Error(`piece ${m[1]} is not in this look (read the pieces and plan the look from the same HTML)`);
     const {cls, style, attrs} = pieceLook(p, look);
-    return `<${tag}${joinAttr(joinAttr(a + b, 'class', cls, ' '), 'style', style, ';')}${attrs}>`;
-  });
+    out += `${html.slice(from, start)}<${tag}${joinAttr(joinAttr(before + after, 'class', cls, ' '), 'style', style, ';')}${attrs}>`;
+    from = end;
+  }
+  return out + html.slice(from);
 }
 
 /** The pieces' HTML inside the stage the view moves (a zoom); unchanged when nothing moves the view. Put it in the map's own box. */

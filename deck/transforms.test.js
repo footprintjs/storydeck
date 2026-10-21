@@ -1,5 +1,7 @@
 import {describe, it, expect} from 'vitest';
-import {wires, icons, readIcon, applyTransforms} from './transforms.js';
+import {wires, wireTags, icons, readIcon, applyTransforms} from './transforms.js';
+import {stripComments} from './html.js';
+import {generated} from './test/helpers.js';
 
 describe('wires', () => {
   it('draws a straight wire in a box that holds it, with its head, keeping the element\'s attributes', () => {
@@ -62,5 +64,60 @@ describe('icons', () => {
     expect(out).toMatch(/^<svg viewBox="0 0 8 8"/);
     expect(out).toContain('class="wire"');
     expect(applyTransforms('<p>plain</p>')).toBe('<p>plain</p>');
+  });
+});
+
+describe('reading an icon file', () => {
+  /** readIcon as it was before: one regex over the file — the oracle the one-pass reading must equal. */
+  function readIconBefore(svg) {
+    const m = /<svg\b([^>]*)>([\s\S]*)<\/svg>\s*$/.exec(stripComments(svg).replace(/^\s*<\?xml[^>]*>/, '').trim());
+    const viewBox = m && /\sviewBox=(["'])([^"']+)\1/.exec(m[1])?.[2];
+    return m && viewBox ? {viewBox, body: m[2].trim()} : null;
+  }
+  const read = (svg) => { try { return readIcon('x', svg); } catch { return null; } };
+
+  it('reads exactly what the one regex read, on 4,000 generated files', () => {
+    const tokens = ['<svg', '>', '</svg>', ' viewBox="0 0 1 1"', " viewBox='2'", '<!--', '-->', '<?xml v?>', ' ', '\n', 'x', '<', '/', 'svg', '<svgx'];
+    for (const svg of generated(tokens, {count: 4000, length: 20})) expect(read(svg), svg).toEqual(readIconBefore(svg));
+  });
+
+  it('stays linear on a file of unfinished tags (the one regex took minutes on 4 MB)', () => {
+    const t0 = performance.now();
+    expect(() => readIcon('x', '<svg>'.repeat(800_000))).toThrow(/an icon file is one <svg/);
+    expect(() => readIcon('x', `${'<svg>'.repeat(800_000)}</svg>`)).toThrow(/has no viewBox/);
+    expect(performance.now() - t0).toBeLessThan(1500);
+  });
+});
+
+describe('wires and icons in one pass', () => {
+  /** wires() and icons() as they were before (one regex each): the oracles the one-pass versions must equal. */
+  const wiresBefore = (html) => html.replace(/<i\b([^<>]*?)\sdata-arrow="([^"<>]+)"([^<>]*)><\/i>/g, (_, a, spec, b) => `[wire|${a + b}|${spec}]`);
+  const iconsBefore = (html) => html.replace(/<i\b([^<>]*?)\sdata-icon="([\w-]+)"([^<>]*)><\/i>/g, (_, a, key, b) => `[icon|${a}${b}|${key}]`);
+  const set = {db: {viewBox: '0 0 1 1', body: ''}};
+
+  it('find exactly what their regexes found, on 4,000 generated maps', () => {
+    const tokens = ['<i', '<i class="w"', ' data-arrow="1 2 3 4"', ' data-arrow="x"', ' data-arrow="', ' data-icon="db"', ' data-icon="a b"', '>', '</i>', '></i>', '<', '"', ' ', 'x'];
+    for (const html of generated(tokens, {count: 4000, length: 24})) {
+      const wired = [];
+      wiresBefore(html).replace(/\[wire\|([^|]*)\|([^\]]*)\]/g, (_, at, spec) => wired.push([at, spec]));
+      expect(wireTags(html).map(({before, m, after}) => [before + after, m[1]]), html).toEqual(wired);
+      let refused = false;
+      try { icons(html, set); } catch { refused = true; }
+      const keys = [...iconsBefore(html).matchAll(/\[icon\|[^|]*\|([\w-]+)\]/g)].map((x) => x[1]);
+      expect(refused, html).toBe(keys.some((k) => k !== 'db'));
+      if (!refused) expect((icons(html, set).match(/<svg/g) ?? []).length - (html.match(/<svg/g) ?? []).length, html).toBe(keys.length);
+    }
+  });
+
+  it('stay linear on one tag that repeats an attribute (the regexes took minutes on 4 MB)', () => {
+    const t0 = performance.now();
+    const arrows = `<i data-k="w"${' data-arrow="1"'.repeat(250_000)}`, names = `<i data-k="w"${' data-icon="db"'.repeat(250_000)}`;
+    expect(wires(arrows)).toBe(arrows);
+    expect(icons(names, set)).toBe(names);
+    expect(performance.now() - t0).toBeLessThan(1500);
+  });
+
+  it('refuses an icon called like a property every object has', () => {
+    expect(() => icons('<i data-icon="constructor"></i>', set)).toThrow(/no icon "constructor" \(there are db\)/);
   });
 });

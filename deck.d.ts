@@ -95,7 +95,7 @@ export interface CompiledDeck {
   readonly maps: Readonly<Record<string, { readonly pieces: readonly FocusPiece[] }>>;
 }
 /** The deck's clicks planned (each map's state carried click to click) and drawn as <deck-stage> slides. */
-export function compileDeck(source: Pick<DeckSource, 'config' | 'parts' | 'maps'> & Partial<DeckSource>): CompiledDeck;
+export function compileDeck(source: Pick<DeckSource, 'config' | 'parts' | 'maps'> & Partial<DeckSource>, options?: { dev?: boolean }): CompiledDeck;
 
 /** What the library ships that a page carries: the <deck-stage> runtime, focus.css, narration.css, deck.css, the version. */
 export interface PageAssets { readonly stageJs: string; readonly css: readonly string[]; readonly version: string }
@@ -103,9 +103,9 @@ export function pageAssets(): PageAssets;
 /** One self-contained page: slides, notes, every stylesheet and runtime inlined, the theme toggle. */
 export function deckPage(compiled: CompiledDeck, assets: PageAssets): string;
 
-export function loadDeck(dir: string): { source: DeckSource; compiled: CompiledDeck };
+export function loadDeck(dir: string, options?: { dev?: boolean }): { source: DeckSource; compiled: CompiledDeck };
 /** The page of a deck folder, as a string (no file written). */
-export function deckHtml(dir: string): { compiled: CompiledDeck; html: string };
+export function deckHtml(dir: string, options?: { dev?: unknown }): { source: DeckSource; compiled: CompiledDeck; html: string };
 /**
  * Write the page (deck.json "out", or `out` — a path you choose, anywhere) and deck-data.json when deck.json names
  * one. A new file is renamed into place, never written through a link; a file deck.json names never lands outside
@@ -148,9 +148,13 @@ export interface DeckServer {
 }
 /**
  * Serve a deck folder for editing: a save rebuilds, and the page reloads on the same click. Loopback only (host
- * 127.0.0.1, ::1 or localhost; anything else is refused), requests addressed to localhost only, read-only.
+ * 127.0.0.1, ::1 or localhost; anything else is refused), requests addressed to localhost only. It reads, and takes
+ * two edits from its own page (its origin and its per-session token, JSON, at most 16 KB): a note on a click, appended
+ * to feedback.md and signed with the person's note key (kept in `home`: STORYDECK_HOME or ~/.storydeck), and a piece
+ * moved by Alt-drag, written into its map file. Only StoryDeck's own scripts run in what it serves (a nonce policy).
+ * `poll` (ms, 0 for none) compares the folder's stamp so a save the watcher missed still rebuilds.
  */
-export function serveDeck(dir: string, options?: { port?: number; host?: '127.0.0.1' | '::1' | 'localhost'; watch?: boolean; log?: (line: string) => void; tries?: number }): Promise<DeckServer>;
+export function serveDeck(dir: string, options?: { port?: number; host?: '127.0.0.1' | '::1' | 'localhost'; watch?: boolean; poll?: number; log?: (line: string) => void; tries?: number; home?: string }): Promise<DeckServer>;
 
 /** Write the starter deck into a new or empty folder. */
 export function initDeck(dir: string): { dir: string; files: string[] };

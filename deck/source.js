@@ -33,6 +33,15 @@ function readText(root, file, {need, what}) {
   return readFileSync(real, 'utf8');
 }
 
+/** A text file the deck has (dev.js re-reads a map before it edits one): read by the same rules as every deck file. */
+export const deckFileText = (root, file) => readText(root, file, {need: true, what: 'the deck'});
+
+/** The file a map is drawn in: the one deck.json "maps" names, or <name>.html. */
+export function mapFile(config, name) {
+  if (!/^[\w-]+$/.test(name)) throw new Error(`a map's name is letters, digits, - and _ — not "${name}"`);
+  return Object.hasOwn(config.maps, name) ? config.maps[name] : deckPath(`${name}.html`, `maps.${name}`);   // a map called "toString" is toString.html
+}
+
 /** The icons folder: every *.svg in it, by its name. */
 function readIcons(root, folder, need) {
   const full = path.join(root, folder);
@@ -66,7 +75,7 @@ export function readDeck(dir) {
   for (const part of parts) {
     if (!part.map || maps[part.map] !== undefined) continue;
     if (!/^[\w-]+$/.test(part.map)) throw new Error(`"${part.label}": data-map="${part.map}" — a map's name is letters, digits, - and _`);
-    const file = config.maps[part.map] ?? deckPath(`${part.map}.html`, `maps.${part.map}`);
+    const file = mapFile(config, part.map);
     const html = readText(root, file, {need: false});
     if (html === null) throw new Error(`"${part.label}" is told on map "${part.map}", but the deck has no ${file} — add it, or name its file in deck.json "maps"`);
     maps[part.map] = html;

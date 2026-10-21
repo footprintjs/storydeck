@@ -26,6 +26,30 @@ describe('compileDeck', () => {
     expect(compiled.maps.map.pieces.map((p) => p.keys[0])).toEqual(['a', 'w1', 'b', 'w2', 'c']);
   });
 
+  it('refuses a deck that writes StoryDeck\'s own numbering attributes, in a map or a plain slide', () => {
+    const map = `${MAP}<div data-k="f" data-sd-at="0" style="left:1px;top:1px">F</div>`;
+    expect(() => compileDeck(sourceOf({clicks: CLICKS, maps: {map}}))).toThrow(/map "map": data-sd-at is StoryDeck's own attribute \(it numbers the pieces\) — remove it from <div>/);
+    const plain = CLICKS.replace('<h1>Hi</h1>', '<h1 DATA-SD-I="3">Hi</h1>');
+    expect(() => compileDeck(sourceOf({clicks: plain}))).toThrow(/"Title": DATA-SD-I is StoryDeck's own attribute/);
+    expect(() => compileDeck(sourceOf({clicks: CLICKS.replace('<h1>Hi</h1>', '<!-- <i data-sd-at="1"> --><h1>Hi</h1>')}))).not.toThrow();
+    // however it is joined to the tag: a browser takes <div/data-sd-at> and x="1"data-sd-at as attributes too
+    for (const tag of ['<div/data-sd-at="0" data-k="f" style="left:1px;top:1px">', '<div x="1"data-sd-at="0" data-k="f" style="left:1px;top:1px">']) {
+      expect(() => compileDeck(sourceOf({clicks: CLICKS, maps: {map: `${MAP}${tag}F</div>`}})), tag).toThrow(/data-sd-at is StoryDeck's own attribute/);
+    }
+    // only an attribute of that name: a deck may write about StoryDeck in a value or in its text
+    const about = `${MAP}<div data-k="f" title="how data-sd-at numbers pieces" style="left:1px;top:1px">data-sd-at="0"</div>`;
+    expect(() => compileDeck(sourceOf({clicks: CLICKS, maps: {map: about}}))).not.toThrow();
+  });
+
+  it('numbers each piece as the build read it in the dev page only (data-sd-at), and nowhere else', () => {
+    expect(compiled.slides.some((sl) => sl.html.includes('data-sd-at'))).toBe(false);
+    const dev = compileDeck(sourceOf({deck: {title: 'T'}, clicks: CLICKS}), {dev: true});
+    const route1 = dev.slides[1].html;
+    expect([...route1.matchAll(/data-k="(\w+)"[^>]*data-sd-at="(\d+)"/g)].map((m) => [m[1], m[2]])).toEqual([['a', '0'], ['w1', '1'], ['b', '2'], ['w2', '3'], ['c', '4']]);
+    // the same page otherwise: the dev numbers are the only difference
+    expect(route1.replace(/ data-sd-at="\d+"/g, '')).toBe(compileDeck(sourceOf({deck: {title: 'T'}, clicks: CLICKS})).slides[1].html);
+  });
+
   it('draws the chrome on every slide: kicker, headline on a map, footer with the count — escaped', () => {
     const [title, route1] = compiled.slides;
     expect(title.html).toMatch(/^<section data-label="Title" class="slide plain"><div class="head" data-chrome><div class="kicker">Hello<\/div><\/div><h1>Hi<\/h1>/);

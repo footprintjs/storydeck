@@ -38,6 +38,10 @@ describe('deckPage', () => {
     const dev = deckPage(compiled, ASSETS, {dev: {client: function devStub() { return 1; }, version: 7}});
     expect(dev).toContain('<meta name="storydeck-dev" content="7">');
     expect(dev).toMatch(/<script>\(function devStub\(\) \{\s*return 1;\s*\}\)\(\);<\/script>/);
+    expect(dev).not.toContain('storydeck-dev-token');
+    // the dev server's token, for the two edits the page may send back
+    const edits = deckPage(compiled, ASSETS, {dev: {client: function devStub() { return 1; }, version: 7, token: '0a1b"<'}});
+    expect(edits).toContain('<meta name="storydeck-dev-token" content="0a1b&quot;&lt;">');
   });
 
   it('leaves the description out when there is none', () => {

@@ -4,17 +4,19 @@ import {spawn} from 'node:child_process';
 import {initDeck} from './init.js';
 import {serveDeck} from './dev.js';
 import {serveMcp} from './mcp.js';
-import {outlineTool, reviewTool, checkTool, buildTool} from './tools.js';
+import {outlineTool, reviewTool, checkTool, buildTool, feedbackTool, printable} from './tools.js';
 import {packageVersion} from './assets.js';
 
 export const USAGE = `storydeck — make a deck: one picture, built click by click
 
   storydeck init <folder>              a starter deck to edit (refuses a folder that holds files)
   storydeck dev [folder] [--port 4321] [--open]
-                                       live preview: a save rebuilds, reloads on the same click and plays it again
+                                       live preview: a save rebuilds, reloads on the same click and plays it again;
+                                       in the page, "note" leaves a note on a click and Alt-drag moves a piece
   storydeck outline [folder]           the whole deck, one line per click
   storydeck review [folder] --click <n|label> | --all
                                        one click as text: what it says, lights, greys and moves
+  storydeck feedback [folder]          the notes a person left on clicks in the dev page (open ones)
   storydeck check [folder] [--layout] [--strict]
                                        what to fix, each with its click (--layout: a browser finds text that spills;
                                        --strict: a warning fails too)
@@ -68,11 +70,13 @@ function untilStopped(close, onStop) {
 }
 
 /**
- * Run one command. `io`: {stdout, stderr} (write(text)), `onStart(handle)` (dev: the server, with stop()) for tests.
+ * Run one command. `io`: {stdout, stderr} (write(text)), `onStart(handle)` (dev: the server, with stop()) and `home` (where
+ * the note key lives: noteKey.js) for tests.
  * Resolves to the exit code: 0 done, 1 refused or problems found.
  */
-export async function runCli(argv, {stdout = process.stdout, stderr = process.stderr, stdin = process.stdin, onStart} = {}) {
-  const out = (t) => stdout.write(`${t}\n`), err = (t) => stderr.write(`${t}\n`);
+export async function runCli(argv, {stdout = process.stdout, stderr = process.stderr, stdin = process.stdin, onStart, home} = {}) {
+  // what a deck says (labels, notes, a refusal naming a piece) reaches the terminal as text, never as its controls
+  const out = (t) => stdout.write(`${printable(t)}\n`), err = (t) => stderr.write(`${printable(t)}\n`);
   let parsed;
   try {
     parsed = parseArgs(argv);
@@ -97,18 +101,21 @@ export async function runCli(argv, {stdout = process.stdout, stderr = process.st
       case 'outline':
         out(outlineTool(dir));
         return 0;
+      case 'feedback':
+        out(feedbackTool(dir, {home}));
+        return 0;
       case 'review':
         out(reviewTool(dir, {click: flags.click, all: flags.all}));
         return 0;
       case 'check': {
-        const r = await checkTool(dir, {layout: flags.layout});
+        const r = await checkTool(dir, {layout: flags.layout, home});
         out(r.text);
         return r.errors || (flags.strict && r.warnings) ? 1 : 0;
       }
       case 'dev': {
         const port = flags.port === undefined ? 4321 : Number(flags.port);
         if (!Number.isInteger(port) || port < 0 || port > 65535) { err(`--port is a port number, not ${flags.port}`); return 1; }
-        const server = await serveDeck(dir, {port, log: (line) => out(`  ${line}`)});
+        const server = await serveDeck(dir, {port, home, log: (line) => out(`  ${line}`)});
         out(`storydeck dev · ${server.url}  (Ctrl-C stops)`);
         if (flags.open) openBrowser(server.url);
         return untilStopped(server.close, (stop) => onStart?.({...server, stop}));

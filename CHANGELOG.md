@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — a deck from a folder, and an editing loop
+## Unreleased — a deck from a folder, an editing loop, and co-editing
 
 - **`storydeck`: a deck is a folder, and the library builds it.** deck.json, clicks.html (a `<section>` per part; on a
   map, a `<step>` per click), the maps, theme.css and icons/ become one self-contained page (`storydeck build`): every
@@ -12,6 +12,30 @@
 - **`storydeck dev`: one page in development and in the room.** It serves the page `build` writes, plus a dev client: a
   save rebuilds (milliseconds), reloads on the same click and plays it again; a save that breaks the build shows why over
   the last good page. Loopback only, localhost requests only, read-only, nothing hidden or outside the deck folder.
+- **Co-editing: the person points, the agent edits.** In `storydeck dev`, **note** leaves a note on the click you are on
+  (appended to `feedback.md`, a checklist with the click, its label and the time), and **Alt-drag** moves a piece of the
+  map: its inline left/top, or a wire's `data-arrow`, is written into the map file — every other byte kept — and the
+  page reloads on the same click. `storydeck feedback` (and the MCP `feedback` tool) lists the open notes; `check`
+  counts them. The server takes these two edits only from its own page: its origin, a per-session token only that page
+  carries, JSON, 16 KB at most; written never through a link; no other origin may frame it. A note is signed with a key
+  kept with the person (`~/.storydeck/key`, or STORYDECK_HOME), and only signed notes are listed — a feedback.md that
+  came with someone else's deck is counted, never read as your requests. A move names the piece by the number the build
+  gave it (in the dev page only) and is refused while the build fails, when the map changed since the build, or when a
+  browser would read the piece's tag differently; a bare `0` moved is written in px. Everything the tools print is
+  text, never what a reader cannot see (controls, bidi marks, Unicode tag characters, runs of selectors); a note's
+  signature covers the person's words and the deck's folder, never the click's label (the deck's text), which is never
+  listed. In development only StoryDeck's own scripts run (a nonce policy on every answer): a deck's own scripts run in
+  the built page, and none can reach the dev page's edits. The build refuses a `data-sd-…` attribute a deck writes
+  itself. The note key is never read through a link or a second name, nor kept inside the deck folder. Every rule that
+  compares paths does so as the disk spells them (`realpathSync.native`), so on a disk that ignores case one folder is
+  never taken for two. `loadDeck`/`compileDeck` take `{dev}`; `deckHtml` also returns the source.
+- **Every scan of a deck's text is one pass.** Stripping comments, reading a map's pieces and drawing a slide's focus
+  (`readPieces`, `drawFocus`, also on `footprint-storydeck/focus-html`), reading an icon file, and drawing wires and
+  icons were quadratic on unfinished tags, unclosed comments or one tag repeating an attribute: a hostile 4 MB map took
+  minutes, and `storydeck dev` never came up. Each now reads in one pass (a 4 MB hostile map builds in about 30 ms),
+  proved equal to the regex it replaced on thousands of generated inputs, with one deliberate difference: a tag ends at
+  its first `>`, so a `data-k` name holding `>` is not read. An `<i data-icon>` naming a property every object has
+  (`constructor`) is now refused as an unknown icon.
 - **Read first, look last.** `storydeck outline` (a line per click), `review --click n` (headline and words, focus, route,
   lit, greyed, what enters, leaves and moves, notes) and `check` (headline words, pieces lit by coming in, clicks that
   change nothing, pieces never shown, missing notes — each with its click and its fix). `check --layout` measures each

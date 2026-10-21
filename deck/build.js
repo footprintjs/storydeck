@@ -6,16 +6,19 @@ import {deckPage} from './page.js';
 import {pageAssets} from './assets.js';
 import {deckRoot, writeInside} from './paths.js';
 
-/** A deck folder read and compiled: {source, compiled}. Throws, naming the file, part and click, when it cannot be. */
-export function loadDeck(dir) {
+/**
+ * A deck folder read and compiled: {source, compiled}. Throws, naming the file, part and click, when it cannot be.
+ * `dev` numbers the pieces in the slides for the dev page (compile.js).
+ */
+export function loadDeck(dir, {dev = false} = {}) {
   const source = readDeck(dir);
-  return {source, compiled: compileDeck(source)};
+  return {source, compiled: compileDeck(source, {dev})};
 }
 
-/** The page of a deck folder, as a string (no file written). `dev` adds the dev client (dev.js). */
+/** The page of a deck folder, as a string (no file written): {source, compiled, html}. `dev` adds the dev client (dev.js). */
 export function deckHtml(dir, {dev = null} = {}) {
-  const {compiled} = loadDeck(dir);
-  return {compiled, html: deckPage(compiled, pageAssets(), {dev})};
+  const {source, compiled} = loadDeck(dir, {dev: Boolean(dev)});
+  return {source, compiled, html: deckPage(compiled, pageAssets(), {dev})};
 }
 
 /**

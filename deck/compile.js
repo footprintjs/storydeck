@@ -10,9 +10,40 @@ import {readPieces, readStep, drawFocus, wrapStage, slideClass, focusOverlay} fr
 import {applyTransforms} from './transforms.js';
 import {plainText} from './parse.js';
 import {esc, stripComments} from './html.js';
+import {readAttributes, tagsWith} from '../pieceRules.js';
 
-/** A map ready to plan on: its HTML with the helpers applied and its pieces read. */
-function prepareMap(name, html, icons) {
+/**
+ * In the dev page only: each piece keeps the number the build gave it (data-sd-at, beside the data-sd-i drawFocus
+ * reads and drops), so a piece moved in the page is named as the build read it — never by a second reading.
+ */
+function numberForDev(html) {
+  let out = '', from = 0;
+  for (const {start, tag, before, m} of tagsWith(html, /\sdata-sd-i="(\d+)"/)) {
+    const at = start + 1 + tag.length + before.length + m[0].length;
+    out += `${html.slice(from, at)} data-sd-at="${m[1]}"`;
+    from = at;
+  }
+  return out + html.slice(from);
+}
+
+/**
+ * The deck's own HTML never carries StoryDeck's numbering attributes (data-sd-…): the build numbers the pieces with them,
+ * and the dev page moves a piece by them — one written by hand would name a piece that is not the one shown.
+ */
+function refuseOwnNumbers(where, html) {
+  for (const t of tagsWith(stripComments(html), /(?:)/)) {
+    // its attributes as a browser reads them, however each is joined to the rest (<div/data-sd-at>, x="1"data-sd-at);
+    // a tag a browser reads past its ">" is judged by its whole text
+    const attrs = readAttributes(t.after);
+    const own = attrs ? attrs.find((a) => a.name.startsWith('data-sd-')) : null;
+    const name = own ? t.after.slice(own.at, own.at + own.name.length) : attrs ? null : /data-sd-[\w-]*/i.exec(t.after)?.[0];
+    if (name) throw new Error(`${where}: ${name} is StoryDeck's own attribute (it numbers the pieces) — remove it from <${t.tag}>`);
+  }
+}
+
+/** A map ready to plan on: its HTML with the helpers applied and its pieces read (`dev`: numbered for the dev page). */
+function prepareMap(name, html, icons, dev) {
+  refuseOwnNumbers(`map "${name}"`, html);
   let drawn;
   try {
     drawn = applyTransforms(stripComments(html), {icons});
@@ -21,7 +52,7 @@ function prepareMap(name, html, icons) {
   }
   const {html: out, pieces} = readPieces(drawn);
   if (!pieces.length) throw new Error(`map "${name}" has no pieces — a piece is an element with data-k="name" and an inline left/top (width/height)`);
-  return {name, html: out, pieces, state: null};
+  return {name, html: dev ? numberForDev(out) : out, pieces, state: null};
 }
 
 /** Every click of the deck, in order, each with what it needs to be drawn, reviewed and checked. */
@@ -30,6 +61,7 @@ function planClicks(parts, maps, {area, canvas, icons}) {
   const clicks = [];
   for (const part of parts) {
     if (!part.map) {
+      refuseOwnNumbers(`"${part.label}"`, part.body);
       let inner;
       try {
         inner = applyTransforms(part.body, {icons});
@@ -89,12 +121,13 @@ function checkPost(post, labels) {
 
 /**
  * The deck compiled: {config, slides: [{label, html, notes}], clicks: [{n, label, kind, …}], maps: {name: {pieces}}}.
+ * `dev` numbers each map's pieces in the slides (data-sd-at), for the dev page's edits.
  * A slide's notes are what notesData carries ({slide, step, steps, now, earlier}). Throws, naming the part and the
  * click, when a click cannot be planned.
  */
-export function compileDeck(source) {
+export function compileDeck(source, {dev = false} = {}) {
   const {config, parts, icons = {}} = source;
-  const maps = Object.fromEntries(Object.entries(source.maps ?? {}).map(([name, html]) => [name, prepareMap(name, html, icons)]));
+  const maps = Object.fromEntries(Object.entries(source.maps ?? {}).map(([name, html]) => [name, prepareMap(name, html, icons, dev)]));
   for (const part of parts) if (part.map && !maps[part.map]) throw new Error(`"${part.label}" is told on map "${part.map}", which the deck does not have`);
   const opts = {area: [...config.area], canvas: config.canvas, icons, footer: config.footer};
   const planned = planClicks(parts, maps, opts);

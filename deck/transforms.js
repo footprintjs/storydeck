@@ -37,30 +37,58 @@ function wireSvg(attrs, spec) {
   return `<svg${at} style="left:${f(X)}px;top:${f(Y)}px;width:${f(W)}px;height:${f(H)}px" viewBox="0 0 ${f(W)} ${f(H)}" aria-hidden="true"><path d="${d}"/>${head}${pkt}</svg>`;
 }
 
+/**
+ * Every empty <i …></i> whose attributes hold `rule`, in order: [{start, end, before, m, after}] — `m` the rule's match.
+ * One pass: an attempt ends at the next "<" or ">", so a deck of unfinished <i …> tags, or one tag repeating an
+ * attribute, costs no more than its length.
+ */
+function emptyI(html, rule) {
+  const out = [];
+  for (const t of html.matchAll(/<i\b([^<>]*)><\/i>/g)) {
+    const m = rule.exec(t[1]);
+    if (m) out.push({start: t.index, end: t.index + t[0].length, before: t[1].slice(0, m.index), m, after: t[1].slice(m.index + m[0].length)});
+  }
+  return out;
+}
+
+/** The empty tags `found` in `html`, each replaced by `draw(found)`. */
+function replaceEach(html, found, draw) {
+  let out = '', from = 0;
+  for (const f of found) { out += html.slice(from, f.start) + draw(f); from = f.end; }
+  return out + html.slice(from);
+}
+
+/**
+ * Every wire as written — <i … data-arrow="x1 y1 x2 y2 [bend]" …></i> — in order: [{start, end, before, m, after}], `m[1]`
+ * its spec. The one rule, so what wires() draws is what an edit moves (edit.js).
+ */
+export const wireTags = (html) => emptyI(html, /\sdata-arrow="([^"<>]+)"/);
+
 /** Every <i data-arrow="…"></i> as its wire. */
 export function wires(html) {
-  // [^<>]: an attempt ends at the next tag, so a deck of unfinished <i …> stays a linear scan
-  return html.replace(/<i\b([^<>]*?)\sdata-arrow="([^"<>]+)"([^<>]*)><\/i>/g, (_, a, spec, b) => wireSvg(a + b, spec));
+  return replaceEach(html, wireTags(html), ({before, m, after}) => wireSvg(before + after, m[1]));
 }
 
 /** An icon file's drawing: {viewBox, body} from a whole <svg …>…</svg>. */
 export function readIcon(name, svg) {
-  const m = /<svg\b([^>]*)>([\s\S]*)<\/svg>\s*$/.exec(stripComments(svg).replace(/^\s*<\?xml[^>]*>/, '').trim());
-  if (!m) throw new Error(`icon "${name}": an icon file is one <svg viewBox="…">…</svg>`);
-  const viewBox = /\sviewBox=(["'])([^"']+)\1/.exec(m[1])?.[2];
+  const text = stripComments(svg).replace(/^\s*<\?xml[^>]*>/, '').trim();
+  // its first <svg …> and the </svg> that ends the file, each found once: a file of unfinished tags stays linear
+  const start = text.search(/<svg\b/), open = start < 0 ? -1 : text.indexOf('>', start), close = text.length - '</svg>'.length;
+  if (open < 0 || !text.endsWith('</svg>') || close <= open) throw new Error(`icon "${name}": an icon file is one <svg viewBox="…">…</svg>`);
+  const viewBox = /\sviewBox=(["'])([^"']+)\1/.exec(text.slice(start + 4, open))?.[2];
   if (!viewBox) throw new Error(`icon "${name}": its <svg> has no viewBox — give it one (e.g. viewBox="0 0 64 64")`);
-  return {viewBox, body: m[2].trim()};
+  return {viewBox, body: text.slice(open + 1, close).trim()};
 }
 
 /** Every <i … data-icon="name"></i> as that icon's SVG, keeping the element's other attributes. */
 export function icons(html, set = {}) {
-  return html.replace(/<i\b([^<>]*?)\sdata-icon="([\w-]+)"([^<>]*)><\/i>/g, (_, a, key, b) => {
-    const icon = set[key];
+  return replaceEach(html, emptyI(html, /\sdata-icon="([\w-]+)"/), ({before, m, after}) => {
+    const icon = Object.hasOwn(set, m[1]) ? set[m[1]] : null;
     if (!icon) {
       const known = Object.keys(set);
-      throw new Error(`no icon "${key}" (${known.length ? `there are ${known.join(', ')}` : 'the deck has no icons'}) — add icons/${key}.svg`);
+      throw new Error(`no icon "${m[1]}" (${known.length ? `there are ${known.join(', ')}` : 'the deck has no icons'}) — add icons/${m[1]}.svg`);
     }
-    return `<svg${a}${b} viewBox="${icon.viewBox}" aria-hidden="true">${icon.body}</svg>`;
+    return `<svg${before}${after} viewBox="${icon.viewBox}" aria-hidden="true">${icon.body}</svg>`;
   });
 }
 

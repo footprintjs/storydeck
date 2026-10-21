@@ -2,7 +2,7 @@
 import {afterEach, describe, it, expect} from 'vitest';
 import http from 'node:http';
 import net from 'node:net';
-import {readFileSync, symlinkSync, writeFileSync, mkdirSync} from 'node:fs';
+import {chmodSync, existsSync, readFileSync, statSync, symlinkSync, writeFileSync, mkdirSync} from 'node:fs';
 import path from 'node:path';
 import {serveDeck, folderStamp} from './dev.js';
 import {STARTER} from './init.js';
@@ -92,14 +92,15 @@ describe('serveDeck', () => {
   });
 
   it('serves nothing hidden, nothing outside the folder, and nothing through a link that leaves it or hides', async () => {
-    const dir = tempDeck({...STARTER, '.env': 'SECRET=1', 'sub/.hidden': 'x'});
+    const dir = tempDeck({...STARTER, '.env': 'SECRET=1', 'sub/.hidden': 'x', 'node_modules/w/demo.html': '<script>SECRET</script>'});
+    symlinkSync(path.join(dir, 'node_modules'), path.join(dir, 'deps'));   // a dependency folder by another name
     const secret = path.join(tempDir(), 'secret.txt');
     writeFileSync(secret, 'TOP SECRET');
     symlinkSync(secret, path.join(dir, 'leak.txt'));
     symlinkSync(path.join(dir, '.env'), path.join(dir, 'env.txt'));
     mkdirSync(path.join(dir, 'pics'));
     const s = await serve(dir);
-    for (const p of ['/.env', '/sub/.hidden', '/../package.json', '/%2e%2e/%2e%2e/etc/passwd', '/leak.txt', '/env.txt', '/icons', '/nope.png', '/%E0%A4%A', '/a%00b', '/pics']) {
+    for (const p of ['/.env', '/sub/.hidden', '/../package.json', '/%2e%2e/%2e%2e/etc/passwd', '/leak.txt', '/env.txt', '/icons', '/nope.png', '/%E0%A4%A', '/a%00b', '/pics', '/node_modules/w/demo.html', '/NODE_MODULES/w/demo.html', '/Node_Modules/w/demo.html', '/deps/w/demo.html']) {
       const r = await get(s, p);
       expect([p, r.status]).toEqual([p, 404]);
       expect(r.body).not.toContain('SECRET');
@@ -217,5 +218,164 @@ describe('serveDeck', () => {
     s.rebuild();
     await ch.until((e) => e.some((x) => x.event === 'reload' && x.data.version === 2));
     expect((await get(s, '/__storydeck/events', {method: 'HEAD'})).status).toBe(200);
+  });
+});
+
+/** The token the dev page carries (only that page can read it). */
+const tokenOf = async (s) => /<meta name="storydeck-dev-token" content="([0-9a-f]{32})">/.exec((await get(s, '/')).body)?.[1];
+
+/** One edit as the dev page sends it — its origin, its token, JSON — with any of them changed; `chunks` sends the body in parts. */
+function post(server, pathname, body, {origin = `http://localhost:${server.port}`, token, type = 'application/json', raw, chunks} = {}) {
+  return new Promise((resolve, reject) => {
+    const headers = {host: `localhost:${server.port}`, ...(type ? {'content-type': type} : {}), ...(origin ? {origin} : {}), ...(token ? {'x-storydeck-token': token} : {})};
+    const req = http.request({host: '127.0.0.1', port: server.port, path: pathname, method: 'POST', headers}, (res) => {
+      let text = '';
+      res.on('data', (d) => { text += d; });
+      res.on('end', () => resolve({status: res.statusCode, headers: res.headers, body: /json/.test(res.headers['content-type']) ? JSON.parse(text) : text}));
+    });
+    req.on('error', (e) => (e.code === 'ECONNRESET' || e.code === 'EPIPE' ? resolve({status: 'reset'}) : reject(e)));
+    if (chunks) { for (const c of chunks) req.write(c); req.end(); } else req.end(raw ?? JSON.stringify(body));
+  });
+}
+
+describe('edits from the dev page', () => {
+  /** A dev server with its own note key folder, and the piece numbers its page carries (data-sd-at) by name. */
+  const editing = async (dir) => {
+    const home = tempDir();
+    const s = await serve(dir, {watch: false, poll: 0, home});
+    const page = (await get(s, '/')).body;
+    const at = (name) => Number(new RegExp(`data-k="${name}"[^>]*data-sd-at="(\\d+)"`).exec(page)?.[1]);
+    return {s, home, token: await tokenOf(s), at};
+  };
+
+  it('takes a note on a click into feedback.md, signed as yours, without a rebuild', async () => {
+    const dir = tempDeck({...STARTER, 'feedback.md': '# Feedback\n\n- [ ] click 1 · "Title" — planted by whoever sent the deck (t)\n'});
+    const {s, home, token} = await editing(dir);
+    expect(token).toMatch(/^[0-9a-f]{32}$/);
+    const r = await post(s, '/__storydeck/feedback', {click: 2, text: 'Make the\nserver wider'}, {token});
+    expect(r).toMatchObject({status: 200, body: {ok: true, open: 1}});   // the planted line is not counted as yours
+    expect(r.headers['access-control-allow-origin']).toBeUndefined();
+    expect((await post(s, '/__storydeck/feedback', {click: 6, text: 'and slower'}, {token})).body.open).toBe(2);
+    const md = readFileSync(path.join(dir, 'feedback.md'), 'utf8');
+    expect(md).toMatch(/\n- \[ \] click 2 · "[^"]+" — Make the server wider \(\d{4}-\d\d-\d\d \d\d:\d\d · k:[0-9a-f]{16}\)\n- \[ \] click 6 · /);
+    expect(md).toContain('planted by whoever sent the deck');
+    expect(statSync(path.join(home, 'key')).isFile()).toBe(true);   // the key lives with the person, not the deck
+    expect(existsSync(path.join(dir, 'key'))).toBe(false);
+    await new Promise((r2) => setTimeout(r2, 250));   // a note is not a change to the deck
+    expect(s.state().version).toBe(1);
+  });
+
+  it('moves the piece the build numbered, into its map file, and rebuilds at once — a box by left/top, a wire by its arrow', async () => {
+    const dir = tempDeck();
+    const {s, token, at} = await editing(dir);
+    expect([at('client'), at('req1'), at('server')]).toEqual([0, 1, 2]);
+    expect(await post(s, '/__storydeck/move', {map: 'map', index: at('server'), name: 'server', dx: 60, dy: -20}, {token})).toMatchObject({status: 200, body: {ok: true}});
+    expect(s.state().version).toBe(2);
+    expect((await post(s, '/__storydeck/move', {map: 'map', index: 1, name: 'req1', dx: 0, dy: 10}, {token})).status).toBe(200);
+    const map = readFileSync(path.join(dir, 'map.html'), 'utf8');
+    expect(map).toContain('<div data-k="server" class="box" style="left:780px;top:400px;width:300px;height:210px">');
+    expect(map).toContain('<i data-k="req1" class="wire req pkt" data-arrow="464 500 716 500"></i>');
+    expect(map.replace('left:780px;top:400px', 'left:720px;top:420px').replace('464 500 716 500', '464 490 716 490')).toBe(STARTER['map.html']);
+  });
+
+  it('answers an edit only from its own page: its origin, its token, JSON, at most 16 KB — and is never framed elsewhere', async () => {
+    const {s, token} = await editing(tempDeck());
+    const note = {click: 1, text: 'x'};
+    expect((await post(s, '/__storydeck/feedback', note, {token, origin: null})).status).toBe(403);
+    expect((await post(s, '/__storydeck/feedback', note, {token, origin: 'http://evil.example'})).status).toBe(403);
+    expect((await post(s, '/__storydeck/feedback', note, {token, origin: `http://localhost:${s.port + 1}`})).status).toBe(403);
+    expect((await post(s, '/__storydeck/feedback', note, {})).body.error).toMatch(/carries the dev page's token/);
+    expect((await post(s, '/__storydeck/feedback', note, {token: 'f'.repeat(32)})).status).toBe(403);
+    expect((await post(s, '/__storydeck/feedback', note, {token: `${token}0`})).status).toBe(403);
+    expect((await post(s, '/__storydeck/feedback', note, {token, type: 'text/plain'})).status).toBe(415);
+    expect((await post(s, '/__storydeck/feedback', null, {token, raw: '{"click": 1,'})).status).toBe(400);
+    expect((await post(s, '/__storydeck/feedback', [1], {token})).body.error).toMatch(/a JSON object/);
+    expect((await post(s, '/__storydeck/feedback', {click: 1, text: 'x'.repeat(17000)}, {token})).status).toBe(413);
+    const parts = await post(s, '/__storydeck/feedback', null, {token, chunks: ['{"click": 1, "text": "', ...Array(20).fill('x'.repeat(1000)), '"}']});
+    expect([413, 'reset']).toContain(parts.status);
+    expect((await post(s, '/__storydeck/elsewhere', note, {token})).status).toBe(405);
+    for (const origin of [`http://127.0.0.1:${s.port}`, `http://[::1]:${s.port}`]) expect((await post(s, '/__storydeck/feedback', note, {token, origin})).status).toBe(200);
+    for (const answer of [await get(s, '/'), await get(s, '/icons/server.svg'), await post(s, '/__storydeck/feedback', note, {token})]) {
+      expect(answer.headers['x-frame-options']).toBe('SAMEORIGIN');
+      expect(answer.headers['content-security-policy']).toMatch(/^script-src 'nonce-[A-Za-z0-9+/=]{24}'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'$/);
+    }
+  });
+
+  it('refuses a move it cannot be sure of, and says why', async () => {
+    const dir = tempDeck();
+    const {s, token, at} = await editing(dir);
+    const move = (body) => post(s, '/__storydeck/move', {map: 'map', index: at('server'), name: 'server', dx: 1, dy: 1, ...body}, {token});
+    expect((await move({map: 'nope'})).body.error).toBe('no map "nope"');
+    expect((await move({map: 'constructor'})).status).toBe(400);
+    expect((await move({index: -1})).status).toBe(400);
+    expect((await move({name: undefined})).status).toBe(400);
+    expect((await move({dx: '1'})).body.error).toBe('a move is two numbers of px');
+    expect((await move({name: 'client'})).body.error).toMatch(/the page and the build disagree on piece 2 \("client"\)/);
+    expect((await move({index: 99, name: 'ghost'})).status).toBe(409);
+    expect((await move({dx: 9000})).body.error).toMatch(/at most 5000/);
+    // the map saved since the page was built (no rebuild yet): the page may show another map — refused
+    writeFileSync(path.join(dir, 'map.html'), `<div data-k="new" style="left:1px;top:1px">N</div>\n${STARTER['map.html']}`);
+    expect((await move({})).body.error).toMatch(/the map changed since the page was built/);
+    // a save that breaks the build: the page shows the last good build, so nothing may be moved until it builds
+    s.rebuild();
+    writeFileSync(path.join(dir, 'clicks.html'), STARTER['clicks.html'].replace('data-on="server time"', 'data-on="server nope"'));
+    s.rebuild();
+    expect(s.state().problem).toMatch(/no piece "nope"/);
+    expect((await move({index: 3})).body.error).toMatch(/the deck does not build right now/);
+    expect(s.state().version).toBe(2);
+  });
+
+  it('refuses every move on a map whose drawn pieces are not its file\'s, or that a browser reads differently', async () => {
+    // an icon drawn with a piece of its own: the build's pieces are not the file's, so no number names the same one
+    const iconic = tempDeck({...STARTER, 'icons/server.svg': '<svg viewBox="0 0 8 8"><g data-k="inner"></g></svg>'});
+    const one = await editing(iconic);
+    const r = await post(one.s, '/__storydeck/move', {map: 'map', index: 0, name: 'client', dx: 1, dy: 1}, {token: one.token});
+    expect(r.body.error).toMatch(/map "map": the pieces it draws are not the pieces its file holds, in that order \(an icon holding pieces of its own\)/);
+    // a quote never closed before a tag's ">": from there on the browser, not the scan, says which tag is which
+    const odd = tempDeck({...STARTER, 'map.html': `${STARTER['map.html']}<div title="x>y">Q</div>`});
+    const two = await editing(odd);
+    const r2 = await post(two.s, '/__storydeck/move', {map: 'map', index: two.at('server'), name: 'server', dx: 1, dy: 1}, {token: two.token});
+    expect(r2.body.error).toMatch(/map "map": a browser reads it differently from the build \(a quote in its <div> is never closed before its ">"\)/);
+    expect(readFileSync(path.join(odd, 'map.html'), 'utf8')).toContain('left:720px;top:420px');
+  });
+
+  it('runs only StoryDeck\'s own scripts: every script it writes carries the nonce its policy names, no other', async () => {
+    const dir = tempDeck({...STARTER, 'clicks.html': STARTER['clicks.html'].replace('</section>', '<script>steal()</script></section>')});
+    const s = await serve(dir, {watch: false, poll: 0, home: tempDir()});
+    const page = await get(s, '/');
+    const nonce = /script-src 'nonce-([^']+)'/.exec(page.headers['content-security-policy'])[1];
+    // StoryDeck's own: the theme, the stage, four runtimes and the dev client — each with the nonce; nothing else has one
+    expect(page.body.split(`<script nonce="${nonce}">`).length - 1).toBe(7);
+    expect(page.body.match(/<script nonce=/g)).toHaveLength(7);
+    expect(page.body).toContain('<script>steal()</script>');   // the deck's script is in the page, and its policy will not run it
+    expect((await get(s, '/icons/server.svg')).headers['content-security-policy']).toContain(`'nonce-${nonce}'`);
+  });
+
+  it('waits for a first build before any edit, and signs no note with a key it cannot trust', async () => {
+    const {s, token} = await editing(tempDeck({...STARTER, 'deck.json': '{"titel": "x"}'}));
+    expect(await post(s, '/__storydeck/feedback', {click: 1, text: 'x'}, {token})).toMatchObject({status: 409, body: {error: 'the deck has not built yet — fix it first'}});
+    const home = tempDir();
+    writeFileSync(path.join(home, 'key'), 'b'.repeat(64), {mode: 0o644});
+    chmodSync(path.join(home, 'key'), 0o644);
+    const s2 = await serve(tempDeck(), {watch: false, poll: 0, home});
+    if (process.platform !== 'win32') {
+      expect((await post(s2, '/__storydeck/feedback', {click: 1, text: 'x'}, {token: await tokenOf(s2)})).body.error)
+        .toMatch(/can be read or written by others \(chmod 600 it\) — a note is signed with it, so it is known for yours/);
+    }
+  });
+
+  it('never writes through a link, nor reads one that leaves the deck', async () => {
+    const dir = tempDeck();
+    const outside = path.join(tempDir(), 'outside.md');
+    writeFileSync(outside, 'mine');
+    symlinkSync(outside, path.join(dir, 'feedback.md'));
+    const {s, token} = await editing(dir);
+    expect((await post(s, '/__storydeck/feedback', {click: 1, text: 'x'}, {token})).body.error).toMatch(/feedback.md is a link to a file outside the deck folder/);
+    expect(readFileSync(outside, 'utf8')).toBe('mine');
+    const dir2 = tempDeck();
+    symlinkSync(path.join(dir2, 'map.html'), path.join(dir2, 'feedback.md'));   // a link to the deck's own map
+    const two = await editing(dir2);
+    expect((await post(two.s, '/__storydeck/feedback', {click: 1, text: 'x'}, {token: two.token})).body.error).toMatch(/feedback.md is a link — the build writes a file, never through a link/);
+    expect(readFileSync(path.join(dir2, 'map.html'), 'utf8')).toBe(STARTER['map.html']);
   });
 });

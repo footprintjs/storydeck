@@ -33,13 +33,15 @@ const TOGGLE = '<button class="theme-toggle" type="button" aria-label="Switch th
 
 /**
  * The page. `assets`: {stageJs, css: [stylesheet …] (focus.css, narration.css, deck.css), version} — what the
- * library ships, read once by assets.js. `dev`: {client, version} adds the dev client (dev.js) and the build number
- * it compares with, or null for the page that ships.
+ * library ships, read once by assets.js. `dev`: {client, version, token, nonce} adds the dev client (dev.js), the build
+ * number it compares with and its token, and marks every script of StoryDeck's own with the nonce the dev server's
+ * policy lets run (so no script a deck carries runs in the dev page) — or null for the page that ships.
  */
 export function deckPage(compiled, assets, {dev = null} = {}) {
   const {config, slides} = compiled;
   const css = [...assets.css, compiled.themeCss ?? ''].join('\n');
-  const runtimes = [focusRuntime, notesRuntime, listenRuntime, themeRuntime].map((fn) => `<script>(${scriptSafe(fn)})();</script>`);
+  const script = dev?.nonce ? `<script nonce="${esc(dev.nonce)}">` : '<script>';
+  const runtimes = [focusRuntime, notesRuntime, listenRuntime, themeRuntime].map((fn) => `${script}(${scriptSafe(fn)})();</script>`);
   return `<!doctype html>
 <html lang="${esc(config.lang)}">
 <head>
@@ -47,7 +49,7 @@ export function deckPage(compiled, assets, {dev = null} = {}) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="footprint-storydeck ${esc(assets.version)}">
 <title>${esc(config.title)}</title>
-${config.description ? `<meta name="description" content="${esc(config.description)}">\n` : ''}${dev ? `<meta name="storydeck-dev" content="${Number(dev.version)}">\n` : ''}<script>${THEME_FIRST}</script>
+${config.description ? `<meta name="description" content="${esc(config.description)}">\n` : ''}${dev ? `<meta name="storydeck-dev" content="${Number(dev.version)}">\n` : ''}${dev?.token ? `<meta name="storydeck-dev-token" content="${esc(dev.token)}">\n` : ''}${script}${THEME_FIRST}</script>
 <style>${styleSafe(css)}</style>
 </head>
 <body>
@@ -57,9 +59,9 @@ ${slides.map((s) => s.html).join('\n')}
 ${TOGGLE}
 <!-- deck-stage.js, focus and narration runtimes: footprint-storydeck ${esc(assets.version)} (MIT) -->
 ${notesData(slides.map((s) => s.notes))}
-<script>${scriptSafe(assets.stageJs)}</script>
+${script}${scriptSafe(assets.stageJs)}</script>
 ${runtimes.join('\n')}
-${dev ? `<script>(${scriptSafe(dev.client)})();</script>\n` : ''}</body>
+${dev ? `${script}(${scriptSafe(dev.client)})();</script>\n` : ''}</body>
 </html>
 `;
 }
