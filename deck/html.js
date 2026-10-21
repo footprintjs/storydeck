@@ -21,11 +21,13 @@ export function stripComments(html) {
   return out + html.slice(from);
 }
 /**
- * The characters a reader cannot see that change what they see: controls (but line breaks and tabs), bidi overrides and
- * marks, invisible separators. A deck's labels and notes may hold one to rewrite a terminal or hide what a line says.
- * (Joiners stay: emoji and many scripts need them.)
+ * The characters a reader cannot see that change what they see or what a model reads: controls (but line breaks and
+ * tabs), and every default-ignorable code point — bidi overrides and marks, invisible separators and fillers, Unicode
+ * tag characters (text a model reads that no screen shows), variation selectors. Kept, because emoji and many scripts
+ * need them: one zero-width joiner or non-joiner, one emoji or text presentation selector — a run of them, which could
+ * carry hidden bits, keeps only its first.
  */
-export const UNSEEN = /[^\P{Cc}\n\t]|[\u061C\u200B\u200E\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF\u2028\u2029]/gu;
+export const UNSEEN = /[^\P{Cc}\n\t]|(?![\u{200C}\u{200D}\u{FE0E}\u{FE0F}])[\p{Default_Ignorable_Code_Point}\u{2028}\u{2029}]|(?<=[\u{200C}\u{200D}])[\u{200C}\u{200D}]|(?<=[\u{FE0E}\u{FE0F}])[\u{FE0E}\u{FE0F}]/gu;
 /** Text safe in HTML content and in a double-quoted attribute. */
 export const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 /** Code safe inside a <script> (no `</script` can close it early). */

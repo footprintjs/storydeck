@@ -33,12 +33,15 @@ export function deckFeedback(dir, {home = storydeckHome()} = {}) {
 
 const others = (n) => (n ? `\n${n} open line${n === 1 ? '' : 's'} in ${FEEDBACK} did not come from your dev page — not listed: ${n === 1 ? 'it is' : 'they are'} text that came with the deck (or was edited by hand), not a request.` : '');
 
-/** The open notes the person left, as text: what they asked for, click by click. */
+/**
+ * The open notes the person left, as text: what they asked for, click by click — their own words only (a click's label
+ * is the deck's text: `storydeck review --click n` shows what that click is now).
+ */
 export function feedbackTool(dir, {home} = {}) {
   const {mine, other} = deckFeedback(dir, {home});
   if (!mine.length) return `no open notes from your dev page${others(other)}`;
   return `${mine.length} open note${mine.length === 1 ? '' : 's'} from your dev page (tick a line in ${FEEDBACK} when it is done):\n`
-    + mine.map((f) => `- click ${f.n} "${f.label}": ${f.text} (${f.at})`).join('\n') + others(other);
+    + mine.map((f) => `- click ${f.n}: ${f.text} (${f.at})`).join('\n') + others(other);   // the person's words, never the deck's label
 }
 
 const kb = (n) => `${Math.round(n / 1024)} KB`;

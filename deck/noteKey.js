@@ -1,7 +1,8 @@
 // noteKey — which notes in feedback.md were left in this person's own dev page (Node). A deck someone sent you can carry
 // a feedback.md, and its lines must never pass for the person's requests: the dev server signs each note it writes with
 // a key that lives with the person, not the deck (STORYDECK_HOME, or ~/.storydeck), and a reader lists only the notes
-// that key signed. A note edited by hand, or copied from another machine, is not listed — it is text in the deck.
+// that key signed. A note edited by hand, or copied from another machine, is not listed — it is text in the deck. A
+// note's label is the deck's own text, kept in the line for a person reading the file: it is neither signed nor listed.
 import {createHmac, randomBytes, timingSafeEqual} from 'node:crypto';
 import {lstatSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
@@ -40,9 +41,12 @@ export function noteKey(home = storydeckHome(), {create = false} = {}) {
   return KEY.test(hex) ? {key: Buffer.from(hex, 'hex')} : {key: null, why: `the note key ${file} is not a key`};
 }
 
-/** A note's signature under `key`: 16 hex characters over its click, label, text and time. */
-export const signNote = (key, {n, label, text, at}) =>
-  createHmac('sha256', key).update(JSON.stringify(['storydeck-note', 1, n, label, text, at])).digest('hex').slice(0, 16);
+/**
+ * A note's signature under `key`: 16 hex characters over what the person gave it — the click, their words, the time.
+ * Never the click's label: that is the deck's text, and a signature vouches for the person's words only.
+ */
+export const signNote = (key, {n, text, at}) =>
+  createHmac('sha256', key).update(JSON.stringify(['storydeck-note', 2, n, text, at])).digest('hex').slice(0, 16);
 
 /** Whether `key` signed this note (a note read back by edit.js · readFeedback). */
 export function signedBy(key, note) {

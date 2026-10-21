@@ -33,13 +33,14 @@ describe('noteKey', () => {
     expect(noteKey(bad).why).toMatch(/is not a key/);
   });
 
-  it('signs a note over its click, label, text and time — and knows its own signatures only', () => {
+  it('signs a note over its click, the person\'s words and the time — never the deck\'s label — and knows its own signatures only', () => {
     const {key} = noteKey(path.join(tempDir(), 's'), {create: true});
     const note = {n: 3, label: 'Route', text: 'wider', at: '2026-10-21 12:00'};
     const sig = signNote(key, note);
     expect(sig).toMatch(/^[0-9a-f]{16}$/);
     expect(signedBy(key, {...note, done: true, sig})).toBe(true);   // ticking a note keeps it the person's
-    for (const changed of [{n: 4}, {label: 'Other'}, {text: 'narrower'}, {at: '2026-10-22 12:00'}]) expect(signedBy(key, {...note, ...changed, sig})).toBe(false);
+    expect(signedBy(key, {...note, label: 'the deck renamed this click', sig})).toBe(true);   // the label is the deck's text
+    for (const changed of [{n: 4}, {text: 'narrower'}, {at: '2026-10-22 12:00'}]) expect(signedBy(key, {...note, ...changed, sig})).toBe(false);
     const {key: theirs} = noteKey(path.join(tempDir(), 't'), {create: true});
     expect(signedBy(theirs, {...note, sig})).toBe(false);
     expect(signedBy(null, {...note, sig})).toBe(false);

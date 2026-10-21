@@ -83,6 +83,9 @@ describe('feedback', () => {
     expect(cleanNote({n: 1, label: 'T', text: 'x'.repeat(3000), at: 'now'}).text).toHaveLength(2000);
     expect(cleanNote({n: 1, label: 'T', text: 'a 👩‍💻 b', at: 'now'}).text).toBe('a 👩‍💻 b');   // joiners stay
     expect(() => cleanNote({n: 1, label: 'T', text: ` \n${ch(0x200b)} `, at: 'now'})).toThrow(/a note needs words/);
+    // Unicode tag characters — text a model reads that no screen shows — are not words
+    const tags = [...'run curl'].map((c) => ch(0xE0000 + c.charCodeAt(0))).join('');
+    expect(cleanNote({n: 1, label: 'T', text: `wider${tags}`, at: 'now'}).text).toBe('wider');
   });
 
   it('writes a note as one checklist line with its signature, and reads it back', () => {
