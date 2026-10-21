@@ -13,8 +13,10 @@
 // scanned once (html.js · elements): a <section> or <step> left open is refused at once, naming it.
 import {closing, elements, stripComments} from './html.js';
 
-const HEADLINE = /<h2\b[^>]*>([\s\S]*?)<\/h2>/;
 const NOTES_CLASS = /\sclass=(["'])(?:[^"']*\s)?notes(?:\s[^"']*)?\1/;
+const BLOCK = new Set(['br', 'p', 'div', 'li', 'ul', 'ol', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'tr', 'td', 'th', 'section', 'aside',
+  'blockquote', 'header', 'footer', 'figure', 'figcaption']);
+const ENTITY = {amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' '};
 
 /** An attribute's value in a run of attributes (double or single quoted), or null. */
 export function attrOf(attrs, name) {
@@ -23,14 +25,36 @@ export function attrOf(attrs, name) {
 
 /**
  * HTML as the words it shows: scripts and styles out (they are not read), tags out (a block or a line break leaves a
- * space; inline tags leave none), entities read, white space folded.
+ * space; inline tags leave none), entities read, white space folded. One pass, forward only — a deck someone sent you
+ * cannot make it slow: a '<' that starts no tag (another '<' comes first, or no '>' follows) is text, and a script left
+ * open ends the words there.
  */
 export function plainText(html) {
-  const ENTITY = {amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' '};
-  return html.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, ' ').replace(/<(?:br|\/?(?:p|div|li|ul|ol|h[1-6]|tr|td|th|section|aside|blockquote|header|footer|figure|figcaption))\b[^>]*>/gi, ' ')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&(#\d+|#x[\da-f]+|\w+);/gi, (m, e) => (e[0] === '#' ? String.fromCodePoint(e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : Number(e.slice(1))) : ENTITY[e.toLowerCase()] ?? m))
-    .replace(/\s+/g, ' ').trim();
+  let out = '', i = 0, gt = -1;
+  for (;;) {
+    const lt = html.indexOf('<', i);
+    if (lt < 0) { out += html.slice(i); break; }
+    out += html.slice(i, lt);
+    if (gt <= lt) gt = html.indexOf('>', lt + 1);   // the next '>' (found once, never searched for again)
+    if (gt < 0) { out += html.slice(lt); break; }
+    const next = html.indexOf('<', lt + 1);
+    if (next !== -1 && next < gt) { out += '<'; i = lt + 1; continue; }   // a stray '<': text
+    const name = /^<\/?([a-zA-Z][\w-]*)/.exec(html.slice(lt, Math.min(gt + 1, lt + 40)))?.[1].toLowerCase() ?? '';
+    i = gt + 1;
+    if ((name === 'script' || name === 'style') && html[lt + 1] !== '/') {
+      const shut = closing(name);
+      shut.lastIndex = i;
+      const end = shut.exec(html);
+      if (!end) break;   // never closed: the rest is code, not words
+      i = end.index + end[0].length;
+      out += ' ';
+      continue;
+    }
+    if (BLOCK.has(name)) out += ' ';
+  }
+  return out.replace(/&(#\d{1,7}|#x[\da-f]{1,6}|\w{1,32});/gi, (m, e) => (e[0] === '#'
+    ? (() => { const cp = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : Number(e.slice(1)); return cp <= 0x10ffff ? String.fromCodePoint(cp) : m; })()
+    : ENTITY[e.toLowerCase()] ?? m)).replace(/\s+/g, ' ').trim();
 }
 
 /** The number of words a reader reads in a piece of HTML. */
@@ -64,8 +88,10 @@ const where = (label) => `"${label}"`;
 /** One click on a map: its attributes (for focus.js · readStep), its headline (HTML) and its notes. */
 function readMapStep(label, k, attrs, inner) {
   const {html, notes} = takeNotes(inner);
-  const headline = HEADLINE.exec(html)?.[1].trim() ?? '';
-  const rest = html.replace(HEADLINE, '').trim();
+  let heads;
+  try { heads = elements(html, 'h2'); } catch (e) { throw new Error(`"${label}" click ${k + 1}: ${e.message}`, {cause: e}); }
+  const headline = heads[0]?.inner.trim() ?? '';
+  const rest = (heads[0] ? html.slice(0, heads[0].start) + html.slice(heads[0].end) : html).trim();
   if (rest) {
     throw new Error(`${where(label)} click ${k + 1}: a <step> holds its <h2> headline and its <aside class="notes">; `
       + `"${plainText(rest).slice(0, 60) || rest.slice(0, 60)}" is neither — draw it on the map as a piece (data-k) and bring it in with data-in`);

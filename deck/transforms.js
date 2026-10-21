@@ -39,7 +39,8 @@ function wireSvg(attrs, spec) {
 
 /** Every <i data-arrow="…"></i> as its wire. */
 export function wires(html) {
-  return html.replace(/<i\b([^>]*?)\sdata-arrow="([^"]+)"([^>]*)><\/i>/g, (_, a, spec, b) => wireSvg(a + b, spec));
+  // [^<>]: an attempt ends at the next tag, so a deck of unfinished <i …> stays a linear scan
+  return html.replace(/<i\b([^<>]*?)\sdata-arrow="([^"<>]+)"([^<>]*)><\/i>/g, (_, a, spec, b) => wireSvg(a + b, spec));
 }
 
 /** An icon file's drawing: {viewBox, body} from a whole <svg …>…</svg>. */
@@ -53,7 +54,7 @@ export function readIcon(name, svg) {
 
 /** Every <i … data-icon="name"></i> as that icon's SVG, keeping the element's other attributes. */
 export function icons(html, set = {}) {
-  return html.replace(/<i\b([^>]*?)\sdata-icon="([\w-]+)"([^>]*)><\/i>/g, (_, a, key, b) => {
+  return html.replace(/<i\b([^<>]*?)\sdata-icon="([\w-]+)"([^<>]*)><\/i>/g, (_, a, key, b) => {
     const icon = set[key];
     if (!icon) {
       const known = Object.keys(set);

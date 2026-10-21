@@ -436,7 +436,7 @@ buildDeck('my-talk');                       // { file, bytes, slides, clicks, ms
 - **One source, several builds.** The room's build carries the presenter's voice and a live demo; the public
   one (slides page, video) leaves both out — a build switch over the same parts, never a second copy.
 - **Read a click before you look at it.** On a 37-click talk ported to a deck folder (its 12 KB build script no longer
-  needed; the library rebuilds its 37 slides byte for byte), a rebuild after a save takes 3.7 ms, and reviewing a click as
+  needed; the library rebuilds its 37 slides byte for byte), a rebuild after a save takes about 6.5 ms, and reviewing a click as
   text costs about 154 tokens against about 1,844 for a screenshot of it — the whole deck about 5,800 tokens as text, about
   68,000 as screenshots. Measured with `node bench/devloop.mjs <deck>` (an Apple M5 Pro, Node 24); text tokens are
   estimated as characters ÷ 4 and a screenshot's by Anthropic's image formula (width × height ÷ 750, at 1568 × 882), not a

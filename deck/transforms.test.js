@@ -22,6 +22,14 @@ describe('wires', () => {
     expect(wires('<i class="ic"></i>')).toBe('<i class="ic"></i>');
   });
 
+  it('stays linear on a map of unfinished <i> tags', () => {
+    const t0 = performance.now();
+    const hostile = '<i data-k="x" '.repeat(100000);
+    expect(wires(hostile)).toBe(hostile);
+    expect(icons(hostile)).toBe(hostile);
+    expect(performance.now() - t0).toBeLessThan(1500);
+  });
+
   it('refuses a wire that is not four or five numbers', () => {
     expect(() => wires('<i data-arrow="1 2 3"></i>')).toThrow(/data-arrow="1 2 3": a wire is "x1 y1 x2 y2"/);
     expect(() => wires('<i data-arrow="1 2 3 x"></i>')).toThrow(/a wire is/);

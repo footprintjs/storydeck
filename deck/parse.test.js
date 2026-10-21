@@ -48,6 +48,10 @@ describe('parseClicks', () => {
 });
 
 describe('parseClicks, scanned once', () => {
+  it('refuses a headline left open, naming the click', () => {
+    expect(() => parseClicks('<section data-label="A" data-map="m"><step><h2>never closed</step></section>')).toThrow(/"A" click 1: <h2> is never closed — end it with <\/h2>/);
+  });
+
   it('refuses a part or a click left open, naming it', () => {
     expect(() => parseClicks('<section data-label="A"><p>x</p>')).toThrow(/<section data-label="A"> is never closed/);
     expect(() => parseClicks('<section data-label="A" data-map="m"><step data-in="a"><h2>x</h2></section>')).toThrow(/"A": <step data-in="a"> is never closed — end it with <\/step>/);
@@ -81,6 +85,22 @@ describe('plainText and wordCount', () => {
 
   it('never counts a script or a style as words', () => {
     expect(plainText('<p>Hello</p><script>const a = "many words here";</script><style>.x{color:red}</style><p>there</p>')).toBe('Hello there');
+    expect(plainText('<p>Hi</p><script>never closed <p>code</p>')).toBe('Hi');
+    expect(plainText('<p>Hi</p></script>there')).toBe('Hi there');
+  });
+
+  it('reads a stray < as text, and a < with no tag after it', () => {
+    expect(plainText('a < b and <b>bold</b>')).toBe('a < b and bold');
+    expect(plainText('5 < 6')).toBe('5 < 6');
+    expect(plainText('&#1114112; &#x41;&#65;')).toBe('&#1114112; AA');   // past the last code point: left as written
+  });
+
+  it('stays a single forward pass on hostile input (a deck someone sent you cannot stall it)', () => {
+    const t0 = performance.now();
+    expect(plainText('<'.repeat(400000)).length).toBe(400000);
+    expect(plainText('<script>'.repeat(100000))).toBe('');
+    expect(plainText(`${'<p '.repeat(100000)}>x`).endsWith('<p x')).toBe(true);   // each '<' before another is text; the last opens a tag
+    expect(performance.now() - t0).toBeLessThan(1500);
   });
 
   it('takes notes out of HTML, empty ones dropped', () => {
