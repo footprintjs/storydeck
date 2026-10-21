@@ -403,11 +403,16 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   `data-theme="ledger"` on each of that part's slides, so `theme.css` can dress it: redefine the tokens for it
   (`[data-theme="ledger"] { --bg: …; --text: …; }`, and `:root.dark [data-theme="ledger"]` for dark) and give its pieces
   their own style. Tokens inherit, so the chrome, the focus and every piece of that part follow. A theme is one
-  lower-case name (letters, digits and dashes); a part without one is drawn as before, byte for byte.
+  lower-case name (letters, digits and dashes); a part without one is drawn as before, byte for byte. The title and the
+  closing slide are parts too, so they can have their own look. To have the page around the slide (the letterbox)
+  follow the part on screen as well, select the active slide in the same rule:
+  `[data-theme="ledger"], :root:has([data-deck-active][data-theme="ledger"]) { … }`. `check` warns about a theme
+  that theme.css never selects (a misspelt name changes nothing), and `review` names each click's theme.
 - **Read first, look last.** A reviewer — a person, or a model that pays for every screenshot — reads the deck as text:
   `outline` (a line per click), `review --click 14` (its headline and words, what it lights, greys, brings in and moves,
   its route, its notes), `check` (what to fix, each with its click and its fix: a headline over 12 words, pieces that
-  light just by coming in, a click that changes nothing, a piece never shown, clicks without notes). `check --layout`
+  light just by coming in, a click that changes nothing, a piece never shown, clicks without notes, a theme theme.css
+  never styles). `check --layout`
   opens the page in a browser, offline, and finds text that spills out of its box (it needs Playwright installed beside
   StoryDeck: `npm i -D footprint-storydeck playwright-core`; without it, it says so and the other checks run). `mcp` serves the same tools to an AI assistant:
   `claude mcp add storydeck -- npx footprint-storydeck mcp my-talk`.

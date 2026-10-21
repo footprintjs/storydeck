@@ -8,6 +8,8 @@ import {wordCount} from './parse.js';
 const nameOf = (pieces, i) => pieces[i].keys[0];
 const unique = (names) => [...new Set(names)];
 const list = (names, max = 14) => (names.length ? `${names.slice(0, max).join(', ')}${names.length > max ? `, … (${names.length - max} more)` : ''}` : '—');
+/** A click's part theme, as the end of its first line (nothing when the part has none). */
+const themed = (c) => (c.theme ? ` · theme ${c.theme}` : '');
 const quote = (s, max = 160) => (s.length > max ? `"${s.slice(0, max - 1)}…"` : `"${s}"`);
 
 /** The pieces of a map click, grouped by what the click does with them. */
@@ -74,10 +76,10 @@ export function reviewClick(compiled, which, {maxWords = compiled.config?.checks
   const lines = [];
   const words = (n) => `${n} word${n === 1 ? '' : 's'}`;
   if (c.kind === 'plain') {
-    lines.push(`click ${c.n} of ${compiled.clicks.length} · "${c.label}" (plain slide)`);
+    lines.push(`click ${c.n} of ${compiled.clicks.length} · "${c.label}" (plain slide)${themed(c)}`);
     lines.push(`text (${words(wordCount(c.text))}): ${quote(c.text, 300)}`);
   } else {
-    lines.push(`click ${c.n} of ${compiled.clicks.length} · "${c.label}" (map "${c.map}", step ${c.stepIndex + 1} of ${c.steps})`);
+    lines.push(`click ${c.n} of ${compiled.clicks.length} · "${c.label}" (map "${c.map}", step ${c.stepIndex + 1} of ${c.steps})${themed(c)}`);
     const hw = wordCount(c.headline);
     lines.push(`headline: ${c.headline ? `${quote(c.headline)} (${words(hw)}${hw > maxWords ? `, over ${maxWords}` : ''})` : '—'}`);
     const pieces = compiled.maps[c.map].pieces;

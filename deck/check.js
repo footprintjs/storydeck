@@ -6,6 +6,7 @@
 //   no-change      a click that changes nothing on screen (same headline, nothing enters, moves or lights)
 //   never-shown    a map piece no click ever brings in
 //   no-notes       clicks without notes in a deck that has them (listen mode says nothing there)
+//   theme-unstyled a part asks for a data-theme that theme.css never selects ([data-theme="…"]): a misspelt name changes nothing
 import {wordCount} from './parse.js';
 
 const names = (pieces, idx) => [...new Set(idx.map((i) => pieces[i].keys[0]))];
@@ -63,6 +64,19 @@ function missingNotes(compiled) {
   return [problem('info', 'no-notes', null, `click${without.length === 1 ? '' : 's'} ${without.map((c) => c.n).join(', ')} ha${without.length === 1 ? 's' : 've'} no notes — the presenter view shows nothing there and listen mode skips ${without.length === 1 ? 'it' : 'them'}`)];
 }
 
+/** Themes the parts ask for that theme.css never selects — once per theme, at its first click. */
+function unstyledThemes(compiled) {
+  const out = [], seen = new Set();
+  for (const c of compiled.clicks) {
+    if (!c.theme || seen.has(c.theme)) continue;
+    seen.add(c.theme);
+    // a theme is [a-z0-9-] (parse.js · THEME), so it is safe inside the pattern as it is
+    const selects = new RegExp(`\\[\\s*data-theme\\s*[~|^$*]?=\\s*(["']?)${c.theme}\\1\\s*(?:[is]\\s*)?\\]`).test(compiled.themeCss ?? '');
+    if (!selects) out.push(problem('warn', 'theme-unstyled', c, `part "${c.part}" asks for data-theme="${c.theme}", which theme.css never selects — fix the name, or give it its tokens there ([data-theme="${c.theme}"] { --bg: …; })`));
+  }
+  return out;
+}
+
 /** Every problem of a compiled deck: [{level: 'error' | 'warn' | 'info', rule, click, label, message}]. */
 export function checkDeck(compiled) {
   const out = [];
@@ -71,7 +85,7 @@ export function checkDeck(compiled) {
     if (c.kind === 'map') out.push(...litOnEntry(c, compiled.maps[c.map].pieces));
     out.push(...noChange(c, compiled.clicks[i - 1]));
   });
-  out.push(...neverShown(compiled), ...missingNotes(compiled));
+  out.push(...neverShown(compiled), ...missingNotes(compiled), ...unstyledThemes(compiled));
   return out;
 }
 

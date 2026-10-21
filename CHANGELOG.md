@@ -7,6 +7,9 @@
   tokens and pieces — a talk in several parts, each dressed for its subject. A theme is one lower-case name (letters,
   digits, dashes; 40 at most), refused otherwise with the part's name. A part without one is drawn byte for byte as
   before.
+  The title and closing slides are parts, so they can have a look of their own. `check` warns (`theme-unstyled`) when a
+  part asks for a theme that theme.css never selects, and `review` ends a click's first line with its theme. The README
+  shows how the page around the slide follows the part on screen (`:root:has([data-deck-active][data-theme=…])`).
 
 ## 0.7.0 — a deck from a folder, an editing loop, co-editing and wire motion
 

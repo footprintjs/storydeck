@@ -140,7 +140,7 @@ export function compileDeck(source, {dev = false} = {}) {
       notes: {slide: c.part.label, step: k, steps: partClicks.length - 1, now: c.notes, earlier: partClicks.slice(0, k).flatMap((x) => x.notes)}};
   });
   checkPost(source.post, new Set(slides.map((s) => s.label)));
-  const clicks = planned.map((c, i) => ({n: i + 1, label: c.label, part: c.part.label, kicker: c.part.kicker, kind: c.kind,
+  const clicks = planned.map((c, i) => ({n: i + 1, label: c.label, part: c.part.label, kicker: c.part.kicker, theme: c.part.theme ?? null, kind: c.kind,
     map: c.kind === 'map' ? c.map.name : null, headline: plainText(c.headline), notes: c.notes,
     ...(c.kind === 'map' ? {step: c.step, look: c.look, stepIndex: c.stepIndex, steps: c.steps} : {text: plainText(c.inner)})}));
   return {config, title: config.title, themeCss: source.themeCss ?? '', slides, clicks, maps: Object.fromEntries(Object.values(maps).map((m) => [m.name, {pieces: m.pieces}]))};
