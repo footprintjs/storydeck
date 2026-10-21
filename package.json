@@ -1,7 +1,7 @@
 {
   "name": "footprint-storydeck",
   "version": "0.6.0",
-  "description": "One source, many lenses — render structured content as a Read article, a Scroll (scrollytelling) story, or a Watch deck.",
+  "description": "One source, many lenses — render structured content as a Read article, a Scroll (scrollytelling) story, or a Watch deck; and make a deck from a folder with a live dev loop.",
   "type": "module",
   "license": "MIT",
   "author": "Sanjay Krishna Anbalagan",
@@ -27,7 +27,10 @@
     "focus",
     "exploded-view",
     "kiosk",
-    "footprintjs"
+    "footprintjs",
+    "cli",
+    "dev-server",
+    "mcp"
   ],
   "engines": {
     "node": ">=22"
@@ -36,6 +39,10 @@
     "*.css"
   ],
   "types": "./index.d.ts",
+  "bin": {
+    "storydeck": "dist/deck/bin.js",
+    "footprint-storydeck": "dist/deck/bin.js"
+  },
   "exports": {
     ".": {
       "types": "./index.d.ts",
@@ -75,7 +82,12 @@
       "types": "./pptx.d.ts",
       "default": "./dist/pptx.js"
     },
+    "./deck": {
+      "types": "./deck.d.ts",
+      "default": "./dist/deck/index.js"
+    },
     "./storydeck.css": "./storydeck.css",
+    "./deck.css": "./deck.css",
     "./deck-stage.js": "./site/public/deck-stage.js"
   },
   "files": [

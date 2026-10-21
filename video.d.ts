@@ -19,6 +19,12 @@ export interface VideoDriver {
   shot(file: string): Promise<unknown>;
   close(): Promise<unknown> | unknown;
 }
+/** What a settled click shows that spills: text out of its box, a lit piece (or the chrome) past the slide's edge. */
+export interface SlideSpill { kind: 'spills' | 'outside'; piece: string | null; text: string; dx: number; dy: number }
+/** The <deck-stage> driver: the video's port, and `measure(n)` — click n as it settles, measured (the layout check). */
+export interface DeckStageDriver extends VideoDriver {
+  measure(n: number): Promise<SlideSpill[]>;
+}
 type Run = (cmd: string, args: string[], options?: object) => { status: number | null };
 
 /** The timeline: each click's lead and length, from its clip (plus `gap`), or `noclip` s. */
@@ -40,4 +46,6 @@ export function renderVideo(options: {
   work?: string; log?: (line: string) => void;
 }): Promise<{ video: string; length: number; cues: number; chapters: Chapters; plan: PlannedClick[] }>;
 /** The driver for storydeck's <deck-stage> pages, with Playwright's `chromium`. */
-export function deckStageDriver(options: { chromium: unknown; executablePath?: string; viewport?: { width: number; height: number }; hide?: string[] }): VideoDriver;
+export function deckStageDriver(options: { chromium: unknown; executablePath?: string; viewport?: { width: number; height: number }; hide?: string[] }): DeckStageDriver;
+/** Runs in the page: what spills on the slide shown, its animations finished first (deckStageDriver · measure). */
+export function measureSlide(): SlideSpill[];

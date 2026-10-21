@@ -231,6 +231,58 @@ export function deckStageDriver({ chromium, executablePath, viewport = { width: 
     }),
     async seek(ms) { await page.evaluate((t) => { for (const a of window.__sdFrozen ?? []) a.currentTime = t; }, ms); await settle(); },
     shot: (file) => page.screenshot({ path: file }),
+    /**
+     * Click n (1-based) as it settles, measured: jump there (a jump lands at once), finish what still moves, and
+     * report text that spills out of its box and lit pieces outside the slide — [{kind, piece, text, dx, dy}] (the
+     * layout check, deck/layout.js, reads it).
+     */
+    async measure(n) {
+      await page.evaluate((i) => document.querySelector('deck-stage').goTo(i), n - 1);
+      await settle();
+      return page.evaluate(measureSlide);
+    },
     close: () => browser?.close(),
   };
+}
+
+/** Runs in the page: what spills on the slide shown (see deckStageDriver · measure). */
+export function measureSlide() {
+  const stage = document.querySelector('deck-stage');
+  for (const a of [...document.getAnimations(), ...(stage?.shadowRoot?.getAnimations() ?? [])]) {
+    try { a.finish(); } catch { /* an endless animation has no end */ }
+  }
+  const slide = stage ? [...stage.children].filter((s) => s.tagName === 'SECTION')[stage.index] : null;
+  if (!slide) return [];
+  const W = Number(stage.getAttribute('width') || 1920), H = Number(stage.getAttribute('height') || 1080);
+  const box = slide.getBoundingClientRect(), scale = box.width / W || 1;
+  // A piece by its first data-k name; an element outside every piece by its class (".kicker") or its tag.
+  const pieceOf = (el) => el.closest('[data-k]')?.getAttribute('data-k')?.trim().split(/\s+/)[0]
+    ?? (el.classList.length ? `.${el.classList[0]}` : el.tagName.toLowerCase());
+  const textOf = (el) => (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  const shown = (el) => {
+    for (let e = el; e && e !== slide; e = e.parentElement) {
+      const cs = getComputedStyle(e);
+      if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) < 0.05) return false;
+    }
+    return true;
+  };
+  const out = [];
+  for (const el of slide.querySelectorAll('*')) {
+    if (el.namespaceURI === 'http://www.w3.org/2000/svg') continue;   // a drawing sizes itself by its viewBox
+    if (![...el.childNodes].some((c) => c.nodeType === 3 && c.textContent.trim())) continue;
+    const cs = getComputedStyle(el);
+    if (cs.display === 'inline' || cs.overflowX === 'auto' || cs.overflowX === 'scroll' || el.clientWidth === 0 || !shown(el)) continue;
+    // A glyph's own overhang (a tight line-height, an italic) is not a spill: a line spills by most of a line.
+    const size = parseFloat(cs.fontSize) || 16;
+    const dx = el.scrollWidth - el.clientWidth, dy = el.scrollHeight - el.clientHeight;
+    if (dx > 2 || dy > Math.max(2, size * 0.35)) out.push({ kind: 'spills', piece: pieceOf(el), text: textOf(el), dx: dx > 2 ? dx : 0, dy: dy > Math.max(2, size * 0.35) ? dy : 0 });
+  }
+  for (const el of slide.querySelectorAll('.sd-on, [data-chrome]')) {
+    if (!shown(el)) continue;
+    const r = el.getBoundingClientRect();
+    const x0 = (r.left - box.left) / scale, y0 = (r.top - box.top) / scale, x1 = (r.right - box.left) / scale, y1 = (r.bottom - box.top) / scale;
+    const dx = Math.max(0, -x0, x1 - W), dy = Math.max(0, -y0, y1 - H);
+    if (dx > 2 || dy > 2) out.push({ kind: 'outside', piece: pieceOf(el), text: textOf(el), dx: Math.round(dx), dy: Math.round(dy) });
+  }
+  return out;
 }
