@@ -2,6 +2,14 @@
 
 ## Unreleased — a deck from a folder, an editing loop, and co-editing
 
+- **A packet rides its wire's curve, and a wire draws itself in.** On a `path` click, a `pkt` packet now follows the
+  wire's quadratic curve (it crossed a bent wire in a straight line, up to 78 px off it); in Chromium it stays within
+  half a pixel of the drawn line. It is CSS only: one `@keyframes` in deck.css whose steps are the curve's points from
+  the control point and end each wire gives its packet (`--cdx`/`--cdy`, beside `--pdx`/`--pdy`), eased by where the
+  steps fall. A wire that comes in draws itself from start to tip at its moment (its turn on a path, after a new blur),
+  its head showing as the line reaches it (`pathLength="1"` on the wire's line). Reduced motion, a jump and print show
+  the plain wire, as before.
+
 - **`storydeck`: a deck is a folder, and the library builds it.** deck.json, clicks.html (a `<section>` per part; on a
   map, a `<step>` per click), the maps, theme.css and icons/ become one self-contained page (`storydeck build`): every
   stylesheet and runtime inlined, notes, presenter and listen mode, a light/dark toggle (T), no network request. No

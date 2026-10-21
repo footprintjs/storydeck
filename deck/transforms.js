@@ -6,8 +6,9 @@
 //
 // A wire is `x1 y1 x2 y2` and an optional bend (px off the straight line, + to the left of travel): a quadratic
 // curve with an arrow head, in an <svg> placed and sized to hold it, so it is a focus piece like any other (its
-// data-k and class are kept, and "wire" is added to its class). Class "pkt" adds a packet that a deck's CSS can run
-// along it (hidden at rest, so print, a jump and reduced motion show the plain wire).
+// data-k and class are kept, and "wire" is added to its class). Class "pkt" adds a packet that rides the curve itself
+// on a path click (hidden at rest, so print, a jump and reduced motion show the plain wire); a wire that comes in draws
+// itself, start to tip.
 
 import {stripComments} from './html.js';
 
@@ -31,10 +32,12 @@ function wireSvg(attrs, spec) {
   const head = `<path class="head" d="M${f(tip[0])} ${f(tip[1])}L${f(back[0] + nx)} ${f(back[1] + ny)}L${f(back[0] - nx)} ${f(back[1] - ny)}Z"/>`;
   let at = attrs.replace(/\sclass="([^"]*)"/, (_, c) => ` class="${/(^|\s)wire(\s|$)/.test(c) ? c : `wire ${c}`}"`);
   if (!/\sclass="/.test(at)) at += ' class="wire"';
+  // the packet rides the curve itself (deck.css · sdPkt): its control point and its end, from where it starts
   const pkt = /\bpkt\b/.test(at)
-    ? `<rect class="pkt" x="${f(x1 - X - 8)}" y="${f(y1 - Y - 6)}" width="16" height="12" rx="3" style="--pdx:${f(ex - x1)}px;--pdy:${f(ey - y1)}px"/>`
+    ? `<rect class="pkt" x="${f(x1 - X - 8)}" y="${f(y1 - Y - 6)}" width="16" height="12" rx="3" style="--cdx:${f(cx - x1)}px;--cdy:${f(cy - y1)}px;--pdx:${f(ex - x1)}px;--pdy:${f(ey - y1)}px"/>`
     : '';
-  return `<svg${at} style="left:${f(X)}px;top:${f(Y)}px;width:${f(W)}px;height:${f(H)}px" viewBox="0 0 ${f(W)} ${f(H)}" aria-hidden="true"><path d="${d}"/>${head}${pkt}</svg>`;
+  // pathLength="1": the line is one unit long, so a dash of 1 is the whole line — how it draws itself (deck.css · sdDraw)
+  return `<svg${at} style="left:${f(X)}px;top:${f(Y)}px;width:${f(W)}px;height:${f(H)}px" viewBox="0 0 ${f(W)} ${f(H)}" aria-hidden="true"><path d="${d}" pathLength="1"/>${head}${pkt}</svg>`;
 }
 
 /**

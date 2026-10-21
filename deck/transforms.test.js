@@ -1,19 +1,25 @@
 import {describe, it, expect} from 'vitest';
 import {wires, wireTags, icons, readIcon, applyTransforms} from './transforms.js';
 import {stripComments} from './html.js';
+import {readFileSync} from 'node:fs';
+import path from 'node:path';
 import {generated} from './test/helpers.js';
 
 describe('wires', () => {
   it('draws a straight wire in a box that holds it, with its head, keeping the element\'s attributes', () => {
     expect(wires('<i data-k="w" class="req" data-arrow="100 200 300 200"></i>')).toBe(
       '<svg data-k="w" class="wire req" style="left:80px;top:180px;width:240px;height:40px" viewBox="0 0 240 40" aria-hidden="true">'
-      + '<path d="M20 20 Q120 20 205.6 20"/><path class="head" d="M220 20L202 30.8L202 9.2Z"/></svg>');
+      + '<path d="M20 20 Q120 20 205.6 20" pathLength="1"/><path class="head" d="M220 20L202 30.8L202 9.2Z"/></svg>');
   });
 
   it('adds a packet for class "pkt", bends the curve, and gives a wire without a class its "wire"', () => {
     const out = wires('<i data-k="w" class="wire pkt" data-arrow="0 0 100 0 40"></i><i data-k="v" data-arrow="0,0,0,50"></i>');
     expect(out).toContain('<rect class="pkt"');
-    expect(out).toContain('--pdx:');
+    // the packet rides the curve: its control point and its end, both from where it starts (deck.css · sdPkt)
+    const [, cdx, cdy, pdx, pdy] = /--cdx:(-?[\d.]+)px;--cdy:(-?[\d.]+)px;--pdx:(-?[\d.]+)px;--pdy:(-?[\d.]+)px/.exec(out).map(Number);
+    expect([cdx, cdy]).toEqual([50, 40]);   // the curve's control point: 50 along, 40 off the straight line
+    expect(pdx).toBeGreaterThan(80);
+    expect(pdy).toBeGreaterThan(0);
     expect(out).toMatch(/class="wire pkt"/);
     expect(out).toMatch(/<svg data-k="v" class="wire"/);
     expect(out).toContain("Q70 60");   // the bend pulls the curve 40 px off the straight line
@@ -119,5 +125,30 @@ describe('wires and icons in one pass', () => {
 
   it('refuses an icon called like a property every object has', () => {
     expect(() => icons('<i data-icon="constructor"></i>', set)).toThrow(/no icon "constructor" \(there are db\)/);
+  });
+});
+
+describe('a packet on the curve', () => {
+  /** deck.css · sdPkt read back: each step's percentage and its weights on the control point and the end. */
+  const steps = () => [...readFileSync(path.join(process.cwd(), 'deck.css'), 'utf8').matchAll(/(\d+)% \{[^}]*?calc\(var\(--cdx\) \* ([\d.]+) \+ var\(--pdx\) \* ([\d.]+)\)/g)]
+    .map((m) => ({p: Number(m[1]) / 100, a: Number(m[2]), b: Number(m[3])}));
+
+  it('steps along the quadratic itself: each step is B(t) = 2(1-t)t·C + t²·E for one t, rising, eased', () => {
+    const s = steps();
+    expect(s).toHaveLength(19);   // 5% to 95%; 0% is the start, 100% the end
+    let last = 0;
+    for (const {p, a, b} of s) {
+      const t = a / 2 + b;   // t(1-t) + t² = t, whatever the rounding of each weight
+      expect(b).toBeCloseTo(t * t, 3);
+      expect(a).toBeCloseTo(2 * (1 - t) * t, 3);   // one t on both weights: a point of the curve
+      expect(t).toBeCloseTo(p * p * (3 - 2 * p), 3);   // smoothstep: slow at both ends
+      expect(t).toBeGreaterThan(last);
+      last = t;
+    }
+  });
+
+  it('keeps a straight wire\'s ride on its line, always forward: with the control point halfway, B(t) = t·E', () => {
+    const progress = steps().map(({a, b}) => a * 0.5 + b);
+    expect(progress.every((v, i) => v > (progress[i - 1] ?? 0) && v < 1)).toBe(true);
   });
 });

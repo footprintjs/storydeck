@@ -38,19 +38,50 @@
 :where(svg.wire path.head) { fill: currentColor; stroke: none; }
 
 /* a wire's packet (class "pkt"): hidden at rest, so print, a jump and reduced motion show the plain wire. On a
-   forward `path` click it rides the wire once, at the wire's turn (and .4 s later under a new blur, as the path does). */
+   forward `path` click it rides the wire once, at the wire's turn (and .4 s later under a new blur, as the path does) —
+   on the curve itself: each step is the quadratic's point B(t) = 2(1-t)t·C + t²·E from the start, with the control
+   point C (--cdx, --cdy) and the end E (--pdx, --pdy) the wire gives its packet. t is eased by where the steps fall
+   (smoothstep), so the steps themselves run linear and the ride has no stutter. */
 :where(svg.wire .pkt) { opacity: 0; fill: var(--sd-glow, currentColor); stroke: none; }
 @keyframes sdPkt {
   0% { opacity: 0; transform: translate(0, 0); }
-  15%, 80% { opacity: 1; }
+  5% { transform: translate(calc(var(--cdx) * 0.0144 + var(--pdx) * 0.0001), calc(var(--cdy) * 0.0144 + var(--pdy) * 0.0001)); }
+  10% { transform: translate(calc(var(--cdx) * 0.0544 + var(--pdx) * 0.0008), calc(var(--cdy) * 0.0544 + var(--pdy) * 0.0008)); }
+  15% { opacity: 1; transform: translate(calc(var(--cdx) * 0.1141 + var(--pdx) * 0.0037), calc(var(--cdy) * 0.1141 + var(--pdy) * 0.0037)); }
+  20% { transform: translate(calc(var(--cdx) * 0.1864 + var(--pdx) * 0.0108), calc(var(--cdy) * 0.1864 + var(--pdy) * 0.0108)); }
+  25% { transform: translate(calc(var(--cdx) * 0.2637 + var(--pdx) * 0.0244), calc(var(--cdy) * 0.2637 + var(--pdy) * 0.0244)); }
+  30% { transform: translate(calc(var(--cdx) * 0.3387 + var(--pdx) * 0.0467), calc(var(--cdy) * 0.3387 + var(--pdy) * 0.0467)); }
+  35% { transform: translate(calc(var(--cdx) * 0.4047 + var(--pdx) * 0.0794), calc(var(--cdy) * 0.4047 + var(--pdy) * 0.0794)); }
+  40% { transform: translate(calc(var(--cdx) * 0.4562 + var(--pdx) * 0.1239), calc(var(--cdy) * 0.4562 + var(--pdy) * 0.1239)); }
+  45% { transform: translate(calc(var(--cdx) * 0.4888 + var(--pdx) * 0.1808), calc(var(--cdy) * 0.4888 + var(--pdy) * 0.1808)); }
+  50% { transform: translate(calc(var(--cdx) * 0.5 + var(--pdx) * 0.25), calc(var(--cdy) * 0.5 + var(--pdy) * 0.25)); }
+  55% { transform: translate(calc(var(--cdx) * 0.4888 + var(--pdx) * 0.3303), calc(var(--cdy) * 0.4888 + var(--pdy) * 0.3303)); }
+  60% { transform: translate(calc(var(--cdx) * 0.4562 + var(--pdx) * 0.4199), calc(var(--cdy) * 0.4562 + var(--pdy) * 0.4199)); }
+  65% { transform: translate(calc(var(--cdx) * 0.4047 + var(--pdx) * 0.5159), calc(var(--cdy) * 0.4047 + var(--pdy) * 0.5159)); }
+  70% { transform: translate(calc(var(--cdx) * 0.3387 + var(--pdx) * 0.6147), calc(var(--cdy) * 0.3387 + var(--pdy) * 0.6147)); }
+  75% { transform: translate(calc(var(--cdx) * 0.2637 + var(--pdx) * 0.7119), calc(var(--cdy) * 0.2637 + var(--pdy) * 0.7119)); }
+  80% { opacity: 1; transform: translate(calc(var(--cdx) * 0.1864 + var(--pdx) * 0.8028), calc(var(--cdy) * 0.1864 + var(--pdy) * 0.8028)); }
+  85% { transform: translate(calc(var(--cdx) * 0.1141 + var(--pdx) * 0.8822), calc(var(--cdy) * 0.1141 + var(--pdy) * 0.8822)); }
+  90% { transform: translate(calc(var(--cdx) * 0.0544 + var(--pdx) * 0.9448), calc(var(--cdy) * 0.0544 + var(--pdy) * 0.9448)); }
+  95% { transform: translate(calc(var(--cdx) * 0.0144 + var(--pdx) * 0.9856), calc(var(--cdy) * 0.0144 + var(--pdy) * 0.9856)); }
   100% { opacity: 0; transform: translate(var(--pdx), var(--pdy)); }
 }
+/* a wire that comes in draws itself, start to tip, at its moment (its turn on a path, or after a new blur), and its
+   head shows as the line reaches it. pathLength="1" (transforms.js): a dash of 1 is the whole line. */
+@keyframes sdDraw { from { stroke-dasharray: 1; stroke-dashoffset: 1; } to { stroke-dasharray: 1; stroke-dashoffset: 0; } }
+@keyframes sdHeadIn { 0%, 75% { opacity: 0; } }
 @media screen and (prefers-reduced-motion: no-preference) {
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) :where(.sd-path) :where(.pkt) {
-    animation: sdPkt .6s ease-in-out var(--sd-path-delay, 0s) both;
+    animation: sdPkt .6s linear var(--sd-path-delay, 0s) both;
   }
   :where([data-deck-active].sd-focus-new:not([data-sd-instant]):not([data-deck-static])) :where(.sd-path) :where(.pkt) {
     animation-delay: calc(var(--sd-path-delay, 0s) + .4s);
+  }
+  :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) :where(svg.wire.sd-enter) :where(path:not(.head)) {
+    animation: sdDraw .6s cubic-bezier(.4, 0, .2, 1) var(--sd-turn, var(--sd-delay, 0s)) both;
+  }
+  :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) :where(svg.wire.sd-enter) :where(path.head) {
+    animation: sdHeadIn .6s linear var(--sd-turn, var(--sd-delay, 0s)) both;
   }
 }
 
