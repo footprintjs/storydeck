@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.0 — a part can have its own look (data-theme)
 
 - **A part can have its own look: `data-theme`.** `<section … data-theme="ledger">` in clicks.html puts
   `data-theme="ledger"` on each slide of that part (plain or on a map), so a deck's theme.css can give one part its own
