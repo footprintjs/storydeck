@@ -34,6 +34,20 @@
 
 const KINDS = ['look', 'camera', 'mover', 'overlay', 'order'];
 
+/**
+ * Names as a click writes them, each `name+` read as that piece and what touches it: the wires that have it as an end
+ * (a piece's `ends`) and the pieces at their other ends — "the gateway and everything it talks to". A piece actually
+ * called `name+` is itself.
+ */
+export function expandNames(pieces, list) {
+  const own = new Set(pieces.flatMap(p => p.keys));
+  return list.flatMap(x => {
+    if (!x.endsWith('+') || x.length < 2 || own.has(x)) return [x];
+    const name = x.slice(0, -1), wires = pieces.filter(p => p.ends?.includes(name));
+    return [...new Set([name, ...wires.map(p => p.keys[0]), ...wires.flatMap(p => p.ends.filter(e => e !== name))])];
+  });
+}
+
 /** A box {x, y, w, h} around a list of boxes (null for none). */
 function union(boxes) {
   const known = boxes.filter(Boolean);
@@ -266,7 +280,7 @@ function changeOf(st, was, look, wasLook, entering, before) {
 export function focusStep(prev, step, deck) {
   const {pieces, strategies = {}} = deck, canvas = deck.canvas ?? {w: 1920, h: 1080};
   const view = deck.view ?? {s: 1, x: 0, y: 0}, areaSlide = deck.area ?? [0, 0, canvas.w, canvas.h];
-  const names = l => (l ?? []).flatMap(x => String(x).trim().split(/\s+/)).filter(Boolean);
+  const names = l => expandNames(pieces, (l ?? []).flatMap(x => String(x).trim().split(/\s+/)).filter(Boolean));
   const ins = names(step.in), outs = names(step.out), on = step.on === undefined || step.on === null ? null : names(step.on), hot = names(step.hot);
   const has = (i, l) => l.includes('*') || l.some(x => pieces[i].keys.includes(x));
   const known = (l, what) => { for (const x of l) if (x !== '*' && !pieces.some(p => p.keys.includes(x))) throw new Error(`${what}no piece "${x}" (the pieces are named ${[...new Set(pieces.flatMap(p => p.keys))].join(', ')})`); return l; };
@@ -294,15 +308,17 @@ export function focusStep(prev, step, deck) {
   // boxOf(names): the box around the shown pieces of those names, for a mover that moves named groups (place).
   const boxOf = l => union(all.filter(i => states[i] !== 'gone' && has(i, known(names([].concat(l)), 'focus group: '))).map(i => pieces[i].box));
   const placed = chosen.mover ? chosen.mover.s.place({subject, context, area, view, canvas, boxOf, options: chosen.mover.options}) ?? {} : {};
+  // a group's names as the click reads every name (gw+ is gw and what it touches), once, for everything below
+  const placedGroups = (placed.groups ?? []).map(x => ({...x, names: names(x.names)}));
   // Named groups (later ones win a piece in two of them) take their pieces out of the subject and context groups. A
   // mover whose groups go by a spring (apart) has each moved piece remember its group, so the next click knows what closes.
   const spring = placed.spring === undefined || placed.spring === null ? null : readSpring(placed.spring, chosen.mover.name);
   const springOf = new Map();
-  for (const {names: l, g} of placed.groups ?? []) for (const i of all) if (states[i] !== 'gone' && has(i, l)) {
+  for (const {names: l, g} of placedGroups) for (const i of all) if (states[i] !== 'gone' && has(i, l)) {
     inGroup.set(i, g ? {g} : 'still');
     if (spring && g) springOf.set(i, l.join(' ')); else springOf.delete(i);
   }
-  const springGroups = [...new Map((spring ? placed.groups ?? [] : []).filter(x => x.g).map(x => [x.names.join(' '), [...x.names]]))];
+  const springGroups = [...new Map((spring ? placedGroups : []).filter(x => x.g).map(x => [x.names.join(' '), [...x.names]]))];
   const groupOf = i => { const k = inGroup.get(i); return k === 'subject' ? placed.subject : k === 'context' ? placed.context : k?.g ?? null; };
   const moves = pieces.map((p, i) => states[i] === 'gone' ? null : placePiece(groupOf(i), p.box));
   // The camera sees the click as the mover leaves it: every box moved by its group. Two things a camera never shares

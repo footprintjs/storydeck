@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { FOCUS, readFocus, focusStep, planFocus } from './focus';
+import { FOCUS, readFocus, focusStep, planFocus, expandNames } from './focus';
 
 // A small map: a page on the left, a code box on the right, a label with no size, and a note with no place.
 const pieces = [
@@ -569,5 +569,47 @@ describe('focus · the camera: zoom goes with a mover', () => {
   it('a camera with nothing to frame does not move the view', () => {
     const none = focusStep(null, { in: ['lid'], on: [], quiet: true, focus: 'zoom' }, fig).look;
     expect(none.stage).toBeNull();
+  });
+});
+
+describe('focus · a piece and what it touches (name+)', () => {
+  // browser → gw → runtime, and gw → db; a wire knows its ends
+  const graph = [
+    { keys: ['browser'], box: { x: 0, y: 0, w: 100, h: 100 } },
+    { keys: ['gw'], box: { x: 300, y: 0, w: 100, h: 100 } },
+    { keys: ['runtime'], box: { x: 600, y: 0, w: 100, h: 100 } },
+    { keys: ['db'], box: { x: 300, y: 300, w: 100, h: 100 } },
+    { keys: ['w1', 'req'], box: null, ends: ['browser', 'gw'] },
+    { keys: ['w2'], box: null, ends: ['gw', 'runtime'] },
+    { keys: ['w3'], box: null, ends: ['gw', 'db'] },
+    { keys: ['w4'], box: null, ends: ['runtime', 'db'] },
+  ];
+
+  it('reads gw+ as gw, the wires with gw as an end, and the pieces at their other ends — the rest as written', () => {
+    expect(expandNames(graph, ['gw+'])).toEqual(['gw', 'w1', 'w2', 'w3', 'browser', 'runtime', 'db']);
+    expect(expandNames(graph, ['browser+', 'x', '*'])).toEqual(['browser', 'w1', 'gw', 'x', '*']);
+    expect(expandNames(graph, ['+', 'w1+'])).toEqual(['+', 'w1']);   // a wire touches nothing by its own name
+  });
+
+  it('a piece called name+ is itself', () => {
+    expect(expandNames([...graph, { keys: ['gw+'], box: null }], ['gw+'])).toEqual(['gw+']);
+  });
+
+  it('a click about gw+ lights gw and its neighbourhood, and greys the rest', () => {
+    const { look } = focusStep(null, { in: ['*'], on: ['gw+'], quiet: true, fresh: true }, { pieces: graph });   // quiet: what comes in greyed
+    expect(look.pieces.map((p) => p.state)).toEqual(['on', 'on', 'on', 'on', 'on', 'on', 'on', 'dim']);
+  });
+
+  it('names an unknown piece as written', () => {
+    expect(() => focusStep(null, { in: ['*'], on: ['gateway+'], fresh: true }, { pieces: graph })).toThrow(/no piece "gateway"/);
+  });
+
+  it('a group a mover moves reads name+ too: apart and place move the piece and what it touches', () => {
+    const moved = (look) => look.pieces.map((p, i) => (p.move ? graph[i].keys[0] : null)).filter(Boolean);
+    const apart = focusStep(null, { in: ['*'], quiet: true, fresh: true, focus: 'apart', options: { apart: 'browser+: 0 -200' } }, { pieces: graph });
+    expect(moved(apart.look)).toEqual(['browser', 'gw']);   // the wire has no box of its own to move
+    expect(apart.look.apart.groups[0].names).toEqual(['browser', 'w1', 'gw']);
+    const place = focusStep(null, { in: ['*'], quiet: true, fresh: true, focus: 'place', options: { groups: 'runtime+: 100 0 1' } }, { pieces: graph });
+    expect(moved(place.look)).toEqual(['gw', 'runtime', 'db']);
   });
 });

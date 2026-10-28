@@ -9,6 +9,7 @@
 //   theme-unstyled a part asks for a data-theme that theme.css never selects ([data-theme="…"]): a misspelt name changes nothing
 //   loop-unset     a loop of the deck's own (a bare data-loop) that nothing gives a --loop: nothing loops
 import {wordCount} from './parse.js';
+import {expandNames} from '../focus.js';
 import {LOOP_NAMES} from './loops.js';
 
 const names = (pieces, idx) => [...new Set(idx.map((i) => pieces[i].keys[0]))];
@@ -25,7 +26,7 @@ function words(c, {maxWords, maxSlideWords}) {
 /** Pieces that come in lit although the click names its subject and they are not in it. */
 function litOnEntry(c, pieces) {
   if (c.kind !== 'map' || c.step.on === null || c.step.quiet) return [];
-  const on = c.step.on;
+  const on = expandNames(pieces, c.step.on);   // "gw+": gw, its wires and what they reach
   if (on.includes('*')) return [];
   const extra = c.look.pieces.map((p, i) => (p.state === 'on' && (p.change === 'enter' || p.change === 'arrive') && !pieces[i].keys.some((k) => on.includes(k)) ? i : null)).filter((i) => i !== null);
   if (!extra.length) return [];

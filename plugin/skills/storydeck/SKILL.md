@@ -61,7 +61,10 @@ dev page only StoryDeck's own scripts run: a deck's own `<script>` runs in the b
 In clicks.html, a `<section data-label data-kicker>` is a plain slide; with `data-map="map"` each `<step>` in it is one
 click on map.html (`data-in`, `data-out`, `data-on`, `data-quiet`, `data-focus` and `data-focus-*`), holding only its
 `<h2>` and `<aside class="notes">` — anything else in a step is refused, naming where it goes (a piece on the map). On
-a map, `<i data-k="w" class="wire pkt" data-arrow="x1 y1 x2 y2 [bend]"></i>` is a wire with a packet and
+a map, `<i data-k="w" class="wire pkt" data-arrow="client to server"></i>` is a wire with a packet, edge to edge
+between the two pieces and following them when they move (prefer it to `"x1 y1 x2 y2"` numbers; a wire each way between
+the same pieces gets its own lane; a bend may follow: `"gw to db 40"`); `data-on="gw+"` is gw, its wires and what they
+reach; and
 `<i class="ic" data-icon="name"></i>` is icons/name.svg. A piece that comes in lights unless the click is `data-quiet`
 (`check` warns: `lit-on-entry`). Motion that keeps going is a loop: `data-loop="pulse"` (or `float`, `marquee`, with a
 pace: `"float 4s"`) on a piece, or `data-loop` alone with the piece's own `--loop: spin 6s linear infinite` in

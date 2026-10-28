@@ -39,7 +39,7 @@ describe('wires', () => {
   });
 
   it('refuses a wire that is not four or five numbers', () => {
-    expect(() => wires('<i data-arrow="1 2 3"></i>')).toThrow(/data-arrow="1 2 3": a wire is "x1 y1 x2 y2"/);
+    expect(() => wires('<i data-arrow="1 2 3"></i>')).toThrow('data-arrow="1 2 3": a wire is the pieces it joins, "from to to" ("client to server"), or "x1 y1 x2 y2" in slide px — either with an optional bend');
     expect(() => wires('<i data-arrow="1 2 3 x"></i>')).toThrow(/a wire is/);
   });
 });
@@ -155,5 +155,88 @@ describe('a packet on the curve, a wire shown in', () => {
     expect(readFileSync(path.join(process.cwd(), 'focus.css'), 'utf8')).toContain('sdLeave .45s ease calc(var(--sd-turn) + var(--sd-twin-lag, 0s)) both');
     expect(readFileSync(path.join(process.cwd(), 'focus.css'), 'utf8')).toContain('var(--sd-a-path, sdNone 0s), var(--sd-a-more, sdNone 0s), var(--sd-a-loop, sdNone 0s); }');
     expect(wires('<i data-k="w" data-arrow="0 0 9 9"></i>')).not.toContain('pathLength');
+  });
+});
+
+describe('a wire between pieces ("from to to")', () => {
+  const box = (k, x, y, w = 300, h = 210) => `<div data-k="${k}" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px"></div>`;
+  /** Each wire as drawn: its ends (data-ends) and its run in slide px, from the drawn box and path. */
+  const drawn = (html) => [...wires(html).matchAll(/<svg( data-ends="([^"]*)")?[^>]*style="left:([\d.-]+)px;top:([\d.-]+)px[^"]*"[^>]*><path d="M([\d.-]+) ([\d.-]+) Q[\d.-]+ [\d.-]+ ([\d.-]+) ([\d.-]+)"/g)]
+    .map((m) => ({ends: m[2] ?? null, from: [+m[5] + +m[3], +m[6] + +m[4]], to: [+m[7] + +m[3], +m[8] + +m[4]]}));
+  const two = box('client', 160, 420) + box('server', 720, 420);
+
+  it('runs from the edge of one box to the edge of the other, 6 px clear, and carries its ends', () => {
+    const [w] = drawn(`${two}<i data-k="req" data-arrow="client to server"></i>`);
+    expect(w.ends).toBe('client server');
+    expect(w.from).toEqual([466, 525]);              // the client's right edge (460) + 6, at its middle
+    expect(w.to[1]).toBe(525);
+    expect(w.to[0]).toBeCloseTo(720 - 6 - 18 * 0.8, 1);   // the path stops where the head begins; the tip is the server's edge − 6
+  });
+
+  it('keeps two wires between the same pieces apart, one lane each — whichever way they run', () => {
+    const [req, ret] = drawn(`${two}<i data-k="req" data-arrow="client to server"></i><i data-k="ret" data-arrow="server to client"></i>`);
+    expect([req.from[1], ret.from[1]]).toEqual([485, 565]);   // 80 px apart, about the middle
+    expect(ret.from[0]).toBe(714);                              // the answer leaves the server's left edge, towards the client
+    const three = drawn(`${two}<i data-k="a" data-arrow="client to server"></i><i data-k="c" data-arrow="server to client"></i><i data-k="b" data-arrow="client to server"></i>`);
+    expect(three.map((w) => w.from[1])).toEqual([445, 605, 525]);   // both requests above the answer, in the order written
+  });
+
+  it('keeps to its left whatever the pieces are called: the lanes follow the way a wire runs, never the names', () => {
+    const lanes = (l, r) => drawn(`${box(l, 160, 420)}${box(r, 720, 420)}<i data-k="req" data-arrow="${l} to ${r}"></i><i data-k="ret" data-arrow="${r} to ${l}"></i>`).map((w) => w.from[1]);
+    expect(lanes('client', 'server')).toEqual([485, 565]);
+    expect(lanes('zed', 'alpha')).toEqual([485, 565]);   // "alpha" sorts first: the drawing is the same
+    // running down the slide, a wire's left is the slide's right
+    const [down, up] = drawn(`${box('a', 0, 0)}${box('b', 0, 600)}<i data-k="d" data-arrow="a to b"></i><i data-k="u" data-arrow="b to a"></i>`);
+    expect(down.from[0]).toBeGreaterThan(up.from[0]);
+  });
+
+  it('keeps the lanes inside small boxes, and a lone wire on the middle line', () => {
+    const small = box('a', 0, 0, 100, 40) + box('b', 400, 0, 100, 40);
+    const [x, y] = drawn(`${small}<i data-k="x" data-arrow="a to b"></i><i data-k="y" data-arrow="b to a"></i>`);
+    expect([x.from[1], y.from[1]]).toEqual([8, 32]);   // half the box (20) − 8 each way, not 80 apart
+    expect(drawn(`${small}<i data-k="x" data-arrow="a to b"></i>`)[0].from[1]).toBe(20);
+  });
+
+  it('keeps its lanes across a wide, flat box on a slant: each wire leaves its box\'s edge and its tip reaches the other\'s', () => {
+    const A = {x: 0, y: 0, w: 600, h: 60}, B = {x: 600, y: 300, w: 600, h: 60};
+    const html = `${box('a', A.x, A.y, A.w, A.h)}${box('b', B.x, B.y, B.w, B.h)}<i data-k="x" data-arrow="a to b"></i><i data-k="y" data-arrow="b to a"></i><i data-k="z" data-arrow="a to b"></i>`;
+    // each wire's start (its path's first point) and its tip (its head's first point), in slide px
+    const ends = [...wires(html).matchAll(/data-ends="(\w) (\w)"[^>]*style="left:([\d.-]+)px;top:([\d.-]+)px[^>]*><path d="M([\d.-]+) ([\d.-]+)[^"]*"\/><path class="head" d="M([\d.-]+) ([\d.-]+)/g)]
+      .map((m) => ({from: m[1], start: [+m[5] + +m[3], +m[6] + +m[4]], tip: [+m[7] + +m[3], +m[8] + +m[4]]}));
+    // a point 6 px outside a box's edge (a little more on a slant), never inside it or far from it
+    const near = ([x, y], b) => {
+      const dx = Math.max(b.x - x, 0, x - b.x - b.w), dy = Math.max(b.y - y, 0, y - b.y - b.h);
+      return Math.hypot(dx, dy) > 2 && Math.hypot(dx, dy) < 8;
+    };
+    expect(ends).toHaveLength(3);
+    for (const w of ends) {
+      const [from, to] = w.from === 'a' ? [A, B] : [B, A];
+      expect(near(w.start, from), JSON.stringify(w)).toBe(true);
+      expect(near(w.tip, to), JSON.stringify(w)).toBe(true);
+    }
+    expect(new Set(ends.map((w) => w.start.join())).size).toBe(3);   // three lanes, none on another
+  });
+
+  it('leaves through whichever edge the line crosses, keeps its bend, and finds a name shared by several pieces as one box', () => {
+    const [w] = drawn(`${box('top', 400, 0, 200, 100)}${box('low', 400, 600, 200, 100)}<i data-k="w" data-arrow="top to low 30"></i>`);
+    expect(w.from).toEqual([500, 106]);   // the bottom edge
+    expect(wires(`${box('top', 400, 0, 200, 100)}${box('low', 400, 600, 200, 100)}<i data-k="w" data-arrow="top to low 30"></i>`)).toMatch(/Q\S+ \S+ /);
+    const [u] = drawn(`${box('g', 0, 0, 100, 100)}${box('g', 0, 200, 100, 100)}${box('far', 600, 100, 100, 100)}<i data-k="u" data-arrow="g to far"></i>`);
+    expect(u.from).toEqual([106, 150]);   // from the box around both "g" pieces
+  });
+
+  it('draws numbered wires as before, beside named ones', () => {
+    const html = `${two}<i data-k="n" data-arrow="252 352 318 352"></i><i data-k="req" data-arrow="client to server"></i>`;
+    expect(drawn(html)[0]).toEqual({ends: null, from: [252, 352], to: [318 - 18 * 0.8, 352]});
+  });
+
+  it('refuses a piece it cannot find, a wire to itself, and pieces too close — naming the fix', () => {
+    expect(() => wires(`${two}<i data-k="w" data-arrow="client to db"></i>`)).toThrow('data-arrow="client to db": no piece "db" with a box (data-k, and an inline left, top, width and height) — the placed pieces are client, server');
+    expect(() => wires('<i data-k="w" data-arrow="a to b"></i>')).toThrow('data-arrow="a to b": no piece "a" with a box (data-k, and an inline left, top, width and height)');
+    const many = Array.from({length: 21}, (_, i) => box(`p${i}`, i * 400, 0)).join('');
+    expect(() => wires(`${many}<i data-k="w" data-arrow="p0 to q"></i>`)).toThrow(/the placed pieces are p0, p1, (p\d+, ){17}p19, …$/);
+    expect(() => wires(`${two}<i data-k="w" data-arrow="client to client"></i>`)).toThrow('data-arrow="client to client": a wire joins two pieces, not "client" to itself');
+    expect(() => wires(`${box('a', 0, 0)}${box('b', 290, 0)}<i data-k="w" data-arrow="a to b"></i>`)).toThrow('data-arrow="a to b": "a" and "b" are too close for a wire between them (they touch or overlap) — move them apart, or give the wire numbers');
+    expect(() => wires(`${box('a', 0, 0)}${box('b', 0, 0)}<i data-k="w" data-arrow="a to b"></i>`)).toThrow(/share a middle/);
   });
 });

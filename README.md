@@ -417,10 +417,16 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   loops (it needs Playwright installed beside
   StoryDeck: `npm i -D footprint-storydeck playwright-core`; without it, it says so and the other checks run). `mcp` serves the same tools to an AI assistant:
   `claude mcp add storydeck -- npx footprint-storydeck mcp my-talk`.
-- **The helpers a diagram needs.** `<i data-k="w1" class="wire pkt" data-arrow="252 352 318 352"></i>` is a wire (an
-  SVG arrow, with an optional bend; class `pkt` adds a packet that rides it on a `path` click, at its turn — along the
-  curve itself, not a straight line across the bend). A wire that comes in shows itself from its start to its tip,
-  its dashes and colours as your theme draws them.
+- **The helpers a diagram needs.** `<i data-k="w1" class="wire pkt" data-arrow="client to server"></i>` is a wire (an
+  SVG arrow) from the edge of one piece's box to the edge of the other's. It follows them: move a box (in the file, or
+  by Alt-drag in the dev page) and its wires go with it. Two wires between the same pieces each take a lane, keeping to
+  their left, so a request going right runs above its answer coming back; a bend may follow the names
+  (`"gw to db 40"`). `data-arrow="252 352 318 352"` places a wire by hand, in slide px. Class `pkt` adds a packet that
+  rides the wire on a `path` click, at its turn — along the curve itself, not a straight line across the bend. A wire
+  that comes in shows itself from its start to its tip, its dashes and colours as your theme draws them. A wire between
+  pieces knows its ends, so a click can be about a piece and everything it touches: `data-on="gw+"` lights the
+  gateway, its wires and the pieces at their other ends, and greys the rest (`review` lists them); it reads in every
+  list of names a click has, the groups a mover moves too (`data-focus-apart="gw+: 0 -200"`).
   `<i class="ic" data-icon="server"></i>` is `icons/server.svg`. `deck.css` styles the chrome (kicker, headline, footer
   and count), wires, packets, icons and the theme toggle from the token contract, every rule `:where()`, so your
   theme wins.

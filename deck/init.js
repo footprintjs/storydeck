@@ -13,17 +13,19 @@ const DECK_JSON = `{
 const MAP = `<!--
   The map: one picture the story is told on, in slide pixels (1920 × 1080).
   Every element with data-k="name" and an inline left/top/width/height is a piece a click can bring in, light,
-  grey or move. Pieces never nest. <i data-arrow="x1 y1 x2 y2 [bend]"> becomes a wire (class "pkt": a packet runs
-  along it on a path click); <i class="ic" data-icon="name"> is icons/name.svg. data-loop="pulse" (float, marquee)
+  grey or move. Pieces never nest. <i data-arrow="client to server"> becomes a wire from one piece's edge to the
+  other's (it follows them when they move; "x1 y1 x2 y2" in slide px places it by hand; a bend may follow either),
+  class "pkt": a packet runs along it on a path click. In a click, "server+" is the server, its wires and what they
+  reach. <i class="ic" data-icon="name"> is icons/name.svg. data-loop="pulse" (float, marquee)
   keeps a piece moving while its slide is shown; data-loop alone runs its own --loop from theme.css.
 -->
 <div data-k="client" class="box" style="left:160px;top:420px;width:300px;height:210px"><i class="ic" data-icon="client"></i><b>Client</b><small>a browser</small></div>
-<i data-k="req1" class="wire req pkt" data-arrow="464 490 716 490"></i>
+<i data-k="req1" class="wire req pkt" data-arrow="client to server"></i>
 <div data-k="server" class="box" style="left:720px;top:420px;width:300px;height:210px"><i class="ic" data-icon="server"></i><b>Server</b><small>an API</small></div>
-<i data-k="req2" class="wire req pkt" data-arrow="1024 490 1276 490"></i>
+<i data-k="req2" class="wire req pkt" data-arrow="server to db"></i>
 <div data-k="db" class="box" style="left:1280px;top:420px;width:300px;height:210px"><i class="ic" data-icon="database"></i><b>Database</b><small>where the data lives</small></div>
-<i data-k="ret2" class="wire ret pkt" data-arrow="1276 570 1024 570"></i>
-<i data-k="ret1" class="wire ret pkt" data-arrow="716 570 464 570"></i>
+<i data-k="ret2" class="wire ret pkt" data-arrow="db to server"></i>
+<i data-k="ret1" class="wire ret pkt" data-arrow="server to client"></i>
 <div data-k="time" class="chip" style="left:760px;top:670px;width:220px;height:70px"><b>120 ms</b><small>illustration</small></div>
 `;
 
