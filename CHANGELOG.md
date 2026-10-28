@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.1 — footprint-narration is now footprint-story
 
 - **footprint-narration is now footprint-story.** StoryDeck's shared narration code (shown-vs-spoken text, captions,
   chapters, the voice cache) comes from `footprint-story` 0.3.0, the same package under its new name: what StoryDeck
