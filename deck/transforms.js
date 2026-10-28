@@ -15,7 +15,8 @@
 // that rides the curve itself on a path click (hidden at rest, so print, a jump and reduced motion show the plain
 // wire); a wire that comes in draws itself, start to tip.
 //
-// A wire's options (deck.css draws them from the theme's tokens):
+// A wire's options (deck.css draws them from the theme's tokens; a ">" or "<" in a value is written &gt; or &lt;, as a
+// tag ends at its first ">"):
 //   data-label="InvokeAgentRuntime"   its name, at its middle, on its left (a request's above it, its answer's below)
 //   class "halo"                      a soft glow around it (--wire-halo)
 //   data-packets="2" data-speed="5"   packets that keep running along it while its slide is shown, 5 s a run, evenly
@@ -24,7 +25,7 @@
 
 import {stripComments} from './html.js';
 import {readPieces} from '../focusHtml.js';
-import {attrValue} from '../pieceRules.js';
+import {readAttributes} from '../pieceRules.js';
 
 const fixed = (v) => +v.toFixed(1);
 /** A wire written by the pieces it joins: "from to to [bend]". */
@@ -38,10 +39,12 @@ const MOST_PACKETS = 6;
 const SPEEDS = [0.5, 60];   // seconds a packet takes to run the wire
 const LABEL = {size: 18, char: 12, clear: 8};   // deck.css's label: its px size, a generous width per letter, px clear of the wire
 
-/** A wire's options, read from its attributes and checked: {label, packets, speed}. */
+/** A wire's options, read as a browser reads its tag (the first of two with one name counts) and checked: {label, packets, speed}. */
 function wireOptions(attrs, spec) {
-  const label = attrValue(attrs, 'data-label')?.value.trim() || null, packets = attrValue(attrs, 'data-packets')?.value, speed = attrValue(attrs, 'data-speed')?.value;
-  const where = `wire data-arrow="${spec}"`;
+  const where = `wire data-arrow="${spec}"`, read = readAttributes(attrs);
+  if (!read) throw new Error(`${where}: a quote in its tag is never closed — write a ">" or "<" inside a value as &gt; or &lt;`);
+  const value = (name) => read.find((a) => a.name === name)?.value;
+  const label = value('data-label')?.trim() || null, packets = value('data-packets'), speed = value('data-speed');
   if (packets !== undefined && !/^[1-9]\d*$/.test(packets.trim())) throw new Error(`${where}: data-packets="${packets}" — the packets that run along it are a whole number, 1 to ${MOST_PACKETS}`);
   const n = packets === undefined ? 0 : Number(packets);
   if (n > MOST_PACKETS) throw new Error(`${where}: data-packets="${packets}" — at most ${MOST_PACKETS} packets run along one wire`);
@@ -64,7 +67,10 @@ function wireSvg(attrs, spec) {
   // the label: beside the curve's middle, B(½), to the left of the way it runs there (its tangent is end − start), as
   // far off as half the label measures across the wire, and LABEL.clear more: above a level wire, beside a standing one
   const half = o.label ? [(o.label.length * LABEL.char) / 2 + 4, LABEL.size / 2 + 4] : null;   // the box holds it, so a wire showing itself in shows it too
-  const off = half ? (Math.abs(dy) / len) * half[0] + (Math.abs(dx) / len) * half[1] + LABEL.clear : 0;
+  let off = half ? (Math.abs(dy) / len) * half[0] + (Math.abs(dx) / len) * half[1] + LABEL.clear : 0;
+  // a wire bent away from its label curves back towards it on either side of its middle — by 2·bend·u²/len² at u along
+  // it, never past the line from end to end: the label stands clear of the curve under its whole width too
+  if (half && bend > 0) off += Math.min(bend / 2, (2 * bend * ((Math.abs(dx) / len) * half[0] + (Math.abs(dy) / len) * half[1]) ** 2) / len ** 2);
   const lx = 0.25 * x1 + 0.5 * cx + 0.25 * x2 + (dy / len) * off, ly = 0.25 * y1 + 0.5 * cy + 0.25 * y2 - (dx / len) * off;
   const xs = [x1, x2, cx, ...(half ? [lx - half[0] + 20, lx + half[0] - 20] : [])], ys = [y1, y2, cy, ...(half ? [ly - half[1] + 20, ly + half[1] - 20] : [])];
   const pad = 20, X = Math.min(...xs) - pad, Y = Math.min(...ys) - pad;
@@ -81,7 +87,7 @@ function wireSvg(attrs, spec) {
     : '';
   // packets that keep running (deck.css · sdRun): loops on one clock, each its share of a run behind the one before
   const ride = `--cdx:${f(cx - x1)}px;--cdy:${f(cy - y1)}px;--pdx:${f(ex - x1)}px;--pdy:${f(ey - y1)}px`;
-  const runs = Array.from({length: o.packets}, (_, k) => `<circle class="run" data-loop cx="${f(x1 - X)}" cy="${f(y1 - Y)}" r="7" style="${ride};--loop:sdRun ${o.speed}s linear ${f((-k * o.speed) / o.packets) + 0}s infinite"/>`).join('');
+  const runs = Array.from({length: o.packets}, (_, k) => `<circle class="run" data-loop cx="${f(x1 - X)}" cy="${f(y1 - Y)}" r="7" style="${ride};--loop:sdRun ${o.speed}s linear ${+((-k * o.speed) / o.packets).toFixed(3) + 0}s infinite"/>`).join('');
   const label = o.label ? `<text class="label" x="${f(lx - X)}" y="${f(ly - Y)}" text-anchor="middle">${o.label}</text>` : '';
   // which way it runs, start to tip, as a CSS angle (0 up, 90 right): a wire coming in shows itself that way (deck.css · sdReveal)
   const angle = f((Math.atan2(dx, -dy) * 180) / Math.PI);

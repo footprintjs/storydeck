@@ -266,7 +266,29 @@ describe('a wire\'s options: data-label, data-packets, data-speed', () => {
     const runs = [...svg(' data-packets="3" data-speed="6s"').matchAll(/<circle class="run" data-loop [^>]*--loop:sdRun 6s linear (-?[\d.]+)s infinite"\/>/g)].map((m) => Number(m[1]));
     expect(runs).toEqual([0, -2, -4]);
     expect(svg(' data-packets="1"')).toContain('--loop:sdRun 3s linear 0s infinite');
-    expect(svg(' data-packets="2" data-speed="1.5"')).toContain('--loop:sdRun 1.5s linear -0.8s infinite');
+    expect(svg(' data-packets="2" data-speed="1.5"')).toContain('--loop:sdRun 1.5s linear -0.75s infinite');
+    // fast and many: still evenly spaced (to the ms), never two on one spot
+    const fast = [...svg(' data-packets="6" data-speed="0.5"').matchAll(/linear (-?[\d.]+)s infinite/g)].map((m) => Number(m[1]));
+    expect(fast).toEqual([0, -0.083, -0.167, -0.25, -0.333, -0.417]);
+  });
+
+  it('reads its options as a browser reads the tag: not from inside another attribute\'s value, in any case, quoted or not', () => {
+    expect(svg(' title="see data-label=\'x\' data-packets=\'9\'" data-label="Real"')).toMatch(/>Real<\/text>/);
+    expect(svg(' title="see data-label=\'x\' data-packets=\'9\'" data-label="Real"')).not.toContain('class="run"');
+    expect(svg(' DATA-LABEL="Up" Data-Packets=2')).toMatch(/>Up<\/text>.*|class="run"/s);
+    expect(svg(' DATA-LABEL="Up" Data-Packets=2').match(/class="run"/g)).toHaveLength(2);
+    expect(svg(' data-label="first" data-label="second"')).toContain('>first</text>');
+    expect(() => wires('<i data-k="w" data-arrow="1 2 3 4" title="a></i>')).toThrow('wire data-arrow="1 2 3 4": a quote in its tag is never closed — write a ">" or "<" inside a value as &gt; or &lt;');
+  });
+
+  it('keeps a label clear of a wire bent away from it, under the label\'s whole width', () => {
+    const labelled = (bend) => svg(` data-label="ABCDEFGHIJ"`, `100 300 300 300 ${bend}`);
+    const yOf = (html) => at(html, /top:([\d.-]+)px/)[0] + at(html, /<text class="label" x="[\d.-]+" y="([\d.-]+)"/)[0];
+    // bent 150 px down (away from the label above it): its middle is at y 375, and under the label's ends it rises
+    // 2·150·u²/200² back towards the label
+    const bottom = yOf(labelled(150)) + 9, rise = (2 * 150 * 64 ** 2) / 200 ** 2;   // 64: half the label's width as drawn (10 letters × 12 / 2 + 4)
+    expect(375 - rise - bottom).toBeCloseTo(12, 0);   // clear of the curve under its ends by its plain gap
+    expect(yOf(labelled(-150))).toBe(300 - 75 - 21);   // bent towards it: the curve leaves, the label keeps its plain gap
   });
 
   it('refuses packets it cannot run and a speed for no packets — naming the fix', () => {

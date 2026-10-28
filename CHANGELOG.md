@@ -19,7 +19,10 @@
   loops, so they run only on the slide shown, in step from click to click, and where loops do not run (reduced motion,
   print, motion off) the first rests at the wire's middle. They are the wire's, not the deck's loops: `review` and
   `check` do not list them. A wire without these is drawn byte for byte as before; packets it cannot run, and a speed
-  with no packets, are refused naming the fix.
+  with no packets, are refused naming the fix. They are read as a browser reads the tag (never from inside another
+  attribute's value, in any case, quoted or not); a `>` or `<` in a value is written `&gt;` or `&lt;`, since a tag ends
+  at its first `>`. A deck that already put its own `data-label`, `data-packets` or `data-speed` on a wire (for its
+  own CSS) now gets them drawn: rename them. A loop an icon file carries is now found by `review` and `check` too.
 - **A piece and what it touches: `name+`.** A wire between pieces carries `data-ends` (the pieces it joins; a wire in
   numbers may carry it too), so a click can name `gw+`: the gateway, the wires with it as an end, and the pieces at
   their other ends — `data-on="gw+"` lights that neighbourhood and greys the rest. It reads anywhere a click names

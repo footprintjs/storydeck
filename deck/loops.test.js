@@ -150,6 +150,14 @@ describe('loops in a deck', () => {
     expect(checkDeck(c).some((p) => p.rule === 'loop-unset')).toBe(false);
   });
 
+  it('finds a loop an icon carries, as the build draws it', () => {
+    const map = MAP.replace('>A</div>', '><i class="ic" data-icon="gear"></i></div>');
+    const c = compileDeck(sourceOf({clicks: '<section data-label="M" data-map="map"><step data-in="*"><h2>All</h2></step></section>', maps: {map},
+      icons: {gear: '<svg viewBox="0 0 8 8"><g data-loop="float"><circle r="3"/></g></svg>'}}));
+    expect(c.clicks[0].loops).toEqual([{piece: null, value: 'float'}]);
+    expect(c.loops).toEqual(['float']);
+  });
+
   it('refuses a map\'s unknown loop, naming the map and the piece', () => {
     expect(() => compileDeck(sourceOf({clicks, maps: {map: map.replace('data-loop="pulse"', 'data-loop="puls"')}}))).toThrow(/^map "map", piece "b": data-loop="puls" is not a loop/);
   });
