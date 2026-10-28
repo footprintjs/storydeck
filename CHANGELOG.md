@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.10.0 — a part arrives with a change of picture, and a deck a viewer can explore
 
 - **A part arrives with a change of picture: `data-enter`.** `<section … data-enter="push" data-enter-from="right">`
   plays one of the editor's changes StoryReel's films use (footprint-story/motion's table: the same names, settings,
