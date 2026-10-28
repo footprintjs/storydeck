@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **Loops keep running in a video.** `renderVideo` stepped a click until its last entrance ended and held that frame,
+  so a loop (a pulse, packets on a wire) stood still for the rest of the click and started again at the next. A click
+  whose loops run is now stepped on to its end, each loop at the video's own time, so they run on from click to click
+  as in the room; a click without loops renders as before, and the timeline is unchanged. It costs frames — a looping
+  click is one frame per 1/fps of its length — so `loops: false` holds the frame as before, for a fast draft. The
+  browser port gains an optional `loops()` and `seek(ms, {loop})`; a driver without them renders as before.
+
 ## 0.10.0 — a part arrives with a change of picture, and a deck a viewer can explore
 
 - **A part arrives with a change of picture: `data-enter`.** `<section … data-enter="push" data-enter-from="right">`

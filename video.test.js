@@ -64,7 +64,7 @@ describe('video · ffmpeg\'s arguments', () => {
 });
 
 /** A browser stand-in: a click's entrance lasts what `ends` says; every frame is a small file. */
-function fakeDriver(ends = {}) {
+function fakeDriver(ends = {}, looping = []) {
   const log = [];
   let n = 0;
   return {
@@ -72,7 +72,8 @@ function fakeDriver(ends = {}) {
     open: vi.fn(async (url) => log.push(`open ${url}`)),
     step: vi.fn(async (k) => { n = k; log.push(`step ${k}`); }),
     freeze: vi.fn(async () => ends[n] ?? 0),
-    seek: vi.fn(async (ms) => log.push(`seek ${Math.round(ms)}`)),
+    loops: vi.fn(async () => looping.includes(n)),
+    seek: vi.fn(async (ms, o) => log.push(`seek ${Math.round(ms)}${o ? ` loop ${Math.round(o.loop)}` : ''}`)),
     shot: vi.fn(async (file) => writeFileSync(file, 'png')),
     close: vi.fn(async () => log.push('close')),
   };
@@ -119,6 +120,19 @@ describe('video · rendering', () => {
     expect(calls[5].at(-1)).toBe(path.join(out, 'talk.mp4'));
     expect(calls[6]).toEqual(['-y', '-loglevel', 'error', '-i', path.join(work, 'frames', 'c004-002.png'), '-vf', 'scale=1280:720', '-q:v', '2', path.join(out, 'thumbnail.jpg')]);
     expect(readFileSync(path.join(work, 'audio.ffconcat'), 'utf8')).toContain(`file '${path.join(work, 'audio', 'c001.wav')}'`);
+  });
+
+  it('steps a click whose loops run on to its end, the loops at the video\'s own time — and holds it with loops: false', async () => {
+    const steps = STEPS.slice(0, 2), { run } = fakeRun();
+    const driver = fakeDriver({ 1: 100, 2: 0 }, [2]);
+    const done = await renderVideo({ url: 'u', steps, out: path.join(dir, 'l1'), driver, run, fps: 10 });
+    const c2 = done.plan[1], seeks = driver.log.filter((l) => l.startsWith('seek')).slice(2);
+    expect(seeks).toHaveLength(Math.floor((c2.length - 0.3) * 10));            // to its end, never lengthening it
+    expect(seeks.slice(0, 3)).toEqual([`seek 0 loop ${Math.round(c2.start * 1000)}`, `seek 0 loop ${Math.round(c2.start * 1000 + 100)}`, `seek 0 loop ${Math.round(c2.start * 1000 + 200)}`]);
+    const held = fakeDriver({ 1: 100, 2: 0 }, [2]);
+    const fast = await renderVideo({ url: 'u', steps, out: path.join(dir, 'l2'), driver: held, run, fps: 10, loops: false });
+    expect(held.log.filter((l) => l.startsWith('seek'))).toEqual(['seek 0', 'seek 100', 'seek 0']);
+    expect(fast.length).toBe(done.length);                                       // the same timeline either way
   });
 
   it('starts the chapters with the intro when no click names 0:00, and caps an entrance', async () => {
@@ -249,6 +263,33 @@ describe.skipIf(!hasFfmpeg && !process.env.CI)('video · with the real ffmpeg', 
   });
 });
 
+describe('video · the deck-stage driver, looping', () => {
+  it('knows a click\'s loops — the endless animations of a slide whose loops run — and sets them to the video\'s time', async () => {
+    const onLoopSlide = { closest: (sel) => (sel === '[data-deck-loop]' ? {} : null) }, elsewhere = { closest: () => null };
+    const anim = (iterations, target, endTime) => ({ pause: vi.fn(), currentTime: 0, effect: { target, getTiming: () => ({ iterations }), getComputedTiming: () => ({ endTime }) } });
+    const loop = anim(Infinity, onLoopSlide, Infinity), entrance = anim(1, onLoopSlide, 500), stray = anim(Infinity, elsewhere, Infinity);
+    const stage = { index: 0, shadowRoot: { getAnimations: () => [], append: vi.fn() } };
+    const doc = { querySelector: () => stage, getAnimations: () => [loop, entrance, stray], createElement: () => ({}) };
+    const page = {
+      goto: vi.fn(), waitForFunction: vi.fn(), addStyleTag: vi.fn(),
+      evaluate: vi.fn(async (fn, arg) => {
+        const saved = { document: globalThis.document, raf: globalThis.requestAnimationFrame };
+        globalThis.document = doc; globalThis.requestAnimationFrame = (cb) => cb();
+        try { return await fn(arg); } finally { globalThis.document = saved.document; globalThis.requestAnimationFrame = saved.raf; }
+      }),
+    };
+    const driver = deckStageDriver({ chromium: { launch: async () => ({ newPage: async () => page, close: vi.fn() }) }, hide: [] });
+    await driver.open('u');
+    expect(await driver.freeze()).toBe(500);
+    expect(await driver.loops()).toBe(true);
+    await driver.seek(200, { loop: 9200 });
+    expect([loop.currentTime, entrance.currentTime, stray.currentTime]).toEqual([9200, 200, 200]);
+    await driver.seek(300);
+    expect(loop.currentTime).toBe(300);
+    delete window.__sdLoops; delete window.__sdFrozen;
+  });
+});
+
 describe('video · the deck-stage driver', () => {
   /** Playwright's chromium, faked: page.evaluate runs the page function against a stand-in document. */
   function fakeChromium() {
@@ -301,6 +342,7 @@ describe('video · the deck-stage driver', () => {
     expect(f.anims.every((a) => a.pause.mock.calls.length === 1)).toBe(true);
     await driver.seek(350);
     expect(f.anims.map((a) => a.currentTime)).toEqual([350, 350]);
+    expect(await driver.loops()).toBe(false);               // nothing marked as a loop on this page
     await driver.shot('/f.png');
     expect(f.page.screenshot).toHaveBeenCalledWith({ path: '/f.png' });
     await driver.close();
