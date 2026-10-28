@@ -11,6 +11,8 @@ const list = (names, max = 14) => (names.length ? `${names.slice(0, max).join(',
 /** A click's part theme, as the end of its first line (nothing when the part has none). */
 const themed = (c) => (c.theme ? ` · theme ${c.theme}` : '');
 const quote = (s, max = 160) => (s.length > max ? `"${s.slice(0, max - 1)}…"` : `"${s}"`);
+/** What loops on a click (loops.js), each by its piece and its loop — nothing when none does. */
+const loopsLine = (c) => (c.loops?.length ? `loops (${c.loops.length}): ${list(c.loops.map((l) => `${l.piece ?? 'an element'} ${l.value || '(its own --loop)'}`), 10)}` : null);
 
 /** The pieces of a map click, grouped by what the click does with them. */
 function pieceGroups(click, pieces) {
@@ -78,6 +80,7 @@ export function reviewClick(compiled, which, {maxWords = compiled.config?.checks
   if (c.kind === 'plain') {
     lines.push(`click ${c.n} of ${compiled.clicks.length} · "${c.label}" (plain slide)${themed(c)}`);
     lines.push(`text (${words(wordCount(c.text))}): ${quote(c.text, 300)}`);
+    if (loopsLine(c)) lines.push(loopsLine(c));
   } else {
     lines.push(`click ${c.n} of ${compiled.clicks.length} · "${c.label}" (map "${c.map}", step ${c.stepIndex + 1} of ${c.steps})${themed(c)}`);
     const hw = wordCount(c.headline);
@@ -101,6 +104,7 @@ export function reviewClick(compiled, which, {maxWords = compiled.config?.checks
     lines.push(`this click: ${changes.length ? changes.join(' · ') : 'nothing changes on the map'}`);
     const motion = motionOf(c.look);
     if (motion.length) lines.push(`motion: ${motion.join(' · ')}`);
+    if (loopsLine(c)) lines.push(loopsLine(c));
   }
   const noteWords = c.notes.reduce((sum, p) => sum + wordCount(p), 0);
   lines.push(c.notes.length ? `notes (${c.notes.length}, ${words(noteWords)}): ${quote(c.notes.join(' '), 240)}` : 'notes: —');

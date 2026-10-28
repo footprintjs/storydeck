@@ -8,6 +8,7 @@
 import {focusStep} from '../focus.js';
 import {readPieces, readStep, drawFocus, wrapStage, slideClass, focusOverlay} from '../focusHtml.js';
 import {applyTransforms} from './transforms.js';
+import {loopsIn} from './loops.js';
 import {plainText} from './parse.js';
 import {esc, stripComments} from './html.js';
 import {readAttributes, tagsWith} from '../pieceRules.js';
@@ -52,7 +53,12 @@ function prepareMap(name, html, icons, dev) {
   }
   const {html: out, pieces} = readPieces(drawn);
   if (!pieces.length) throw new Error(`map "${name}" has no pieces — a piece is an element with data-k="name" and an inline left/top (width/height)`);
-  return {name, html: dev ? numberForDev(out) : out, pieces, state: null};
+  return {name, html: dev ? numberForDev(out) : out, pieces, loops: loopsIn(out, `map "${name}"`), state: null};
+}
+
+/** A map's loops a click shows: on a piece it does not keep out (gone), or on no piece. */
+function shownLoops(map, look) {
+  return map.loops.filter((l) => l.piece === null || look.pieces.some((p, i) => p.state !== 'gone' && map.pieces[i].keys.includes(l.piece)));
 }
 
 /** Every click of the deck, in order, each with what it needs to be drawn, reviewed and checked. */
@@ -68,7 +74,7 @@ function planClicks(parts, maps, {area, canvas, icons}) {
       } catch (e) {
         throw new Error(`"${part.label}": ${e.message}`, {cause: e});
       }
-      clicks.push({label: part.label, part, kind: 'plain', inner, notes: part.notes, headline: '', step: 0, steps: 1});
+      clicks.push({label: part.label, part, kind: 'plain', inner, loops: loopsIn(inner, `"${part.label}"`), notes: part.notes, headline: '', step: 0, steps: 1});
       lastMap = null;
       continue;
     }
@@ -83,7 +89,7 @@ function planClicks(parts, maps, {area, canvas, icons}) {
       }
       map.state = r.state;
       lastMap = map;
-      clicks.push({label: `${part.label} · ${k + 1}`, part, kind: 'map', map, step, look: r.look, headline: s.headline, notes: s.notes, stepIndex: k, steps: part.steps.length});
+      clicks.push({label: `${part.label} · ${k + 1}`, part, kind: 'map', map, step, look: r.look, loops: shownLoops(map, r.look), headline: s.headline, notes: s.notes, stepIndex: k, steps: part.steps.length});
     });
   }
   const seen = new Set();
@@ -121,7 +127,8 @@ function checkPost(post, labels) {
 }
 
 /**
- * The deck compiled: {config, slides: [{label, html, notes}], clicks: [{n, label, kind, …}], maps: {name: {pieces}}}.
+ * The deck compiled: {config, slides: [{label, html, notes}], clicks: [{n, label, kind, loops, …}], loops (the named
+ * loops its clicks show, for the page's CSS), maps: {name: {pieces}}}.
  * `dev` numbers each map's pieces in the slides (data-sd-at), for the dev page's edits.
  * A slide's notes are what notesData carries ({slide, step, steps, now, earlier}). Throws, naming the part and the
  * click, when a click cannot be planned.
@@ -141,7 +148,9 @@ export function compileDeck(source, {dev = false} = {}) {
   });
   checkPost(source.post, new Set(slides.map((s) => s.label)));
   const clicks = planned.map((c, i) => ({n: i + 1, label: c.label, part: c.part.label, kicker: c.part.kicker, theme: c.part.theme ?? null, kind: c.kind,
-    map: c.kind === 'map' ? c.map.name : null, headline: plainText(c.headline), notes: c.notes,
+    map: c.kind === 'map' ? c.map.name : null, headline: plainText(c.headline), notes: c.notes, loops: c.loops,
     ...(c.kind === 'map' ? {step: c.step, look: c.look, stepIndex: c.stepIndex, steps: c.steps} : {text: plainText(c.inner)})}));
-  return {config, title: config.title, themeCss: source.themeCss ?? '', slides, clicks, maps: Object.fromEntries(Object.values(maps).map((m) => [m.name, {pieces: m.pieces}]))};
+  // the named loops the page draws: those its clicks show
+  const loops = [...new Set(planned.flatMap((c) => c.loops.map((l) => l.value)))].filter(Boolean).sort();
+  return {config, title: config.title, themeCss: source.themeCss ?? '', slides, clicks, loops, maps: Object.fromEntries(Object.values(maps).map((m) => [m.name, {pieces: m.pieces}]))};
 }

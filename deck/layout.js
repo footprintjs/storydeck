@@ -1,4 +1,6 @@
-// layout — the check only a browser can make: text that spills out of its box, and lit pieces pushed off the slide.
+// layout — the check only a browser can make: text that spills out of its box, lit pieces pushed off the slide, and
+// endless animations that are not loops (deck-stage.js USAGE (i)): one running on a slide no one sees, one that starts
+// again at each click.
 // It drives the built page through the video's browser port (video.js · deckStageDriver · measure), one click at a
 // time as it settles, offline. Optional: it needs Playwright installed beside StoryDeck (`npm i -D footprint-storydeck
 // playwright-core`, then `npx playwright-core install chromium`); without it the check says so and the others run.
@@ -37,26 +39,33 @@ export function clickRuns(ns) {
   return runs.map(([a, b]) => (a === b ? `${a}` : `${a}–${b}`)).join(', ');
 }
 
+/** Each finding's problem: its level, its rule, and its message (`also`: the other clicks it was found on). */
+const KINDS = {
+  spills: (f, where, also) => ['warn', `text spills out of ${where} by ${size(f)} ("${f.text}")${also} — shorten it, or give the box more room`],
+  outside: (f, where, also) => ['warn', `${where} reaches ${size(f)} past the slide's edge ("${f.text}")${also} — move it in, or zoom less`],
+  'loose-loop': (f, where, also) => ['warn', `${where} has an endless animation that is not a loop${also}: it starts again at each click and stops on a jump — give the element data-loop and its animation as --loop (or name a loop: data-loop="pulse")`],
+  'hidden-loop': (f, where, also) => ['error', `${f.count} endless animation${f.count === 1 ? '' : 's'} on ${f.piece} keep${f.count === 1 ? 's' : ''} running while the slide is hidden${also} — make ${f.count === 1 ? 'it a loop' : 'each a loop'} (data-loop and its animation as --loop): a loop runs only on the slide shown`],
+};
+const size = ({dx, dy}) => [dx > 0 && `${Math.round(dx)} px wide`, dy > 0 && `${Math.round(dy)} px tall`].filter(Boolean).join(' and ');
+
 /**
  * What the browser found, as problems ({level, rule, click, label, message}) — the shape check.js reports. The same
- * finding on several clicks (a piece that stays on the map) is one problem, at its first click, naming the others.
+ * finding on several clicks (a piece that stays on the map) is one problem, at its first click, naming the others. A loop
+ * running on a hidden slide is found from every other click: it is one problem, at the slides it runs on.
  */
 export function layoutProblems(found, clicks) {
   const same = new Map();
   for (const f of found) {
-    const key = JSON.stringify([f.kind, f.piece, f.text, Math.round(f.dx), Math.round(f.dy)]);
-    if (!same.has(key)) same.set(key, {...f, ns: []});
-    same.get(key).ns.push(f.n);
+    const at = f.kind === 'hidden-loop' ? f.slide : f.n;
+    const key = JSON.stringify(f.kind === 'hidden-loop' ? [f.kind, f.piece, f.count] : [f.kind, f.piece, f.text, Math.round(f.dx), Math.round(f.dy)]);
+    if (!same.has(key)) same.set(key, {...f, ns: new Set()});
+    same.get(key).ns.add(at);
   }
-  return [...same.values()].sort((a, b) => a.ns[0] - b.ns[0]).map(({ns, kind, piece, text, dx, dy}) => {
-    const c = clicks[ns[0] - 1];
-    const where = piece ? `"${piece}"` : 'an element';
-    const by = [dx > 0 && `${Math.round(dx)} px wide`, dy > 0 && `${Math.round(dy)} px tall`].filter(Boolean).join(' and ');
-    const also = ns.length > 1 ? ` (on clicks ${clickRuns(ns)})` : '';
-    const message = kind === 'spills'
-      ? `text spills out of ${where} by ${by} ("${text}")${also} — shorten it, or give the box more room`
-      : `${where} reaches ${by} past the slide's edge ("${text}")${also} — move it in, or zoom less`;
-    return {level: 'warn', rule: kind === 'spills' ? 'spills' : 'outside', click: ns[0], label: c?.label ?? null, message};
+  return [...same.values()].map((f) => ({...f, ns: [...f.ns].sort((a, b) => a - b)})).sort((a, b) => a.ns[0] - b.ns[0]).map((f) => {
+    const c = clicks[f.ns[0] - 1];
+    const also = f.ns.length > 1 ? ` (on clicks ${clickRuns(f.ns)})` : '';
+    const [level, message] = KINDS[f.kind](f, f.piece ? `"${f.piece}"` : 'an element', also);
+    return {level, rule: f.kind, click: f.ns[0], label: c?.label ?? null, message};
   });
 }
 

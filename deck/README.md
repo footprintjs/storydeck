@@ -11,6 +11,7 @@ text. Each module does one job, and they compose in one direction:
 | `config.js` | deck.json read: defaults filled, an unknown key refused with the keys there are |
 | `parse.js` | clicks.html read into parts and clicks (a step holds its `<h2>` and notes; anything else is refused) |
 | `transforms.js` | the built-in drawing helpers: `data-arrow` wires (with packets), `data-icon` icons |
+| `loops.js` | what loops on each click (`data-loop`), checked, and the named loops (footprint-story/motion's endless moves) drawn as CSS — only those a deck shows |
 | `source.js` | the folder read from disk (Node) — only its own files, never through a link that leaves it |
 | `compile.js` | clicks planned (each map's focus state carried from click to click) and drawn as `<deck-stage>` slides |
 | `page.js` | the one page: slides, notes, every stylesheet and runtime inlined; the theme toggle |

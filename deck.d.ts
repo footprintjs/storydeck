@@ -67,6 +67,8 @@ export interface DeckSource {
 }
 export function readDeck(dir: string): DeckSource;
 
+/** A loop a click shows (deck-stage: data-loop runs its --loop on the slide shown): its piece's first name (null when the element is not a piece), and its value as written — a named loop ("pulse", "float 4s") or '' for the deck's own (`styled` when its own style sets --loop). */
+export interface DeckLoop { readonly piece: string | null; readonly value: string; readonly styled?: true }
 /** A click of the compiled deck, as review and check read it. */
 export type DeckClick = {
   readonly n: number;
@@ -76,6 +78,8 @@ export type DeckClick = {
   /** The headline as plain text ('' on a plain slide). */
   readonly headline: string;
   readonly notes: readonly string[];
+  /** What loops on the click (on a map: on the pieces it shows). */
+  readonly loops: readonly DeckLoop[];
 } & (
   | { readonly kind: 'plain'; readonly map: null; readonly text: string }
   | { readonly kind: 'map'; readonly map: string; readonly step: FocusClick; readonly look: FocusLook; readonly stepIndex: number; readonly steps: number }
@@ -92,6 +96,8 @@ export interface CompiledDeck {
   readonly themeCss: string;
   readonly slides: readonly DeckSlide[];
   readonly clicks: readonly DeckClick[];
+  /** The named loops the clicks show (data-loop values), drawn into the page's CSS once each. */
+  readonly loops: readonly string[];
   readonly maps: Readonly<Record<string, { readonly pieces: readonly FocusPiece[] }>>;
 }
 /** The deck's clicks planned (each map's state carried click to click) and drawn as <deck-stage> slides. */
@@ -133,10 +139,10 @@ export function formatProblems(problems: readonly DeckProblem[]): string;
 /** The browser port the layout check drives (the video's deckStageDriver, with measure). */
 export interface LayoutDriver {
   open(url: string): Promise<void>;
-  measure(n: number): Promise<readonly { kind: 'spills' | 'outside'; piece: string | null; text: string; dx: number; dy: number }[]>;
+  measure(n: number): Promise<readonly { kind: 'spills' | 'outside' | 'loose-loop' | 'hidden-loop'; piece: string | null; text: string; dx: number; dy: number; slide?: number; count?: number }[]>;
   close(): Promise<unknown> | unknown;
 }
-/** Text that spills out of its box and lit pieces off the slide, measured click by click in a browser. */
+/** Text that spills out of its box, lit pieces off the slide, and endless animations that are not loops, measured click by click in a browser. */
 export function layoutCheck(url: string, options: { clicks: readonly DeckClick[]; driver?: LayoutDriver; chromium?: unknown }): Promise<DeckProblem[]>;
 
 export interface DeckServer {

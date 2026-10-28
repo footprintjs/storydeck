@@ -413,7 +413,8 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   its route, its notes), `check` (what to fix, each with its click and its fix: a headline over 12 words, pieces that
   light just by coming in, a click that changes nothing, a piece never shown, clicks without notes, a theme theme.css
   never styles). `check --layout`
-  opens the page in a browser, offline, and finds text that spills out of its box (it needs Playwright installed beside
+  opens the page in a browser, offline, and finds text that spills out of its box and endless animations that are not
+  loops (it needs Playwright installed beside
   StoryDeck: `npm i -D footprint-storydeck playwright-core`; without it, it says so and the other checks run). `mcp` serves the same tools to an AI assistant:
   `claude mcp add storydeck -- npx footprint-storydeck mcp my-talk`.
 - **The helpers a diagram needs.** `<i data-k="w1" class="wire pkt" data-arrow="252 352 318 352"></i>` is a wire (an
@@ -423,6 +424,18 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   `<i class="ic" data-icon="server"></i>` is `icons/server.svg`. `deck.css` styles the chrome (kicker, headline, footer
   and count), wires, packets, icons and the theme toggle from the token contract, every rule `:where()`, so your
   theme wins.
+- **Motion that keeps going: a loop.** `data-loop="pulse"` on a piece makes it pulse while its slide is shown;
+  `pulse`, `float` and `marquee` are the endless moves of the motion table StoryReel's films use
+  (`footprint-story/motion`), drawn into the page only when a deck names them (`data-loop="float 4s"` sets the pace).
+  `data-loop` alone runs the piece's own animation from theme.css: `.gear { --loop: spin 6s linear infinite; }`. A
+  map is drawn again for every click, yet a loop never starts over: every loop in the deck runs on one clock, so the
+  next click shows it where the last one left it, and a jump or a step back keeps it running. A loop runs only on the
+  slide shown (a deck of 40 map clicks runs one slide's loops, not 40), and never under reduced motion, in print, or
+  with motion off — there the piece rests in its own style. **Motion off** is `?motion=off` after the page's address
+  (or `<deck-stage data-motion="off">`): no loops, and every click lands at once, so a screenshot of a click is the same
+  every time. `review` lists each click's loops; `check` warns about a `data-loop` that nothing gives a `--loop`, and
+  `check --layout` finds an endless animation that is not a loop: one running on a slide no one sees (an error: it
+  costs the whole deck), and one that starts over at each click.
 - **A deck is files, never a program — on your machine.** No deck code runs in Node: no build script, no deck module.
   Playwright (1.48 or newer), for `check --layout`, is loaded only from beside StoryDeck — never from the deck folder or
   the folder you run in — and the page is measured offline: no name resolves, the browser context is offline and routed

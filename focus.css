@@ -8,6 +8,9 @@
  * Every rule is as weak as it can be (the motion gate is a :where()), so a deck's own rule for a piece —
  * its own entrance, say — wins without !important.
  *
+ * A piece with a loop (deck-stage: data-loop and its --loop) keeps it while it changes: the loop is the last animation
+ * in the piece's list.
+ *
  * Tokens (set them in your theme; each has a fallback): --sd-dim-opacity · --sd-hot · --sd-blur ·
  * --sd-veil · --sd-accent (falls back to storydeck's --yellow) · --sd-ease · --sd-move-time · --sd-glow (a path's
  * pulse, falls back to the accent).
@@ -50,6 +53,7 @@
 @property --sd-a-hot { syntax: '*'; inherits: false; }
 @property --sd-a-path { syntax: '*'; inherits: false; }
 @property --sd-a-more { syntax: '*'; inherits: false; }   /* one more animation a stylesheet may give a piece, on the piece itself (deck.css: a wire showing itself in) */
+@property --sd-a-loop { syntax: '*'; inherits: false; }   /* a piece's loop (deck-stage: data-loop and its --loop), kept while the piece changes */
 @property --sd-turn { syntax: '*'; inherits: false; }   /* a piece's moment on a path; never inherited, so 0 off the route */
 @keyframes sdNone {}
 @keyframes sdEnter { from { opacity: 0; scale: calc(var(--sd-s, 1) * .92); } }
@@ -80,6 +84,7 @@
   .sd-move { --sd-a-move: sdMove var(--sd-move-time, 1s) var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) both; }
   .sd-hot-in { --sd-a-hot: sdRing .6s var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) calc(.3s + var(--sd-turn, 0s)) both; }   /* on a path, .3s after its turn */
   .sd-focus-new .sd-enter { --sd-delay: .4s; }   /* what a click adds waits for its blur */
+  :where([data-deck-loop] [data-loop]) { --sd-a-loop: var(--loop); }   /* only where deck-stage runs loops */
   /* a path: everything on it has one moment, --sd-turn — its delay, and .4s more under a new blur, so the whole path
      waits for the blur and then runs. A piece on the route enters, arrives or lights then, and glows as the route
      reaches it (on every forward click); a piece stepping aside for its lit twin goes then; the line shows then. */
@@ -91,7 +96,7 @@
   .sd-path.sd-light { --sd-a-state: sdLightPulse .9s ease var(--sd-turn) backwards; --sd-a-path: sdNone 0s; }   /* grey until its turn */
   .sd-twin-turn.sd-leave { --sd-a-state: sdLeave .45s ease calc(var(--sd-turn) + var(--sd-twin-lag, 0s)) both; }   /* a stylesheet may let a piece step aside later than its twin arrives (deck.css: a wire, while its twin sweeps in) */
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) :is(.sd-enter, .sd-arrive, .sd-light, .sd-fade, .sd-leave, .sd-relook, .sd-move, .sd-hot-in, .sd-path) {
-    animation: var(--sd-a-state, sdNone 0s), var(--sd-a-move, sdNone 0s), var(--sd-a-hot, sdNone 0s), var(--sd-a-path, sdNone 0s), var(--sd-a-more, sdNone 0s); }
+    animation: var(--sd-a-state, sdNone 0s), var(--sd-a-move, sdNone 0s), var(--sd-a-hot, sdNone 0s), var(--sd-a-path, sdNone 0s), var(--sd-a-more, sdNone 0s), var(--sd-a-loop, sdNone 0s); }
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-path-line { animation: sdArrive .5s ease var(--sd-turn) both; }
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-stage.sd-move { animation: sdStage var(--sd-move-time, 1s) var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) both; }
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-veil-in-new { animation: sdVeilIn .7s cubic-bezier(.4, 0, .2, 1) both; }

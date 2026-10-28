@@ -66,6 +66,18 @@
  *      an opaque background of their own. Decks without data-build behave
  *      exactly as before. Rail thumbnails and print show each slide's own
  *      authored content (not the composite).
+ *  (i) loops — an element with data-loop runs the animation in its --loop
+ *      (e.g. style="--loop: spin 4s linear infinite") as ambient motion: only
+ *      on the slide shown and the layers under it (the engine stamps
+ *      data-deck-loop on them), on ONE clock for the whole deck (each
+ *      endless animation there is set to start at the page's start), so
+ *      the next slide of the same picture shows every loop where the last
+ *      one left it, and a jump or a step back keeps them running. Loops
+ *      never run under prefers-reduced-motion, in print, or with motion
+ *      off: there the element rests in its own style (its still pose).
+ *  (j) motion off — <deck-stage data-motion="off">, or ?motion=off in the
+ *      page's address: no loops, and every arrival lands at once (as a
+ *      jump does), so a screenshot of a slide is the same every time.
  *
  * Slides are HIDDEN, not unmounted. Non-active slides stay in the DOM with
  * `visibility: hidden` + `opacity: 0`, so their state (videos, iframes,
@@ -122,7 +134,9 @@
  *     animate *from* hidden, so print and reduced-motion show content.
  *     Gate the animation on [data-deck-active] and the motion query, e.g.
  *     `@media (prefers-reduced-motion:no-preference){ [data-deck-active] .x{animation:fade-in .5s both} }`.
- *     Avoid infinite decorative loops on slide content.
+ *   - Endless motion is a loop (USAGE (i)): data-loop and its --loop, never
+ *     an infinite animation of your own (that one keeps running on hidden
+ *     slides, restarts at each slide and stops on a jump).
  */
 /* END USAGE */
 
@@ -133,6 +147,7 @@
   const VALIDATE_ATTR = 'no_overflowing_text,no_overlapping_text,slide_sized_text';
   const FINE_POINTER_MQ = matchMedia('(hover: hover) and (pointer: fine)');
   const NARROW_MQ = matchMedia('(max-width: 640px)');
+  const REDUCED_MQ = matchMedia('(prefers-reduced-motion: reduce)');
   // Slide-authored controls that should keep a tap instead of it navigating.
   const INTERACTIVE_SEL = 'a[href], button, input, select, textarea, summary, label, video[controls], audio[controls], [role="button"], [onclick], [tabindex]:not([tabindex^="-"]), [contenteditable]:not([contenteditable="false" i])';
 
@@ -596,7 +611,7 @@
   `;
 
   class DeckStage extends HTMLElement {
-    static get observedAttributes() { return ['width', 'height', 'noscale', 'no-rail']; }
+    static get observedAttributes() { return ['width', 'height', 'noscale', 'no-rail', 'data-motion']; }
 
     constructor() {
       super();
@@ -614,6 +629,7 @@
       this._onMouseMove = this._onMouseMove.bind(this);
       this._onTap = this._onTap.bind(this);
       this._onMessage = this._onMessage.bind(this);
+      this._onMotionChange = this._onMotionChange.bind(this);
       // Capture-phase close so a click anywhere dismisses the menu, but
       // ignore clicks that land inside the menu itself — otherwise the
       // capture handler runs before the menu's own (bubble) handler and
@@ -636,10 +652,14 @@
       // next thumbnails — the rail has no business rendering inside those
       // (wrong scale, and it offsets the stage so the thumb shows a gutter).
       if (/[?&]_snthumb=/.test(location.search)) this.setAttribute('no-rail', '');
+      // ?motion=off: a still deck (USAGE (j)), for a screenshot or a person who asks for one
+      if (/[?&]motion=off(?:&|$)/.test(location.search)) this.setAttribute('data-motion', 'off');
       this._render();
       this._loadNotes();
       this._syncPrintPageRule();
       this._syncBuildStyleRule();
+      this._syncLoopStyleRule();
+      if (REDUCED_MQ.addEventListener) REDUCED_MQ.addEventListener('change', this._onMotionChange);
       window.addEventListener('keydown', this._onKey);
       window.addEventListener('resize', this._onResize);
       window.addEventListener('mousemove', this._onMouseMove, { passive: true });
@@ -658,15 +678,18 @@
         this._freezeStyle = document.createElement('style');
         this._freezeStyle.textContent = '*,*::before,*::after{transition-duration:0s !important}';
         document.head.appendChild(this._freezeStyle);
+        this._printing = true;   // a loop prints its still pose
         this._slides.forEach((s) => {
           s.setAttribute('data-deck-active', '');
           // Print pages each slide standalone — no additive layering, and
           // the under-layer chrome-hide rule must not leak into print.
           s.removeAttribute('data-deck-under');
           s.removeAttribute('data-deck-static');
+          s.removeAttribute('data-deck-loop');
         });
       };
       this._onAfterPrint = () => {
+        this._printing = false;
         this._applyIndex({ showOverlay: false, broadcast: false });
         if (this._freezeStyle) { this._freezeStyle.remove(); this._freezeStyle = null; }
       };
@@ -884,6 +907,7 @@
       window.removeEventListener('click', this._onDocClick, true);
       window.removeEventListener('beforeprint', this._onBeforePrint);
       window.removeEventListener('afterprint', this._onAfterPrint);
+      if (REDUCED_MQ.removeEventListener) REDUCED_MQ.removeEventListener('change', this._onMotionChange);
       if (this._freezeStyle) { this._freezeStyle.remove(); this._freezeStyle = null; }
       this.removeEventListener('click', this._onTap);
       if (this._hideTimer) clearTimeout(this._hideTimer);
@@ -897,7 +921,8 @@
       if (this._onTweakChange) window.removeEventListener('tweakchange', this._onTweakChange);
     }
 
-    attributeChangedCallback() {
+    attributeChangedCallback(name) {
+      if (name === 'data-motion') { this._onMotionChange(); return; }
       if (this._canvas) {
         this._canvas.style.width = this.designWidth + 'px';
         this._canvas.style.height = this.designHeight + 'px';
@@ -1107,7 +1132,9 @@
         // in connectedCallback that sets data-deck-active on every slide.
         '*, *::before, *::after { animation-delay: -99s !important; animation-duration: .001s !important; ' +
         'animation-iteration-count: 1 !important; animation-fill-mode: both !important; ' +
-        'animation-play-state: running !important; transition-duration: 0s !important; } }';
+        'animation-play-state: running !important; transition-duration: 0s !important; } ' +
+        // A loop prints its still pose, even in a print taken without beforeprint (USAGE (i)).
+        'deck-stage [data-loop] { animation: none !important; } }';
     }
 
     /** Additive-build support styles. Like the print-page rule, this must
@@ -1140,11 +1167,67 @@
         'deck-stage [data-deck-under] [data-chrome] { visibility: hidden !important; }\n' +
         // Instant arrival (back-step / deep link / jump): entrance
         // animations complete in 0s — fill-mode lands them on their end
-        // state, so the composite appears fully built.
-        'deck-stage [data-deck-static], deck-stage [data-deck-static] * { animation-duration: 0s !important; animation-delay: 0s !important; }\n' +
+        // state, so the composite appears fully built. A loop is not an
+        // entrance: it keeps running (USAGE (i)).
+        'deck-stage [data-deck-static]:not([data-loop]), deck-stage [data-deck-static] :not([data-loop]) { animation-duration: 0s !important; animation-delay: 0s !important; }\n' +
         // Belt for a print snapshot taken without beforeprint having
         // cleared the attributes.
         '@media print { deck-stage [data-deck-under] [data-chrome] { visibility: visible !important; } }';
+    }
+
+    /** Loop styles (USAGE (i)), in the DOCUMENT stylesheet for the same
+     *  reason as the build styles. --loop is registered as not inherited,
+     *  so a loop's animation never reaches the elements inside it. The rule
+     *  is :where() — no weight — so a deck's own rule for the element wins
+     *  (a stylesheet that animates pieces can add var(--loop) to its list). */
+    _syncLoopStyleRule() {
+      const id = 'deck-stage-loop-css';
+      let tag = document.getElementById(id);
+      if (!tag) {
+        tag = document.createElement('style');
+        tag.id = id;
+      }
+      (document.body || document.head).appendChild(tag);
+      tag.textContent =
+        '@property --loop { syntax: "*"; inherits: false; }\n' +
+        ':where(deck-stage [data-deck-loop] [data-loop]) { animation: var(--loop, none); }';
+    }
+
+    /** Whether loops run: not with motion off, under reduced motion, or in print. */
+    _loopsRun() {
+      return this.getAttribute('data-motion') !== 'off' && !REDUCED_MQ.matches && !this._printing;
+    }
+
+    /** data-deck-loop on the slides whose loops run: the one shown and the layers under it. */
+    _syncLoops() {
+      const run = this._loopsRun();
+      this._slides.forEach((s) => {
+        if (run && (s.hasAttribute('data-deck-active') || s.hasAttribute('data-deck-under'))) s.setAttribute('data-deck-loop', '');
+        else s.removeAttribute('data-deck-loop');
+      });
+    }
+
+    /** One clock for every loop: each endless animation on a slide whose
+     *  loops run starts at the page's start, so the same loop on the next
+     *  slide (the same picture, drawn again) goes on where this one is. */
+    _lockLoops() {
+      for (const s of this._slides) {
+        if (!s.hasAttribute('data-deck-loop') || typeof s.getAnimations !== 'function') continue;
+        for (const a of s.getAnimations({ subtree: true })) {
+          if (a.playState === 'paused' || a.startTime === 0) continue;
+          if (a.effect && a.effect.getTiming().iterations === Infinity) a.startTime = 0;
+        }
+      }
+    }
+
+    /** Motion turned on or off (data-motion, or the reduced-motion setting): the slide shown keeps its place; with
+     *  motion off it lands at once (static), and loops start or stop. */
+    _onMotionChange() {
+      if (!this._slides.length) return;
+      const s = this._slides[this._index];
+      if (s && this.getAttribute('data-motion') === 'off') s.setAttribute('data-deck-static', '');
+      this._syncLoops();
+      this._lockLoops();
     }
 
     _onSlotChange() {
@@ -1255,6 +1338,7 @@
         else s.removeAttribute('data-deck-active');
       });
       this._applyChainState(prev, curr);
+      this._syncLoops();
       if (this._countEl) this._countEl.textContent = String(curr + 1);
       // Follow-scroll on every navigation (init deep-link, keyboard, click,
       // tap, external goTo) — the only time we *don't* want the rail to
@@ -1288,6 +1372,8 @@
       }
 
       this._prevIndex = curr;
+      // after the listeners: what they changed on the slide is in step too
+      this._lockLoops();
       if (showOverlay) this._flashOverlay();
     }
 
@@ -1317,9 +1403,10 @@
       const additive = base !== curr;
       const sameChain = prev >= 0 && prev < this._slides.length
         && bases[prev] === bases[curr];
-      let instant = false;
+      // with motion off every arrival lands at once (USAGE (j))
+      let instant = this.getAttribute('data-motion') === 'off';
       if (additive) {
-        instant = !(prev === this._prevPlayable(curr) && prev >= base);
+        instant = instant || !(prev === this._prevPlayable(curr) && prev >= base);
       } else if (sameChain && prev > curr) {
         instant = true;
       }
@@ -1734,6 +1821,7 @@
       // but don't let stale nav attributes ride along either).
       clone.removeAttribute('data-deck-under');
       clone.removeAttribute('data-deck-static');
+      clone.removeAttribute('data-deck-loop');
       clone.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
       // Neuter heavy media; replace <video> with its poster so the box
       // keeps a visual. <iframe>/<audio> become empty placeholders.
