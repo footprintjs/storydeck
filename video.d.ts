@@ -15,7 +15,10 @@ export interface VideoDriver {
   open(url: string): Promise<void>;
   step(n: number): Promise<void>;
   freeze(): Promise<number>;
-  seek(ms: number): Promise<void>;
+  /** Whether the click's loops run (deck-stage's data-loop): then its frames go on to its end, the loops at the video's time. */
+  loops?(): Promise<boolean> | boolean;
+  /** Every frozen animation to `ms`; with `loop`, the loops to that instead (ms since the video began). */
+  seek(ms: number, options?: { loop?: number }): Promise<void>;
   shot(file: string): Promise<unknown>;
   close(): Promise<unknown> | unknown;
 }
@@ -45,6 +48,8 @@ export function encodeArgs(options: { frames: string; narration: string; out: st
 export function renderVideo(options: {
   url: string; steps: readonly VideoStep[]; out: string; name?: string; driver: VideoDriver; run?: Run;
   fps?: number; gap?: number; lead?: number; noclip?: number; only?: [number, number] | null; maxEntrance?: number;
+  /** A click whose loops run is stepped on to its end, so they keep running (true); false holds its frame — a faster draft. */
+  loops?: boolean;
   chapters?: (click: PlannedClick) => string | null; intro?: string; thumbnail?: (click: PlannedClick) => boolean;
   /** where frames and sounds are made (its frames/ and audio/ are replaced); by default a temporary folder, removed afterwards */
   work?: string; log?: (line: string) => void;

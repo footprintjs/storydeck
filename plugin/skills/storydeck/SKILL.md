@@ -180,8 +180,9 @@ It is pictures + notes + sound, not editable PowerPoint shapes.
   deck says it tours.
 - **A cloned voice is its speaker's**: a page that carries clips stays internal. A public build leaves
   `embedClips` out; listen mode falls back to the browser's voice.
-- **Video frames are deterministic**: each click is made forward, every animation paused and stepped. Looping
-  motion stops when the entrance ends. Compare two renders by `timeline.json` and `captions.srt` (equal) and
+- **Video frames are deterministic**: each click is made forward, every animation paused and stepped. A click whose
+  loops run (data-loop, a wire's packets) is stepped on to its end, the loops at the video's own time, so they keep
+  running from click to click; `loops: false` holds the click's frame instead (a faster draft). Compare two renders by `timeline.json` and `captions.srt` (equal) and
   frames (byte-equal, or within a hair where the GPU blends a backdrop filter).
 - **Paths may be relative; scratch folders are temporary.** `voiceClips` and `renderVideo` resolve every path and
   work in a temporary folder of their own unless you name a `work` folder (which they empty before use) — never

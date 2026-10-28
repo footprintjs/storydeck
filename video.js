@@ -6,10 +6,12 @@
 //
 // Every click is made forward, as in the room, so its entrance plays; then every animation on the page is paused
 // and stepped frame by frame (deterministic: the same deck renders the same frames), until the last entrance
-// ends; that frame is held for the rest of the clip. Motion that loops (a running path) stops there. A click
+// ends; that frame is held for the rest of the clip. A click whose loops run (deck-stage's data-loop: a pulse, packets
+// on a wire) is stepped on to its end instead, each loop at the video's own time, so they keep running from click to
+// click as in the room (`loops: false` holds its frame, as before: fewer frames, a faster draft). A click
 // lasts its clip plus `gap`; the first one starts after `lead` (a fade in from black); a click without a clip
 // stays `noclip` seconds. The browser is a port — { open(url), step(n), freeze() → ms the entrances last,
-// seek(ms), shot(file), close() } — and `deckStageDriver` drives storydeck's own <deck-stage> with Playwright
+// loops?() → whether its loops run, seek(ms, {loop?}), shot(file), close() } — and `deckStageDriver` drives storydeck's own <deck-stage> with Playwright
 // (pass its `chromium`). ffmpeg runs through `run` (spawnSync's shape), so both can be faked.
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -98,18 +100,29 @@ function ffmpeg(run, args, what) {
   if (why) throw new Error(`ffmpeg failed: ${what} (${why})`);
 }
 
-/** The frames of every click, through the driver: entrance stepped at `fps`, then one held frame. */
-async function frames(driver, url, plan, dir, { fps, maxEntrance, log }) {
+/** What a click that loops leaves held at its end, at least (s): framesConcat's 0.3 s after the last stepped frame. */
+const LOOP_HOLD = 0.3;
+
+/**
+ * The frames of every click, through the driver: entrance stepped at `fps`, then one held frame — or, for a click
+ * whose loops run, frames on to its end, the loops at the video's own time (its start + the frame's).
+ */
+async function frames(driver, url, plan, dir, { fps, maxEntrance, loops, log }) {
   rmSync(dir, { recursive: true, force: true }); mkdirSync(dir, { recursive: true });
   const shots = [];
   try {
     await driver.open(url);   // inside the try: a page that fails to open still closes its browser
     for (const c of plan) {
       await driver.step(c.n);
-      const end = Math.min(maxEntrance, await driver.freeze()), count = Math.max(1, Math.ceil(end / (1000 / fps)) + 1);
+      const end = Math.min(maxEntrance, await driver.freeze());
+      const looping = loops && typeof driver.loops === 'function' && (await driver.loops()) === true;
+      // a looping click's frames stop LOOP_HOLD short of its end, so framesConcat never lengthens it
+      const count = Math.max(1, Math.ceil(end / (1000 / fps)) + 1, looping ? Math.floor((c.length - LOOP_HOLD) * fps) : 0);
       const files = [];
       for (let k = 0; k < count; k++) {
-        await driver.seek(Math.min(end, (k * 1000) / fps));
+        const t = (k * 1000) / fps;
+        if (looping) await driver.seek(Math.min(end, t), { loop: c.start * 1000 + t });
+        else await driver.seek(Math.min(end, t));
         const file = path.join(dir, `c${NUM(c.n)}-${NUM(k)}.png`);
         await driver.shot(file);
         files.push(file);
@@ -148,7 +161,7 @@ function narration(run, plan, work) {
  * what the rule changed. Returns { video, length, cues, chapters: { lines, text, kept, changes, problems }, plan }.
  */
 export async function renderVideo({ url, steps, out, name = 'deck', driver, run = spawnSync, fps = 30, gap, lead, noclip, only, maxEntrance = 4000,
-  chapters = () => null, intro = 'Intro', thumbnail = () => false, work, log = () => {} }) {
+  loops = true, chapters = () => null, intro = 'Intro', thumbnail = () => false, work, log = () => {} }) {
   const plan = planVideo(steps, { gap, lead, noclip, only });
   if (!plan.length) throw new Error(`nothing to render: no click in ${only ? `[${only.join(', ')}]` : 'the deck'} (it has ${steps.length})`);
   // the concat lists read each picture at the video's frame rate (`option framerate`), which ffmpeg 4 cannot parse
@@ -159,14 +172,14 @@ export async function renderVideo({ url, steps, out, name = 'deck', driver, run 
   const own = !work, dir = own ? mkdtempSync(path.join(tmpdir(), 'storydeck-video-')) : path.resolve(work);
   try {
     mkdirSync(dir, { recursive: true });
-    return await render({ url, plan, out, name, driver, run, fps, maxEntrance, chapters, intro, thumbnail, work: dir, log });
+    return await render({ url, plan, out, name, driver, run, fps, maxEntrance, loops, chapters, intro, thumbnail, work: dir, log });
   } finally {
     if (own) rmSync(dir, { recursive: true, force: true });
   }
 }
 
-async function render({ url, plan, out, name, driver, run, fps, maxEntrance, chapters, intro, thumbnail, work, log }) {
-  const shots = await frames(driver, url, plan, path.join(work, 'frames'), { fps, maxEntrance, log });
+async function render({ url, plan, out, name, driver, run, fps, maxEntrance, loops, chapters, intro, thumbnail, work, log }) {
+  const shots = await frames(driver, url, plan, path.join(work, 'frames'), { fps, maxEntrance, loops, log });
   const concat = path.join(work, 'frames.ffconcat');
   writeFileSync(concat, framesConcat(plan, shots, { fps }));
   const wav = narration(run, plan, work), length = plan.reduce((s, c) => s + c.length, 0), video = path.join(out, `${name}.mp4`);
@@ -255,10 +268,20 @@ export function deckStageDriver({ chromium, executablePath, viewport = { width: 
       const all = [...new Set([...document.getAnimations(), ...(stage?.shadowRoot?.getAnimations() ?? [])])];
       all.forEach((a) => a.pause());
       window.__sdFrozen = all;
+      // its loops: the endless animations of a slide whose loops run (deck-stage marks it data-deck-loop)
+      window.__sdLoops = all.filter((a) => a.effect?.getTiming?.().iterations === Infinity && a.effect.target?.closest?.('[data-deck-loop]'));
       const ends = all.map((a) => a.effect?.getComputedTiming().endTime).filter((t) => Number.isFinite(t));
       return Math.max(0, ...ends);
     }),
-    async seek(ms) { await page.evaluate((t) => { for (const a of window.__sdFrozen ?? []) a.currentTime = t; }, ms); await settle(); },
+    loops: () => page.evaluate(() => (window.__sdLoops ?? []).length > 0),
+    /** Every frozen animation to `ms` — its loops, given `loop`, to that (the video's own time, so they run on across clicks). */
+    async seek(ms, { loop } = {}) {
+      await page.evaluate(([t, l]) => {
+        const loops = new Set(window.__sdLoops ?? []);
+        for (const a of window.__sdFrozen ?? []) a.currentTime = l !== null && loops.has(a) ? l : t;
+      }, [ms, loop ?? null]);
+      await settle();
+    },
     shot: (file) => page.screenshot({ path: file }),
     /**
      * Click n (1-based) as it settles, measured: jump there (a jump lands at once), finish what still moves, and
