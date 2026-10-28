@@ -1,10 +1,10 @@
 /**
  * storydeck · video (video.js) — a narrated deck as a video: every click on screen while its clip plays. Node + ffmpeg 5.0+.
  */
-import type { Clip } from 'footprint-narration/voice';
-import type { Chapters } from 'footprint-narration';
+import type { Clip } from 'footprint-story/voice';
+import type { Chapters } from 'footprint-story';
 
-/** A cached clip as the video uses it (`words` is not read: a clip from before footprint-narration has none). */
+/** A cached clip as the video uses it (`words` is not read: a clip from before footprint-story has none). */
 export type VideoClip = Omit<Clip, 'words'> & { words?: Clip['words'] };
 /** A click to render: its label, its words as written and as spoken, and its clip (or null). */
 export interface VideoStep { label?: string; written?: string; spoken?: string; clip?: VideoClip | null }

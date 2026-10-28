@@ -192,7 +192,7 @@ export * from './focusHtml';
 // Tour — a deck or a figure that shows its point by itself while nobody is using it (tour.d.ts).
 export * from './tour';
 // Narration — what a deck says on each click (narration.d.ts), in the page: notes, presenter, listen mode (narrationHtml.d.ts).
-// The rules a voice reads by, sentences, captions and chapters are footprint-narration's (its own types).
+// The rules a voice reads by, sentences, captions and chapters are footprint-story's (its own types).
 // footprint-storydeck/voice, /video and /pptx (Node-only) carry their own types.
 export * from './narration';
 export * from './narrationHtml';

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **footprint-narration is now footprint-story.** StoryDeck's shared narration code (shown-vs-spoken text, captions,
+  chapters, the voice cache) comes from `footprint-story` 0.3.0, the same package under its new name: what StoryDeck
+  and footprint-storyreel share, now with a `/motion` door too. Nothing a deck says, shows or voices changes. A project
+  that imports `footprint-narration` itself beside StoryDeck should move to `footprint-story` (the two doors export
+  exactly what they did).
+
 ## 0.8.0 — a part can have its own look (data-theme)
 
 - **A part can have its own look: `data-theme`.** `<section … data-theme="ledger">` in clicks.html puts

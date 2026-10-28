@@ -118,7 +118,7 @@
     }
   },
   "dependencies": {
-    "footprint-narration": "^0.1.0",
+    "footprint-story": "^0.3.0",
     "markdown-it": "^14.1.0"
   },
   "devDependencies": {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { clipKey } from 'footprint-narration/voice';
+import { clipKey } from 'footprint-story/voice';
 import { narrationText, writtenText } from './narration';
 
 // The settings of a real profile (no audio): the keys of clips a deck already has.
@@ -19,7 +19,7 @@ describe('narration · what the deck says', () => {
     for (const [notes, key] of golden) expect(clipKey(narrationText(notes), PROFILE)).toBe(key);
   });
 
-  it('drops [draft] marks, joins notes and collapses white space, then says the text by footprint-narration\'s rules', () => {
+  it('drops [draft] marks, joins notes and collapses white space, then says the text by footprint-story\'s rules', () => {
     expect(narrationText(['First.', '[draft] A bridge — then on · and → on.'])).toBe('First. A bridge, then on, and, on.');
     expect(narrationText(['[draft] - a bridge.'])).toBe('a bridge.');
     expect(narrationText(['  spaced\n\nout  '])).toBe('spaced out');

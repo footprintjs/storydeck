@@ -3,12 +3,12 @@
 //   const { tags, have, wanted } = embedClips(texts, { cache, profile });   // the clips inside one HTML file
 //
 // The voice itself — the clip cache keyed by what is said, the voice port and the Chatterbox kit adapter — is
-// footprint-narration's (Node door 'footprint-narration/voice': voiceClips, clipFor, clipKey, chatterboxKit,
+// footprint-story's (Node door 'footprint-story/voice': voiceClips, clipFor, clipKey, chatterboxKit,
 // pickSteps). What is the deck's own is carrying the clips in the page for listenRuntime.
 import { existsSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-import { clipFor } from 'footprint-narration/voice';
+import { clipFor } from 'footprint-story/voice';
 
 /** Why a spawned process failed, or null when it ran and exited 0 (a missing binary or a signal is a failure). */
 const failure = (done) => (done?.error ? done.error.message : done?.signal ? `signal ${done.signal}` : done?.status !== 0 ? `exit ${done?.status}` : null);

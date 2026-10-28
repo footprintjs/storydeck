@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { saidSentences } from 'footprint-narration';
+import { saidSentences } from 'footprint-story';
 import { notesData, notesRuntime, listenRuntime } from './narrationHtml';
 import { writtenText } from './narration';
 
@@ -195,7 +195,7 @@ describe('narrationHtml · listen runtime (L)', () => {
     });
   }
   for (const note of corpus) {
-    it(`splits a click into sentences as footprint-narration does: ${note}`, () => {
+    it(`splits a click into sentences as footprint-story does: ${note}`, () => {
       const { queue } = fakeSpeech(); fakeAudio();
       mountDeck([{ slide: 'S', now: [note] }]);
       listenRuntime();

@@ -8,9 +8,9 @@ description: Build, focus, narrate and film talks and posts with StoryDeck — o
 A talk or a post is written once: **sections** of slide steps plus prose. StoryDeck shows it as an article
 (Read), a scrollytelling story (Scroll) or a click-through deck (Watch), decides per click what the audience
 looks at (focus), and turns the speaker notes into a voice, captions and a video (narration). Most of it is
-plain data and string builders; only `footprint-storydeck/voice`, `footprint-storydeck/video`, `footprint-storydeck/pptx` and `footprint-narration/voice` touch the
+plain data and string builders; only `footprint-storydeck/voice`, `footprint-storydeck/video`, `footprint-storydeck/pptx` and `footprint-story/voice` touch the
 file system. The narration rules underneath (what a voice says for a number, captions, chapters, the clip cache)
-are footprint-narration's, a package StoryDeck depends on and shares with footprint-storyreel.
+are footprint-story's, a package StoryDeck depends on and shares with footprint-storyreel.
 
 ## Pick the door
 
@@ -22,15 +22,15 @@ are footprint-narration's, a package StoryDeck depends on and shares with footpr
 | that focus written into slide HTML | `footprint-storydeck/focus-html` + `footprint-storydeck/focus.css`, `focusRuntime` once in the page | build + page |
 | a deck (or figure) that shows its point while nobody is using it (`idleTour`, its plan `tourPlan`, a notes line `tourText`) | `footprint-storydeck/tour`; declared as `<deck-stage data-tour="3 4 5 9:6s">` + `(${idleTour})()`, or `SlideDeck`'s `tour` / post.json's `tour` | build + page |
 | what each click says (`narrationText`, `writtenText`: `[draft]`-aware) | `footprint-storydeck/narration` | anywhere |
-| the rules beneath (`spokenMap`, `autoRules`, `SPELL`, `SAY`), sentences, captions, YouTube chapters | `footprint-narration` | anywhere |
+| the rules beneath (`spokenMap`, `autoRules`, `SPELL`, `SAY`), sentences, captions, YouTube chapters | `footprint-story` | anywhere |
 | notes (N), presenter (P), listen mode (L) in the page | `footprint-storydeck/narration-html` + `footprint-storydeck/narration.css` | build + page |
-| a clip per click in a voice, cached (`voiceClips`, `clipFor`, `chatterboxKit`, `pickSteps`) | `footprint-narration/voice` | **Node only** |
+| a clip per click in a voice, cached (`voiceClips`, `clipFor`, `chatterboxKit`, `pickSteps`) | `footprint-story/voice` | **Node only** |
 | those clips carried inside one page (`embedClips`) | `footprint-storydeck/voice` | **Node only** |
 | the deck as a narrated video | `footprint-storydeck/video` (+ ffmpeg 5.0 or newer on the path, Playwright's `chromium` passed in) | **Node only** |
 | the deck as PowerPoint (.pptx): a slide per click, its picture, notes and clip | `footprint-storydeck/pptx` — `exportPptx` (the same driver as the video; no ffmpeg; `npm i footprintjs` beside it, an optional peer) | **Node only** |
 | a deck from a folder: one page, a dev server that reloads on the same click, the deck read back as text | the `storydeck` command (`npx footprint-storydeck init · dev · outline · review · check · build · mcp`); `footprint-storydeck/deck` for scripts | **Node only** |
 
-Never import `footprint-storydeck/voice`, `footprint-storydeck/video`, `footprint-storydeck/pptx` or `footprint-narration/voice` into browser code: they use `node:fs`
+Never import `footprint-storydeck/voice`, `footprint-storydeck/video`, `footprint-storydeck/pptx` or `footprint-story/voice` into browser code: they use `node:fs`
 and child processes.
 The main entry (`footprint-storydeck`) re-exports only what runs anywhere.
 
@@ -99,7 +99,7 @@ whole path .4 s).
 **Narrate a deck in a voice.**
 
 ```js
-import { voiceClips, chatterboxKit } from 'footprint-narration/voice';
+import { voiceClips, chatterboxKit } from 'footprint-story/voice';
 import { narrationText } from 'footprint-storydeck/narration';
 import { embedClips } from 'footprint-storydeck/voice';
 import { notesData, notesRuntime, listenRuntime } from 'footprint-storydeck/narration-html';
@@ -113,14 +113,14 @@ page += notesData(clicks.map(c => c.notes)) + voice.tags + `<script>(${notesRunt
 
 The engine is a port — `{ name, synthesize(scenes, { work }) }`, scenes `{ id, text }`, results `{ id, audio,
 duration, words: [{ text, start, end }] }` — so a cloud voice or a test fake plugs in the same way as the local kit.
-A clip keeps its timed words (`clipFor(…).words`; `null` for a clip voiced before footprint-narration).
+A clip keeps its timed words (`clipFor(…).words`; `null` for a clip voiced before footprint-story).
 
 **Render the narrated video.** A strip first, then the whole.
 
 ```js
 import { chromium } from 'playwright-core';
 import { renderVideo, deckStageDriver } from 'footprint-storydeck/video';
-import { clipFor } from 'footprint-narration/voice';
+import { clipFor } from 'footprint-story/voice';
 import { narrationText, writtenText } from 'footprint-storydeck/narration';
 
 const steps = clicks.map(c => {
@@ -149,7 +149,7 @@ It is pictures + notes + sound, not editable PowerPoint shapes.
 
 - **A clip's key is its recipe**: the voice profile's settings and the exact spoken text. Change the words a
   voice reads — a note, or the `spell` list — and those clicks are voiced again; everything else stays cached.
-  `spell` replaces the default list: extend it with `{ ...SPELL, K8s: 'K eight s' }` (`SPELL` from `footprint-narration`;
+  `spell` replaces the default list: extend it with `{ ...SPELL, K8s: 'K eight s' }` (`SPELL` from `footprint-story`;
   a value is words — a letter in every word, no digits, no comma, semicolon or colon at its end — or it is refused).
 - **Every word needs letters.** A lone symbol that means something is said (`SAY`: & + = < > × % and Greek
   letters; pass `say` to change it); any other (— → ... an emoji) is a pause that keeps its sentence end. The local

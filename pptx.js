@@ -17,7 +17,7 @@ import { Buffer } from 'node:buffer';
 import { closeSync, copyFileSync, existsSync, fstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { clipFor } from 'footprint-narration/voice';
+import { clipFor } from 'footprint-story/voice';
 import { narrationText, writtenText } from './narration.js';
 import { planVideo } from './video.js';
 import { pptxParts, pngSize, plainText, isSound, AUDIO, LANG_TAG, SOUND } from './pptxParts.js';
@@ -77,15 +77,15 @@ function headOf(file) {
 /** Why a clip's file will not play, from its bytes: empty, or not beginning as its kind of file; null when it will. */
 function soundProblem(clip, ext) {
   const { size, head } = headOf(clip.audio);
-  if (!size) return `its clip ${clip.audio} is empty (0 bytes) — voice it again (footprint-narration/voice · voiceClips)`;
+  if (!size) return `its clip ${clip.audio} is empty (0 bytes) — voice it again (footprint-story/voice · voiceClips)`;
   return isSound(head, ext) ? null : `its clip ${clip.audio} is not a .${ext} file (no ${SOUND[ext].sign}) — voice it again, or convert it with ffmpeg`;
 }
 
 /** One click's sound weighed: [kind, what is wrong and its fix], or null when it is ready (or the click has none to give). */
 function clipProblem(c, { voiced, maxClip }) {
   const clip = c.clip, d = clip?.duration, ext = extOf(clip?.audio);
-  if (!clip) return voiced && c.spoken.trim() ? ['unvoiced', 'it says words but has no clip — voice it (footprint-narration/voice · voiceClips), or give its step its clip'] : null;
-  if (!clip.audio || !existsSync(clip.audio)) return ['missing', `its clip ${clip.audio} is not there — voice it again (footprint-narration/voice · voiceClips)`];
+  if (!clip) return voiced && c.spoken.trim() ? ['unvoiced', 'it says words but has no clip — voice it (footprint-story/voice · voiceClips), or give its step its clip'] : null;
+  if (!clip.audio || !existsSync(clip.audio)) return ['missing', `its clip ${clip.audio} is not there — voice it again (footprint-story/voice · voiceClips)`];
   if (!AUDIO[ext]) return ['unplayable', `its clip is .${ext} — PowerPoint plays .wav, .m4a and .mp3 (convert it with ffmpeg)`];
   const bytes = soundProblem(clip, ext);
   if (bytes) return ['unplayable', bytes];
