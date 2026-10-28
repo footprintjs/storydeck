@@ -408,6 +408,12 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   follow the part on screen as well, select the active slide in the same rule:
   `[data-theme="ledger"], :root:has([data-deck-active][data-theme="ledger"]) { … }`. `check` warns about a theme
   that theme.css never selects (a misspelt name changes nothing), and `review` names each click's theme.
+- **Explore: click a piece, go to the click about it.** `"explore": true` in deck.json lets a viewer wander the
+  deck: a click on a piece goes to the click that is about it (the first whose `data-on` names it, else the first that
+  takes it in through a `name+`), and "Back to click N" (or Backspace) returns, as a browser's Back does. Pieces that
+  lead somewhere show a pointer and a ring on hover; on a touch screen a tap on one explores (tap beside the pieces to
+  step), and the keyboard keeps stepping in order. The order you wrote is
+  untouched — explore is a way through the same clicks, for a deck left open on a screen or sent to someone.
 - **Read first, look last.** A reviewer — a person, or a model that pays for every screenshot — reads the deck as text:
   `outline` (a line per click), `review --click 14` (its headline and words, what it lights, greys, brings in and moves,
   its route, its notes), `check` (what to fix, each with its click and its fix: a headline over 12 words, pieces that

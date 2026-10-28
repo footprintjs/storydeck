@@ -65,7 +65,8 @@ a map, `<i data-k="w" class="wire pkt" data-arrow="client to server"></i>` is a 
 between the two pieces and following them when they move (prefer it to `"x1 y1 x2 y2"` numbers; a wire each way between
 the same pieces gets its own lane; a bend may follow: `"gw to db 40"`); `data-on="gw+"` is gw, its wires and what they
 reach; a wire takes `data-label="name"` (at its middle, on its left), class `halo` (a glow) and `data-packets="2"
-data-speed="5"` (packets that keep running along it on the slide shown — loops); and
+data-speed="5"` (packets that keep running along it on the slide shown — loops); `"explore": true` in deck.json lets a
+viewer click a piece to go to the click about it (Back returns); and
 `<i class="ic" data-icon="name"></i>` is icons/name.svg. A piece that comes in lights unless the click is `data-quiet`
 (`check` warns: `lit-on-entry`). Motion that keeps going is a loop: `data-loop="pulse"` (or `float`, `marquee`, with a
 pace: `"float 4s"`) on a piece, or `data-loop` alone with the piece's own `--loop: spin 6s linear infinite` in

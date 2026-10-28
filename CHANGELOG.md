@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- **Explore: a viewer clicks a piece to go to the click about it.** With `"explore": true` in deck.json, a click on a
+  piece goes to the click that is about it — the first click whose `data-on` names it (`gw+`'s gw too), or, when none
+  does, the first that takes it in through a `name+` — and a "Back to click N" control (or Backspace) returns, a step
+  at a time, as a browser's Back does (to where the viewer was before each jump, whatever they stepped through since).
+  Pieces that lead somewhere get a pointer and a ring on hover; a piece whose click is the one shown, or one that
+  cannot be seen, leads nowhere; a link or control inside a piece keeps its click; a drag (the dev page's Alt-drag) is
+  never a click. On a touch screen a tap on a piece that leads somewhere explores — tap beside the pieces to step. The
+  pieces are reached by pointer, not by keyboard: arrow keys still step through the clicks in order. The presenter
+  window does not explore (it follows the room's deck). The authored order never changes: explore is a way through the
+  same clicks. A deck without `"explore"` builds byte for byte as before (its look comes with it, not in deck.css).
+
 ## 0.9.0 — living system diagrams: loops, wires between pieces, a wire's label, halo and running packets
 
 - **A wire between pieces: `data-arrow="client to server"`.** The wire runs from the edge of one piece's box to the

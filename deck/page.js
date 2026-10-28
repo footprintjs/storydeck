@@ -8,6 +8,7 @@ import {focusRuntime} from '../focusHtml.js';
 import {notesData, notesRuntime, listenRuntime} from '../narrationHtml.js';
 import {esc, scriptSafe, styleSafe} from './html.js';
 import {loopCss} from './loops.js';
+import {EXPLORE_CSS, exploreData, exploreRuntime} from './explore.js';
 
 /** Runs in the page: the theme toggle (its button, or T). Light or dark follows the system until a choice is saved. */
 export function themeRuntime() {
@@ -42,9 +43,9 @@ export function deckPage(compiled, assets, {dev = null} = {}) {
   const {config, slides} = compiled;
   // the named loops the deck shows (loops.js), before theme.css: the deck's own rules win (a deck with none: as before)
   const loops = loopCss(compiled.loops ?? []);
-  const css = [...assets.css, ...(loops ? [loops] : []), compiled.themeCss ?? ''].join('\n');
+  const css = [...assets.css, ...(loops ? [loops] : []), ...(compiled.explore ? [EXPLORE_CSS] : []), compiled.themeCss ?? ''].join('\n');
   const script = dev?.nonce ? `<script nonce="${esc(dev.nonce)}">` : '<script>';
-  const runtimes = [focusRuntime, notesRuntime, listenRuntime, themeRuntime].map((fn) => `${script}(${scriptSafe(fn)})();</script>`);
+  const runtimes = [focusRuntime, notesRuntime, listenRuntime, themeRuntime, ...(compiled.explore ? [exploreRuntime] : [])].map((fn) => `${script}(${scriptSafe(fn)})();</script>`);
   return `<!doctype html>
 <html lang="${esc(config.lang)}">
 <head>
@@ -56,12 +57,12 @@ ${config.description ? `<meta name="description" content="${esc(config.descripti
 <style>${styleSafe(css)}</style>
 </head>
 <body>
-<deck-stage width="${config.canvas[0]}" height="${config.canvas[1]}" no-rail>
+<deck-stage width="${config.canvas[0]}" height="${config.canvas[1]}" no-rail${compiled.explore ? ' data-explore' : ''}>
 ${slides.map((s) => s.html).join('\n')}
 </deck-stage>
 ${TOGGLE}
 <!-- deck-stage.js, focus and narration runtimes: footprint-storydeck ${esc(assets.version)} (MIT) -->
-${notesData(slides.map((s) => s.notes))}
+${notesData(slides.map((s) => s.notes))}${compiled.explore ? `\n${exploreData(compiled.explore)}` : ''}
 ${script}${scriptSafe(assets.stageJs)}</script>
 ${runtimes.join('\n')}
 ${dev ? `${script}(${scriptSafe(dev.client)})();</script>\n` : ''}</body>

@@ -9,6 +9,7 @@ import {focusStep} from '../focus.js';
 import {readPieces, readStep, drawFocus, wrapStage, slideClass, focusOverlay} from '../focusHtml.js';
 import {applyTransforms, icons as drawIcons} from './transforms.js';
 import {loopsIn} from './loops.js';
+import {exploreTargets} from './explore.js';
 import {plainText} from './parse.js';
 import {esc, stripComments} from './html.js';
 import {readAttributes, tagsWith} from '../pieceRules.js';
@@ -153,5 +154,5 @@ export function compileDeck(source, {dev = false} = {}) {
     ...(c.kind === 'map' ? {step: c.step, look: c.look, stepIndex: c.stepIndex, steps: c.steps} : {text: plainText(c.inner)})}));
   // the named loops the page draws: those its clicks show
   const loops = [...new Set(planned.flatMap((c) => c.loops.map((l) => l.value)))].filter(Boolean).sort();
-  return {config, title: config.title, themeCss: source.themeCss ?? '', slides, clicks, loops, maps: Object.fromEntries(Object.values(maps).map((m) => [m.name, {pieces: m.pieces}]))};
+  return {config, title: config.title, themeCss: source.themeCss ?? '', slides, clicks, loops, explore: config.explore ? exploreTargets(planned) : null, maps: Object.fromEntries(Object.values(maps).map((m) => [m.name, {pieces: m.pieces}]))};
 }

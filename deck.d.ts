@@ -29,6 +29,8 @@ export interface DeckConfig {
   readonly deckData: string | null;
   /** What `storydeck check` asks: words in a map click's headline (12), on a plain slide (40). */
   readonly checks: { readonly maxWords: number; readonly maxSlideWords: number };
+  /** A viewer may click a piece to go to the click about it, and come back (false). */
+  readonly explore: boolean;
   /** The keys deck.json wrote (a file it names must be there; a default may be absent). */
   readonly given: readonly string[];
 }
@@ -98,6 +100,8 @@ export interface CompiledDeck {
   readonly clicks: readonly DeckClick[];
   /** The named loops the clicks show (data-loop values), drawn into the page's CSS once each. */
   readonly loops: readonly string[];
+  /** With deck.json "explore": the map each click is on (null on a plain slide), and where each piece leads on its map — the first click whose data-on names it, else the first that takes it in through a name+ (0-based). */
+  readonly explore: { readonly slides: readonly (string | null)[]; readonly targets: Readonly<Record<string, Readonly<Record<string, number>>>> } | null;
   readonly maps: Readonly<Record<string, { readonly pieces: readonly FocusPiece[] }>>;
 }
 /** The deck's clicks planned (each map's state carried click to click) and drawn as <deck-stage> slides. */
