@@ -140,6 +140,24 @@ describe('loops in a deck', () => {
     expect(reviewClick(compiled, 2)).not.toContain('loops');
   });
 
+  it('a wire\'s packets are its wire\'s, not loops the deck wrote: review and check say nothing of them', () => {
+    const flowing = MAP.replace('data-arrow="300 470 500 470"', 'data-arrow="300 470 500 470" data-packets="2"');
+    const c = compileDeck(sourceOf({clicks: '<section data-label="M" data-map="map"><step data-in="*"><h2>All</h2></step></section>', maps: {map: flowing}}));
+    expect(c.slides[0].html.match(/<circle class="run" data-loop/g)).toHaveLength(2);
+    expect(c.clicks[0].loops).toEqual([]);
+    expect(c.loops).toEqual([]);
+    expect(reviewClick(c, 1)).not.toContain('loops');
+    expect(checkDeck(c).some((p) => p.rule === 'loop-unset')).toBe(false);
+  });
+
+  it('finds a loop an icon carries, as the build draws it', () => {
+    const map = MAP.replace('>A</div>', '><i class="ic" data-icon="gear"></i></div>');
+    const c = compileDeck(sourceOf({clicks: '<section data-label="M" data-map="map"><step data-in="*"><h2>All</h2></step></section>', maps: {map},
+      icons: {gear: '<svg viewBox="0 0 8 8"><g data-loop="float"><circle r="3"/></g></svg>'}}));
+    expect(c.clicks[0].loops).toEqual([{piece: null, value: 'float'}]);
+    expect(c.loops).toEqual(['float']);
+  });
+
   it('refuses a map\'s unknown loop, naming the map and the piece', () => {
     expect(() => compileDeck(sourceOf({clicks, maps: {map: map.replace('data-loop="pulse"', 'data-loop="puls"')}}))).toThrow(/^map "map", piece "b": data-loop="puls" is not a loop/);
   });
