@@ -39,10 +39,12 @@ export function readConfig(json: string | object): DeckConfig;
 
 /** One click on a map, as written: its attributes (focus-html · readStep reads them), headline (HTML) and notes. */
 export interface DeckStepSource { readonly attrs: string; readonly headline: string; readonly notes: readonly string[] }
+/** How a part arrives, as written: data-enter and its data-enter-* settings, as text (compile reads them against the shared table). */
+export interface DeckEnterSource { readonly type: string; readonly given: Readonly<Record<string, string>> }
 /** A part of the deck: a plain slide (map null) or clicks told on a map. */
-export type DeckPart =
+export type DeckPart = { readonly theme: string | null; readonly enter: DeckEnterSource | null } & (
   | { readonly label: string; readonly kicker: string; readonly map: null; readonly body: string; readonly notes: readonly string[] }
-  | { readonly label: string; readonly kicker: string; readonly map: string; readonly steps: readonly DeckStepSource[] };
+  | { readonly label: string; readonly kicker: string; readonly map: string; readonly steps: readonly DeckStepSource[] });
 /**
  * The clicks file read into parts, scanned once. A step holds only its <h2> and notes (anything else is refused, naming
  * where it goes); a <section> or <step> left open, or opened inside another, is refused.
@@ -82,6 +84,8 @@ export type DeckClick = {
   readonly notes: readonly string[];
   /** What loops on the click (on a map: on the pieces it shows). */
   readonly loops: readonly DeckLoop[];
+  /** How the click's part arrives, on its first click (null elsewhere, or when it just appears): footprint-story/motion's change, read. */
+  readonly enter: { readonly type: string; readonly seconds: number; readonly ease: string; readonly p: Readonly<Record<string, unknown>> } | null;
 } & (
   | { readonly kind: 'plain'; readonly map: null; readonly text: string }
   | { readonly kind: 'map'; readonly map: string; readonly step: FocusClick; readonly look: FocusLook; readonly stepIndex: number; readonly steps: number }
@@ -102,6 +106,8 @@ export interface CompiledDeck {
   readonly loops: readonly string[];
   /** With deck.json "explore": the map each click is on (null on a plain slide), and where each piece leads on its map — the first click whose data-on names it, else the first that takes it in through a name+ (0-based). */
   readonly explore: { readonly slides: readonly (string | null)[]; readonly targets: Readonly<Record<string, Readonly<Record<string, number>>>> } | null;
+  /** The parts' entrances as the page plays them: each distinct change sampled once (kinds), and its key per slide — or null when no part has one. */
+  readonly transitions: { readonly kinds: Readonly<Record<string, unknown>>; readonly enter: readonly (string | null)[] } | null;
   readonly maps: Readonly<Record<string, { readonly pieces: readonly FocusPiece[] }>>;
 }
 /** The deck's clicks planned (each map's state carried click to click) and drawn as <deck-stage> slides. */

@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- **A part arrives with a change of picture: `data-enter`.** `<section … data-enter="push" data-enter-from="right">`
+  plays one of the editor's changes StoryReel's films use (footprint-story/motion's table: the same names, settings,
+  lengths and eases) as the deck steps into the part: cut, fade, dip, wipe, split, iris, push, slide, whip or zoom,
+  each with its settings as `data-enter-*` (`from`, `line`, `at` as "x y" in slide px or "centre", `color`) and
+  `data-enter-seconds` / `data-enter-ease`. The build samples each distinct change once into keyframes for both slides
+  (30 a second, the same curves a film draws); the page plays them with Web Animations only on a forward step into the
+  part — a jump, a step back, reduced motion and motion off land at once — keeping the slide it leaves in view until
+  it ends, and a video steps them like any animation. A dip shows its colour behind both slides (black unless
+  `data-enter-color` says otherwise): `<deck-stage>` now paints what shows behind its slides with `--deck-canvas` (white,
+  as before, when unset). A change a page cannot play (clock, page, through, match: they need a canvas), a setting the
+  change does not take and a value out of range are refused at build, naming the part and the fix. `review` says how
+  each part arrives. While a change plays the frame clips both slides (a push never crosses the letterbox: `<deck-stage>`
+  clips its canvas while it carries `data-deck-changing`), the slide being left keeps its loops running, and printing
+  puts everything back first. Settings are read as a browser reads the tag. A deck without `data-enter` carries none
+  of it (no keyframes, rule or runtime); the `<deck-stage>` every page carries gained the two hooks, and draws as
+  before without them.
+
 - **Explore: a viewer clicks a piece to go to the click about it.** With `"explore": true` in deck.json, a click on a
   piece goes to the click that is about it — the first click whose `data-on` names it (`gw+`'s gw too), or, when none
   does, the first that takes it in through a `name+` — and a "Back to click N" control (or Backspace) returns, a step
@@ -11,7 +28,7 @@
   never a click. On a touch screen a tap on a piece that leads somewhere explores — tap beside the pieces to step. The
   pieces are reached by pointer, not by keyboard: arrow keys still step through the clicks in order. The presenter
   window does not explore (it follows the room's deck). The authored order never changes: explore is a way through the
-  same clicks. A deck without `"explore"` builds byte for byte as before (its look comes with it, not in deck.css).
+  same clicks. A deck without `"explore"` carries none of it (its look comes with it, not in deck.css).
 
 ## 0.9.0 — living system diagrams: loops, wires between pieces, a wire's label, halo and running packets
 
@@ -58,8 +75,9 @@
   step back keeps it running (a static arrival no longer zeroes a loop, only entrances). A loop never runs under
   reduced motion (switched live), in print, or with motion off: there the piece rests in its own style. A piece that
   loops and changes on the same click (comes in, lights up) does both: focus.css keeps the loop as the last animation
-  of the piece's list. Loop CSS is drawn only for decks that use loops, so a deck without one builds byte for byte as
-  before.
+  of the piece's list. Loop CSS is drawn only for decks that use loops, so a deck without one gains none; the
+  `<deck-stage>` every page carries changed, and a deck without loops draws as before. (Corrected after release: this
+  line first said such a deck builds byte for byte as before — its page carries the changed stage.)
 - **Motion off: a still deck.** `?motion=off` after the page's address, or `<deck-stage data-motion="off">` (switched
   live too): no loops, and every click lands at once, as a jump does — so a screenshot of a click is the same every
   time.

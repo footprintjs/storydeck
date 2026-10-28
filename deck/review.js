@@ -3,6 +3,7 @@
 // A reviewer — a person, or a model that cannot afford a screenshot per click — reads the deck here first and
 // looks at a picture only to confirm. `outline` is the whole deck, a line per click; `reviewClick` is one click.
 import {wordCount} from './parse.js';
+import {enterText} from './transitions.js';
 
 /** A piece's name: its first data-k name (a wire and its label may share one; they are listed once). */
 const nameOf = (pieces, i) => pieces[i].keys[0];
@@ -11,6 +12,8 @@ const list = (names, max = 14) => (names.length ? `${names.slice(0, max).join(',
 /** A click's part theme, as the end of its first line (nothing when the part has none). */
 const themed = (c) => (c.theme ? ` · theme ${c.theme}` : '');
 const quote = (s, max = 160) => (s.length > max ? `"${s.slice(0, max - 1)}…"` : `"${s}"`);
+/** How a click's part arrives (transitions.js), on its first click — nothing when it just appears. */
+const enterLine = (c) => (c.enter ? `enters by ${enterText(c.enter)} (on a forward step)` : null);
 /** What loops on a click (loops.js), each by its piece and its loop — nothing when none does. */
 const loopsLine = (c) => (c.loops?.length ? `loops (${c.loops.length}): ${list(c.loops.map((l) => `${l.piece ?? 'an element'} ${l.value || '(its own --loop)'}`), 10)}` : null);
 
@@ -80,6 +83,7 @@ export function reviewClick(compiled, which, {maxWords = compiled.config?.checks
   if (c.kind === 'plain') {
     lines.push(`click ${c.n} of ${compiled.clicks.length} · "${c.label}" (plain slide)${themed(c)}`);
     lines.push(`text (${words(wordCount(c.text))}): ${quote(c.text, 300)}`);
+    if (enterLine(c)) lines.push(enterLine(c));
     if (loopsLine(c)) lines.push(loopsLine(c));
   } else {
     lines.push(`click ${c.n} of ${compiled.clicks.length} · "${c.label}" (map "${c.map}", step ${c.stepIndex + 1} of ${c.steps})${themed(c)}`);
@@ -104,6 +108,7 @@ export function reviewClick(compiled, which, {maxWords = compiled.config?.checks
     lines.push(`this click: ${changes.length ? changes.join(' · ') : 'nothing changes on the map'}`);
     const motion = motionOf(c.look);
     if (motion.length) lines.push(`motion: ${motion.join(' · ')}`);
+    if (enterLine(c)) lines.push(enterLine(c));
     if (loopsLine(c)) lines.push(loopsLine(c));
   }
   const noteWords = c.notes.reduce((sum, p) => sum + wordCount(p), 0);
