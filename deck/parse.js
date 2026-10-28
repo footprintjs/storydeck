@@ -14,6 +14,7 @@
 // headline and its notes, and anything else in it is refused, naming where it goes instead (on the map). The file is
 // scanned once (html.js · elements): a <section> or <step> left open is refused at once, naming it.
 import {closing, elements, stripComments} from './html.js';
+import {readAttributes} from '../pieceRules.js';
 
 const NOTES_CLASS = /\sclass=(["'])(?:[^"']*\s)?notes(?:\s[^"']*)?\1/;
 const BLOCK = new Set(['br', 'p', 'div', 'li', 'ul', 'ol', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'tr', 'td', 'th', 'section', 'aside',
@@ -117,11 +118,12 @@ function readMapStep(label, k, attrs, inner) {
  * {setting: text}} (transitions.js reads them against the shared table), or null.
  */
 function enterOf(attrs) {
-  const type = attrOf(attrs, 'data-enter');
-  if (type === null) return null;
+  // read as a browser reads the tag: quoted or not, in any case, never from inside another attribute's value
+  const read = readAttributes(attrs) ?? [], type = read.find((a) => a.name === 'data-enter');
+  if (!type) return null;
   const given = {};
-  for (const m of attrs.matchAll(/\sdata-enter-([\w-]+)=(["'])(.*?)\2/g)) given[m[1]] ??= m[3];
-  return {type: type.trim(), given};
+  for (const a of read) if (a.name.startsWith('data-enter-') && a.name.length > 11) given[a.name.slice(11)] ??= a.value;
+  return {type: type.value.trim(), given};
 }
 
 /**

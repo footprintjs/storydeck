@@ -36,6 +36,7 @@ describe('readEnter', () => {
     expect(enterText(enter('push', {from: 'left'}))).toBe('push from left, 0.7 s');
     expect(enterText(enter('iris', {at: '10 20'}))).toBe('iris at 10 20, 0.8 s');
     expect(enterText(enter('fade'))).toBe('fade, 0.8 s');
+    expect(enterText(enter('cut'))).toBe('cut, at once');
   });
 });
 
@@ -92,6 +93,12 @@ describe('in a deck', () => {
     expect(reviewClick(compiled, 3)).not.toContain('enters by');
   });
 
+  it('reads a part\'s entrance as a browser reads the tag: quoted or not, in any case, never inside another value', () => {
+    const one = (attrs) => compileDeck(sourceOf({clicks: `<section data-label="P"${attrs}><p>x</p></section>`})).clicks[0].enter;
+    expect(one(' data-enter=push data-enter-from=left DATA-ENTER-SECONDS=1')).toMatchObject({type: 'push', seconds: 1, p: {from: 'left'}});
+    expect(one(' data-kicker="see data-enter-from=\'top\'" data-enter="wipe"').p.from).toBe('left');
+  });
+
   it('names the part when its entrance is refused', () => {
     expect(() => compileDeck(sourceOf({clicks: clicks.replace('data-enter="fade"', 'data-enter="page"')}))).toThrow(/^"End": data-enter="page" — a page cannot play it/);
   });
@@ -104,8 +111,10 @@ describe('in a deck', () => {
     expect(off).not.toMatch(/deck-transitions|data-sd-leaving|transitionRuntime/);
   });
 
-  it('deck-stage paints what shows behind the slides with --deck-canvas, white by default', () => {
-    expect(readFileSync(path.join(process.cwd(), 'site/public/deck-stage.js'), 'utf8')).toContain('background: var(--deck-canvas, #fff);');
+  it('deck-stage paints what shows behind the slides with --deck-canvas, white by default, and clips them while a change plays', () => {
+    const stage = readFileSync(path.join(process.cwd(), 'site/public/deck-stage.js'), 'utf8');
+    expect(stage).toContain('background: var(--deck-canvas, #fff);');
+    expect(stage).toContain(':host([data-deck-changing]) .canvas { overflow: hidden; }');
   });
 });
 
@@ -135,9 +144,10 @@ describe('transitionRuntime (in the page)', () => {
   }
 
   it('plays a forward step\'s change: the leaving slide kept in view and under the arriving one, both animated', () => {
-    const {slides, played, go} = page();
+    const {stage, slides, played, go} = page();
     go(1, 0);
     expect(played.map((p) => p.slide)).toEqual([0, 1]);
+    expect(stage.hasAttribute('data-deck-changing')).toBe(true);
     expect(slides[0].hasAttribute('data-sd-leaving')).toBe(true);
     expect([slides[0].style.zIndex, slides[1].style.zIndex]).toEqual(['1', '2']);
     expect(played[1].a.options.duration).toBe(700);
@@ -156,6 +166,30 @@ describe('transitionRuntime (in the page)', () => {
     expect(stage.style.getPropertyValue('--deck-canvas')).toBe('');
     expect([slides[1].style.zIndex, slides[3].style.zIndex, slides[1].hasAttribute('data-sd-leaving')]).toEqual(['', '', false]);
     expect(played).toHaveLength(4);
+  });
+
+  it('keeps the leaving slide\'s loops running while it leaves, when loops run; puts it all back when printing starts', () => {
+    const {stage, slides, played, go} = page();
+    slides[1].setAttribute('data-deck-loop', '');   // the stage runs loops: it marked the slide arriving
+    go(1, 0);
+    expect(slides[0].hasAttribute('data-deck-loop')).toBe(true);
+    window.dispatchEvent(new Event('beforeprint'));
+    expect([slides[0].hasAttribute('data-deck-loop'), slides[0].hasAttribute('data-sd-leaving'), stage.hasAttribute('data-deck-changing')]).toEqual([false, false, false]);
+    expect(played[1].a.cancel).toHaveBeenCalled();
+    slides[2].setAttribute('data-deck-loop', '');
+    slides[3].setAttribute('data-deck-loop', '');   // one already marked (a layer under it) keeps its mark
+    go(3, 1);
+    expect(slides[1].hasAttribute('data-deck-loop')).toBe(true);
+  });
+
+  it('a slide change that moves nothing (the stage saying again where it is) leaves a change playing; one cancelled by someone else still puts everything back', async () => {
+    const {stage, slides, played, go} = page();
+    go(1, 0);
+    go(1, 1);
+    expect(slides[0].hasAttribute('data-sd-leaving')).toBe(true);
+    played[1].a.cancel();
+    await Promise.resolve(); await Promise.resolve();
+    expect([slides[0].hasAttribute('data-sd-leaving'), stage.hasAttribute('data-deck-changing')]).toEqual([false, false]);
   });
 
   it('draws a zoom\'s leaving slide over the arriving one; a change that ends after a newer one began leaves the newer alone', async () => {

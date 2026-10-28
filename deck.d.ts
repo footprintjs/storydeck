@@ -39,9 +39,9 @@ export function readConfig(json: string | object): DeckConfig;
 
 /** One click on a map, as written: its attributes (focus-html · readStep reads them), headline (HTML) and notes. */
 export interface DeckStepSource { readonly attrs: string; readonly headline: string; readonly notes: readonly string[] }
-/** A part of the deck: a plain slide (map null) or clicks told on a map. */
 /** How a part arrives, as written: data-enter and its data-enter-* settings, as text (compile reads them against the shared table). */
 export interface DeckEnterSource { readonly type: string; readonly given: Readonly<Record<string, string>> }
+/** A part of the deck: a plain slide (map null) or clicks told on a map. */
 export type DeckPart = { readonly theme: string | null; readonly enter: DeckEnterSource | null } & (
   | { readonly label: string; readonly kicker: string; readonly map: null; readonly body: string; readonly notes: readonly string[] }
   | { readonly label: string; readonly kicker: string; readonly map: string; readonly steps: readonly DeckStepSource[] });

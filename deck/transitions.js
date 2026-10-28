@@ -102,8 +102,8 @@ export function readEnter(enter, where, {frame = [1920, 1080]} = {}) {
   return {type: t.type, seconds: t.seconds, ease: t.ease, p: t.p};
 }
 
-/** A part's entrance in words, for review: "push from right, 0.7 s". */
-export const enterText = (t) => `${t.type}${Object.entries(t.p).map(([k, v]) => ` ${k === 'from' ? 'from ' : `${k} `}${Array.isArray(v) ? v.join(' ') : v}`).join('')}, ${t.seconds} s`;
+/** A part's entrance in words, for review: "push from right, 0.7 s" ("cut, at once"). */
+export const enterText = (t) => `${t.type}${Object.entries(t.p).map(([k, v]) => ` ${k} ${Array.isArray(v) ? v.join(' ') : v}`).join('')}, ${t.type === 'cut' ? 'at once' : `${t.seconds} s`}`;
 
 /**
  * What the page carries for the entrances its slides make: {kinds: {key: keyframes}, enter: [key or null, per slide]}
@@ -128,10 +128,11 @@ export const TRANSITION_CSS = 'deck-stage > [data-sd-leaving] { visibility: visi
 
 /**
  * Runs in the page: on a forward step onto a slide that makes an entrance (a step over skipped slides is still one),
- * plays its change — the slide it leaves kept in view and animated out, the one it arrives at animated in, the one
- * drawn over on top, a dip's colour behind both — and puts everything back when it ends or the next change of slide
- * comes. Never on a jump, a step back or an arrival that lands at once (data-deck-static), nor under reduced motion or
- * with motion off. Web Animations, so a video's frame stepper steps it like any animation.
+ * plays its change — the slide it leaves kept in view as it rests (its loops still running) and animated out, the one
+ * it arrives at animated in, the one drawn over on top, a dip's colour behind both, the frame clipping both — and puts
+ * everything back when it ends, when printing starts, or when the next change of slide comes. Never on a jump, a step
+ * back or an arrival that lands at once (data-deck-static), nor under reduced motion or with motion off. Web
+ * Animations, so a video's frame stepper steps it like any animation.
  */
 export function transitionRuntime() {
   const stage = document.querySelector('deck-stage'), data = document.getElementById('deck-transitions');
@@ -144,26 +145,37 @@ export function transitionRuntime() {
     playing = null;
     p.anims.forEach((a) => a.cancel());
     p.leaving.removeAttribute('data-sd-leaving');
+    if (p.looped && !p.leaving.hasAttribute('data-deck-active') && !p.leaving.hasAttribute('data-deck-under')) p.leaving.removeAttribute('data-deck-loop');
     p.leaving.style.zIndex = p.z[0];
     p.arriving.style.zIndex = p.z[1];
     if (p.bg !== null) stage.style.setProperty('--deck-canvas', p.bg);
+    stage.removeAttribute('data-deck-changing');
   };
   const calm = () => !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || stage.getAttribute('data-motion') === 'off';
+  window.addEventListener('beforeprint', settle);   // a page prints as it rests
   stage.addEventListener('slidechange', (e) => {
-    settle();
     const {index, previousIndex, slide, previousSlide} = e.detail;
+    if (index === previousIndex) return;   // the stage saying again where it is (its slides re-read): nothing moved
+    settle();
     const t = kinds[enter[index]];
-    if (!t || t.type === 'cut' || !slide || !previousSlide || index <= previousIndex || calm() || slide.hasAttribute('data-deck-static')) return;
+    if (!t || t.type === 'cut' || !slide || !previousSlide || index < previousIndex || calm() || slide.hasAttribute('data-deck-static')) return;
     const all = [...stage.children].filter((s) => s.tagName === 'SECTION');
     if (!all.slice(previousIndex + 1, index).every((s) => s.hasAttribute('data-deck-skip')) || typeof slide.animate !== 'function') return;
     const over = t.on === 'leaving';
-    const p = {anims: [], leaving: previousSlide, arriving: slide, z: [previousSlide.style.zIndex, slide.style.zIndex], bg: t.backdrop ? stage.style.getPropertyValue('--deck-canvas') : null};
+    const p = {anims: [], leaving: previousSlide, arriving: slide, z: [previousSlide.style.zIndex, slide.style.zIndex],
+      bg: t.backdrop ? stage.style.getPropertyValue('--deck-canvas') : null, looped: false};
     previousSlide.setAttribute('data-sd-leaving', '');
+    // its loops run on while it leaves, when loops run at all (the stage marks the arriving slide so): one clock, so
+    // they go on in step
+    if (slide.hasAttribute('data-deck-loop') && !previousSlide.hasAttribute('data-deck-loop')) { previousSlide.setAttribute('data-deck-loop', ''); p.looped = true; }
     previousSlide.style.zIndex = over ? '2' : '1';
     slide.style.zIndex = over ? '1' : '2';
     if (t.backdrop) stage.style.setProperty('--deck-canvas', t.backdrop);   // deck-stage paints its canvas with it, behind both slides
+    stage.setAttribute('data-deck-changing', '');                          // and keeps both inside its frame
     p.anims = [previousSlide.animate(t.leaving, t.options), slide.animate(t.arriving, t.options)];
     playing = p;
-    p.anims[1].finished.then(() => { if (playing === p) settle(); }, () => {});
+    // ended, or cancelled by someone else (a frame stepper): either way, put everything back
+    const done = () => { if (playing === p) settle(); };
+    p.anims[1].finished.then(done, done);
   });
 }

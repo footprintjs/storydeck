@@ -204,6 +204,8 @@
       background: var(--deck-canvas, #fff);
       will-change: transform;
     }
+    /* while a change of slide plays (the page sets data-deck-changing), a slide moving in or out stays inside the frame */
+    :host([data-deck-changing]) .canvas { overflow: hidden; }
 
     /* Slides live in light DOM (via <slot>) so authored CSS still applies.
        We absolutely position each slotted child to stack them. */
