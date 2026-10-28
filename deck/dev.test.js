@@ -266,16 +266,34 @@ describe('edits from the dev page', () => {
   });
 
   it('moves the piece the build numbered, into its map file, and rebuilds at once — a box by left/top, a wire by its arrow', async () => {
-    const dir = tempDeck();
+    const numbered = STARTER['map.html'].replace('data-k="req1" class="wire req pkt" data-arrow="client to server"', 'data-k="req1" class="wire req pkt" data-arrow="464 490 716 490"');
+    expect(numbered).not.toBe(STARTER['map.html']);
+    const dir = tempDeck({...STARTER, 'map.html': numbered});
     const {s, token, at} = await editing(dir);
     expect([at('client'), at('req1'), at('server')]).toEqual([0, 1, 2]);
     expect(await post(s, '/__storydeck/move', {map: 'map', index: at('server'), name: 'server', dx: 60, dy: -20}, {token})).toMatchObject({status: 200, body: {ok: true}});
     expect(s.state().version).toBe(2);
-    expect((await post(s, '/__storydeck/move', {map: 'map', index: 1, name: 'req1', dx: 0, dy: 10}, {token})).status).toBe(200);
+    expect((await post(s, '/__storydeck/move', {map: 'map', index: 1, name: 'req1', dx: 0, dy: 10}, {token})).body).toEqual({ok: true});
     const map = readFileSync(path.join(dir, 'map.html'), 'utf8');
     expect(map).toContain('<div data-k="server" class="box" style="left:780px;top:400px;width:300px;height:210px">');
     expect(map).toContain('<i data-k="req1" class="wire req pkt" data-arrow="464 500 716 500"></i>');
-    expect(map.replace('left:780px;top:400px', 'left:720px;top:420px').replace('464 500 716 500', '464 490 716 490')).toBe(STARTER['map.html']);
+    expect(map.replace('left:780px;top:400px', 'left:720px;top:420px').replace('464 500 716 500', '464 490 716 490')).toBe(numbered);
+  });
+
+  it('a wire between pieces follows them: moving a piece moves its wires, and the wire itself is not moved', async () => {
+    const dir = tempDeck();
+    const {s, token, at} = await editing(dir);
+    // where the page draws req1 (its first slide on the map): its box's left and top
+    const wireAt = async () => /<svg data-ends="client server" data-k="req1"[^>]*?style="left:([\d.]+)px;top:([\d.]+)px/.exec((await get(s, '/')).body).slice(1).map(Number);
+    const before = await wireAt();
+    const r = await post(s, '/__storydeck/move', {map: 'map', index: at('req1'), name: 'req1', dx: 0, dy: 10}, {token});
+    expect(r.body.error).toBe('"req1" runs from "client" to "server" and follows them — move one of them');
+    expect(readFileSync(path.join(dir, 'map.html'), 'utf8')).toBe(STARTER['map.html']);
+    expect(await post(s, '/__storydeck/move', {map: 'map', index: at('server'), name: 'server', dx: 0, dy: 100}, {token})).toMatchObject({status: 200});
+    expect(readFileSync(path.join(dir, 'map.html'), 'utf8')).toContain('data-arrow="client to server"');   // the wire's text is kept
+    const after = await wireAt();
+    expect(after[0]).toBeCloseTo(before[0], 0);   // it still leaves the client's right edge
+    expect(after[1]).toBeGreaterThan(before[1]);   // it leans down to the server's new place
   });
 
   it('answers an edit only from its own page: its origin, its token, JSON, at most 16 KB — and is never framed elsewhere', async () => {

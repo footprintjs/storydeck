@@ -12,6 +12,8 @@ export interface FocusPiece {
   readonly box: FocusBox | null;
   /** Names of its twin: while a twin is lit, this piece steps aside (a dashed wire under a solid one). */
   readonly twin?: readonly string[];
+  /** A wire's ends: the pieces it joins (data-ends; a wire written "from to to" carries them), for a click's `name+`. */
+  readonly ends?: readonly string[];
 }
 
 /** A focus as written on a click: a strategy name ('left'), several ('left blur'), or {strategy, …options}. */
@@ -162,5 +164,7 @@ export type FocusState = { readonly __focusState: true } & Record<string, unknow
 export const FOCUS: Readonly<Record<'grey' | 'hide' | 'keep' | 'zoom' | 'left' | 'right' | 'up' | 'down' | 'place' | 'apart' | 'path' | 'blur', FocusStrategy>>;
 export function readFocus(spec: FocusSpec | undefined | null, shared?: Readonly<Record<string, unknown>>): { strategy: string; options: Record<string, unknown> }[];
 export function focusStep(prev: FocusState | null, click: FocusClick, deck: FocusDeck): { state: FocusState; look: FocusLook };
+/** Names as a click writes them, each `name+` read as that piece, the wires with it as an end, and the pieces at their other ends. */
+export function expandNames(pieces: readonly FocusPiece[], names: readonly string[]): string[];
 /** `end` is null only when there are no clicks and no `start`. */
 export function planFocus(clicks: readonly FocusClick[], deck: FocusDeck, start?: FocusState | null): { looks: FocusLook[]; end: FocusState | null };

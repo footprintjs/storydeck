@@ -11,7 +11,7 @@
 // when a browser would read the piece's tag differently (a quote or a ">" inside a value): it edits only what both see.
 import {attrValue, pieceTags, readAttributes, styleLength, tagsWith} from '../pieceRules.js';
 import {UNSEEN, commentRanges, stripComments} from './html.js';
-import {wireTags} from './transforms.js';
+import {wireEnds, wireTags} from './transforms.js';
 
 /** The checklist of notes a person leaves on clicks in the dev page, in the deck folder. */
 export const FEEDBACK = 'feedback.md';
@@ -93,7 +93,8 @@ function moveEdits(html, piece, dx, dy) {
   if (browserValueAt(html, piece, 'data-k') !== piece.start + 1 + piece.tag.length + piece.before.length + ' data-k="'.length) throw ambiguous();
   const wire = wiresBySource(html).get(piece.start);
   if (wire) {
-    const spec = wire.m[1], parts = spec.trim().split(/[\s,]+/), nums = parts.map(Number);
+    const spec = wire.m[1], parts = spec.trim().split(/[\s,]+/), nums = parts.map(Number), ends = wireEnds(spec);
+    if (ends) throw new Error(`"${piece.name}" runs from "${ends[0]}" to "${ends[1]}" and follows them — move one of them`);
     if ((parts.length !== 4 && parts.length !== 5) || nums.some((n) => !Number.isFinite(n))) {
       throw new Error(`"${piece.name}": its data-arrow is not "x1 y1 x2 y2 [bend]" — fix it before moving it`);
     }

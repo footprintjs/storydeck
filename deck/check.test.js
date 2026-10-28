@@ -44,6 +44,14 @@ describe('checkDeck', () => {
     expect(rules(check('<section data-label="M" data-map="map"><step data-in="a b"><h2>A</h2></step></section>'))).not.toContain('warn lit-on-entry 1');
   });
 
+  it('lit-on-entry reads name+ as the piece and what it touches', () => {
+    const map = MAP.replace('data-arrow="300 470 500 470"', 'data-arrow="a to b"').replace('data-arrow="700 470 900 470"', 'data-arrow="b to c"');
+    const clicks = '<section data-label="M" data-map="map"><step data-in="a"><h2>A</h2></step><step data-in="w1 b w2 c" data-on="b+"><h2>B and its wires</h2></step></section>';
+    expect(check(clicks, {maps: {map}}).filter((p) => p.rule === 'lit-on-entry')).toEqual([]);
+    const narrow = clicks.replace('data-on="b+"', 'data-on="b"');
+    expect(rules(check(narrow, {maps: {map}})).filter((r) => r.includes('lit-on-entry'))).toEqual(['warn lit-on-entry 2']);
+  });
+
   it('no-change: a click that leaves the screen as it was, with the same headline', () => {
     const same = check('<section data-label="M" data-map="map"><step data-in="*"><h2>H</h2></step><step><h2>H</h2></step></section>');
     expect(rules(same)).toContain('warn no-change 2');

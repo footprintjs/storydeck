@@ -34,6 +34,20 @@
 
 const KINDS = ['look', 'camera', 'mover', 'overlay', 'order'];
 
+/**
+ * Names as a click writes them, each `name+` read as that piece and what touches it: the wires that have it as an end
+ * (a piece's `ends`) and the pieces at their other ends — "the gateway and everything it talks to". A piece actually
+ * called `name+` is itself.
+ */
+export function expandNames(pieces, list) {
+  const own = new Set(pieces.flatMap(p => p.keys));
+  return list.flatMap(x => {
+    if (!x.endsWith('+') || x.length < 2 || own.has(x)) return [x];
+    const name = x.slice(0, -1), wires = pieces.filter(p => p.ends?.includes(name));
+    return [...new Set([name, ...wires.map(p => p.keys[0]), ...wires.flatMap(p => p.ends.filter(e => e !== name))])];
+  });
+}
+
 /** A box {x, y, w, h} around a list of boxes (null for none). */
 function union(boxes) {
   const known = boxes.filter(Boolean);
@@ -266,7 +280,7 @@ function changeOf(st, was, look, wasLook, entering, before) {
 export function focusStep(prev, step, deck) {
   const {pieces, strategies = {}} = deck, canvas = deck.canvas ?? {w: 1920, h: 1080};
   const view = deck.view ?? {s: 1, x: 0, y: 0}, areaSlide = deck.area ?? [0, 0, canvas.w, canvas.h];
-  const names = l => (l ?? []).flatMap(x => String(x).trim().split(/\s+/)).filter(Boolean);
+  const names = l => expandNames(pieces, (l ?? []).flatMap(x => String(x).trim().split(/\s+/)).filter(Boolean));
   const ins = names(step.in), outs = names(step.out), on = step.on === undefined || step.on === null ? null : names(step.on), hot = names(step.hot);
   const has = (i, l) => l.includes('*') || l.some(x => pieces[i].keys.includes(x));
   const known = (l, what) => { for (const x of l) if (x !== '*' && !pieces.some(p => p.keys.includes(x))) throw new Error(`${what}no piece "${x}" (the pieces are named ${[...new Set(pieces.flatMap(p => p.keys))].join(', ')})`); return l; };

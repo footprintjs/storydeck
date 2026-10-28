@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- **A wire between pieces: `data-arrow="client to server"`.** The wire runs from the edge of one piece's box to the
+  edge of the other's (6 px clear), so it follows them: move a box, in the file or by Alt-drag, and its wires come
+  along — no four numbers to keep in step. Two or more wires between the same pieces each take a lane (80 px apart at
+  most, always inside both boxes), keeping to their left, so a request going right runs above its answer coming back
+  whatever the pieces are called. A bend may follow the names (`"gw to db 40"`). Words, not `>`, because a `>` would
+  end the tag. A name not placed, a wire to itself and pieces too close for a wire are refused, naming the fix; a
+  numbered wire is drawn byte for byte as before. Alt-dragging a wire between pieces is refused with its fix (move one
+  of its pieces). The starter deck now writes its four wires this way (they land within 5 px of where its numbers put them).
+- **A piece and what it touches: `name+`.** A wire between pieces carries `data-ends` (the pieces it joins; a wire in
+  numbers may carry it too), so a click can name `gw+`: the gateway, the wires with it as an end, and the pieces at
+  their other ends — `data-on="gw+"` lights that neighbourhood and greys the rest. It reads anywhere a click names
+  pieces (`data-in`, `data-out`, `data-on`, `data-hot`); `check`'s lit-on-entry reads it the same way, and `review`
+  lists what it lit. A piece actually called `gw+` is itself. `footprint-storydeck/focus` exports `expandNames`.
+
 - **Motion that keeps going: loops.** `data-loop="pulse"` on a piece keeps it pulsing while its slide is shown.
   `pulse`, `float` and `marquee` are the endless moves of the motion table StoryReel's films use
   (`footprint-story/motion`), sampled from the same curves and drawn into the page only when a deck names them
