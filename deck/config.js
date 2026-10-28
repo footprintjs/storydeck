@@ -9,7 +9,8 @@
 //     "maps": { "map": "map.html" },                            a map's file (default: <name>.html)
 //     "out": "index.html",                                      the built page, inside the deck folder
 //     "post": "post.json", "deckData": "deck-data.json",       the Read/Scroll lenses' sources, when the deck has them
-//     "checks": { "maxWords": 12, "maxSlideWords": 40 } }       what `storydeck check` asks: words in a headline, on a plain slide
+//     "checks": { "maxWords": 12, "maxSlideWords": 40 },        what `storydeck check` asks: words in a headline, on a plain slide
+//     "explore": true }                                         a viewer may click a piece to go to the click about it (explore.js)
 //
 // A key it does not know is refused with the keys it does, so a typo is never a silent default. A file name it gives
 // follows paths.js · deckPath (relative, inside the deck, nothing hidden).
@@ -25,7 +26,7 @@ export const DEFAULTS = Object.freeze({
   out: 'index.html',
   checks: Object.freeze({maxWords: 12, maxSlideWords: 40}),
 });
-const KEYS = ['title', 'description', 'lang', 'footer', 'area', 'canvas', 'clicks', 'theme', 'icons', 'maps', 'out', 'post', 'deckData', 'checks'];
+const KEYS = ['title', 'description', 'lang', 'footer', 'area', 'canvas', 'clicks', 'theme', 'icons', 'maps', 'out', 'post', 'deckData', 'checks', 'explore'];
 const CHECK_KEYS = ['maxWords', 'maxSlideWords'];
 
 const isText = (v) => typeof v === 'string' && v.trim().length > 0;
@@ -62,6 +63,7 @@ export function readConfig(json) {
     return v;
   };
   const maxWords = count('maxWords'), maxSlideWords = count('maxSlideWords');
+  if (raw.explore !== undefined && typeof raw.explore !== 'boolean') throw new Error(`deck.json "explore" is true or false, not ${JSON.stringify(raw.explore)}`);
   return Object.freeze({
     title: raw.title.trim(),
     description: raw.description ?? '',
@@ -77,6 +79,7 @@ export function readConfig(json) {
     post: raw.post === undefined ? null : deckPath(raw.post, 'post'),
     deckData: raw.deckData === undefined ? null : deckPath(raw.deckData, 'deckData'),
     checks: Object.freeze({maxWords, maxSlideWords}),
+    explore: raw.explore === true,
     given: Object.freeze(Object.keys(raw)),   // the keys deck.json wrote: a file it names must be there; a default may be absent
   });
 }

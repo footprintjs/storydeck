@@ -13,6 +13,7 @@ text. Each module does one job, and they compose in one direction:
 | `transforms.js` | the built-in drawing helpers: `data-arrow` wires (with packets) — by numbers, or between pieces ("client to server": edge to edge, in lanes, carrying `data-ends` for a click's `name+`), with a label, a halo and running packets (loops) — and `data-icon` icons |
 | `loops.js` | what loops on each click (`data-loop`), checked, and the named loops (footprint-story/motion's endless moves) drawn as CSS — only those a deck shows |
 | `source.js` | the folder read from disk (Node) — only its own files, never through a link that leaves it |
+| `explore.js` | where each piece leads when a viewer explores (deck.json "explore": the click about it), and the page's runtime that follows it |
 | `compile.js` | clicks planned (each map's focus state carried from click to click) and drawn as `<deck-stage>` slides |
 | `page.js` | the one page: slides, notes, every stylesheet and runtime inlined; the theme toggle |
 | `assets.js` | what the library ships that the page carries (the runtime, focus.css, narration.css, deck.css) |
