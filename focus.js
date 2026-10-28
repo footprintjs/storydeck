@@ -308,15 +308,17 @@ export function focusStep(prev, step, deck) {
   // boxOf(names): the box around the shown pieces of those names, for a mover that moves named groups (place).
   const boxOf = l => union(all.filter(i => states[i] !== 'gone' && has(i, known(names([].concat(l)), 'focus group: '))).map(i => pieces[i].box));
   const placed = chosen.mover ? chosen.mover.s.place({subject, context, area, view, canvas, boxOf, options: chosen.mover.options}) ?? {} : {};
+  // a group's names as the click reads every name (gw+ is gw and what it touches), once, for everything below
+  const placedGroups = (placed.groups ?? []).map(x => ({...x, names: names(x.names)}));
   // Named groups (later ones win a piece in two of them) take their pieces out of the subject and context groups. A
   // mover whose groups go by a spring (apart) has each moved piece remember its group, so the next click knows what closes.
   const spring = placed.spring === undefined || placed.spring === null ? null : readSpring(placed.spring, chosen.mover.name);
   const springOf = new Map();
-  for (const {names: l, g} of placed.groups ?? []) for (const i of all) if (states[i] !== 'gone' && has(i, l)) {
+  for (const {names: l, g} of placedGroups) for (const i of all) if (states[i] !== 'gone' && has(i, l)) {
     inGroup.set(i, g ? {g} : 'still');
     if (spring && g) springOf.set(i, l.join(' ')); else springOf.delete(i);
   }
-  const springGroups = [...new Map((spring ? placed.groups ?? [] : []).filter(x => x.g).map(x => [x.names.join(' '), [...x.names]]))];
+  const springGroups = [...new Map((spring ? placedGroups : []).filter(x => x.g).map(x => [x.names.join(' '), [...x.names]]))];
   const groupOf = i => { const k = inGroup.get(i); return k === 'subject' ? placed.subject : k === 'context' ? placed.context : k?.g ?? null; };
   const moves = pieces.map((p, i) => states[i] === 'gone' ? null : placePiece(groupOf(i), p.box));
   // The camera sees the click as the mover leaves it: every box moved by its group. Two things a camera never shares

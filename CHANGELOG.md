@@ -13,8 +13,10 @@
 - **A piece and what it touches: `name+`.** A wire between pieces carries `data-ends` (the pieces it joins; a wire in
   numbers may carry it too), so a click can name `gw+`: the gateway, the wires with it as an end, and the pieces at
   their other ends — `data-on="gw+"` lights that neighbourhood and greys the rest. It reads anywhere a click names
-  pieces (`data-in`, `data-out`, `data-on`, `data-hot`); `check`'s lit-on-entry reads it the same way, and `review`
-  lists what it lit. A piece actually called `gw+` is itself. `footprint-storydeck/focus` exports `expandNames`.
+  pieces (`data-in`, `data-out`, `data-on`, `data-hot`, and the groups a mover moves: `subject`, `aside`, `place`,
+  `apart`); `check`'s lit-on-entry reads it the same way, and `review` lists what it lit. A piece actually called `gw+`
+  is itself. On a `path` click it lights the piece, then its wires, then what they reach — for a request's own order,
+  write the route out (`data-focus-route`), where `+` is not read. `footprint-storydeck/focus` exports `expandNames`.
 
 - **Motion that keeps going: loops.** `data-loop="pulse"` on a piece keeps it pulsing while its slide is shown.
   `pulse`, `float` and `marquee` are the endless moves of the motion table StoryReel's films use

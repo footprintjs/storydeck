@@ -118,7 +118,9 @@ function wiresBetween(html, found) {
     const ca = [A.x + A.w / 2, A.y + A.h / 2], cb = [B.x + B.w / 2, B.y + B.h / 2], len = Math.hypot(cb[0] - ca[0], cb[1] - ca[1]);
     if (len === 0) throw new Error(`data-arrow="${spec}": "${a}" and "${b}" share a middle — place them apart, or give the wire numbers`);
     const u = [(cb[0] - ca[0]) / len, (cb[1] - ca[1]) / len], n = [-u[1], u[0]];
-    const across = (box) => (Math.abs(n[0]) * box.w + Math.abs(n[1]) * box.h) / 2;   // half the box, measured across the line
+    // half the box measured across the line: a lane closer to the middle than this, less 8 px, crosses the box, so its
+    // ends are found on the box's edges (exit: from any point of such a line, as the line leaves the box)
+    const across = (box) => (Math.abs(n[0]) * box.w + Math.abs(n[1]) * box.h) / 2;
     const lane = lanes.get(pairOf(m)), k = lane.indexOf(i), most = Math.max(0, Math.min(across(A), across(B)) - 8);
     const step = lane.length > 1 ? Math.min(LANE, (2 * most) / (lane.length - 1)) : 0, off = (k - (lane.length - 1) / 2) * step;
     const pa = [ca[0] + n[0] * off, ca[1] + n[1] * off], pb = [cb[0] + n[0] * off, cb[1] + n[1] * off];

@@ -197,6 +197,26 @@ describe('a wire between pieces ("from to to")', () => {
     expect(drawn(`${small}<i data-k="x" data-arrow="a to b"></i>`)[0].from[1]).toBe(20);
   });
 
+  it('keeps its lanes across a wide, flat box on a slant: each wire leaves its box\'s edge and its tip reaches the other\'s', () => {
+    const A = {x: 0, y: 0, w: 600, h: 60}, B = {x: 600, y: 300, w: 600, h: 60};
+    const html = `${box('a', A.x, A.y, A.w, A.h)}${box('b', B.x, B.y, B.w, B.h)}<i data-k="x" data-arrow="a to b"></i><i data-k="y" data-arrow="b to a"></i><i data-k="z" data-arrow="a to b"></i>`;
+    // each wire's start (its path's first point) and its tip (its head's first point), in slide px
+    const ends = [...wires(html).matchAll(/data-ends="(\w) (\w)"[^>]*style="left:([\d.-]+)px;top:([\d.-]+)px[^>]*><path d="M([\d.-]+) ([\d.-]+)[^"]*"\/><path class="head" d="M([\d.-]+) ([\d.-]+)/g)]
+      .map((m) => ({from: m[1], start: [+m[5] + +m[3], +m[6] + +m[4]], tip: [+m[7] + +m[3], +m[8] + +m[4]]}));
+    // a point 6 px outside a box's edge (a little more on a slant), never inside it or far from it
+    const near = ([x, y], b) => {
+      const dx = Math.max(b.x - x, 0, x - b.x - b.w), dy = Math.max(b.y - y, 0, y - b.y - b.h);
+      return Math.hypot(dx, dy) > 2 && Math.hypot(dx, dy) < 8;
+    };
+    expect(ends).toHaveLength(3);
+    for (const w of ends) {
+      const [from, to] = w.from === 'a' ? [A, B] : [B, A];
+      expect(near(w.start, from), JSON.stringify(w)).toBe(true);
+      expect(near(w.tip, to), JSON.stringify(w)).toBe(true);
+    }
+    expect(new Set(ends.map((w) => w.start.join())).size).toBe(3);   // three lanes, none on another
+  });
+
   it('leaves through whichever edge the line crosses, keeps its bend, and finds a name shared by several pieces as one box', () => {
     const [w] = drawn(`${box('top', 400, 0, 200, 100)}${box('low', 400, 600, 200, 100)}<i data-k="w" data-arrow="top to low 30"></i>`);
     expect(w.from).toEqual([500, 106]);   // the bottom edge

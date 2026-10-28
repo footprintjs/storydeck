@@ -425,7 +425,8 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   rides the wire on a `path` click, at its turn — along the curve itself, not a straight line across the bend. A wire
   that comes in shows itself from its start to its tip, its dashes and colours as your theme draws them. A wire between
   pieces knows its ends, so a click can be about a piece and everything it touches: `data-on="gw+"` lights the
-  gateway, its wires and the pieces at their other ends, and greys the rest (`review` lists them).
+  gateway, its wires and the pieces at their other ends, and greys the rest (`review` lists them); it reads in every
+  list of names a click has, the groups a mover moves too (`data-focus-apart="gw+: 0 -200"`).
   `<i class="ic" data-icon="server"></i>` is `icons/server.svg`. `deck.css` styles the chrome (kicker, headline, footer
   and count), wires, packets, icons and the theme toggle from the token contract, every rule `:where()`, so your
   theme wins.

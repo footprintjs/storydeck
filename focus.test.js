@@ -603,4 +603,13 @@ describe('focus · a piece and what it touches (name+)', () => {
   it('names an unknown piece as written', () => {
     expect(() => focusStep(null, { in: ['*'], on: ['gateway+'], fresh: true }, { pieces: graph })).toThrow(/no piece "gateway"/);
   });
+
+  it('a group a mover moves reads name+ too: apart and place move the piece and what it touches', () => {
+    const moved = (look) => look.pieces.map((p, i) => (p.move ? graph[i].keys[0] : null)).filter(Boolean);
+    const apart = focusStep(null, { in: ['*'], quiet: true, fresh: true, focus: 'apart', options: { apart: 'browser+: 0 -200' } }, { pieces: graph });
+    expect(moved(apart.look)).toEqual(['browser', 'gw']);   // the wire has no box of its own to move
+    expect(apart.look.apart.groups[0].names).toEqual(['browser', 'w1', 'gw']);
+    const place = focusStep(null, { in: ['*'], quiet: true, fresh: true, focus: 'place', options: { groups: 'runtime+: 100 0 1' } }, { pieces: graph });
+    expect(moved(place.look)).toEqual(['gw', 'runtime', 'db']);
+  });
 });
