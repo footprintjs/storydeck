@@ -200,7 +200,8 @@
       position: relative;
       transform-origin: center center;
       flex-shrink: 0;
-      background: #fff;
+      /* what shows behind the slides (a change of slide that fades both — a dip — shows it); --deck-canvas from the page */
+      background: var(--deck-canvas, #fff);
       will-change: transform;
     }
 

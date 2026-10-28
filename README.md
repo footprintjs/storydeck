@@ -408,6 +408,11 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   follow the part on screen as well, select the active slide in the same rule:
   `[data-theme="ledger"], :root:has([data-deck-active][data-theme="ledger"]) { … }`. `check` warns about a theme
   that theme.css never selects (a misspelt name changes nothing), and `review` names each click's theme.
+- **A part arrives with a change of picture.** `<section … data-enter="push" data-enter-from="right">` plays one of
+  the editor's changes StoryReel's films use — cut, fade, dip, wipe, split, iris, push, slide, whip, zoom — with its
+  settings as `data-enter-*` (`from`, `line`, `at` "x y" or "centre", `color`, `seconds`, `ease`), as the deck steps
+  into the part. Only on a forward step: a jump or a step back lands at once, and so does every step under reduced
+  motion or with motion off. `review` says how each part arrives.
 - **Explore: click a piece, go to the click about it.** `"explore": true` in deck.json lets a viewer wander the
   deck: a click on a piece goes to the click that is about it (the first whose `data-on` names it, else the first that
   takes it in through a `name+`), and "Back to click N" (or Backspace) returns, as a browser's Back does. Pieces that

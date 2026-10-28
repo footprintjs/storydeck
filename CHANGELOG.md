@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- **A part arrives with a change of picture: `data-enter`.** `<section … data-enter="push" data-enter-from="right">`
+  plays one of the editor's changes StoryReel's films use (footprint-story/motion's table: the same names, settings,
+  lengths and eases) as the deck steps into the part: cut, fade, dip, wipe, split, iris, push, slide, whip or zoom,
+  each with its settings as `data-enter-*` (`from`, `line`, `at` as "x y" in slide px or "centre", `color`) and
+  `data-enter-seconds` / `data-enter-ease`. The build samples each distinct change once into keyframes for both slides
+  (30 a second, the same curves a film draws); the page plays them with Web Animations only on a forward step into the
+  part — a jump, a step back, reduced motion and motion off land at once — keeping the slide it leaves in view until
+  it ends, and a video steps them like any animation. A dip shows its colour behind both slides (black unless
+  `data-enter-color` says otherwise): `<deck-stage>` now paints what shows behind its slides with `--deck-canvas` (white,
+  as before, when unset). A change a page cannot play (clock, page, through, match: they need a canvas), a setting the
+  change does not take and a value out of range are refused at build, naming the part and the fix. `review` says how
+  each part arrives. A deck without `data-enter` builds byte for byte as before.
+
 - **Explore: a viewer clicks a piece to go to the click about it.** With `"explore": true` in deck.json, a click on a
   piece goes to the click that is about it — the first click whose `data-on` names it (`gw+`'s gw too), or, when none
   does, the first that takes it in through a `name+` — and a "Back to click N" control (or Backspace) returns, a step

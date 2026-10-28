@@ -113,8 +113,21 @@ function readMapStep(label, k, attrs, inner) {
 }
 
 /**
+ * How a part arrives, as written: data-enter="push" and its settings, data-enter-from="right" … — {type, given:
+ * {setting: text}} (transitions.js reads them against the shared table), or null.
+ */
+function enterOf(attrs) {
+  const type = attrOf(attrs, 'data-enter');
+  if (type === null) return null;
+  const given = {};
+  for (const m of attrs.matchAll(/\sdata-enter-([\w-]+)=(["'])(.*?)\2/g)) given[m[1]] ??= m[3];
+  return {type: type.trim(), given};
+}
+
+/**
  * The parts of a deck, in order, from its clicks file. A part with data-map is told on that map, one click per
- * <step>; a part without one is a plain slide (one click). Labels are unique; every part has one.
+ * <step>; a part without one is a plain slide (one click). Labels are unique; every part has one. A part may say how
+ * it arrives (data-enter).
  */
 export function parseClicks(html) {
   const source = stripComments(html);
@@ -131,10 +144,11 @@ export function parseClicks(html) {
     const kicker = attrOf(attrs, 'data-kicker') ?? '';
     const map = attrOf(attrs, 'data-map');
     const theme = themeOf(label, attrs);
+    const enter = enterOf(attrs);
     if (map === null) {
       if (/<step\b/i.test(body)) throw new Error(`${where(label)} has <step> clicks but no data-map — name the map they are told on (data-map="map")`);
       const {html: inner, notes} = takeNotes(body);
-      parts.push({label, kicker, theme, map: null, body: inner, notes});
+      parts.push({label, kicker, theme, enter, map: null, body: inner, notes});
       continue;
     }
     if (!map.trim()) throw new Error(`${where(label)}: data-map is empty — name a map (a file in the deck, e.g. data-map="map")`);
@@ -143,7 +157,7 @@ export function parseClicks(html) {
     if (!steps.length) throw new Error(`${where(label)} is told on map "${map}" but has no <step> — a map part is one click per <step>`);
     const outside = plainText(takeNotes(without(body, steps)).html);
     if (outside) throw new Error(`${where(label)}: "${outside.slice(0, 60)}" is outside every <step> — put a headline or notes inside the step they belong to`);
-    parts.push({label, kicker, theme, map: map.trim(), steps: steps.map(({attrs: a, inner}, k) => readMapStep(label, k, a, inner))});
+    parts.push({label, kicker, theme, enter, map: map.trim(), steps: steps.map(({attrs: a, inner}, k) => readMapStep(label, k, a, inner))});
   }
   if (!parts.length) throw new Error('the clicks file has no <section> — a deck is one <section data-label="…"> per part');
   return parts;

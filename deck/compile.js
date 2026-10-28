@@ -10,6 +10,7 @@ import {readPieces, readStep, drawFocus, wrapStage, slideClass, focusOverlay} fr
 import {applyTransforms, icons as drawIcons} from './transforms.js';
 import {loopsIn} from './loops.js';
 import {exploreTargets} from './explore.js';
+import {readEnter, transitionTable} from './transitions.js';
 import {plainText} from './parse.js';
 import {esc, stripComments} from './html.js';
 import {readAttributes, tagsWith} from '../pieceRules.js';
@@ -68,6 +69,7 @@ function planClicks(parts, maps, {area, canvas, icons}) {
   let lastMap = null;
   const clicks = [];
   for (const part of parts) {
+    const enter = readEnter(part.enter, `"${part.label}"`, {frame: canvas});   // how the part arrives: its first click's slide
     if (!part.map) {
       refuseOwnNumbers(`"${part.label}"`, part.body);
       let inner;
@@ -76,7 +78,7 @@ function planClicks(parts, maps, {area, canvas, icons}) {
       } catch (e) {
         throw new Error(`"${part.label}": ${e.message}`, {cause: e});
       }
-      clicks.push({label: part.label, part, kind: 'plain', inner, loops: loopsIn(drawIcons(part.body, icons), `"${part.label}"`), notes: part.notes, headline: '', step: 0, steps: 1});
+      clicks.push({label: part.label, part, kind: 'plain', inner, enter, loops: loopsIn(drawIcons(part.body, icons), `"${part.label}"`), notes: part.notes, headline: '', step: 0, steps: 1});
       lastMap = null;
       continue;
     }
@@ -91,7 +93,7 @@ function planClicks(parts, maps, {area, canvas, icons}) {
       }
       map.state = r.state;
       lastMap = map;
-      clicks.push({label: `${part.label} · ${k + 1}`, part, kind: 'map', map, step, look: r.look, loops: shownLoops(map, r.look), headline: s.headline, notes: s.notes, stepIndex: k, steps: part.steps.length});
+      clicks.push({label: `${part.label} · ${k + 1}`, part, kind: 'map', map, step, look: r.look, enter: k === 0 ? enter : null, loops: shownLoops(map, r.look), headline: s.headline, notes: s.notes, stepIndex: k, steps: part.steps.length});
     });
   }
   const seen = new Set();
@@ -150,9 +152,10 @@ export function compileDeck(source, {dev = false} = {}) {
   });
   checkPost(source.post, new Set(slides.map((s) => s.label)));
   const clicks = planned.map((c, i) => ({n: i + 1, label: c.label, part: c.part.label, kicker: c.part.kicker, theme: c.part.theme ?? null, kind: c.kind,
-    map: c.kind === 'map' ? c.map.name : null, headline: plainText(c.headline), notes: c.notes, loops: c.loops,
+    map: c.kind === 'map' ? c.map.name : null, headline: plainText(c.headline), notes: c.notes, loops: c.loops, enter: c.enter,
     ...(c.kind === 'map' ? {step: c.step, look: c.look, stepIndex: c.stepIndex, steps: c.steps} : {text: plainText(c.inner)})}));
   // the named loops the page draws: those its clicks show
   const loops = [...new Set(planned.flatMap((c) => c.loops.map((l) => l.value)))].filter(Boolean).sort();
-  return {config, title: config.title, themeCss: source.themeCss ?? '', slides, clicks, loops, explore: config.explore ? exploreTargets(planned) : null, maps: Object.fromEntries(Object.values(maps).map((m) => [m.name, {pieces: m.pieces}]))};
+  return {config, title: config.title, themeCss: source.themeCss ?? '', slides, clicks, loops, explore: config.explore ? exploreTargets(planned) : null,
+    transitions: transitionTable(planned.map((c) => c.enter), config.canvas), maps: Object.fromEntries(Object.values(maps).map((m) => [m.name, {pieces: m.pieces}]))};
 }
