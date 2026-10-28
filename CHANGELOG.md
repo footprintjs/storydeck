@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.0 — living system diagrams: loops, wires between pieces, a wire's label, halo and running packets
 
 - **A wire between pieces: `data-arrow="client to server"`.** The wire runs from the edge of one piece's box to the
   edge of the other's (6 px clear), so it follows them: move a box, in the file or by Alt-drag, and its wires come
