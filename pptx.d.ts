@@ -3,14 +3,14 @@
  * its clip. Node. The export is a footprintjs flowchart: every run leaves a record that explains it. footprintjs is an
  * optional peer dependency: `npm i footprintjs` beside StoryDeck to export.
  */
-import type { VoiceProfile } from 'footprint-narration/voice';
+import type { VoiceProfile } from 'footprint-story/voice';
 import type { VideoClip, VideoDriver, VideoStep } from './video';
 
 /** A click to export: as renderVideo takes it, plus the slide's headline (the title, before the label). */
 export interface PptxStep extends VideoStep { headline?: string }
 /** A click of a deck: its label (and headline), and its notes — narration-html's notesData entry ({ now }), a string, or a list of strings. */
 export interface DeckClick { label?: string; headline?: string; notes?: string | readonly string[] | { now: readonly string[] } | null }
-/** Where a deck's clips are: footprint-narration/voice's cache and profile, and the reading rules the clips were voiced with. */
+/** Where a deck's clips are: footprint-story/voice's cache and profile, and the reading rules the clips were voiced with. */
 export interface PptxVoice { cache: string; profile: VoiceProfile; spell?: Readonly<Record<string, string>>; say?: Readonly<Record<string, string>> }
 /** A click as exported: its number, title, notes as written, words as spoken, clip, and the seconds it stays (null: the speaker clicks). */
 export interface PlannedSlide {

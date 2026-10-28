@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { clipKey } from 'footprint-narration/voice';
+import { clipKey } from 'footprint-story/voice';
 import { narrationText } from './narration.js';
 import { solidPng } from './pptxParts.js';
 import { exportPptx, checkPptx, pptxParts, zip, unzip } from './pptx.js';
@@ -23,7 +23,7 @@ afterEach(() => { readBack.edit = null; rmSync(dir, { recursive: true, force: tr
 /** A real 0.1 s WAV (8 kHz mono), its bytes made a little different per key: each clip its own sound. */
 const TONE = readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'tone-0.1s.wav'));
 const toneFor = (key) => { const bytes = Buffer.from(TONE); bytes[100] ^= key.charCodeAt(key.length - 1); return bytes; };
-/** A clip as footprint-narration/voice's clipFor gives it, its sound a small file in the test's folder (`bytes` to give other ones). */
+/** A clip as footprint-story/voice's clipFor gives it, its sound a small file in the test's folder (`bytes` to give other ones). */
 function clip(key, duration, ext = 'wav', bytes = toneFor(key)) {
   const audio = path.join(dir, `${key}.${ext}`);
   writeFileSync(audio, bytes);
@@ -163,7 +163,7 @@ describe('pptx · what it refuses, and why', () => {
     const given = steps();
     rmSync(given[2].clip.audio);
     const { error, driver, condition } = await refusal({ steps: given });
-    expect(error.message).toBe(`exportPptx: a clip is not ready: click 3: its clip ${given[2].clip.audio} is not there — voice it again (footprint-narration/voice · voiceClips)`);
+    expect(error.message).toBe(`exportPptx: a clip is not ready: click 3: its clip ${given[2].clip.audio} is not there — voice it again (footprint-story/voice · voiceClips)`);
     expect(condition).toBe('[Condition]: It evaluated Rule 0 "A clip\'s sound file is not there": clipsMissing 1 gt 0 ✓, and chose RefuseClips.');
     expect(driver.open).not.toHaveBeenCalled();
   });
@@ -183,7 +183,7 @@ describe('pptx · what it refuses, and why', () => {
     odd[0].clip = clip('empty', 1, 'wav', Buffer.alloc(0));
     odd[2].clip = clip('garbage', 1, 'wav', Buffer.from('this is not a wave file at all'));
     const { error, driver, condition } = await refusal({ steps: odd });
-    expect(error.message).toBe(`exportPptx: a clip is not ready: click 1: its clip ${odd[0].clip.audio} is empty (0 bytes) — voice it again (footprint-narration/voice · voiceClips); `
+    expect(error.message).toBe(`exportPptx: a clip is not ready: click 1: its clip ${odd[0].clip.audio} is empty (0 bytes) — voice it again (footprint-story/voice · voiceClips); `
       + `click 3: its clip ${odd[2].clip.audio} is not a .wav file (no RIFF…WAVE) — voice it again, or convert it with ffmpeg`);
     expect(condition).toBe('[Condition]: It evaluated Rule 1 "A clip PowerPoint cannot play": clipsUnplayable 2 gt 0 ✓, and chose RefuseClips.');
     expect(driver.open).not.toHaveBeenCalled();
@@ -203,7 +203,7 @@ describe('pptx · what it refuses, and why', () => {
     const given = steps();
     given[2].clip = null;
     const { error, condition } = await refusal({ steps: given });
-    expect(error.message).toBe('exportPptx: a clip is not ready: click 3: it says words but has no clip — voice it (footprint-narration/voice · voiceClips), or give its step its clip');
+    expect(error.message).toBe('exportPptx: a clip is not ready: click 3: it says words but has no clip — voice it (footprint-story/voice · voiceClips), or give its step its clip');
     expect(condition).toContain('"A click says words with no clip, in a voiced deck": clipsUnvoiced 1 gt 0 ✓');
   });
 

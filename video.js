@@ -1,6 +1,6 @@
 // video — a narrated deck as a video: every click on screen while its clip plays. Node, with ffmpeg 5.0+ on the path.
 //
-//   const steps = notes.map((n, i) => ({ label: labels[i], written: writtenText(n), spoken, clip: clipFor(spoken, …) }));   // clipFor: footprint-narration/voice
+//   const steps = notes.map((n, i) => ({ label: labels[i], written: writtenText(n), spoken, clip: clipFor(spoken, …) }));   // clipFor: footprint-story/voice
 //   await renderVideo({ url: 'file:///…/deck.html', steps, out: 'out/video', driver: deckStageDriver({ chromium }) });
 //   // → out/video/deck.mp4 · captions.srt · captions.vtt · chapters.txt · thumbnail.jpg · timeline.json
 //
@@ -15,7 +15,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-import { captionCues, captionFile, readCaptions, youtubeChapters } from 'footprint-narration';
+import { captionCues, captionFile, readCaptions, youtubeChapters } from 'footprint-story';
 
 const NUM = (n) => String(n).padStart(3, '0');
 /** A file in an ffconcat list: absolute (ffmpeg reads a relative one from the list's folder), its quotes escaped. */
@@ -24,7 +24,7 @@ const entry = (file) => `file '${path.resolve(file).replace(/'/g, "'\\''")}'`;
 const failure = (done) => (done?.error ? done.error.message : done?.signal ? `signal ${done.signal}` : done?.status !== 0 ? `exit ${done?.status}` : null);
 
 /**
- * The timeline: each step (`{ label, written, spoken, clip }`, clip as footprint-narration/voice's clipFor gives it) as a
+ * The timeline: each step (`{ label, written, spoken, clip }`, clip as footprint-story/voice's clipFor gives it) as a
  * click with its number n (1-based), lead and length (s). `only` ([first, last], 1-based) renders a strip.
  */
 export function planVideo(steps, { gap = 0.6, lead = 0.6, noclip = 2.5, only = null } = {}) {
@@ -143,7 +143,7 @@ function narration(run, plan, work) {
  * `chapters(click)` names the clicks where a chapter starts (a title, or null; the first chapter at 0:00
  * defaults to `intro`, or 'Intro' when that is blank); `thumbnail(click)` picks the click whose settled frame is the thumbnail. The frames and
  * sounds are made in `work` (its frames/ and audio/ are replaced) — by default a temporary folder, removed
- * afterwards; name one to keep them. The chapters go by YouTube's rule (footprint-narration · youtubeChapters):
+ * afterwards; name one to keep them. The chapters go by YouTube's rule (footprint-story · youtubeChapters):
  * chapters.txt holds the list YouTube will show — empty when fewer than three would stand — and `chapters` says
  * what the rule changed. Returns { video, length, cues, chapters: { lines, text, kept, changes, problems }, plan }.
  */

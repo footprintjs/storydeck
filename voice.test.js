@@ -2,10 +2,10 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { clipKey } from 'footprint-narration/voice';
+import { clipKey } from 'footprint-story/voice';
 import { embedClips } from './voice';
 
-// The settings of a real profile (no audio). The cache itself is footprint-narration's (and tested there).
+// The settings of a real profile (no audio). The cache itself is footprint-story's (and tested there).
 const PROFILE = {
   id: 'me', exaggeration: 0.5, cfgWeight: 0.5, seed: 7, sentenceGapSeconds: 0.3,
   takes: { 'The end.': { seed: 17114, note: 'default take came out clipped (0.24 s, letters 0.0); this take scored minWord 0.93, letters 1.0' } },
