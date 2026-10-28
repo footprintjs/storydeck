@@ -15,8 +15,9 @@ const MAP = `<!--
   Every element with data-k="name" and an inline left/top/width/height is a piece a click can bring in, light,
   grey or move. Pieces never nest. <i data-arrow="client to server"> becomes a wire from one piece's edge to the
   other's (it follows them when they move; "x1 y1 x2 y2" in slide px places it by hand; a bend may follow either),
-  class "pkt": a packet runs along it on a path click. In a click, "server+" is the server, its wires and what they
-  reach. <i class="ic" data-icon="name"> is icons/name.svg. data-loop="pulse" (float, marquee)
+  class "pkt": a packet runs along it on a path click. A wire may carry data-label="its name", class "halo", and
+  data-packets="2" data-speed="5" (packets that keep running along it). In a click, "server+" is the server, its wires
+  and what they reach. <i class="ic" data-icon="name"> is icons/name.svg. data-loop="pulse" (float, marquee)
   keeps a piece moving while its slide is shown; data-loop alone runs its own --loop from theme.css.
 -->
 <div data-k="client" class="box" style="left:160px;top:420px;width:300px;height:210px"><i class="ic" data-icon="client"></i><b>Client</b><small>a browser</small></div>

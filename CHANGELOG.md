@@ -10,6 +10,16 @@
   end the tag. A name not placed, a wire to itself and pieces too close for a wire are refused, naming the fix; a
   numbered wire is drawn byte for byte as before. Alt-dragging a wire between pieces is refused with its fix (move one
   of its pieces). The starter deck now writes its four wires this way (they land within 5 px of where its numbers put them).
+- **A wire's label, halo and running packets.** Three attributes on any wire: `data-label="InvokeAgentRuntime"` writes
+  its name beside its middle, on its left — above a level wire going right, below one coming back, beside a standing
+  one by half its width — in the wire's colour on an edge of the ground (the wire's box grows to hold it, so a wire
+  showing itself in shows its label too); class `halo` gives the line and its head a soft glow (`--wire-halo`); and
+  `data-packets="2" data-speed="5"` keeps packets running along the curve, evenly spaced, 5 s a run (3 by default;
+  1–6 packets, 0.5–60 s), fading in at the start and out before the head (`--packet`, `--packet-glow`). The packets are
+  loops, so they run only on the slide shown, in step from click to click, and where loops do not run (reduced motion,
+  print, motion off) the first rests at the wire's middle. They are the wire's, not the deck's loops: `review` and
+  `check` do not list them. A wire without these is drawn byte for byte as before; packets it cannot run, and a speed
+  with no packets, are refused naming the fix.
 - **A piece and what it touches: `name+`.** A wire between pieces carries `data-ends` (the pieces it joins; a wire in
   numbers may carry it too), so a click can name `gw+`: the gateway, the wires with it as an end, and the pieces at
   their other ends — `data-on="gw+"` lights that neighbourhood and greys the rest. It reads anywhere a click names

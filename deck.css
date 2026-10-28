@@ -41,11 +41,11 @@
    click it rides the curve once, at the wire's turn: --sd-t runs 0 → 1 and it stands at B(t) = 2(1-t)t·C + t²·E from
    its start (C: --cdx/--cdy, E: --pdx/--pdy, from transforms.js). */
 @property --sd-t { syntax: '<number>'; inherits: false; initial-value: 0; }
-:where(svg.wire .pkt) {
-  opacity: 0; fill: var(--sd-glow, currentColor); stroke: none;
+:where(svg.wire :is(.pkt, .run)) {
   transform: translate(calc(var(--cdx) * 2 * (1 - var(--sd-t)) * var(--sd-t) + var(--pdx) * var(--sd-t) * var(--sd-t)),
     calc(var(--cdy) * 2 * (1 - var(--sd-t)) * var(--sd-t) + var(--pdy) * var(--sd-t) * var(--sd-t)));
 }
+:where(svg.wire .pkt) { opacity: 0; fill: var(--sd-glow, currentColor); stroke: none; }
 @keyframes sdPkt { from { --sd-t: 0; } to { --sd-t: 1; } }
 @keyframes sdPktShow { 0%, 100% { opacity: 0; } 15%, 80% { opacity: 1; } }
 /* a wire that comes in shows itself start to tip behind a sweeping soft edge (a mask: a theme's dashes stay), square to
@@ -69,6 +69,23 @@
     mask-image: linear-gradient(var(--sd-angle, 90deg), #000 var(--sd-reveal), transparent calc(var(--sd-reveal) + 12%));
   }
 }
+
+/* a wire's options (transforms.js): its label at its middle, in its colour, on a ground-coloured edge so it reads over
+   anything; class "halo", a soft glow; data-packets, packets that keep running along it — loops (deck-stage.js USAGE
+   (i)): on the slide shown, on one clock, each fading in at the start and out before the head. Where loops do not run
+   (reduced motion, print, motion off) the first packet rests at the wire's middle and the others are hidden. */
+:where(svg.wire text.label) {
+  font: 600 18px/1 var(--mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace); letter-spacing: .06em;
+  text-transform: uppercase; dominant-baseline: central; fill: currentColor;
+  stroke: var(--bg, #ffffff); stroke-width: 6px; stroke-linejoin: round; paint-order: stroke;
+}
+:where(svg.wire.halo path) { filter: drop-shadow(0 0 6px var(--wire-halo, currentColor)); }   /* the line and its head, not the label */
+:where(svg.wire .run) {
+  --sd-t: .5; fill: var(--packet, var(--sd-glow, currentColor)); stroke: none;
+  filter: drop-shadow(0 0 5px var(--packet-glow, var(--packet, var(--sd-glow, currentColor))));
+}
+:where(svg.wire .run + .run) { opacity: 0; }
+@keyframes sdRun { 0% { --sd-t: 0; opacity: 0; } 12%, 85% { opacity: 1; } 100% { --sd-t: 1; opacity: 0; } }
 
 /* icons (data-icon): drawn in currentColor */
 :where(svg.ic) { width: 60px; height: 60px; flex: none; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }

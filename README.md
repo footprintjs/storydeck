@@ -426,7 +426,13 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   that comes in shows itself from its start to its tip, its dashes and colours as your theme draws them. A wire between
   pieces knows its ends, so a click can be about a piece and everything it touches: `data-on="gw+"` lights the
   gateway, its wires and the pieces at their other ends, and greys the rest (`review` lists them); it reads in every
-  list of names a click has, the groups a mover moves too (`data-focus-apart="gw+: 0 -200"`).
+  list of names a click has, the groups a mover moves too (`data-focus-apart="gw+: 0 -200"`). A living system
+  diagram needs three more things on a wire, each an attribute: `data-label="InvokeAgentRuntime"` writes its name at its
+  middle, on its left (a request's above it, its answer's below; in the wire's colour, on an edge of the ground so it
+  reads over anything); class `halo` gives it a soft glow (`--wire-halo`); and `data-packets="2" data-speed="5"` keeps
+  packets running along it, evenly spaced, 5 s a run (`--packet`, `--packet-glow`). The packets are loops (see below):
+  only on the slide shown, in step from click to click, and under reduced motion, in print or with motion off one rests
+  at the wire's middle.
   `<i class="ic" data-icon="server"></i>` is `icons/server.svg`. `deck.css` styles the chrome (kicker, headline, footer
   and count), wires, packets, icons and the theme toggle from the token contract, every rule `:where()`, so your
   theme wins.

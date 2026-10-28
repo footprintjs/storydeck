@@ -53,7 +53,8 @@ function prepareMap(name, html, icons, dev) {
   }
   const {html: out, pieces} = readPieces(drawn);
   if (!pieces.length) throw new Error(`map "${name}" has no pieces — a piece is an element with data-k="name" and an inline left/top (width/height)`);
-  return {name, html: dev ? numberForDev(out) : out, pieces, loops: loopsIn(out, `map "${name}"`), state: null};
+  // the loops the deck writes (its own text: a wire's packets are its wire's, not loops of their own)
+  return {name, html: dev ? numberForDev(out) : out, pieces, loops: loopsIn(stripComments(html), `map "${name}"`), state: null};
 }
 
 /** A map's loops a click shows: on a piece it does not keep out (gone), or on no piece. */
@@ -74,7 +75,7 @@ function planClicks(parts, maps, {area, canvas, icons}) {
       } catch (e) {
         throw new Error(`"${part.label}": ${e.message}`, {cause: e});
       }
-      clicks.push({label: part.label, part, kind: 'plain', inner, loops: loopsIn(inner, `"${part.label}"`), notes: part.notes, headline: '', step: 0, steps: 1});
+      clicks.push({label: part.label, part, kind: 'plain', inner, loops: loopsIn(stripComments(part.body), `"${part.label}"`), notes: part.notes, headline: '', step: 0, steps: 1});
       lastMap = null;
       continue;
     }

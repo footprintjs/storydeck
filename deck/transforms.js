@@ -6,16 +6,25 @@
 //   <i class="ic" data-icon="server"></i>                                  a drawn identity: icons/server.svg inline
 //
 // A wire is `x1 y1 x2 y2` and an optional bend (px off the straight line, + to the left of travel), or the pieces it
-// joins, `from to to` and an optional bend ("client to server 24"; words, as a ">" would end the tag): it runs from the edge of one's box to the edge of the other's, so a piece
-// moved takes its wires with it, and two wires between the same pieces (a request and its answer) each keep a lane of
-// their own. A wire between pieces carries data-ends="from to", so a click can light a piece and what it touches
-// (focus.js · expandNames: `data-on="gw+"`). Either way it is a quadratic curve with an arrow head, in an <svg> placed and sized to hold it, so it is a focus piece like any other (its
-// data-k and class are kept, and "wire" is added to its class). Class "pkt" adds a packet that rides the curve itself
-// on a path click (hidden at rest, so print, a jump and reduced motion show the plain wire); a wire that comes in draws
-// itself, start to tip.
+// joins, `from to to` and an optional bend ("client to server 24"; words, as a ">" would end the tag): it runs from the
+// edge of one's box to the edge of the other's, so a piece moved takes its wires with it, and two wires between the
+// same pieces (a request and its answer) each keep a lane of their own. A wire between pieces carries
+// data-ends="from to", so a click can light a piece and what it touches (focus.js · expandNames: `data-on="gw+"`).
+// Either way it is a quadratic curve with an arrow head, in an <svg> placed and sized to hold it, so it is a focus
+// piece like any other (its data-k and class are kept, and "wire" is added to its class). Class "pkt" adds a packet
+// that rides the curve itself on a path click (hidden at rest, so print, a jump and reduced motion show the plain
+// wire); a wire that comes in draws itself, start to tip.
+//
+// A wire's options (deck.css draws them from the theme's tokens):
+//   data-label="InvokeAgentRuntime"   its name, at its middle, on its left (a request's above it, its answer's below)
+//   class "halo"                      a soft glow around it (--wire-halo)
+//   data-packets="2" data-speed="5"   packets that keep running along it while its slide is shown, 5 s a run, evenly
+//                                     spaced (--packet, --packet-glow): loops (deck-stage.js USAGE (i)), so they stop
+//                                     under reduced motion, in print and with motion off, where one rests at its middle
 
 import {stripComments} from './html.js';
 import {readPieces} from '../focusHtml.js';
+import {attrValue} from '../pieceRules.js';
 
 const fixed = (v) => +v.toFixed(1);
 /** A wire written by the pieces it joins: "from to to [bend]". */
@@ -25,18 +34,41 @@ export const wireEnds = (spec) => { const m = BETWEEN.exec(spec); return m ? [m[
 const LANE = 80;   // px between two wires joining the same pieces, at most (less when a box is too small to hold them)
 const GAP = 6;     // px between a wire's end and the box it leaves or reaches
 
-/** One wire's SVG: the element's own attributes kept, a box that holds the curve, the curve, the head, and its packet. */
+const MOST_PACKETS = 6;
+const SPEEDS = [0.5, 60];   // seconds a packet takes to run the wire
+const LABEL = {size: 18, char: 12, clear: 8};   // deck.css's label: its px size, a generous width per letter, px clear of the wire
+
+/** A wire's options, read from its attributes and checked: {label, packets, speed}. */
+function wireOptions(attrs, spec) {
+  const label = attrValue(attrs, 'data-label')?.value.trim() || null, packets = attrValue(attrs, 'data-packets')?.value, speed = attrValue(attrs, 'data-speed')?.value;
+  const where = `wire data-arrow="${spec}"`;
+  if (packets !== undefined && !/^[1-9]\d*$/.test(packets.trim())) throw new Error(`${where}: data-packets="${packets}" — the packets that run along it are a whole number, 1 to ${MOST_PACKETS}`);
+  const n = packets === undefined ? 0 : Number(packets);
+  if (n > MOST_PACKETS) throw new Error(`${where}: data-packets="${packets}" — at most ${MOST_PACKETS} packets run along one wire`);
+  if (speed !== undefined && !n) throw new Error(`${where}: data-speed sets how fast its packets run — give it data-packets too`);
+  const s = speed === undefined ? 3 : /^\s*\d+(?:\.\d+)?s?\s*$/.test(speed) ? parseFloat(speed) : NaN;
+  if (!(s >= SPEEDS[0] && s <= SPEEDS[1])) throw new Error(`${where}: data-speed="${speed}" — the seconds a packet takes to run the wire, ${SPEEDS[0]} to ${SPEEDS[1]}`);
+  return {label, packets: n, speed: s};
+}
+
+/** One wire's SVG: the element's own attributes kept, a box that holds the curve (and its label), the curve, the head, its packets and its label. */
 function wireSvg(attrs, spec) {
   const parts = spec.trim().split(/[\s,]+/).map(Number);
   if ((parts.length !== 4 && parts.length !== 5) || parts.some((n) => !Number.isFinite(n))) {
     throw new Error(`data-arrow="${spec}": a wire is the pieces it joins, "from to to" ("client to server"), or "x1 y1 x2 y2" in slide px — either with an optional bend`);
   }
-  const [x1, y1, x2, y2, bend = 0] = parts;
+  const [x1, y1, x2, y2, bend = 0] = parts, o = wireOptions(attrs, spec);
   const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
   const cx = (x1 + x2) / 2 - (dy / len) * bend, cy = (y1 + y2) / 2 + (dx / len) * bend;
   const tl = Math.hypot(x2 - cx, y2 - cy) || 1, ux = (x2 - cx) / tl, uy = (y2 - cy) / tl, hs = 18;
-  const pad = 20, X = Math.min(x1, x2, cx) - pad, Y = Math.min(y1, y2, cy) - pad;
-  const W = Math.max(x1, x2, cx) + pad - X, H = Math.max(y1, y2, cy) + pad - Y, f = fixed;
+  // the label: beside the curve's middle, B(½), to the left of the way it runs there (its tangent is end − start), as
+  // far off as half the label measures across the wire, and LABEL.clear more: above a level wire, beside a standing one
+  const half = o.label ? [(o.label.length * LABEL.char) / 2 + 4, LABEL.size / 2 + 4] : null;   // the box holds it, so a wire showing itself in shows it too
+  const off = half ? (Math.abs(dy) / len) * half[0] + (Math.abs(dx) / len) * half[1] + LABEL.clear : 0;
+  const lx = 0.25 * x1 + 0.5 * cx + 0.25 * x2 + (dy / len) * off, ly = 0.25 * y1 + 0.5 * cy + 0.25 * y2 - (dx / len) * off;
+  const xs = [x1, x2, cx, ...(half ? [lx - half[0] + 20, lx + half[0] - 20] : [])], ys = [y1, y2, cy, ...(half ? [ly - half[1] + 20, ly + half[1] - 20] : [])];
+  const pad = 20, X = Math.min(...xs) - pad, Y = Math.min(...ys) - pad;
+  const W = Math.max(...xs) + pad - X, H = Math.max(...ys) + pad - Y, f = fixed;
   const ex = x2 - ux * hs * 0.8, ey = y2 - uy * hs * 0.8;
   const d = `M${f(x1 - X)} ${f(y1 - Y)} Q${f(cx - X)} ${f(cy - Y)} ${f(ex - X)} ${f(ey - Y)}`;
   const tip = [x2 - X, y2 - Y], back = [tip[0] - ux * hs, tip[1] - uy * hs], nx = -uy * hs * 0.6, ny = ux * hs * 0.6;
@@ -47,9 +79,13 @@ function wireSvg(attrs, spec) {
   const pkt = /\bpkt\b/.test(at)
     ? `<rect class="pkt" x="${f(x1 - X - 8)}" y="${f(y1 - Y - 6)}" width="16" height="12" rx="3" style="--cdx:${f(cx - x1)}px;--cdy:${f(cy - y1)}px;--pdx:${f(ex - x1)}px;--pdy:${f(ey - y1)}px"/>`
     : '';
+  // packets that keep running (deck.css · sdRun): loops on one clock, each its share of a run behind the one before
+  const ride = `--cdx:${f(cx - x1)}px;--cdy:${f(cy - y1)}px;--pdx:${f(ex - x1)}px;--pdy:${f(ey - y1)}px`;
+  const runs = Array.from({length: o.packets}, (_, k) => `<circle class="run" data-loop cx="${f(x1 - X)}" cy="${f(y1 - Y)}" r="7" style="${ride};--loop:sdRun ${o.speed}s linear ${f((-k * o.speed) / o.packets) + 0}s infinite"/>`).join('');
+  const label = o.label ? `<text class="label" x="${f(lx - X)}" y="${f(ly - Y)}" text-anchor="middle">${o.label}</text>` : '';
   // which way it runs, start to tip, as a CSS angle (0 up, 90 right): a wire coming in shows itself that way (deck.css · sdReveal)
   const angle = f((Math.atan2(dx, -dy) * 180) / Math.PI);
-  return `<svg${at} style="left:${f(X)}px;top:${f(Y)}px;width:${f(W)}px;height:${f(H)}px;--sd-angle:${angle}deg" viewBox="0 0 ${f(W)} ${f(H)}" aria-hidden="true"><path d="${d}"/>${head}${pkt}</svg>`;
+  return `<svg${at} style="left:${f(X)}px;top:${f(Y)}px;width:${f(W)}px;height:${f(H)}px;--sd-angle:${angle}deg" viewBox="0 0 ${f(W)} ${f(H)}" aria-hidden="true"><path d="${d}"/>${head}${pkt}${runs}${label}</svg>`;
 }
 
 /**

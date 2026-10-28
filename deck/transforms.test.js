@@ -240,3 +240,50 @@ describe('a wire between pieces ("from to to")', () => {
     expect(() => wires(`${box('a', 0, 0)}${box('b', 0, 0)}<i data-k="w" data-arrow="a to b"></i>`)).toThrow(/share a middle/);
   });
 });
+
+describe('a wire\'s options: data-label, data-packets, data-speed', () => {
+  const svg = (attrs, spec = '100 300 500 300') => wires(`<i data-k="w" data-arrow="${spec}"${attrs}></i>`);
+  const at = (html, re) => re.exec(html).slice(1).map(Number);
+
+  it('writes its label beside its middle, to the left of the way it runs: above a level wire, beside a standing one', () => {
+    const level = svg(' data-label="SigV4"');
+    const [bx, by] = at(level, /style="left:([\d.-]+)px;top:([\d.-]+)px/), [tx, ty] = at(level, /<text class="label" x="([\d.-]+)" y="([\d.-]+)" text-anchor="middle">SigV4<\/text>/);
+    expect([bx + tx, by + ty]).toEqual([300, 300 - 13 - 8]);   // the middle, half the label's height and 8 px above
+    const back = svg(' data-label="answer"', '500 300 100 300');
+    expect(at(back, /top:([\d.-]+)px/)[0] + at(back, /<text class="label" x="[\d.-]+" y="([\d.-]+)"/)[0]).toBe(321);   // running left: below
+    const down = svg(' data-label="read"', '300 100 300 500');
+    expect(at(down, /left:([\d.-]+)px/)[0] + at(down, /<text class="label" x="([\d.-]+)"/)[0]).toBe(300 + (4 * 12) / 2 + 4 + 8);   // running down, its left is the slide's right (as its lane's): half the label's width and 8 px off
+  });
+
+  it('grows the wire\'s box to hold its label, so a wire showing itself in shows its label too', () => {
+    const [w, h] = at(svg(' data-label="InvokeAgentRuntime"', '100 300 160 300'), /width:([\d.]+)px;height:([\d.]+)px/);
+    expect(w).toBeGreaterThanOrEqual((18 * 12) / 2 * 2);
+    expect(h).toBeGreaterThan(40);
+    expect(svg(' data-label="A &amp; B"')).toContain('>A &amp; B</text>');   // written as the deck wrote it
+  });
+
+  it('runs its packets as loops, evenly spaced on one clock: data-speed the seconds a run takes (3 by default)', () => {
+    const runs = [...svg(' data-packets="3" data-speed="6s"').matchAll(/<circle class="run" data-loop [^>]*--loop:sdRun 6s linear (-?[\d.]+)s infinite"\/>/g)].map((m) => Number(m[1]));
+    expect(runs).toEqual([0, -2, -4]);
+    expect(svg(' data-packets="1"')).toContain('--loop:sdRun 3s linear 0s infinite');
+    expect(svg(' data-packets="2" data-speed="1.5"')).toContain('--loop:sdRun 1.5s linear -0.8s infinite');
+  });
+
+  it('refuses packets it cannot run and a speed for no packets — naming the fix', () => {
+    const where = 'wire data-arrow="100 300 500 300": ';
+    expect(() => svg(' data-packets="0"')).toThrow(`${where}data-packets="0" — the packets that run along it are a whole number, 1 to 6`);
+    expect(() => svg(' data-packets="two"')).toThrow(/a whole number, 1 to 6/);
+    expect(() => svg(' data-packets="7"')).toThrow(`${where}data-packets="7" — at most 6 packets run along one wire`);
+    expect(() => svg(' data-speed="2"')).toThrow(`${where}data-speed sets how fast its packets run — give it data-packets too`);
+    for (const v of ['0.2', '61', 'fast', '-1']) expect(() => svg(` data-packets="1" data-speed="${v}"`), v).toThrow(`${where}data-speed="${v}" — the seconds a packet takes to run the wire, 0.5 to 60`);
+  });
+
+  it('a wire without them is drawn as before; deck.css styles the label, the halo and the packets from the theme\'s tokens', () => {
+    expect(svg('')).not.toMatch(/label|run/);
+    const css = readFileSync(path.join(process.cwd(), 'deck.css'), 'utf8');
+    expect(css).toContain(':where(svg.wire.halo path) { filter: drop-shadow(0 0 6px var(--wire-halo, currentColor)); }');
+    expect(css).toMatch(/:where\(svg\.wire \.run\) \{\n\s+--sd-t: \.5; fill: var\(--packet, /);
+    expect(css).toContain(':where(svg.wire .run + .run) { opacity: 0; }');
+    expect(css).toContain('@keyframes sdRun { 0% { --sd-t: 0; opacity: 0; } 12%, 85% { opacity: 1; } 100% { --sd-t: 1; opacity: 0; } }');
+  });
+});
