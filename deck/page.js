@@ -8,7 +8,7 @@ import {focusRuntime} from '../focusHtml.js';
 import {notesData, notesRuntime, listenRuntime} from '../narrationHtml.js';
 import {esc, scriptSafe, styleSafe} from './html.js';
 import {loopCss} from './loops.js';
-import {exploreData, exploreRuntime} from './explore.js';
+import {EXPLORE_CSS, exploreData, exploreRuntime} from './explore.js';
 
 /** Runs in the page: the theme toggle (its button, or T). Light or dark follows the system until a choice is saved. */
 export function themeRuntime() {
@@ -43,7 +43,7 @@ export function deckPage(compiled, assets, {dev = null} = {}) {
   const {config, slides} = compiled;
   // the named loops the deck shows (loops.js), before theme.css: the deck's own rules win (a deck with none: as before)
   const loops = loopCss(compiled.loops ?? []);
-  const css = [...assets.css, ...(loops ? [loops] : []), compiled.themeCss ?? ''].join('\n');
+  const css = [...assets.css, ...(loops ? [loops] : []), ...(compiled.explore ? [EXPLORE_CSS] : []), compiled.themeCss ?? ''].join('\n');
   const script = dev?.nonce ? `<script nonce="${esc(dev.nonce)}">` : '<script>';
   const runtimes = [focusRuntime, notesRuntime, listenRuntime, themeRuntime, ...(compiled.explore ? [exploreRuntime] : [])].map((fn) => `${script}(${scriptSafe(fn)})();</script>`);
   return `<!doctype html>

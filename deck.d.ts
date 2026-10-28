@@ -100,7 +100,7 @@ export interface CompiledDeck {
   readonly clicks: readonly DeckClick[];
   /** The named loops the clicks show (data-loop values), drawn into the page's CSS once each. */
   readonly loops: readonly string[];
-  /** With deck.json "explore": the map each click is on (null on a plain slide), and where each piece leads on its map — the first click whose data-on names it (0-based). */
+  /** With deck.json "explore": the map each click is on (null on a plain slide), and where each piece leads on its map — the first click whose data-on names it, else the first that takes it in through a name+ (0-based). */
   readonly explore: { readonly slides: readonly (string | null)[]; readonly targets: Readonly<Record<string, Readonly<Record<string, number>>>> } | null;
   readonly maps: Readonly<Record<string, { readonly pieces: readonly FocusPiece[] }>>;
 }

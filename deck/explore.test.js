@@ -3,6 +3,7 @@ import {exploreTargets, exploreData, exploreRuntime} from './explore.js';
 import {compileDeck} from './compile.js';
 import {deckPage} from './page.js';
 import {readConfig} from './config.js';
+import {pageAssets} from './assets.js';
 import {sourceOf, MAP} from './test/helpers.js';
 
 // a ↔ b ↔ c, wires named by the pieces they join
@@ -30,6 +31,11 @@ describe('exploreTargets', () => {
     expect(() => readConfig({title: 'T', explore: 'yes'})).toThrow('deck.json "explore" is true or false, not "yes"');
   });
 
+  it('takes any piece name as a plain key — constructor and __proto__ too', () => {
+    const odd = (name) => exploreTargets([{kind: 'map', map: {name: 'm', pieces: [{keys: [name]}]}, step: {on: [name]}}]).targets.m;
+    for (const name of ['constructor', 'toString', '__proto__']) expect(Object.hasOwn(odd(name), name) && odd(name)[name], name).toBe(0);
+  });
+
   it('reads the planned clicks alone: a plain slide leads nowhere, and "*" names no piece', () => {
     expect(exploreTargets([{kind: 'plain'}, {kind: 'map', map: {name: 'm', pieces: [{keys: ['x']}]}, step: {on: ['*']}}, {kind: 'map', map: {name: 'm', pieces: []}, step: {on: null}}]))
       .toEqual({slides: [null, 'm', 'm'], targets: {m: {}}});
@@ -37,10 +43,10 @@ describe('exploreTargets', () => {
 });
 
 describe('the page', () => {
-  const assets = {stageJs: '', css: [], version: '0'};
 
-  it('carries the targets, the explore mark and the runtime only when the deck explores', () => {
-    const on = deckPage(compiled(), assets), off = deckPage(compiled(false), assets);
+  it('carries the targets, the explore mark, its look and the runtime only when the deck explores', () => {
+    const on = deckPage(compiled(), pageAssets()), off = deckPage(compiled(false), pageAssets());
+    expect(on).toContain(':where(deck-stage[data-explore] .sd-leads) { cursor: pointer; }');
     expect(on).toContain('no-rail data-explore>');
     expect(on).toContain('<script type="application/json" id="deck-explore">{"slides":');
     expect(on).toContain('exploreRuntime');
@@ -129,6 +135,47 @@ describe('exploreRuntime (in the page)', () => {
     click(piece(stage, 'c'));
     document.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true, button: 0}));
     expect(stage.index).toBe(0);
+  });
+
+  it('leaves alone a link or control inside a piece, a piece that cannot be seen, and a press that was a drag', () => {
+    const stage = page(4);
+    const c = piece(stage, 'c');
+    c.innerHTML = '<a href="#x">more</a><button>b</button>';
+    const link = new MouseEvent('click', {bubbles: true, cancelable: true, button: 0});
+    c.querySelector('a').dispatchEvent(link);
+    click(c.querySelector('button'));
+    expect([stage.index, link.defaultPrevented]).toEqual([4, false]);
+    piece(stage, 'b').classList.add('sd-dim', 'sd-hide');   // greyed to nothing
+    stage.goTo(4);
+    expect(piece(stage, 'b').classList.contains('sd-leads')).toBe(false);
+    click(piece(stage, 'b'));
+    expect(stage.index).toBe(4);
+    document.dispatchEvent(new PointerEvent('pointerdown', {clientX: 10, clientY: 10}));
+    click(piece(stage, 'a'), {clientX: 60, clientY: 10});
+    expect(stage.index).toBe(4);
+    document.dispatchEvent(new PointerEvent('pointerdown', {clientX: 10, clientY: 10}));
+    click(piece(stage, 'a'), {clientX: 12, clientY: 11});   // a hand that shakes a little still clicks
+    expect(stage.index).toBe(2);
+  });
+
+  it('Backspace with a modifier, or one already handled, is not Back; the Back control lets go of the focus', () => {
+    const stage = page(4);
+    click(piece(stage, 'c'));
+    for (const mod of ['metaKey', 'ctrlKey', 'altKey', 'shiftKey']) window.dispatchEvent(new KeyboardEvent('keydown', {key: 'Backspace', [mod]: true, cancelable: true}));
+    const handled = new KeyboardEvent('keydown', {key: 'Backspace', cancelable: true});
+    handled.preventDefault();
+    window.dispatchEvent(handled);
+    expect(stage.index).toBe(3);
+    back().focus();
+    click(back());
+    expect([stage.index, document.activeElement === back()]).toEqual([4, false]);
+  });
+
+  it('the presenter window follows the room\'s deck: it never explores', () => {
+    window.name = 'deck-presenter';
+    page(4);
+    expect(back()).toBeNull();
+    window.name = '';
   });
 
   it('does nothing on a page that does not explore', () => {
