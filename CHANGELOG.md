@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased
+
+- **Motion that keeps going: loops.** `data-loop="pulse"` on a piece keeps it pulsing while its slide is shown.
+  `pulse`, `float` and `marquee` are the endless moves of the motion table StoryReel's films use
+  (`footprint-story/motion`), sampled from the same curves and drawn into the page only when a deck names them
+  (`data-loop="float 4s"` sets the pace; any other name is refused at build, naming the piece and the loops there are).
+  A named loop moves its element by `transform` (a shape inside a drawing about its own middle), so a tag that sets a
+  transform of its own is refused, naming the fix: put data-loop on an element inside it. `data-loop` alone runs the
+  piece's own animation, `--loop` in theme.css (`.gear { --loop: spin 6s linear infinite; }`); a theme.css rule that
+  gives the element its own `animation` wins, so list `var(--loop)` in it to keep both.
+  <deck-stage> owns where loops run, so it works in any deck on the stage: only on the slide shown and the layers under
+  it (it stamps `data-deck-loop` on them), so a deck of 40 map clicks runs one slide's loops, not 40. Every loop runs
+  on one clock (only a data-loop element's animations are set to it: a deck's other animations are left as they were), so a map drawn again for the next click shows each loop where the last click left it, and a jump or a
+  step back keeps it running (a static arrival no longer zeroes a loop, only entrances). A loop never runs under
+  reduced motion (switched live), in print, or with motion off: there the piece rests in its own style. A piece that
+  loops and changes on the same click (comes in, lights up) does both: focus.css keeps the loop as the last animation
+  of the piece's list. Loop CSS is drawn only for decks that use loops, so a deck without one builds byte for byte as
+  before.
+- **Motion off: a still deck.** `?motion=off` after the page's address, or `<deck-stage data-motion="off">` (switched
+  live too): no loops, and every click lands at once, as a jump does — so a screenshot of a click is the same every
+  time.
+- **The checks know loops.** `review` lists each click's loops (`loops (2): db pulse, gear (its own --loop)`). `check`
+  warns (`loop-unset`) about a `data-loop` that neither theme.css nor its own style gives a `--loop` (nothing would
+  loop). `check --layout` reports an endless animation that is not a loop: one running on a slide no one sees is an
+  error (`hidden-loop`, with how many and on which pieces, one problem for all the slides it runs on); one shown on a
+  click is a warning (`loose-loop`: it starts over at each click and stops on a jump).
+
 ## 0.8.1 — footprint-narration is now footprint-story
 
 - **footprint-narration is now footprint-story.** StoryDeck's shared narration code (shown-vs-spoken text, captions,

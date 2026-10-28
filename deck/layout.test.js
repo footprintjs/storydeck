@@ -23,6 +23,23 @@ describe('layoutProblems', () => {
   });
 });
 
+describe('layoutProblems · loops', () => {
+  it('an endless animation that is not a loop, shown on a click: a warning, one for all the clicks it is on', () => {
+    const found = [3, 4, 5].map((n) => ({n, kind: 'loose-loop', piece: 'gear', text: '', dx: 0, dy: 0}));
+    expect(layoutProblems(found, clicks)).toEqual([{level: 'warn', rule: 'loose-loop', click: 3, label: 'C3',
+      message: '"gear" has an endless animation that is not a loop (on clicks 3–5): it starts again at each click and stops on a jump — give the element data-loop and its animation as --loop (or name a loop: data-loop="pulse")'}]);
+  });
+
+  it('one running on a hidden slide: an error at the slides it runs on (found from every other click), merged when the same', () => {
+    const leak = (n, slide, count = 2, piece = 'a, b') => ({n, kind: 'hidden-loop', piece, text: '', dx: 0, dy: 0, slide, count});
+    const found = [leak(1, 2), leak(1, 3), leak(2, 3), leak(3, 2), leak(1, 6, 1, 'c'), leak(2, 6, 1, 'c')];
+    expect(layoutProblems(found, clicks)).toEqual([
+      {level: 'error', rule: 'hidden-loop', click: 2, label: 'C2', message: '2 endless animations on a, b keep running while the slide is hidden (on clicks 2–3) — make each a loop (data-loop and its animation as --loop): a loop runs only on the slide shown'},
+      {level: 'error', rule: 'hidden-loop', click: 6, label: 'C6', message: '1 endless animation on c keeps running while the slide is hidden — make it a loop (data-loop and its animation as --loop): a loop runs only on the slide shown'},
+    ]);
+  });
+});
+
 describe('layoutCheck', () => {
   it('measures every click through the driver, and closes it', async () => {
     const driver = {open: vi.fn(), close: vi.fn(), measure: vi.fn(async (n) => (n === 2 ? [{kind: 'spills', piece: 'a', text: 'x', dx: 9, dy: 0}] : []))};
@@ -152,6 +169,25 @@ describe('measureSlide (in the page)', () => {
       {kind: 'outside', piece: 'far', text: '', dx: 80, dy: 0},
     ]);
     expect(finish).toHaveBeenCalled();
+    delete document.getAnimations;
+  });
+
+  it('reports an endless animation shown that is not a loop, and those running on a slide no one sees, by slide', () => {
+    document.body.innerHTML = `<deck-stage width="1920" height="1080">
+      <section data-deck-active><div data-k="gear" style="animation-iteration-count: 1, infinite"></div><div data-k="ok" data-loop style="animation-iteration-count: infinite"></div></section>
+      <section><div data-k="a"><i></i></div><b data-k="b"></b></section>
+      <section data-deck-under><div data-k="u"></div></section>
+      <section><div data-k="c"></div></section></deck-stage>`;
+    const stage = document.querySelector('deck-stage');
+    stage.index = 0;
+    const slide = stage.querySelector('section');
+    slide.getBoundingClientRect = () => ({left: 0, top: 0, right: 960, bottom: 540, width: 960, height: 540});
+    const on = (sel, {iterations = Infinity, playState = 'running'} = {}) => ({playState, finish() {}, effect: {target: stage.querySelector(sel), getTiming: () => ({iterations})}});
+    document.getAnimations = () => [on('[data-k="a"] i'), on('[data-k="b"]'), on('[data-k="b"]', {iterations: 1}), on('[data-k="c"]', {playState: 'paused'}), on('[data-k="u"]'), on('[data-k="ok"]')];
+    expect(measureSlide()).toEqual([
+      {kind: 'loose-loop', piece: 'gear', text: '', dx: 0, dy: 0},
+      {kind: 'hidden-loop', piece: 'a, b', text: '', dx: 0, dy: 0, slide: 2, count: 2},
+    ]);
     delete document.getAnimations;
   });
 

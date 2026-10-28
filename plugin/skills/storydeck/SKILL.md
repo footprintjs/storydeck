@@ -44,7 +44,7 @@ the project that holds the deck, naming its folder (npx would prefer a StoryDeck
 npx footprint-storydeck init my-talk            # a starter: deck.json, clicks.html, map.html, theme.css, icons/
 npx footprint-storydeck outline my-talk         # the whole deck, a line per click — read this before editing
 npx footprint-storydeck review my-talk --click 3    # one click: headline (words), focus, route, lit, greyed, enters, moves, notes
-npx footprint-storydeck check my-talk           # what to fix, each with its click and its fix (--layout: text that spills, in a browser)
+npx footprint-storydeck check my-talk           # what to fix, each with its click and its fix (--layout: text that spills and stray endless animations, in a browser)
 npx footprint-storydeck build my-talk           # my-talk/index.html, self-contained
 npx footprint-storydeck dev my-talk             # for the person: a save reloads on the same click and replays it
 npx footprint-storydeck feedback my-talk        # the notes the person left in the dev page — read these first
@@ -63,7 +63,12 @@ click on map.html (`data-in`, `data-out`, `data-on`, `data-quiet`, `data-focus` 
 `<h2>` and `<aside class="notes">` — anything else in a step is refused, naming where it goes (a piece on the map). On
 a map, `<i data-k="w" class="wire pkt" data-arrow="x1 y1 x2 y2 [bend]"></i>` is a wire with a packet and
 `<i class="ic" data-icon="name"></i>` is icons/name.svg. A piece that comes in lights unless the click is `data-quiet`
-(`check` warns: `lit-on-entry`). For an assistant: `claude mcp add storydeck -- npx footprint-storydeck mcp my-talk`
+(`check` warns: `lit-on-entry`). Motion that keeps going is a loop: `data-loop="pulse"` (or `float`, `marquee`, with a
+pace: `"float 4s"`) on a piece, or `data-loop` alone with the piece's own `--loop: spin 6s linear infinite` in
+theme.css — never an infinite animation of your own (`check --layout` refuses one running on a hidden slide). A named
+loop moves its element by `transform`: put it on an element without a transform of its own (wrap it). A loop
+runs only on the slide shown, on one clock across clicks, and rests in its own style under reduced motion, in print and
+with `?motion=off` (a still deck, for screenshots). For an assistant: `claude mcp add storydeck -- npx footprint-storydeck mcp my-talk`
 gives it outline, review, feedback, check and build as tools.
 
 **Focus a diagram, click by click.** Every element with `data-k="name …"` and an inline `left/top`

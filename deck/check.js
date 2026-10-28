@@ -7,7 +7,9 @@
 //   never-shown    a map piece no click ever brings in
 //   no-notes       clicks without notes in a deck that has them (listen mode says nothing there)
 //   theme-unstyled a part asks for a data-theme that theme.css never selects ([data-theme="…"]): a misspelt name changes nothing
+//   loop-unset     a loop of the deck's own (a bare data-loop) that nothing gives a --loop: nothing loops
 import {wordCount} from './parse.js';
+import {LOOP_NAMES} from './loops.js';
 
 const names = (pieces, idx) => [...new Set(idx.map((i) => pieces[i].keys[0]))];
 const problem = (level, rule, click, message) => ({level, rule, click: click?.n ?? null, label: click?.label ?? null, message});
@@ -77,6 +79,15 @@ function unstyledThemes(compiled) {
   return out;
 }
 
+/** Loops of the deck's own (a bare data-loop) when neither theme.css nor their own style sets --loop — once, at the first click showing one. */
+function unsetLoops(compiled) {
+  if (/--loop\s*:/.test(compiled.themeCss ?? '')) return [];
+  const bare = compiled.clicks.flatMap((c) => (c.loops ?? []).filter((l) => l.value === '' && !l.styled).map((l) => ({c, piece: l.piece ?? 'an element'})));
+  if (!bare.length) return [];
+  const list = [...new Set(bare.map((b) => b.piece))], one = list.length === 1;
+  return [problem('warn', 'loop-unset', bare[0].c, `${list.join(', ')} ha${one ? 's' : 've'} data-loop but nothing sets ${one ? 'its' : 'their'} --loop, so nothing loops — give ${one ? 'it' : 'them'} one in theme.css (.gear { --loop: spin 4s linear infinite }), or name a loop: data-loop="${LOOP_NAMES[0]}" (${LOOP_NAMES.join(', ')})`)];
+}
+
 /** Every problem of a compiled deck: [{level: 'error' | 'warn' | 'info', rule, click, label, message}]. */
 export function checkDeck(compiled) {
   const out = [];
@@ -85,7 +96,7 @@ export function checkDeck(compiled) {
     if (c.kind === 'map') out.push(...litOnEntry(c, compiled.maps[c.map].pieces));
     out.push(...noChange(c, compiled.clicks[i - 1]));
   });
-  out.push(...neverShown(compiled), ...missingNotes(compiled), ...unstyledThemes(compiled));
+  out.push(...neverShown(compiled), ...missingNotes(compiled), ...unstyledThemes(compiled), ...unsetLoops(compiled));
   return out;
 }
 

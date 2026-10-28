@@ -19,8 +19,12 @@ export interface VideoDriver {
   shot(file: string): Promise<unknown>;
   close(): Promise<unknown> | unknown;
 }
-/** What a settled click shows that spills: text out of its box, a lit piece (or the chrome) past the slide's edge. */
-export interface SlideSpill { kind: 'spills' | 'outside'; piece: string | null; text: string; dx: number; dy: number }
+/**
+ * What a settled click shows that spills: text out of its box, a lit piece (or the chrome) past the slide's edge; and
+ * endless animations that are not deck-stage loops: one shown here ('loose-loop'), or running on a slide no one sees
+ * ('hidden-loop': `slide`, 1-based, and `count`; `piece` names their pieces).
+ */
+export interface SlideSpill { kind: 'spills' | 'outside' | 'loose-loop' | 'hidden-loop'; piece: string | null; text: string; dx: number; dy: number; slide?: number; count?: number }
 /** The <deck-stage> driver: the video's port, and `measure(n)` — click n as it settles, measured (the layout check). */
 export interface DeckStageDriver extends VideoDriver {
   measure(n: number): Promise<SlideSpill[]>;
@@ -47,7 +51,7 @@ export function renderVideo(options: {
 }): Promise<{ video: string; length: number; cues: number; chapters: Chapters; plan: PlannedClick[] }>;
 /** The driver for storydeck's <deck-stage> pages, with Playwright's `chromium`. */
 export function deckStageDriver(options: { chromium: unknown; executablePath?: string; viewport?: { width: number; height: number }; hide?: string[]; /** keep the page off the network: it loads only its own file and inline data (OFFLINE) */ offline?: boolean }): DeckStageDriver;
-/** Runs in the page: what spills on the slide shown, its animations finished first (deckStageDriver · measure). */
+/** Runs in the page: what spills on the slide shown (its animations finished first), and endless animations that are not loops (deckStageDriver · measure). */
 export function measureSlide(): SlideSpill[];
 /** How an offline page is run: the browser's launch args and the page context's options (see deckStageDriver's `offline`). */
 export const OFFLINE: { readonly args: readonly string[]; readonly context: { readonly offline: true; readonly serviceWorkers: 'block' } };

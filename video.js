@@ -274,13 +274,28 @@ export function deckStageDriver({ chromium, executablePath, viewport = { width: 
   };
 }
 
-/** Runs in the page: what spills on the slide shown (see deckStageDriver · measure). */
+/**
+ * Runs in the page: what spills on the slide shown, and what loops where it should not (see deckStageDriver · measure).
+ * A loop is deck-stage's data-loop (its USAGE (i)); any other endless animation is reported: running on a slide no one
+ * sees ('hidden-loop', with the slide and how many), or shown on this one ('loose-loop': it restarts at each click and
+ * stops on a jump).
+ */
 export function measureSlide() {
   const stage = document.querySelector('deck-stage');
+  const all = stage ? [...stage.children].filter((s) => s.tagName === 'SECTION') : [];
+  const endless = (a) => a.effect?.getTiming?.().iterations === Infinity;
+  const hidden = new Map();   // a slide no one sees → the endless animations running on it, and their pieces
+  for (const a of document.getAnimations?.() ?? []) {
+    const s = a.effect?.target?.closest?.('deck-stage > section');
+    if (!s || s.hasAttribute('data-deck-active') || s.hasAttribute('data-deck-under') || a.playState !== 'running' || !endless(a)) continue;
+    if (!hidden.has(s)) hidden.set(s, {count: 0, pieces: new Set()});
+    hidden.get(s).count += 1;
+    hidden.get(s).pieces.add(a.effect.target.closest('[data-k]')?.getAttribute('data-k')?.trim().split(/\s+/)[0] ?? a.effect.target.tagName.toLowerCase());
+  }
   for (const a of [...(document.getAnimations?.() ?? []), ...(stage?.shadowRoot?.getAnimations?.() ?? [])]) {
     try { a.finish(); } catch { /* an endless animation has no end */ }
   }
-  const slide = stage ? [...stage.children].filter((s) => s.tagName === 'SECTION')[stage.index] : null;
+  const slide = all[stage?.index] ?? null;
   if (!slide) return [];
   const W = Number(stage.getAttribute('width') || 1920), H = Number(stage.getAttribute('height') || 1080);
   const box = slide.getBoundingClientRect(), scale = box.width / W || 1;
@@ -313,5 +328,11 @@ export function measureSlide() {
     const dx = Math.max(0, -x0, x1 - W), dy = Math.max(0, -y0, y1 - H);
     if (dx > 2 || dy > 2) out.push({ kind: 'outside', piece: pieceOf(el), text: textOf(el), dx: Math.round(dx), dy: Math.round(dy) });
   }
+  // an endless animation on this slide that is not a loop (its computed style says so, even where a jump zeroed it)
+  for (const el of [slide, ...slide.querySelectorAll('*')]) {
+    if (el.hasAttribute('data-loop')) continue;
+    if (getComputedStyle(el).animationIterationCount.split(',').some((c) => c.trim() === 'infinite')) out.push({ kind: 'loose-loop', piece: pieceOf(el), text: textOf(el), dx: 0, dy: 0 });
+  }
+  for (const [s, { count, pieces }] of hidden) out.push({ kind: 'hidden-loop', piece: [...pieces].join(', '), text: '', dx: 0, dy: 0, slide: all.indexOf(s) + 1, count });
   return out;
 }

@@ -13,8 +13,8 @@ function key(k) {
   window.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
 }
 
-async function mount(sectionsHtml, { hash = '' } = {}) {
-  window.history.replaceState(null, '', hash ? `/${hash}` : '/');
+async function mount(sectionsHtml, { hash = '', search = '' } = {}) {
+  window.history.replaceState(null, '', `/${search}${hash}`);
   const el = document.createElement('deck-stage');
   el.setAttribute('no-rail', '');
   el.innerHTML = sectionsHtml;
@@ -44,16 +44,20 @@ const PLAIN_DECK = `
   <section data-label="P2">c</section>
 `;
 
+// jsdom has no matchMedia: each query is a switch a test can flip (and tell its listeners)
+const MQ = {};
+const REDUCED = '(prefers-reduced-motion: reduce)';
+const setQuery = (q, on) => { const m = window.matchMedia(q); m.matches = on; m.listeners.forEach((f) => f({ matches: on })); };
+
 beforeAll(async () => {
-  if (typeof window.matchMedia !== 'function') {
-    window.matchMedia = () => ({
-      matches: false,
-      addEventListener() {},
-      removeEventListener() {},
-      addListener() {},
-      removeListener() {},
-    });
-  }
+  window.matchMedia = (q) => (MQ[q] ??= {
+    matches: false,
+    listeners: new Set(),
+    addEventListener(type, f) { this.listeners.add(f); },
+    removeEventListener(type, f) { this.listeners.delete(f); },
+    addListener() {},
+    removeListener() {},
+  });
   await import('./site/public/deck-stage.js');
 });
 
@@ -219,5 +223,84 @@ describe('skips, print, and the injected stylesheet', () => {
     expect(tag.textContent).toContain('data-build="add"');
     // every rule stays scoped so Read/Scrolly figures are untouched
     expect(tag.textContent).not.toMatch(/^\s*\[data-deck-under\]/m);
+  });
+});
+
+describe('loops — ambient motion on the slide shown (USAGE (i), (j))', () => {
+  const looping = (el) => slides(el).map((s, i) => (s.hasAttribute('data-deck-loop') ? i : -1)).filter((i) => i >= 0);
+  /** An animation as the stage sees it: endless or not, running or paused, started when. */
+  const anim = (iterations, { playState = 'running', startTime = 1234, target = null } = {}) => ({ playState, startTime, effect: { target, getTiming: () => ({ iterations }) } });
+
+  it('loops run only on the slide shown and the layers under it', async () => {
+    const el = await mount(CHAIN_DECK);
+    expect(looping(el)).toEqual([0]);
+    key('ArrowRight');
+    key('ArrowRight');
+    expect(looping(el)).toEqual([0, 1, 2]);   // S2 and its chain underneath
+    key('ArrowRight');
+    expect(looping(el)).toEqual([3]);
+  });
+
+  it('every loop where loops run starts on the page clock; any other animation, a paused loop and a hidden one are left alone', async () => {
+    const el = await mount(`<section><i data-loop></i></section><section><i data-loop></i><b></b></section><section><b></b></section>`);
+    const [a, b, c] = slides(el);
+    const [loopEl, other] = [b.querySelector('i'), b.querySelector('b')];
+    const loop = anim(Infinity, { target: loopEl }), entrance = anim(1, { target: loopEl }), paused = anim(Infinity, { playState: 'paused', target: loopEl });
+    const spinner = anim(Infinity, { target: other }), hidden = anim(Infinity, { target: a.querySelector('i') });
+    a.getAnimations = () => [hidden];
+    b.getAnimations = (o) => (o?.subtree ? [loop, entrance, paused, spinner] : []);
+    key('ArrowRight');
+    expect([loop.startTime, entrance.startTime, paused.startTime, spinner.startTime, hidden.startTime]).toEqual([0, 1234, 1234, 1234, 1234]);
+    let asked = 0;
+    c.getAnimations = () => { asked += 1; return []; };
+    key('ArrowRight');
+    expect(asked).toBe(0);   // a slide without loops is never asked
+  });
+
+  it('reduced motion: no loops anywhere; turned back on, the slide shown loops again', async () => {
+    const el = await mount(PLAIN_DECK);
+    setQuery(REDUCED, true);
+    expect(looping(el)).toEqual([]);
+    key('ArrowRight');
+    expect(looping(el)).toEqual([]);
+    setQuery(REDUCED, false);
+    expect(looping(el)).toEqual([1]);
+  });
+
+  it('motion off (data-motion="off", or ?motion=off): no loops, and every arrival lands at once — a forward click too', async () => {
+    let el = await mount(PLAIN_DECK, { search: '?motion=off' });
+    expect(el.getAttribute('data-motion')).toBe('off');
+    expect(looping(el)).toEqual([]);
+    key('ArrowRight');
+    expect(isStatic(el, 1)).toBe(true);
+    expect(looping(el)).toEqual([]);
+    el.removeAttribute('data-motion');   // on again: the slide shown loops (and stays where it landed)
+    expect(looping(el)).toEqual([1]);
+    key('ArrowRight');
+    expect(isStatic(el, 2)).toBe(false);
+    el.remove();
+    el = await mount(PLAIN_DECK);
+    el.setAttribute('data-motion', 'off');   // turned off live: the slide shown lands, its loops stop
+    expect(isStatic(el, 0)).toBe(true);
+    expect(looping(el)).toEqual([]);
+    expect(el.getAttribute('data-motion')).toBe('off');
+  });
+
+  it('print: no loops while printing; afterprint brings them back', async () => {
+    const el = await mount(CHAIN_DECK, { hash: '#3' });
+    window.dispatchEvent(new Event('beforeprint'));
+    expect(looping(el)).toEqual([]);
+    window.dispatchEvent(new Event('afterprint'));
+    expect(looping(el)).toEqual([0, 1, 2]);
+  });
+
+  it('installs the loop rule (no weight, --loop not inherited); a static arrival and print leave a loop to it', async () => {
+    await mount(PLAIN_DECK);
+    const loop = document.getElementById('deck-stage-loop-css').textContent;
+    expect(loop).toContain('@property --loop { syntax: "*"; inherits: false; }');
+    expect(loop).toContain(':where(deck-stage [data-deck-loop] [data-loop]) { animation: var(--loop, none); }');
+    expect(document.getElementById('deck-stage-build-css').textContent)
+      .toContain('deck-stage [data-deck-static]:not([data-loop]), deck-stage [data-deck-static] :not([data-loop]) { animation-duration: 0s !important;');
+    expect(document.getElementById('deck-stage-print-page').textContent).toContain('deck-stage [data-loop] { animation: none !important; } }');
   });
 });

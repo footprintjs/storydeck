@@ -14,7 +14,8 @@ const MAP = `<!--
   The map: one picture the story is told on, in slide pixels (1920 × 1080).
   Every element with data-k="name" and an inline left/top/width/height is a piece a click can bring in, light,
   grey or move. Pieces never nest. <i data-arrow="x1 y1 x2 y2 [bend]"> becomes a wire (class "pkt": a packet runs
-  along it on a path click); <i class="ic" data-icon="name"> is icons/name.svg.
+  along it on a path click); <i class="ic" data-icon="name"> is icons/name.svg. data-loop="pulse" (float, marquee)
+  keeps a piece moving while its slide is shown; data-loop alone runs its own --loop from theme.css.
 -->
 <div data-k="client" class="box" style="left:160px;top:420px;width:300px;height:210px"><i class="ic" data-icon="client"></i><b>Client</b><small>a browser</small></div>
 <i data-k="req1" class="wire req pkt" data-arrow="464 490 716 490"></i>

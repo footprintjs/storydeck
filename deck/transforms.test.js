@@ -153,7 +153,7 @@ describe('a packet on the curve, a wire shown in', () => {
     expect(t).toMatch(/:where\(svg\.wire\.sd-enter:not\(\.sd-hot, \.sd-hot-in\)\) \{\n\s+-webkit-mask-image/);
     expect(t).toContain(':where(svg.wire.sd-twin-turn) { --sd-twin-lag: .3s; }');
     expect(readFileSync(path.join(process.cwd(), 'focus.css'), 'utf8')).toContain('sdLeave .45s ease calc(var(--sd-turn) + var(--sd-twin-lag, 0s)) both');
-    expect(readFileSync(path.join(process.cwd(), 'focus.css'), 'utf8')).toContain('var(--sd-a-path, sdNone 0s), var(--sd-a-more, sdNone 0s); }');
+    expect(readFileSync(path.join(process.cwd(), 'focus.css'), 'utf8')).toContain('var(--sd-a-path, sdNone 0s), var(--sd-a-more, sdNone 0s), var(--sd-a-loop, sdNone 0s); }');
     expect(wires('<i data-k="w" data-arrow="0 0 9 9"></i>')).not.toContain('pathLength');
   });
 });
