@@ -6,10 +6,13 @@
   `pulse`, `float` and `marquee` are the endless moves of the motion table StoryReel's films use
   (`footprint-story/motion`), sampled from the same curves and drawn into the page only when a deck names them
   (`data-loop="float 4s"` sets the pace; any other name is refused at build, naming the piece and the loops there are).
-  `data-loop` alone runs the piece's own animation, `--loop` in theme.css (`.gear { --loop: spin 6s linear infinite; }`).
+  A named loop moves its element by `transform` (a shape inside a drawing about its own middle), so a tag that sets a
+  transform of its own is refused, naming the fix: put data-loop on an element inside it. `data-loop` alone runs the
+  piece's own animation, `--loop` in theme.css (`.gear { --loop: spin 6s linear infinite; }`); a theme.css rule that
+  gives the element its own `animation` wins, so list `var(--loop)` in it to keep both.
   <deck-stage> owns where loops run, so it works in any deck on the stage: only on the slide shown and the layers under
   it (it stamps `data-deck-loop` on them), so a deck of 40 map clicks runs one slide's loops, not 40. Every loop runs
-  on one clock, so a map drawn again for the next click shows each loop where the last click left it, and a jump or a
+  on one clock (only a data-loop element's animations are set to it: a deck's other animations are left as they were), so a map drawn again for the next click shows each loop where the last click left it, and a jump or a
   step back keeps it running (a static arrival no longer zeroes a loop, only entrances). A loop never runs under
   reduced motion (switched live), in print, or with motion off: there the piece rests in its own style. A piece that
   loops and changes on the same click (comes in, lights up) does both: focus.css keeps the loop as the last animation

@@ -229,7 +229,7 @@ describe('skips, print, and the injected stylesheet', () => {
 describe('loops — ambient motion on the slide shown (USAGE (i), (j))', () => {
   const looping = (el) => slides(el).map((s, i) => (s.hasAttribute('data-deck-loop') ? i : -1)).filter((i) => i >= 0);
   /** An animation as the stage sees it: endless or not, running or paused, started when. */
-  const anim = (iterations, { playState = 'running', startTime = 1234 } = {}) => ({ playState, startTime, effect: { getTiming: () => ({ iterations }) } });
+  const anim = (iterations, { playState = 'running', startTime = 1234, target = null } = {}) => ({ playState, startTime, effect: { target, getTiming: () => ({ iterations }) } });
 
   it('loops run only on the slide shown and the layers under it', async () => {
     const el = await mount(CHAIN_DECK);
@@ -241,14 +241,20 @@ describe('loops — ambient motion on the slide shown (USAGE (i), (j))', () => {
     expect(looping(el)).toEqual([3]);
   });
 
-  it('every endless animation where loops run starts on the page clock; a finite, a paused or a hidden one is left alone', async () => {
-    const el = await mount(PLAIN_DECK);
-    const [a, b] = [slides(el)[0], slides(el)[1]];
-    const loop = anim(Infinity), entrance = anim(1), paused = anim(Infinity, { playState: 'paused' }), hidden = anim(Infinity);
+  it('every loop where loops run starts on the page clock; any other animation, a paused loop and a hidden one are left alone', async () => {
+    const el = await mount(`<section><i data-loop></i></section><section><i data-loop></i><b></b></section><section><b></b></section>`);
+    const [a, b, c] = slides(el);
+    const [loopEl, other] = [b.querySelector('i'), b.querySelector('b')];
+    const loop = anim(Infinity, { target: loopEl }), entrance = anim(1, { target: loopEl }), paused = anim(Infinity, { playState: 'paused', target: loopEl });
+    const spinner = anim(Infinity, { target: other }), hidden = anim(Infinity, { target: a.querySelector('i') });
     a.getAnimations = () => [hidden];
-    b.getAnimations = (o) => (o?.subtree ? [loop, entrance, paused] : []);
+    b.getAnimations = (o) => (o?.subtree ? [loop, entrance, paused, spinner] : []);
     key('ArrowRight');
-    expect([loop.startTime, entrance.startTime, paused.startTime, hidden.startTime]).toEqual([0, 1234, 1234, 1234]);
+    expect([loop.startTime, entrance.startTime, paused.startTime, spinner.startTime, hidden.startTime]).toEqual([0, 1234, 1234, 1234, 1234]);
+    let asked = 0;
+    c.getAnimations = () => { asked += 1; return []; };
+    key('ArrowRight');
+    expect(asked).toBe(0);   // a slide without loops is never asked
   });
 
   it('reduced motion: no loops anywhere; turned back on, the slide shown loops again', async () => {

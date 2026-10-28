@@ -34,17 +34,24 @@ export function readLoop(value, where) {
 /**
  * Every data-loop in `html`, in order, checked: [{piece, value, styled?}] — `piece` the element's first data-k name (null
  * for an element that is not a piece), `value` as written ('' for the deck's own; `styled` when its own style sets
- * --loop). One pass; each tag read as a browser reads it (the first of two data-loop attributes counts).
+ * --loop). One pass; each tag read as a browser reads it (the first of two data-loop attributes counts). Refused: a tag a
+ * browser would read past its ">" (a quote never closed before it), and a named loop on an element with a transform of
+ * its own in its tag — the loop moves it by its transform, so it would replace that one.
  */
 export function loopsIn(html, where) {
   const out = [];
   for (const t of tagsWith(html, /\sdata-loop(?![\w-])/i)) {
-    const attrs = readAttributes(t.before + t.m[0] + t.after) ?? [];
+    const attrs = readAttributes(t.before + t.m[0] + t.after);
+    if (!attrs) throw new Error(`${where}: <${t.tag}> with data-loop holds a quote never closed before its ">" — write a ">" inside a value as &gt;`);
     const loop = attrs.find((a) => a.name === 'data-loop');
     if (!loop) continue;
-    const k = attrs.find((a) => a.name === 'data-k')?.value.trim().split(/\s+/)[0] || null;
-    readLoop(loop.value, k ? `${where}, piece "${k}"` : where);
-    const styled = loop.value === '' && /(?:^|;)\s*--loop\s*:/.test(attrs.find((a) => a.name === 'style')?.value ?? '');
+    const k = attrs.find((a) => a.name === 'data-k')?.value.trim().split(/\s+/)[0] || null, at = k ? `${where}, piece "${k}"` : where;
+    readLoop(loop.value, at);
+    const style = attrs.find((a) => a.name === 'style')?.value ?? '';
+    if (loop.value !== '' && (attrs.some((a) => a.name === 'transform') || /(?:^|;)\s*transform\s*:/i.test(style))) {
+      throw new Error(`${at}: data-loop="${loop.value}" moves the element by its transform, which would replace the one it has — put data-loop on an element inside it`);
+    }
+    const styled = loop.value === '' && /(?:^|;)\s*--loop\s*:/.test(style);
     out.push({piece: k, value: loop.value, ...(styled ? {styled} : {})});
   }
   return out;
@@ -78,13 +85,18 @@ function keyframes(name) {
   return `@keyframes sd-loop-${name} { ${frames.join(' ')} }`;
 }
 
-/** The CSS for the named loops `values` (data-loop values as written; the deck's own are skipped): keyframes once per name. */
+/**
+ * The CSS for the named loops `values` (data-loop values as written; the deck's own are skipped): keyframes once per name,
+ * and a shape inside a drawing (an SVG element) turned and swelled about its own middle, as a box is.
+ */
 export function loopCss(values) {
   const named = [...new Set(values)].filter((v) => v !== '').sort(), names = new Set();
+  if (!named.length) return '';
   const rules = named.map((v) => {
     const {name, seconds} = readLoop(v, 'loopCss');
     names.add(name);
     return `:where([data-loop="${v}"]) { --loop: sd-loop-${name} ${r4(seconds)}s linear infinite; }`;
   });
-  return [...[...names].map(keyframes), ...rules].join('\n');
+  const shapes = ':where(svg [data-loop]:not([data-loop=""])) { transform-box: fill-box; transform-origin: center; }';
+  return [...[...names].map(keyframes), ...rules, shapes].join('\n');
 }

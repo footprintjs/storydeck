@@ -41,8 +41,17 @@ describe('loopsIn', () => {
     ]);
   });
 
-  it('skips what only looks like one: data-loop inside another attribute\'s value, or a tag a browser reads past its ">"', () => {
-    expect(loopsIn('<i title="see data-loop=pulse"></i><i data-loop="pulse></i>', 'x')).toEqual([]);
+  it('skips what only looks like one: data-loop inside another attribute\'s value', () => {
+    expect(loopsIn('<i title="see data-loop=pulse"></i>', 'x')).toEqual([]);
+  });
+
+  it('refuses a tag a browser reads past its ">", and a named loop on an element with its own transform — naming the fix', () => {
+    expect(() => loopsIn('<div data-loop="float 4s" title="a>b"></div>', 'map "m"')).toThrow('map "m": <div> with data-loop holds a quote never closed before its ">" — write a ">" inside a value as &gt;');
+    expect(() => loopsIn('<div data-k="db" data-loop="pulse" style="left:0;TRANSFORM: rotate(3deg)"></div>', 'map "m"'))
+      .toThrow('map "m", piece "db": data-loop="pulse" moves the element by its transform, which would replace the one it has — put data-loop on an element inside it');
+    expect(() => loopsIn('<g data-loop="float" transform="translate(9 9)"></g>', 'x')).toThrow(/moves the element by its transform/);
+    // the deck's own loop is its own business; a transform-origin is no transform
+    expect(loopsIn('<g data-loop transform="translate(9 9)"></g><i data-loop="pulse" style="transform-origin:0 0"></i>', 'x')).toHaveLength(2);
   });
 
   it('refuses a loop it does not have, naming the piece', () => {
@@ -65,6 +74,7 @@ describe('loopCss', () => {
     expect(css).toContain(':where([data-loop="pulse"]) { --loop: sd-loop-pulse 1.6s linear infinite; }');
     expect(css).toContain(':where([data-loop="float 4s"]) { --loop: sd-loop-float 4s linear infinite; }');
     expect(css).not.toContain('marquee');
+    expect(css).toContain(':where(svg [data-loop]:not([data-loop=""])) { transform-box: fill-box; transform-origin: center; }');
     expect(loopCss([])).toBe('');
     expect(loopCss(['', ''])).toBe('');
   });

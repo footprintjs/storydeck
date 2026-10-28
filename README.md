@@ -428,6 +428,10 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   `pulse`, `float` and `marquee` are the endless moves of the motion table StoryReel's films use
   (`footprint-story/motion`), drawn into the page only when a deck names them (`data-loop="float 4s"` sets the pace).
   `data-loop` alone runs the piece's own animation from theme.css: `.gear { --loop: spin 6s linear infinite; }`. A
+  named loop moves its element by `transform` (`marquee` slides it 1600 px left and starts over: a ticker), so it goes
+  on an element without a transform of its own — a tag that sets one is refused; one theme.css gives it is replaced
+  while the loop runs. A rule of theme.css that gives the element its own `animation` wins over its loop: list
+  `var(--loop)` in it to keep both. A
   map is drawn again for every click, yet a loop never starts over: every loop in the deck runs on one clock, so the
   next click shows it where the last one left it, and a jump or a step back keeps it running. A loop runs only on the
   slide shown (a deck of 40 map clicks runs one slide's loops, not 40), and never under reduced motion, in print, or

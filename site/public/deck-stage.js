@@ -70,7 +70,7 @@
  *      (e.g. style="--loop: spin 4s linear infinite") as ambient motion: only
  *      on the slide shown and the layers under it (the engine stamps
  *      data-deck-loop on them), on ONE clock for the whole deck (each
- *      endless animation there is set to start at the page's start), so
+ *      loop's animation is set to start at the page's start), so
  *      the next slide of the same picture shows every loop where the last
  *      one left it, and a jump or a step back keeps them running. Loops
  *      never run under prefers-reduced-motion, in print, or with motion
@@ -1207,15 +1207,18 @@
       });
     }
 
-    /** One clock for every loop: each endless animation on a slide whose
-     *  loops run starts at the page's start, so the same loop on the next
-     *  slide (the same picture, drawn again) goes on where this one is. */
+    /** One clock for every loop: each loop (an endless animation of a
+     *  data-loop element) on a slide whose loops run starts at the page's
+     *  start, so the same loop on the next slide (the same picture, drawn
+     *  again) goes on where this one is. Nothing else is touched: a slide
+     *  without loops is never asked for its animations. */
     _lockLoops() {
       for (const s of this._slides) {
-        if (!s.hasAttribute('data-deck-loop') || typeof s.getAnimations !== 'function') continue;
+        if (!s.hasAttribute('data-deck-loop') || typeof s.getAnimations !== 'function' || !s.querySelector('[data-loop]')) continue;
         for (const a of s.getAnimations({ subtree: true })) {
-          if (a.playState === 'paused' || a.startTime === 0) continue;
-          if (a.effect && a.effect.getTiming().iterations === Infinity) a.startTime = 0;
+          if (a.playState === 'paused' || a.startTime === 0 || !a.effect) continue;
+          const t = a.effect.target;
+          if (t && t.hasAttribute && t.hasAttribute('data-loop') && a.effect.getTiming().iterations === Infinity) a.startTime = 0;
         }
       }
     }
