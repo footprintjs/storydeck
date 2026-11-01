@@ -1,5 +1,9 @@
 # Footprint StoryDeck
 
+For developers publishing technical explanations, product walkthroughs and teaching material.
+
+[Quick start](#quick-start) · [Folder-based deck CLI](#a-deck-from-a-folder-storydeck) · [Live demo](https://footprintjs.github.io/storydeck/) · [API](#api)
+
 **One source, many lenses.** Write a piece of content once, render it three ways:
 
 - **Read** — a detailed, SEO-first article (figure + prose per section).
