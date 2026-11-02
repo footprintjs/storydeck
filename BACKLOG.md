@@ -42,3 +42,29 @@ code: borrow the ideas, write the code here.
 Borrowed from the same article. A loop's last frame must flow into its first, keeping its SPEED through the seam,
 not only its position. `check` can measure each named loop's start and end states, and `review` can report a loop
 that jumps at its seam.
+
+## 3. A figure drawn by its model, with one input to move (2026-11-02)
+
+A slide can hold a figure that its own model draws (a spiral from its growth rate, a pattern from its rule, a
+flowchart from a real run), and expose ONE of the model's inputs as a control. Moving it redraws a quick preview;
+letting go regrows the whole figure at the new value, and the figure's label says it is no longer the real value.
+It is for explaining, not decorating: the viewer sees that the real thing is one setting of its rule.
+
+- **A trial row.** Under the figure, three to five small copies at other values, drawn by the same code, each with
+  its value lettered under it and the real one ticked. With no viewer at all, the slide still makes its point.
+- **Scrub the build.** The figure draws itself (the construction first, then the thing growing out of it), and the
+  viewer can scrub that build in time, as a film can.
+- **Data, not code.** The figure names its model module, the input, its range and its real value in deck.json. Built
+  pages stay one file: heavy work runs in a Web Worker made from the page's own code, with no network.
+- **Laws:**
+  - the figure is a pure function of its input and time, with seeded randomness only;
+  - the real value is always one step away (a "back to real" control), and the label shows when it is not;
+  - reduced motion shows the finished figure, never the build;
+  - `check` refuses a trial row drawn by different code from the figure, and a figure whose sources call
+    `Math.random`.
+- **Look first.** One sample slide: a spiral with its growth rate on a slider and a trial row of three. The owner
+  tries it in a browser before anything is built.
+
+Source: Math-Animals by r3al1tym (https://github.com/r3al1tym/math-animals), MIT (Copyright (c) 2026 r3al1tym). On its
+site, each plate runs its model in its own Web Worker, the viewer scrubs its time, and one of the model's inputs
+regrows the animal at a new value. Its code may be adapted if that notice is kept in the file it lands in.
