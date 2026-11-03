@@ -68,3 +68,16 @@ It is for explaining, not decorating: the viewer sees that the real thing is one
 Source: Math-Animals by r3al1tym (https://github.com/r3al1tym/math-animals), MIT (Copyright (c) 2026 r3al1tym). On its
 site, each plate runs its model in its own Web Worker, the viewer scrubs its time, and one of the model's inputs
 regrows the animal at a new value. Its code may be adapted if that notice is kept in the file it lands in.
+
+## 4. A 3D stage: fly from one view to another (2026-11-03)
+
+Pieces placed in x, y, z (each a card: a panel, a picture, a word) and named viewpoints; a click flies the camera
+from one view to the next with the browser's own CSS 3D (`perspective`, `translate3d`, `rotate3d`), so built pages stay
+one file with no library.
+
+- **One model with StoryReel.** The views, the flight and its choices (which way round, how far to arc, how long) are
+  one module shared with StoryReel's 3D stage (its backlog), so a deck and a film fly the same way.
+- **Data, not code:** `"stage": {"cards": …, "views": …}` in deck.json; a click names its view.
+- **Laws:** pieces move by transform only; reduced motion and `motion off` cut instead of flying; a card is never
+  seen from behind unless it has a back; `check` refuses a view that sees no card, or a card edge-on to every view.
+- **Look first:** one sample: three cards and two views, a click flies between them.
