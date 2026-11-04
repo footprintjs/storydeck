@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **A part that differs from the real thing says so.** A picture is believed, so a process run 30 times faster or a part
+  drawn far larger than it is reads as how the thing is. A part now declares it (`data-differs-time="30"`,
+  `data-differs-scale="…"`), and the deck says it: a label at the top right of its slides by default, in the notes with
+  `data-differs-said`, or both. `check` refuses a phrase the notes do not hold (`differs-unsaid`), and `review` says how
+  each click differs. A deck that declares nothing builds byte for byte as before. It cannot see a speed-up nobody declared.
 - **Loops keep running in a video.** `renderVideo` stepped a click until its last entrance ended and held that frame,
   so a loop (a pulse, packets on a wire) stood still for the rest of the click and started again at the next. A click
   whose loops run is now stepped on to its end, each loop at the video's own time, so they run on from click to click

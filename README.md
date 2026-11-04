@@ -403,6 +403,14 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   ticks the line (`- [x]`). Pointing costs the person a second and the agent no screenshot. Each note is signed with a
   key kept with you (`~/.storydeck/key`) for that deck's folder, so a feedback.md that came with someone else's deck is
   never read as your requests: its lines are counted, never listed.
+- **A part that differs from the real thing says so.** A picture is believed, so a process run 30 times faster or a
+  part drawn far larger than it is reads as how the thing is. `<section data-label="Inside" data-differs-time="30"
+  data-differs-scale="The dots are drawn far larger than real" data-differs-said="thirty times faster">` declares it, and the
+  deck says it: on the slide by default, a label at the top right of each of the part's slides ("Time shown 30 times
+  faster"; `data-differs-shown` gives other words, `A | B` for two labels, or `false` for the notes alone), in the notes with
+  `data-differs-said`, the phrase that says it, or both. `check` refuses a phrase the part's notes do not hold, `review`
+  says how each click differs, and a video shows the labels as the page does. It reads what is declared, and cannot see a
+  speed-up nobody declared.
 - **A part can have its own look.** `<section data-label="3 · Storage" … data-theme="ledger">` puts
   `data-theme="ledger"` on each of that part's slides, so `theme.css` can dress it: redefine the tokens for it
   (`[data-theme="ledger"] { --bg: …; --text: …; }`, and `:root.dark [data-theme="ledger"]` for dark) and give its pieces

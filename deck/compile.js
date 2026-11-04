@@ -14,6 +14,7 @@ import {readEnter, transitionTable} from './transitions.js';
 import {plainText} from './parse.js';
 import {esc, stripComments} from './html.js';
 import {readAttributes, tagsWith} from '../pieceRules.js';
+import {differsHtml} from './differs.js';
 
 /**
  * In the dev page only: each piece keeps the number the build gave it (data-sd-at, beside the data-sd-i drawFocus
@@ -113,8 +114,8 @@ const foot = (footer, n, total) => `<div class="foot" data-chrome><span>${esc(fo
 function drawClick(c, i, total, {footer, area, canvas}) {
   // a part's theme rides on each of its slides, for the deck's theme.css ([data-theme="…"])
   const open = `<section data-label="${esc(c.label)}"${c.part.theme ? ` data-theme="${esc(c.part.theme)}"` : ''}`;
-  if (c.kind === 'plain') return `${open} class="slide plain">${head(c.part.kicker, '')}${c.inner}${foot(footer, i + 1, total)}</section>`;
-  return `${open} class="slide on-map ${slideClass(c.look)}">${head(c.part.kicker, c.headline)}`
+  if (c.kind === 'plain') return `${open} class="slide plain">${head(c.part.kicker, '')}${differsHtml(c.part.differs)}${c.inner}${foot(footer, i + 1, total)}</section>`;
+  return `${open} class="slide on-map ${slideClass(c.look)}">${head(c.part.kicker, c.headline)}${differsHtml(c.part.differs)}`
     + `<div class="map map-${c.map.name}">${wrapStage(drawFocus(c.map.html, c.look), c.look)}</div>`
     + `${focusOverlay(c.look, {area, canvas: {w: canvas[0], h: canvas[1]}})}${foot(footer, i + 1, total)}</section>`;
 }
@@ -151,7 +152,7 @@ export function compileDeck(source, {dev = false} = {}) {
       notes: {slide: c.part.label, step: k, steps: partClicks.length - 1, now: c.notes, earlier: partClicks.slice(0, k).flatMap((x) => x.notes)}};
   });
   checkPost(source.post, new Set(slides.map((s) => s.label)));
-  const clicks = planned.map((c, i) => ({n: i + 1, label: c.label, part: c.part.label, kicker: c.part.kicker, theme: c.part.theme ?? null, kind: c.kind,
+  const clicks = planned.map((c, i) => ({n: i + 1, label: c.label, part: c.part.label, kicker: c.part.kicker, theme: c.part.theme ?? null, ...(c.part.differs ? {differs: c.part.differs} : {}), kind: c.kind,
     map: c.kind === 'map' ? c.map.name : null, headline: plainText(c.headline), notes: c.notes, loops: c.loops, enter: c.enter,
     ...(c.kind === 'map' ? {step: c.step, look: c.look, stepIndex: c.stepIndex, steps: c.steps} : {text: plainText(c.inner)})}));
   // the named loops the page draws: those its clicks show
