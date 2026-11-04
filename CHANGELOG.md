@@ -5,8 +5,14 @@
 - **A part that differs from the real thing says so.** A picture is believed, so a process run 30 times faster or a part
   drawn far larger than it is reads as how the thing is. A part now declares it (`data-differs-time="30"`,
   `data-differs-scale="…"`), and the deck says it: a label at the top right of its slides by default, in the notes with
-  `data-differs-said`, or both. `check` refuses a phrase the notes do not hold (`differs-unsaid`), and `review` says how
-  each click differs. A deck that declares nothing builds byte for byte as before. It cannot see a speed-up nobody declared.
+  `data-differs-said` (`"A | B"` gives one phrase per statement), or both. Each statement declared needs a line or a
+  phrase of its own, a number in the time's line must be the one declared, and a deck in another language gives its own
+  words. A time factor is 1.01 or more or 0.99 or less, up to a billion times either way. `check` refuses a phrase the
+  notes do not hold (`differs-unsaid`), matching words as StoryReel matches a phrase, never inside a word, and `check
+  --layout` warns when a label meets the kicker, the headline or a lit piece (`differs-overlap`). `review` says how each
+  click differs. A `>` in a value, or `data-differs-*` on a `<step>`, is refused instead of lost. A deck that declares no
+  label builds byte for byte as before: the page carries the label's CSS only when a part shows one. It cannot see a
+  speed-up nobody declared.
 - **Loops keep running in a video.** `renderVideo` stepped a click until its last entrance ended and held that frame,
   so a loop (a pulse, packets on a wire) stood still for the rest of the click and started again at the next. A click
   whose loops run is now stepped on to its end, each loop at the video's own time, so they run on from click to click

@@ -15,7 +15,7 @@ const quote = (s, max = 160) => (s.length > max ? `"${s.slice(0, max - 1)}…"` 
 /** How a click's part arrives (transitions.js), on its first click — nothing when it just appears. */
 const enterLine = (c) => (c.enter ? `enters by ${enterText(c.enter)} (on a forward step)` : null);
 /** How a click's part differs from the real thing (differs.js), as it says so — nothing when it declares none. */
-const differsLine = (c) => (c.differs ? `differs: ${c.differs.shown.length ? `on the slide: ${c.differs.shown.join(' · ')}` : 'not on the slide'}${c.differs.said ? `; in the notes: "${c.differs.said}"` : ''}` : null);
+const differsLine = (c) => (c.differs ? `differs: ${c.differs.shown.length ? `on the slide: ${c.differs.shown.join(' · ')}` : 'not on the slide'}${c.differs.said ? `; in the notes: ${c.differs.said.map((p) => `"${p}"`).join(' · ')}` : ''}` : null);
 
 /** What loops on a click (loops.js), each by its piece and its loop — nothing when none does. */
 const loopsLine = (c) => (c.loops?.length ? `loops (${c.loops.length}): ${list(c.loops.map((l) => `${l.piece ?? 'an element'} ${l.value || '(its own --loop)'}`), 10)}` : null);

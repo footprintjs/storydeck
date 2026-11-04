@@ -408,9 +408,14 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   data-differs-scale="The dots are drawn far larger than real" data-differs-said="thirty times faster">` declares it, and the
   deck says it: on the slide by default, a label at the top right of each of the part's slides ("Time shown 30 times
   faster"; `data-differs-shown` gives other words, `A | B` for two labels, or `false` for the notes alone), in the notes with
-  `data-differs-said`, the phrase that says it, or both. `check` refuses a phrase the part's notes do not hold, `review`
-  says how each click differs, and a video shows the labels as the page does. It reads what is declared, and cannot see a
-  speed-up nobody declared.
+  `data-differs-said`, the phrase that says it (`A | B` for one per statement), or both. A factor a label can say is 1.01 or
+  more, or 0.99 or less, up to a billion times either way. Each statement declared needs a line or a phrase of its own, and
+  a number in the time's line must be the one declared. A deck in another language gives its own words: the default ones
+  are English. A value is read as a browser reads it: write `&gt;` for a `>` and `&#124;` for a `|` in your words. `check`
+  refuses a phrase the part's notes do not hold, matching whole words in order, as a film does. `check --layout` warns when a
+  label meets the kicker, the headline or a lit piece. `review` says how each click differs, and a video shows the labels as
+  the page does. A deck that shows no label builds byte for byte as if this did not exist. It reads what is declared, and
+  cannot see a speed-up nobody declared.
 - **A part can have its own look.** `<section data-label="3 · Storage" … data-theme="ledger">` puts
   `data-theme="ledger"` on each of that part's slides, so `theme.css` can dress it: redefine the tokens for it
   (`[data-theme="ledger"] { --bg: …; --text: …; }`, and `:root.dark [data-theme="ledger"]` for dark) and give its pieces
@@ -436,8 +441,8 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   its route, its notes), `check` (what to fix, each with its click and its fix: a headline over 12 words, pieces that
   light just by coming in, a click that changes nothing, a piece never shown, clicks without notes, a theme theme.css
   never styles). `check --layout`
-  opens the page in a browser, offline, and finds text that spills out of its box and endless animations that are not
-  loops (it needs Playwright installed beside
+  opens the page in a browser, offline, and finds text that spills out of its box, a label on how a part differs that meets
+  what is on its slide, and endless animations that are not loops (it needs Playwright installed beside
   StoryDeck: `npm i -D footprint-storydeck playwright-core`; without it, it says so and the other checks run). `mcp` serves the same tools to an AI assistant:
   `claude mcp add storydeck -- npx footprint-storydeck mcp my-talk`.
 - **The helpers a diagram needs.** `<i data-k="w1" class="wire pkt" data-arrow="client to server"></i>` is a wire (an

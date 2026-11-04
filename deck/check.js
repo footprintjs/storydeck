@@ -8,8 +8,8 @@
 //   no-notes       clicks without notes in a deck that has them (listen mode says nothing there)
 //   theme-unstyled a part asks for a data-theme that theme.css never selects ([data-theme="…"]): a misspelt name changes nothing
 //   loop-unset     a loop of the deck's own (a bare data-loop) that nothing gives a --loop: nothing loops
-//   differs-unsaid a part names the phrase of its notes that says how it differs from the real thing, and they do not hold it
-import {wordCount, plainText} from './parse.js';
+//   differs-unsaid a part names a phrase of its notes that says how it differs from the real thing, and they do not hold it
+import {wordCount} from './parse.js';
 import {expandNames} from '../focus.js';
 import {LOOP_NAMES} from './loops.js';
 import {saidInNotes} from './differs.js';
@@ -91,14 +91,15 @@ function unsetLoops(compiled) {
   return [problem('warn', 'loop-unset', bare[0].c, `${list.join(', ')} ha${one ? 's' : 've'} data-loop but nothing sets ${one ? 'its' : 'their'} --loop, so nothing loops — give ${one ? 'it' : 'them'} one in theme.css (.gear { --loop: spin 4s linear infinite }), or name a loop: data-loop="${LOOP_NAMES[0]}" (${LOOP_NAMES.join(', ')})`)];
 }
 
-/** A part that names the phrase of its notes that says how it differs, when they do not hold it — once, at its first click. */
+/** A part that names a phrase of its notes that says how it differs, when they do not hold it — once, at its first click. */
 function unsaidDiffers(compiled) {
   const out = [], seen = new Set();
   for (const c of compiled.clicks) {
     if (!c.differs?.said || seen.has(c.part)) continue;
     seen.add(c.part);
-    const notes = compiled.clicks.filter((x) => x.part === c.part).flatMap((x) => x.notes);
-    if (!saidInNotes(c.differs.said, plainText(notes.join(' ')))) out.push(problem('error', 'differs-unsaid', c, `part "${c.part}" says its notes tell how it differs from the real thing ("${c.differs.said}"), and they do not hold those words — say it in the notes, or fix data-differs-said`));
+    const notes = compiled.clicks.filter((x) => x.part === c.part).flatMap((x) => x.notes).join(' ');   // plain text already (parse.js · takeNotes)
+    const missing = c.differs.said.filter((phrase) => !saidInNotes(phrase, notes));
+    if (missing.length) out.push(problem('error', 'differs-unsaid', c, `part "${c.part}" says its notes tell how it differs from the real thing (${missing.map((p) => `"${p}"`).join(', ')}), and they do not hold those words — say it in the notes, or fix data-differs-said`));
   }
   return out;
 }

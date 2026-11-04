@@ -40,6 +40,11 @@ export const UNSEEN = new RegExp([
   String.raw`(?![\u{200C}\u{200D}\u{FE0E}\u{FE0F}])\p{Default_Ignorable_Code_Point}`,
   String.raw`[^\p{L}\p{M}\p{N}\p{P}\p{S}\p{Zs}\n\t\u{200C}\u{200D}\u{FE0E}\u{FE0F}]`,
 ].join('|'), 'gu');
+const ENTITY = {amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' '};
+/** Text with its HTML entities read, once: named ones (the few a text holds) and numeric ones; anything else stays as written. */
+export const decodeEntities = (text) => String(text).replace(/&(#\d{1,7}|#x[\da-f]{1,6}|\w{1,32});/gi, (m, e) => (e[0] === '#'
+  ? (() => { const cp = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : Number(e.slice(1)); return cp <= 0x10ffff ? String.fromCodePoint(cp) : m; })()
+  : ENTITY[e.toLowerCase()] ?? m));
 /** Text safe in HTML content and in a double-quoted attribute. */
 export const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 /** Code safe inside a <script> (no `</script` can close it early). */

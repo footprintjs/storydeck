@@ -14,7 +14,7 @@ import {readEnter, transitionTable} from './transitions.js';
 import {plainText} from './parse.js';
 import {esc, stripComments} from './html.js';
 import {readAttributes, tagsWith} from '../pieceRules.js';
-import {differsHtml} from './differs.js';
+import {differsHtml, refuseEnglishWords} from './differs.js';
 
 /**
  * In the dev page only: each piece keeps the number the build gave it (data-sd-at, beside the data-sd-i drawFocus
@@ -142,6 +142,7 @@ export function compileDeck(source, {dev = false} = {}) {
   const {config, parts, icons = {}} = source;
   const maps = Object.fromEntries(Object.entries(source.maps ?? {}).map(([name, html]) => [name, prepareMap(name, html, icons, dev)]));
   for (const part of parts) if (part.map && !maps[part.map]) throw new Error(`"${part.label}" is told on map "${part.map}", which the deck does not have`);
+  for (const part of parts) refuseEnglishWords(part.differs, config.lang, `"${part.label}"`);
   const opts = {area: [...config.area], canvas: config.canvas, icons, footer: config.footer};
   const planned = planClicks(parts, maps, opts);
   const total = planned.length;

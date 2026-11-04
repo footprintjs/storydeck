@@ -27,9 +27,6 @@
   font: 500 20px/1 var(--mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace); color: var(--fg-muted, #5d6673);
 }
 :where(.foot .count) { color: var(--fg, #14181f); font-weight: 700; }
-/* a part that differs from the real thing says so (deck/differs.js): labels on the kicker's row, right-aligned */
-:where(.differs) { position: absolute; right: 50px; top: 44px; z-index: 4; display: flex; gap: 10px; justify-content: flex-end; max-width: 75%; flex-wrap: wrap; }
-:where(.differs span) { padding: 8px 16px; border-radius: 20px; background: var(--fg, #14181f); color: var(--bg, #ffffff); font: 700 20px/1.2 var(--sans, system-ui, sans-serif); }
 
 /* the map: every piece is placed by its own inline left/top/width/height */
 :where(.map) { position: absolute; inset: 0; }
