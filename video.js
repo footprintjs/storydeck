@@ -285,7 +285,7 @@ export function deckStageDriver({ chromium, executablePath, viewport = { width: 
     shot: (file) => page.screenshot({ path: file }),
     /**
      * Click n (1-based) as it settles, measured: jump there (a jump lands at once), finish what still moves, and
-     * report text that spills out of its box and lit pieces outside the slide — [{kind, piece, text, dx, dy}] (the
+     * report text that spills out of its box, lit pieces outside the slide and a label that meets what is on it — [{kind, piece, text, dx, dy}] (the
      * layout check, deck/layout.js, reads it).
      */
     async measure(n) {
@@ -350,6 +350,19 @@ export function measureSlide() {
     const x0 = (r.left - box.left) / scale, y0 = (r.top - box.top) / scale, x1 = (r.right - box.left) / scale, y1 = (r.bottom - box.top) / scale;
     const dx = Math.max(0, -x0, x1 - W), dy = Math.max(0, -y0, y1 - H);
     if (dx > 2 || dy > 2) out.push({ kind: 'outside', piece: pieceOf(el), text: textOf(el), dx: Math.round(dx), dy: Math.round(dy) });
+  }
+  // a label on how the part differs (deck/differs.js) and what it meets on the slide: its text as it lies (a block's box is
+  // wider than its words) or a lit piece's box. Whichever is on top, one hides the other.
+  const labels = [...slide.querySelectorAll('.differs span')].filter(shown).map((el) => el.getBoundingClientRect());
+  if (labels.length) {
+    const meets = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 2 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 2;
+    const textRects = (el) => { const r = document.createRange(); r.selectNodeContents(el); return [...r.getClientRects()]; };
+    for (const el of slide.querySelectorAll('*')) {
+      if (el.closest('.differs, .foot') || !shown(el)) continue;
+      const piece = el.matches('.sd-on');
+      if (!piece && (el.closest('.sd-on') || el.namespaceURI === 'http://www.w3.org/2000/svg' || ![...el.childNodes].some((c) => c.nodeType === 3 && c.textContent.trim()))) continue;
+      if ((piece ? [el.getBoundingClientRect()] : textRects(el)).some((r) => labels.some((l) => meets(r, l)))) out.push({ kind: 'differs-overlap', piece: pieceOf(el), text: textOf(el), dx: 0, dy: 0 });
+    }
   }
   // an endless animation on this slide that is not a loop (its computed style says so, even where a jump zeroed it)
   for (const el of [slide, ...slide.querySelectorAll('*')]) {

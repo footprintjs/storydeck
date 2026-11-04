@@ -1,5 +1,5 @@
-// layout — the check only a browser can make: text that spills out of its box, lit pieces pushed off the slide, and
-// endless animations that are not loops (deck-stage.js USAGE (i)): one running on a slide no one sees, one that starts
+// layout — the check only a browser can make: text that spills out of its box, lit pieces pushed off the slide, a label
+// on how a part differs that meets what is on the slide (differs.js), and endless animations that are not loops (deck-stage.js USAGE (i)): one running on a slide no one sees, one that starts
 // again at each click.
 // It drives the built page through the video's browser port (video.js · deckStageDriver · measure), one click at a
 // time as it settles, offline. Optional: it needs Playwright installed beside StoryDeck (`npm i -D footprint-storydeck
@@ -43,6 +43,7 @@ export function clickRuns(ns) {
 const KINDS = {
   spills: (f, where, also) => ['warn', `text spills out of ${where} by ${size(f)} ("${f.text}")${also} — shorten it, or give the box more room`],
   outside: (f, where, also) => ['warn', `${where} reaches ${size(f)} past the slide's edge ("${f.text}")${also} — move it in, or zoom less`],
+  'differs-overlap': (f, where, also) => ['warn', `the label on how this part differs meets ${where} ("${f.text}")${also}, and one hides the other — shorten the label, or move ${where} clear of the top right`],
   'loose-loop': (f, where, also) => ['warn', `${where} has an endless animation that is not a loop${also}: it starts again at each click and stops on a jump — give the element data-loop and its animation as --loop (or name a loop: data-loop="pulse")`],
   'hidden-loop': (f, where, also) => ['error', `${f.count} endless animation${f.count === 1 ? '' : 's'} on ${f.piece} keep${f.count === 1 ? 's' : ''} running while the slide is hidden${also} — make ${f.count === 1 ? 'it a loop' : 'each a loop'} (data-loop and its animation as --loop): a loop runs only on the slide shown`],
 };
