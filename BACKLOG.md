@@ -81,3 +81,30 @@ one file with no library.
 - **Laws:** pieces move by transform only; reduced motion and `motion off` cut instead of flying; a card is never
   seen from behind unless it has a back; `check` refuses a view that sees no card, or a card edge-on to every view.
 - **Look first:** one sample: three cards and two views, a click flies between them.
+
+## 5. A lesson spread: predict, lift the flap, a figure that says how it differs (2026-11-03)
+
+Two pages of an open book on a desk. The left page explains: a title, the one formula, the key words, working in the
+margin, a question to predict, and a flap. The right page holds a live figure, its numbered key, and one line telling the
+viewer what to do. It is a layout in deck.json, not a 3D engine, and built pages stay one file.
+
+- **Predict, then lift the flap.** The answer stays under a flap until the viewer has picked; their pick stays beside it.
+  A presenter's click opens it too. Nothing is stored or sent. Reduced motion opens it with no animation.
+- **A figure that says how it differs from the real thing.** The figure declares its time factor and what it draws out of
+  scale, the words are drawn on it, and a control switches between slowed and real (item 3's "back to real"). `check`
+  refuses a declared rate other than 1 with no words on the slide; it cannot see a speed-up nobody declared.
+- **A numbered key.** Numbers on the figure, the key under it; hover, tap or a click lights the part. `check`: every
+  number in the key is on a part, and every number on a part or in the action line is in the key.
+- **A cutaway.** A partner to `apart` (the exploded view): a window opens in a part's cover to show what is inside, the cut
+  faces hatched.
+- **A flow along a wire.** Dots along a named path, their speed from the model's value, each place a pure function of
+  time. Item 1's `ripple` passes a touch along wired pieces; this one runs on its own. Reduced motion shows fixed dots and an arrow.
+- **Ink, with colour only for what the lesson is about.** A hatched line drawing where only what moves has colour.
+- **It stands off the page.** With item 4's CSS 3D the figure rises from the page and turns a little under the pointer.
+- **One model with StoryReel.** The key, the `differs` words and the flow are the same data in a deck and a film (its
+  backlog section of the same date), so one figure can be shown in both.
+- **Look first:** one spread, a torch cut away with its current flowing, opened in a browser before anything is built.
+
+Source: a 3D interactive electricity book by @techartist_, being built with Opus 5.5, shown by @0xKapri
+(https://x.com/0xKapri/status/2117304745228394951). It is not published and states no licence, so the ideas are borrowed
+and the code is written here. Read from three frames of the post's video.
