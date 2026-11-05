@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.11.0 — FootPrint 11 and a part that says how it differs
+
+- **Migration:** PowerPoint export requires FootPrint 11. Install `footprintjs@^11.0.0` beside Storydeck;
+  the peer stays optional and is loaded when an export runs. Older FootPrint majors are no longer supported.
 
 - **A part that differs from the real thing says so.** A picture is believed, so a process run 30 times faster or a part
   drawn far larger than it is reads as how the thing is. A part now declares it (`data-differs-time="30"`,

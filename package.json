@@ -1,6 +1,6 @@
 {
   "name": "footprint-storydeck",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "React views and a deck CLI for turning one structured story into an article, scrollytelling page, slide deck, narrated video or PowerPoint.",
   "type": "module",
   "license": "MIT",
@@ -108,7 +108,7 @@
     "test:cov": "vitest run --coverage"
   },
   "peerDependencies": {
-    "footprintjs": "^10.0.0",
+    "footprintjs": "^11.0.0",
     "react": ">=18",
     "react-dom": ">=18"
   },
@@ -128,7 +128,7 @@
     "@vitejs/plugin-react": "^5.0.4",
     "@vitest/coverage-v8": "^4.1.9",
     "esbuild": "^0.28.2",
-    "footprintjs": "^10.0.0",
+    "footprintjs": "11.0.0",
     "jsdom": "^29.1.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
