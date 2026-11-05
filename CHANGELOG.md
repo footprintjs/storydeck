@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- **A part told as an analogy says so.** `data-differs-analogy="people stand in for the services"` shows "An analogy:
+  people stand in for the services", or say it in the notes with `data-differs-said`. It is a statement like time and
+  scale: it needs a line or a phrase of its own, it fits the label it goes on, and a deck in another language gives its
+  own words.
+- **How a part's pieces arrive and leave, with no CSS of your own.** `data-arrive` (`grow` or `fade`),
+  `data-arrive-time`, `data-arrive-delay` and `data-leave-time` on a `<section>` set it for all of its clicks. It plays
+  only on a forward step, and a jump, a step back, reduced motion and print land at once. A value it cannot play, or one
+  of these on a `<step>`, is refused. A deck that asks for none builds byte for byte as before.
+- **A part's label moved in from the corner.** The labels on how a part differs sit 60 slide pixels further left, so they
+  clear the theme toggle at usual window sizes (it stays the same size as the slide scales, so a very small window can
+  still crowd them). Rebuilding a deck that shows one may change what `check --layout` says about it and its headline.
+
 ## 0.11.0 — FootPrint 11 and a part that says how it differs
 
 - **Migration:** PowerPoint export requires FootPrint 11. Install `footprintjs@^11.0.0` beside Storydeck;

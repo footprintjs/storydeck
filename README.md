@@ -403,6 +403,12 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   ticks the line (`- [x]`). Pointing costs the person a second and the agent no screenshot. Each note is signed with a
   key kept with you (`~/.storydeck/key`) for that deck's folder, so a feedback.md that came with someone else's deck is
   never read as your requests: its lines are counted, never listed.
+- **How a part's pieces arrive and leave.** `<section data-arrive="fade" data-arrive-time="0.9" data-arrive-delay="0.5"
+  data-leave-time="0.5">` sets it for all of the part's clicks, with no CSS of your own: `data-arrive` is `grow` (the
+  default) or `fade`, and the others are seconds. A delay shorter than the leave time crossfades; longer, and the old
+  piece is gone before the new one comes. `data-enter` is how the slide arrives; this is how the pieces on it do. It keeps the rules of
+  every arrival: it plays on a forward step, and a jump, a step back, reduced motion and print land at once. A deck that
+  asks for none builds byte for byte as before.
 - **A part that differs from the real thing says so.** A picture is believed, so a process run 30 times faster or a
   part drawn far larger than it is reads as how the thing is. `<section data-label="Inside" data-differs-time="30"
   data-differs-scale="The dots are drawn far larger than real" data-differs-said="thirty times faster">` declares it, and the
@@ -415,7 +421,8 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   refuses a phrase the part's notes do not hold, matching whole words in order, as a film does. `check --layout` warns when a
   label meets the kicker, the headline or a lit piece. `review` says how each click differs, and a video shows the labels as
   the page does. A deck that shows no label builds byte for byte as if this did not exist. It reads what is declared, and
-  cannot see a speed-up nobody declared.
+  cannot see a speed-up nobody declared. A part told as an analogy says that too: `data-differs-analogy="people stand in
+  for the services"` shows "An analogy: people stand in for the services", and it counts as a statement of its own.
 - **A part can have its own look.** `<section data-label="3 · Storage" … data-theme="ledger">` puts
   `data-theme="ledger"` on each of that part's slides, so `theme.css` can dress it: redefine the tokens for it
   (`[data-theme="ledger"] { --bg: …; --text: …; }`, and `:root.dark [data-theme="ledger"]` for dark) and give its pieces

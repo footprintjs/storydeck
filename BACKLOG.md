@@ -108,3 +108,42 @@ viewer what to do. It is a layout in deck.json, not a 3D engine, and built pages
 Source: a 3D interactive electricity book by @techartist_, being built with Opus 5.5, shown by @0xKapri
 (https://x.com/0xKapri/status/2117304745228394951). It is not published and states no licence, so the ideas are borrowed
 and the code is written here. Read from three frames of the post's video.
+
+## 6. A cast acts out a system, then turns into it (2026-11-05)
+
+From the owner's own field test of a deck built on 0.10.0. Viewers who weren't engineers followed it, and the same system
+told only in boxes lost them by the seventh click. Only the method comes here, written fresh, with no content or drawings.
+
+**The method:** one picture that never moves, told twice.
+
+1. A cast of people and everyday things acts the system out.
+2. A bridge: one group at a time, each stand-in fades out, the real piece fades in where it stood, and a callout says
+   both names and what it does.
+3. The same clicks again, with the real pieces and real calls.
+4. Where everything lives, and what to remember.
+
+**General pieces, each useful without the method:**
+
+- **One piece, two looks.** Today a deck draws every piece twice, and each click must name the right copy. A piece holds
+  its looks and a part picks one, so clicks name one key in every part.
+- **A part replayed in another look, with its own words.** Written once, so the two tellings cannot drift. `check`
+  refuses a replayed click with no words for its look.
+- **The turn, one item at a time.** Waiting items stay as they are, and an item's callouts come after its pieces.
+  Crossfading worked; flipping boxes over was too much motion. A jump, a step back and reduced motion land at once.
+- **Callouts pinned to a piece, with a tail.** A bubble beside each piece was easy to tie to it, where one card listing
+  every mapping was not. `check --layout`: callouts in a click overlapping, a tail missing its target.
+- **Layout checks found by eye:** a headline wrapping into the map, a wire's label crossing a piece, two wires drawn on
+  the same points.
+
+Already built: the analogy label and how a part's pieces arrive and leave.
+
+**Templates: a story shape plus its checks.** `init --template <shape>`, as data on the general pieces, so the library stays
+generic and the words stay the deck's. The checks are what a template adds over a starter: "told twice" checks that every
+real click matches a story click; "explain, then quantify" checks that no measured number appears before the explanation
+ends. Same shape names as StoryReel's recipe kinds, so a deck and a film can share a story.
+
+**A page for agents, from the same source.** A fourth lens beside Read, Scroll and Watch: a glossary from story word to
+real thing, each flow step by step, facts not to get wrong, and where to look in the code.
+
+**Look first:** one sample of two looks and the turn, opened in a browser before anything else is built.
+

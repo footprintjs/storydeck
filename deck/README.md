@@ -16,6 +16,7 @@ text. Each module does one job, and they compose in one direction:
 | `transitions.js` | how a part arrives (`data-enter`): footprint-story/motion's changes of picture, read and sampled into keyframes for both slides, and the page's runtime that plays them on a forward step |
 | `explore.js` | where each piece leads when a viewer explores (deck.json "explore": the click about it), and the page's runtime that follows it |
 | `differs.js` | a part that differs from the real thing says so (`data-differs-*`): its declaration read and checked, its labels drawn with their CSS, its phrases looked for in the notes |
+| `pace.js` | how a part's pieces arrive and leave (`data-arrive`, its times): read and checked, carried on its slides, with the CSS the page adds only when a part asks |
 | `compile.js` | clicks planned (each map's focus state carried from click to click) and drawn as `<deck-stage>` slides |
 | `page.js` | the one page: slides, notes, every stylesheet and runtime inlined; the theme toggle |
 | `assets.js` | what the library ships that the page carries (the runtime, focus.css, narration.css, deck.css) |

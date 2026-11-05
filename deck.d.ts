@@ -42,9 +42,11 @@ export interface DeckStepSource { readonly attrs: string; readonly headline: str
 /** How a part arrives, as written: data-enter and its data-enter-* settings, as text (compile reads them against the shared table). */
 export interface DeckEnterSource { readonly type: string; readonly given: Readonly<Record<string, string>> }
 /** How a part differs from the real thing, checked (data-differs-*): the time factor, what is out of scale, the labels' words (none: the notes alone), the phrases of its notes that say it. */
-export interface DeckDiffers { readonly time?: number; readonly scale?: string; readonly shown: readonly string[]; readonly said?: readonly string[] }
+export interface DeckDiffers { readonly time?: number; readonly scale?: string; readonly analogy?: string; readonly shown: readonly string[]; readonly said?: readonly string[] }
+/** How a part's pieces arrive and leave (data-arrive and its times), in seconds. */
+export interface DeckPace { readonly arrive?: 'grow' | 'fade'; readonly arriveTime?: number; readonly arriveDelay?: number; readonly leaveTime?: number }
 /** A part of the deck: a plain slide (map null) or clicks told on a map. */
-export type DeckPart = { readonly theme: string | null; readonly enter: DeckEnterSource | null; readonly differs: DeckDiffers | null } & (
+export type DeckPart = { readonly theme: string | null; readonly enter: DeckEnterSource | null; readonly differs: DeckDiffers | null; readonly pace: DeckPace | null } & (
   | { readonly label: string; readonly kicker: string; readonly map: null; readonly body: string; readonly notes: readonly string[] }
   | { readonly label: string; readonly kicker: string; readonly map: string; readonly steps: readonly DeckStepSource[] });
 /**
@@ -87,7 +89,7 @@ export type DeckClick = {
   /** What loops on the click (on a map: on the pieces it shows). */
   readonly loops: readonly DeckLoop[];
   /** How the click's part differs from the real thing, when it declares it. */
-  readonly differs?: DeckDiffers;
+  readonly pace?: DeckPace; readonly differs?: DeckDiffers;
   /** How the click's part arrives, on its first click (null elsewhere, or when it just appears): footprint-story/motion's change, read. */
   readonly enter: { readonly type: string; readonly seconds: number; readonly ease: string; readonly p: Readonly<Record<string, unknown>> } | null;
 } & (

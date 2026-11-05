@@ -18,6 +18,42 @@ const map = (attrs, ...notes) => `<section data-label="M" data-map="map" ${attrs
 const compiled = (clicks, deck) => compileDeck(sourceOf({clicks, ...(deck ? {deck: {title: 'T', ...deck}} : {})}));
 const rules = (problems) => problems.filter((p) => p.rule === 'differs-unsaid');
 
+describe('an analogy', () => {
+  const ANALOGY = 'people stand in for the services';
+  it('says what stands in for what, in its own words on the slide', () => {
+    expect(read(`data-differs-analogy="${ANALOGY}"`)).toEqual({analogy: ANALOGY, shown: [`An analogy: ${ANALOGY}`]});
+    expect(differsHtml(read(`data-differs-analogy="${ANALOGY}"`))).toContain(`An analogy: ${ANALOGY}`);
+    expect(read(`data-differs-analogy="${ANALOGY}" data-differs-shown="Eine Analogie"`).shown).toEqual(['Eine Analogie']);
+  });
+  it('comes after the time and the scale, each with a line of its own', () => {
+    expect(read(`data-differs-analogy="${ANALOGY}" data-differs-scale="${SCALE}" data-differs-time="30"`).shown).toEqual([TIME, SCALE, `An analogy: ${ANALOGY}`]);
+  });
+  it('is a statement like the others: each needs its own line or phrase', () => {
+    expect(() => read(`data-differs-time="30" data-differs-analogy="${ANALOGY}" data-differs-shown="${TIME}"`)).toThrow(/it declares both time and an analogy and says only 1 thing .* so neither goes unstated/);
+    expect(() => read(`data-differs-time="30" data-differs-scale="${SCALE}" data-differs-analogy="${ANALOGY}" data-differs-shown="A | B"`)).toThrow(/it declares time, scale and an analogy and says only 2 thing .* so none goes unstated/);
+    expect(read(`data-differs-analogy="${ANALOGY}" data-differs-shown="false" data-differs-said="stand in for"`)).toEqual({analogy: ANALOGY, shown: [], said: ['stand in for']});
+  });
+  it('does not take a number in the analogy for a wrong time', () => {
+    expect(read('data-differs-time="30" data-differs-analogy="2 dogs stand in for 2 nuclei"').shown).toEqual([TIME, 'An analogy: 2 dogs stand in for 2 nuclei']);
+    expect(() => read('data-differs-time="30" data-differs-analogy="a shop" data-differs-shown="Time shown 40 times faster | A shop"')).toThrow(/says 40 where data-differs-time says 30/);
+  });
+  it('fits the label it goes on, words first', () => {
+    const room = DIFFERS_MOST - 'An analogy: '.length;
+    expect(read(`data-differs-analogy="${'x'.repeat(room)}"`).shown[0]).toHaveLength(DIFFERS_MOST);
+    expect(() => read(`data-differs-analogy="${'x'.repeat(room + 1)}"`)).toThrow(new RegExp(`more than its label can hold in a glance \\(${room}`));
+    expect(() => read('data-differs-analogy="  "')).toThrow(/data-differs-analogy is empty/);
+  });
+  it('has English default words, so a deck in another language gives its own', () => {
+    const part = (attrs) => compiled(plain(attrs, 'Hier'), {lang: 'de'});
+    expect(() => part(`data-differs-analogy="${ANALOGY}"`)).toThrow(/"An analogy: people stand in for the services" is English and the deck is in "de"/);
+    expect(part(`data-differs-analogy="${ANALOGY}" data-differs-shown="Eine Analogie: Menschen stehen für die Dienste"`).clicks[0].differs.shown).toEqual(['Eine Analogie: Menschen stehen für die Dienste']);
+  });
+  it('is held to the notes when it names a phrase, as any statement is', () => {
+    const problems = checkDeck(compiled(plain(`data-differs-analogy="${ANALOGY}" data-differs-said="stand in"`, 'Nothing about it here.')));
+    expect(rules(problems)).toHaveLength(1);
+  });
+});
+
 describe('readDiffers', () => {
   it('reads a declaration, the labels from it unless it gives its own', () => {
     expect(read('')).toBeNull();
@@ -34,7 +70,7 @@ describe('readDiffers', () => {
     expect(() => read('data-differs-time="1"')).toThrow(/1 is real time, so leave it out/);
     expect(() => read('data-differs-time="fast"')).toThrow(/how many times faster the picture runs/);
     expect(() => read('data-differs-time=""')).toThrow(/how many times faster the picture runs/);
-    expect(() => read('data-differs-said="thirty"')).toThrow(/say how the part differs: data-differs-time .* or both/);
+    expect(() => read('data-differs-said="thirty"')).toThrow(/say how the part differs: data-differs-time .* or more than one/);
     expect(() => read(`data-differs-scale="${'x'.repeat(DIFFERS_MOST + 1)}"`)).toThrow(/more than a label can hold in a glance \(70\) — shorten it, and say the rest in the notes/);
     expect(() => read('data-differs-time="30" data-differs-shown="false"')).toThrow(/the notes must say it — name their phrase in data-differs-said/);
     expect(() => read('data-differs-time="30" data-differs-said=" "')).toThrow(/data-differs-said is empty/);
@@ -147,7 +183,7 @@ describe('a deck that declares', () => {
   it('a deck that shows a label carries its look, and that and the label are all it adds to the page', () => {
     const page = deckPage(compiled(plain('data-differs-time="30"')), pageAssets()), label = `<div class="differs" data-chrome><span>${TIME}</span></div>`;
     expect(page).toContain(label);
-    expect(page).toContain(':where(.differs) { position: absolute; right: 50px; top: 44px;');
+    expect(page).toContain(':where(.differs) { position: absolute; right: 110px; top: 44px;');
     expect(page.replace(label, '').replace(`${DIFFERS_CSS}\n`, '')).toBe(deckPage(compiled(plain('')), pageAssets()));
     // before the deck's own theme, so its rules win
     const themed = deckPage({...compiled(plain('data-differs-time="30"')), themeCss: '.mine {}'}, pageAssets());
