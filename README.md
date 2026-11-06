@@ -277,6 +277,15 @@ page += notesData(clicks.map(c => c.notes)) + voice.tags
 
 Or leave the script to the command, which does all of that for a deck folder:
 
+```mermaid
+flowchart LR
+  said[What each click says] --> named{A voice named?}
+  named -- no --> read[Read the clips and say what is left]
+  named -- yes --> voice[Voice what is missing and keep each clip]
+  voice --> read
+  read --> build["storydeck build --voice carries the clips you have"]
+```
+
 ```bash
 storydeck narrate my-talk                                     # what each click says, voiced or not; asking costs nothing
 storydeck narrate my-talk --kit ../voice-kit                  # voices what is missing, and keeps every clip it finishes
