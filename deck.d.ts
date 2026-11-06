@@ -62,7 +62,7 @@ export interface DeckIcon { readonly viewBox: string; readonly body: string }
  * The built-in drawing helpers, icons then wires: <i data-icon="name"></i> becomes that icon's SVG, and
  * <i data-arrow="x1 y1 x2 y2 [bend]"></i> an SVG wire (class "pkt": a packet that rides it on a path click).
  */
-export function applyTransforms(html: string, options?: { icons?: Readonly<Record<string, DeckIcon>> }): string;
+export function applyTransforms(html: string, options?: { icons?: Readonly<Record<string, DeckIcon>>; canvas?: readonly [number, number] | null }): string;
 
 /** A deck folder as plain data. Every file is read by its real path, inside the folder, never a hidden one. */
 export interface DeckSource {
@@ -104,6 +104,8 @@ export interface DeckSlide {
   /** What notesData carries for the slide. */
   readonly notes: { readonly slide: string; readonly step: number; readonly steps: number; readonly now: readonly string[]; readonly earlier: readonly string[] };
 }
+/** Words pinned to a piece: data-callout="target side" on the element, as read back. */
+export interface DeckCallout { readonly name: string; readonly target: string; readonly side: 'above' | 'below' | 'left' | 'right'; readonly text: string }
 export interface CompiledDeck {
   readonly config: DeckConfig;
   readonly title: string;
@@ -116,7 +118,9 @@ export interface CompiledDeck {
   readonly explore: { readonly slides: readonly (string | null)[]; readonly targets: Readonly<Record<string, Readonly<Record<string, number>>>> } | null;
   /** The parts' entrances as the page plays them: each distinct change sampled once (kinds), and its key per slide — or null when no part has one. */
   readonly transitions: { readonly kinds: Readonly<Record<string, unknown>>; readonly enter: readonly (string | null)[] } | null;
-  readonly maps: Readonly<Record<string, { readonly pieces: readonly FocusPiece[] }>>;
+  readonly maps: Readonly<Record<string, { readonly pieces: readonly FocusPiece[]; readonly callouts?: readonly DeckCallout[] }>>;
+  /** Present when the deck has a callout: the page then carries a callout's stylesheet. */
+  readonly callouts?: true;
 }
 /** The deck's clicks planned (each map's state carried click to click) and drawn as <deck-stage> slides. */
 export function compileDeck(source: Pick<DeckSource, 'config' | 'parts' | 'maps'> & Partial<DeckSource>, options?: { dev?: boolean }): CompiledDeck;

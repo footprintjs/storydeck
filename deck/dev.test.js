@@ -118,7 +118,7 @@ describe('serveDeck', () => {
     writeFileSync(clicks, orig.replace('A client needs data', 'A client needs its data'));
     await ch.until((e) => e.some((x) => x.event === 'reload'));
     expect((await get(s, '/')).body).toContain('A client needs its data');
-    writeFileSync(clicks, orig.replace('data-on="server time"', 'data-on="server nope"'));
+    writeFileSync(clicks, orig.replace('data-on="server time why"', 'data-on="server nope"'));
     const ev = await ch.until((e) => e.some((x) => x.event === 'problem'));
     expect(ev.find((x) => x.event === 'problem').data.message).toMatch(/"2 · Close in" click 1: no piece "nope"/);
     expect((await get(s, '/')).body).toContain('A client needs its data');   // the last good page
@@ -336,7 +336,7 @@ describe('edits from the dev page', () => {
     expect((await move({})).body.error).toMatch(/the map changed since the page was built/);
     // a save that breaks the build: the page shows the last good build, so nothing may be moved until it builds
     s.rebuild();
-    writeFileSync(path.join(dir, 'clicks.html'), STARTER['clicks.html'].replace('data-on="server time"', 'data-on="server nope"'));
+    writeFileSync(path.join(dir, 'clicks.html'), STARTER['clicks.html'].replace('data-on="server time why"', 'data-on="server nope"'));
     s.rebuild();
     expect(s.state().problem).toMatch(/no piece "nope"/);
     expect((await move({index: 3})).body.error).toMatch(/the deck does not build right now/);

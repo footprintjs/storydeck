@@ -10,6 +10,7 @@ import {esc, scriptSafe, styleSafe} from './html.js';
 import {loopCss} from './loops.js';
 import {DIFFERS_CSS} from './differs.js';
 import {PACE_CSS} from './pace.js';
+import {CALLOUT_CSS} from './callouts.js';
 import {EXPLORE_CSS, exploreData, exploreRuntime} from './explore.js';
 import {TRANSITION_CSS, transitionData, transitionRuntime} from './transitions.js';
 
@@ -42,7 +43,7 @@ const TOGGLE = '<button class="theme-toggle" type="button" aria-label="Switch th
  * the last, byte for byte as before each of these came to be.
  */
 export function deckStyles(compiled, assets) {
-  // the ready-made look a deck asks for, right after deck.css
+  // the ready-made look a deck asks for, right after deck.css, then a callout's stylesheet if it has one (callouts.js)
   const look = compiled.config.look ? [assets.looks[compiled.config.look]] : [];
   // the named loops the deck shows (loops.js)
   const loops = loopCss(compiled.loops ?? []);
@@ -50,7 +51,7 @@ export function deckStyles(compiled, assets) {
   const labelled = (compiled.clicks ?? []).some((c) => c.differs?.shown.length);
   // how a part's pieces arrive and leave (pace.js): only when a part asks
   const paced = (compiled.clicks ?? []).some((c) => c.pace);
-  return [...assets.css, ...look, ...(loops ? [loops] : []), ...(compiled.explore ? [EXPLORE_CSS] : []), ...(compiled.transitions ? [TRANSITION_CSS] : []), ...(labelled ? [DIFFERS_CSS] : []), ...(paced ? [PACE_CSS] : []), compiled.themeCss ?? ''].join('\n');
+  return [...assets.css, ...look, ...(compiled.callouts ? [CALLOUT_CSS] : []), ...(loops ? [loops] : []), ...(compiled.explore ? [EXPLORE_CSS] : []), ...(compiled.transitions ? [TRANSITION_CSS] : []), ...(labelled ? [DIFFERS_CSS] : []), ...(paced ? [PACE_CSS] : []), compiled.themeCss ?? ''].join('\n');
 }
 
 /**

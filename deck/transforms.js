@@ -4,6 +4,7 @@
 //   <i data-k="wire1" class="wire pkt" data-arrow="252 352 318 352"></i>   a wire: an SVG arrow in slide pixels
 //   <i data-k="req" class="wire" data-arrow="client to server"></i>         a wire between two pieces, edge to edge
 //   <i class="ic" data-icon="server"></i>                                  a drawn identity: icons/server.svg inline
+//   <div data-k="why" data-callout="server above">Why it waits</div>        words pinned to a piece (callouts.js)
 //
 // A wire is `x1 y1 x2 y2` and an optional bend (px off the straight line, + to the left of travel), or the pieces it
 // joins, `from to to` and an optional bend ("client to server 24"; words, as a ">" would end the tag): it runs from the
@@ -24,8 +25,9 @@
 //                                     under reduced motion, in print and with motion off, where one rests at its middle
 
 import {stripComments} from './html.js';
-import {readPieces} from '../focusHtml.js';
 import {readAttributes} from '../pieceRules.js';
+import {boxFinder, exit} from './boxes.js';
+import {callouts} from './callouts.js';
 
 const fixed = (v) => +v.toFixed(1);
 /** A wire written by the pieces it joins: "from to to [bend]". */
@@ -115,17 +117,9 @@ function replaceEach(html, found, draw) {
   return out + html.slice(from);
 }
 
-/** How far a ray from p (inside the box) along the unit vector u runs before it leaves the box. */
-function exit(b, [px, py], [ux, uy]) {
-  const tx = ux > 0 ? (b.x + b.w - px) / ux : ux < 0 ? (b.x - px) / ux : Infinity;
-  const ty = uy > 0 ? (b.y + b.h - py) / uy : uy < 0 ? (b.y - py) / uy : Infinity;
-  return Math.min(tx, ty);
-}
-
 /**
- * Each wire written between pieces as its numbers, "x1 y1 x2 y2 bend" (others: null). A piece is found by its first
- * data-k name and must be placed (inline left, top, width and height); several pieces with that first name are one
- * box around them. Wires joining the same two pieces are spread across the line between their middles, LANE apart at
+ * Each wire written between pieces as its numbers, "x1 y1 x2 y2 bend" (others: null). A piece is found as boxes.js ·
+ * boxFinder finds it. Wires joining the same two pieces are spread across the line between their middles, LANE apart at
  * most and always inside both boxes, each keeping to its left (a request going right above its answer coming back,
  * whatever the pieces are called), in the order written; each then runs from the edge of one box to the edge of the
  * other, GAP clear of both.
@@ -133,16 +127,7 @@ function exit(b, [px, py], [ux, uy]) {
 function wiresBetween(html, found) {
   const read = found.map((f) => BETWEEN.exec(f.m[1]));
   if (!read.some(Boolean)) return read;
-  const {pieces} = readPieces(html), placed = pieces.filter((p) => p.box && p.box.w > 0 && p.box.h > 0);
-  const boxOf = (name, spec) => {
-    const boxes = placed.filter((p) => p.keys[0] === name).map((p) => p.box);
-    if (!boxes.length) {
-      const names = [...new Set(placed.map((p) => p.keys[0]))];
-      throw new Error(`data-arrow="${spec}": no piece "${name}" with a box (data-k, and an inline left, top, width and height)${names.length ? ` — the placed pieces are ${names.slice(0, 20).join(', ')}${names.length > 20 ? ', …' : ''}` : ''}`);
-    }
-    const x0 = Math.min(...boxes.map((b) => b.x)), y0 = Math.min(...boxes.map((b) => b.y));
-    return {x: x0, y: y0, w: Math.max(...boxes.map((b) => b.x + b.w)) - x0, h: Math.max(...boxes.map((b) => b.y + b.h)) - y0};
-  };
+  const boxOf = boxFinder(html);
   // a pair's wires across its line, in its own direction (its names in order): those running that way first, on their
   // left of it, then those running back — on their own left
   const pairOf = (m) => [m[1], m[2]].sort().join('\u0000'), lanes = new Map();
@@ -156,7 +141,7 @@ function wiresBetween(html, found) {
     const spec = found[i].m[1];
     if (m[1] === m[2]) throw new Error(`data-arrow="${spec}": a wire joins two pieces, not "${m[1]}" to itself`);
     // in the pair's own direction (its names in order), so the wires both ways share one set of lanes
-    const [a, b] = [m[1], m[2]].sort(), A = boxOf(a, spec), B = boxOf(b, spec);
+    const [a, b] = [m[1], m[2]].sort(), A = boxOf(a, `data-arrow="${spec}"`), B = boxOf(b, `data-arrow="${spec}"`);
     const ca = [A.x + A.w / 2, A.y + A.h / 2], cb = [B.x + B.w / 2, B.y + B.h / 2], len = Math.hypot(cb[0] - ca[0], cb[1] - ca[1]);
     if (len === 0) throw new Error(`data-arrow="${spec}": "${a}" and "${b}" share a middle — place them apart, or give the wire numbers`);
     const u = [(cb[0] - ca[0]) / len, (cb[1] - ca[1]) / len], n = [-u[1], u[0]];
@@ -213,7 +198,10 @@ export function icons(html, set = {}) {
   });
 }
 
-/** The built-in helpers, in the order they run: icons first (a wire never holds one), then wires. */
-export function applyTransforms(html, {icons: set = {}} = {}) {
-  return wires(icons(html, set));
+/**
+ * The built-in helpers, in the order they run: icons first (a wire never holds one), then callouts (so a wire may reach
+ * one), then wires. `canvas`, [w, h]: the slide a callout is kept on.
+ */
+export function applyTransforms(html, {icons: set = {}, canvas = null} = {}) {
+  return wires(callouts(icons(html, set), {canvas}));
 }

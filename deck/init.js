@@ -22,6 +22,8 @@ const MAP = `<!--
   keeps a piece moving while its slide is shown; data-loop alone runs its own --loop from theme.css.
   Ready-made pieces, from "look": "base" in deck.json: class box, chip, area, group or card, with a <b> and a <small>
   inside; add ok, warn or bad to colour one. An area goes before the pieces that stand in it.
+  data-callout="server above" pins words to a piece, with a tail (or below, left, right). It sizes itself and comes in
+  like any piece; "server+" in a click takes in its callouts. Change its colours in theme.css: --callout-bg, --callout-fg.
 -->
 <div data-k="client" class="box" style="left:160px;top:420px;width:300px;height:210px"><i class="ic" data-icon="client"></i><b>Client</b><small>a browser</small></div>
 <i data-k="req1" class="wire req pkt" data-arrow="client to server"></i>
@@ -31,6 +33,7 @@ const MAP = `<!--
 <i data-k="ret2" class="wire ret pkt" data-arrow="db to server"></i>
 <i data-k="ret1" class="wire ret pkt" data-arrow="server to client"></i>
 <div data-k="time" class="chip" style="left:760px;top:670px;width:220px;height:70px"><b>120 ms</b><small>illustration</small></div>
+<div data-k="why" data-callout="server above">Most of the wait is here</div>
 `;
 
 const CLICKS = `<!--
@@ -71,7 +74,7 @@ const CLICKS = `<!--
 </section>
 
 <section data-label="2 · Close in" data-kicker="2 · Close in" data-map="map">
-  <step data-in="time" data-on="server time" data-focus="zoom">
+  <step data-in="time why" data-on="server time why" data-focus="zoom">
     <h2>Where the time is spent</h2>
     <aside class="notes">Zoom in on the server: most of the wait is spent here. The number is an illustration.</aside>
   </step>

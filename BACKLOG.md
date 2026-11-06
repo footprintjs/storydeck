@@ -135,8 +135,8 @@ told only in boxes lost them by the seventh click. Only the method comes here, w
 - **Layout checks found by eye:** a headline wrapping into the map, a wire's label crossing a piece, two wires drawn on
   the same points.
 
-Already built: the analogy label, how a part's pieces arrive and leave, and a ready-made look (`"look": "base"`) for the
-looks here to build on.
+Already built: the analogy label, how a part's pieces arrive and leave, a ready-made look (`"look": "base"`) for the looks
+here to build on, and callouts.
 
 **Templates: a story shape plus its checks.** `init --template <shape>`, as data on the general pieces, so the library stays
 generic and the words stay the deck's. The checks are what a template adds over a starter: "told twice" checks that every

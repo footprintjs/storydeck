@@ -8,6 +8,7 @@
 import {focusStep} from '../focus.js';
 import {readPieces, readStep, drawFocus, wrapStage, slideClass, focusOverlay} from '../focusHtml.js';
 import {applyTransforms, icons as drawIcons} from './transforms.js';
+import {calloutsIn} from './callouts.js';
 import {loopsIn} from './loops.js';
 import {exploreTargets} from './explore.js';
 import {readEnter, transitionTable} from './transitions.js';
@@ -47,18 +48,18 @@ function refuseOwnNumbers(where, html) {
 }
 
 /** A map ready to plan on: its HTML with the helpers applied and its pieces read (`dev`: numbered for the dev page). */
-function prepareMap(name, html, icons, dev) {
+function prepareMap(name, html, icons, canvas, dev) {
   refuseOwnNumbers(`map "${name}"`, html);
   let drawn;
   try {
-    drawn = applyTransforms(stripComments(html), {icons});
+    drawn = applyTransforms(stripComments(html), {icons, canvas});
   } catch (e) {
     throw new Error(`map "${name}": ${e.message}`, {cause: e});
   }
   const {html: out, pieces} = readPieces(drawn);
   if (!pieces.length) throw new Error(`map "${name}" has no pieces — a piece is an element with data-k="name" and an inline left/top (width/height)`);
   // the loops the deck writes: its own text and its icons' (a wire's packets are its wire's, not loops of their own)
-  return {name, html: dev ? numberForDev(out) : out, pieces, loops: loopsIn(drawIcons(stripComments(html), icons), `map "${name}"`), state: null};
+  return {name, html: dev ? numberForDev(out) : out, pieces, loops: loopsIn(drawIcons(stripComments(html), icons), `map "${name}"`), callouts: calloutsIn(stripComments(html)), state: null};
 }
 
 /** A map's loops a click shows: on a piece it does not keep out (gone), or on no piece. */
@@ -76,7 +77,7 @@ function planClicks(parts, maps, {area, canvas, icons}) {
       refuseOwnNumbers(`"${part.label}"`, part.body);
       let inner;
       try {
-        inner = applyTransforms(part.body, {icons});
+        inner = applyTransforms(part.body, {icons, canvas});
       } catch (e) {
         throw new Error(`"${part.label}": ${e.message}`, {cause: e});
       }
@@ -134,14 +135,14 @@ function checkPost(post, labels) {
 
 /**
  * The deck compiled: {config, slides: [{label, html, notes}], clicks: [{n, label, kind, loops, …}], loops (the named
- * loops its clicks show, for the page's CSS), maps: {name: {pieces}}}.
+ * loops its clicks show, for the page's CSS), maps: {name: {pieces, callouts?}}, callouts?: true when it has any}.
  * `dev` numbers each map's pieces in the slides (data-sd-at), for the dev page's edits.
  * A slide's notes are what notesData carries ({slide, step, steps, now, earlier}). Throws, naming the part and the
  * click, when a click cannot be planned.
  */
 export function compileDeck(source, {dev = false} = {}) {
   const {config, parts, icons = {}} = source;
-  const maps = Object.fromEntries(Object.entries(source.maps ?? {}).map(([name, html]) => [name, prepareMap(name, html, icons, dev)]));
+  const maps = Object.fromEntries(Object.entries(source.maps ?? {}).map(([name, html]) => [name, prepareMap(name, html, icons, config.canvas, dev)]));
   for (const part of parts) if (part.map && !maps[part.map]) throw new Error(`"${part.label}" is told on map "${part.map}", which the deck does not have`);
   for (const part of parts) refuseEnglishWords(part.differs, config.lang, `"${part.label}"`);
   const opts = {area: [...config.area], canvas: config.canvas, icons, footer: config.footer};
@@ -159,6 +160,9 @@ export function compileDeck(source, {dev = false} = {}) {
     ...(c.kind === 'map' ? {step: c.step, look: c.look, stepIndex: c.stepIndex, steps: c.steps} : {text: plainText(c.inner)})}));
   // the named loops the page draws: those its clicks show
   const loops = [...new Set(planned.flatMap((c) => c.loops.map((l) => l.value)))].filter(Boolean).sort();
+  // whether the page needs a callout's stylesheet: a map or a plain slide that has one, shown or not
+  const hasCallouts = Object.values(maps).some((m) => m.callouts.length) || parts.some((p) => !p.map && calloutsIn(p.body).length);
   return {config, title: config.title, themeCss: source.themeCss ?? '', slides, clicks, loops, explore: config.explore ? exploreTargets(planned) : null,
-    transitions: transitionTable(planned.map((c) => c.enter), config.canvas), maps: Object.fromEntries(Object.values(maps).map((m) => [m.name, {pieces: m.pieces}]))};
+    transitions: transitionTable(planned.map((c) => c.enter), config.canvas), maps: Object.fromEntries(Object.values(maps).map((m) => [m.name, {pieces: m.pieces, ...(m.callouts.length ? {callouts: m.callouts} : {})}])),
+    ...(hasCallouts ? {callouts: true} : {})};
 }

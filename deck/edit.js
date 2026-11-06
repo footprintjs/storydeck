@@ -106,6 +106,8 @@ function moveEdits(html, piece, dx, dy) {
     return [[at, spec.length, [x1 + dx, y1 + dy, x2 + dx, y2 + dy].map(num).concat(parts.slice(4)).join(' ')]];
   }
   const left = placeOf(piece, 'left'), top = placeOf(piece, 'top');
+  const about = attrValue(piece.before + piece.after, 'data-callout')?.value.trim().split(/\s+/)[0];
+  if (about && (!left || !top)) throw new Error(`"${piece.name}" stands beside "${about}" and follows it — move "${about}", or give the callout a left and top of its own`);
   if (!left || !top) throw new Error(`"${piece.name}" has no inline left/top in px — a piece without them keeps its place; give it left and top to move it`);
   if (browserValueAt(html, piece, 'style') !== left.styleAt) throw ambiguous();
   // CSS reads a style its own way, so anything that could set the place twice is refused, not guessed: a comment, an
