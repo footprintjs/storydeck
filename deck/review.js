@@ -4,6 +4,7 @@
 // looks at a picture only to confirm. `outline` is the whole deck, a line per click; `reviewClick` is one click.
 import {wordCount} from './parse.js';
 import {enterText} from './transitions.js';
+import {showsPiece} from './callouts.js';
 
 /** A piece's name: its first data-k name (a wire and its label may share one; they are listed once). */
 const nameOf = (pieces, i) => pieces[i].keys[0];
@@ -19,6 +20,12 @@ const differsLine = (c) => (c.differs ? `differs: ${c.differs.shown.length ? `on
 
 /** What loops on a click (loops.js), each by its piece and its loop — nothing when none does. */
 const loopsLine = (c) => (c.loops?.length ? `loops (${c.loops.length}): ${list(c.loops.map((l) => `${l.piece ?? 'an element'} ${l.value || '(its own --loop)'}`), 10)}` : null);
+
+/** The callouts a map click shows, each by the piece it is about and its words — nothing when none shows. */
+function calloutsLine(c, {pieces, callouts = []}) {
+  const shown = callouts.filter((k) => showsPiece(c.look, pieces, k.name));
+  return shown.length ? `callouts (${shown.length}): ${shown.map((k) => `${k.name} ${k.side} ${k.target} ${quote(k.text, 80)}`).join('; ')}` : null;
+}
 
 /** The pieces of a map click, grouped by what the click does with them. */
 function pieceGroups(click, pieces) {
@@ -111,6 +118,7 @@ export function reviewClick(compiled, which, {maxWords = compiled.config?.checks
     ].filter(Boolean);
     lines.push(`this click: ${changes.length ? changes.join(' · ') : 'nothing changes on the map'}`);
     const motion = motionOf(c.look);
+    if (calloutsLine(c, compiled.maps[c.map])) lines.push(calloutsLine(c, compiled.maps[c.map]));
     if (motion.length) lines.push(`motion: ${motion.join(' · ')}`);
     if (enterLine(c)) lines.push(enterLine(c));
     if (differsLine(c)) lines.push(differsLine(c));

@@ -88,7 +88,8 @@ describe('deck-data.json, for the Read and Scroll lenses', () => {
   });
 
   it('a deck that asks for nothing gets what it always did: what every page carries, then its theme', () => {
-    const none = data({'deck.json': '{"title":"T","deckData":"deck-data.json"}'});
+    const plainMap = STARTER['map.html'].replace(/<div data-k="why"[^\n]*\n/, ''), plainClicks = STARTER['clicks.html'].replace('data-in="time why" data-on="server time why"', 'data-in="time" data-on="server time"');
+    const none = data({'deck.json': '{"title":"T","deckData":"deck-data.json"}', 'map.html': plainMap, 'clicks.html': plainClicks});
     expect(none.deckCss).toBe([...pageAssets().css, STARTER['theme.css']].join('\n'));
   });
 });

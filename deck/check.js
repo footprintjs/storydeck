@@ -9,10 +9,12 @@
 //   theme-unstyled a part asks for a data-theme that theme.css never selects ([data-theme="…"]): a misspelt name changes nothing
 //   loop-unset     a loop of the deck's own (a bare data-loop) that nothing gives a --loop: nothing loops
 //   differs-unsaid a part names a phrase of its notes that says how it differs from the real thing, and they do not hold it
+//   callout-alone  a callout shown on a click that does not show the piece it points at: its tail points at nothing
 import {wordCount} from './parse.js';
 import {expandNames} from '../focus.js';
 import {LOOP_NAMES} from './loops.js';
 import {saidInNotes} from './differs.js';
+import {showsPiece} from './callouts.js';
 
 const names = (pieces, idx) => [...new Set(idx.map((i) => pieces[i].keys[0]))];
 const problem = (level, rule, click, message) => ({level, rule, click: click?.n ?? null, label: click?.label ?? null, message});
@@ -104,6 +106,22 @@ function unsaidDiffers(compiled) {
   return out;
 }
 
+/** A callout shown on a click that does not show the piece it points at — once per callout, at its first such click. */
+function aloneCallouts(compiled) {
+  const out = [], seen = new Set();
+  for (const c of compiled.clicks) {
+    if (c.kind !== 'map') continue;
+    const {pieces, callouts = []} = compiled.maps[c.map];
+    const shown = (name) => showsPiece(c.look, pieces, name);
+    for (const k of callouts) {
+      if (seen.has(`${c.map}/${k.name}`) || !shown(k.name) || shown(k.target)) continue;
+      seen.add(`${c.map}/${k.name}`);
+      out.push(problem('warn', 'callout-alone', c, `"${k.name}" points at "${k.target}", which this click does not show — bring "${k.target}" in, or take the callout out with data-out`));
+    }
+  }
+  return out;
+}
+
 /** Every problem of a compiled deck: [{level: 'error' | 'warn' | 'info', rule, click, label, message}]. */
 export function checkDeck(compiled) {
   const out = [];
@@ -112,7 +130,7 @@ export function checkDeck(compiled) {
     if (c.kind === 'map') out.push(...litOnEntry(c, compiled.maps[c.map].pieces));
     out.push(...noChange(c, compiled.clicks[i - 1]));
   });
-  out.push(...neverShown(compiled), ...missingNotes(compiled), ...unstyledThemes(compiled), ...unsetLoops(compiled), ...unsaidDiffers(compiled));
+  out.push(...neverShown(compiled), ...missingNotes(compiled), ...unstyledThemes(compiled), ...unsetLoops(compiled), ...unsaidDiffers(compiled), ...aloneCallouts(compiled));
   return out;
 }
 

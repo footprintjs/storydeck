@@ -1,6 +1,7 @@
 // layout — the check only a browser can make: text that spills out of its box, lit pieces pushed off the slide, a label
-// on how a part differs that meets what is on the slide (differs.js), and endless animations that are not loops (deck-stage.js USAGE (i)): one running on a slide no one sees, one that starts
-// again at each click.
+// on how a part differs that meets what is on the slide (differs.js), a callout that meets another or the headline, or whose
+// tail no longer reaches its piece (callouts.js), and endless animations that are not loops (deck-stage.js USAGE (i)): one
+// running on a slide no one sees, one that starts again at each click.
 // It drives the built page through the video's browser port (video.js · deckStageDriver · measure), one click at a
 // time as it settles, offline. Optional: it needs Playwright installed beside StoryDeck (`npm i -D footprint-storydeck
 // playwright-core`, then `npx playwright-core install chromium`); without it the check says so and the others run.
@@ -44,6 +45,8 @@ const KINDS = {
   spills: (f, where, also) => ['warn', `text spills out of ${where} by ${size(f)} ("${f.text}")${also} — shorten it, or give the box more room`],
   outside: (f, where, also) => ['warn', `${where} reaches ${size(f)} past the slide's edge ("${f.text}")${also} — move it in, or zoom less`],
   'differs-overlap': (f, where, also) => ['warn', `the label on how this part differs meets ${where} ("${f.text}")${also}, and one hides the other — shorten the label, or move ${where} clear of the top right`],
+  'callout-overlap': (f, where, also) => ['warn', `${where} meets ${f.other}${also}, and one hides the other — stand it on another side (data-callout="… below"), or give it a left and top of its own`],
+  'tail-miss': (f, where, also) => ['warn', `the tail of ${where} no longer reaches "${f.other}"${also}: the piece moved on this click and the callout did not — light them together, or take the callout out`],
   'loose-loop': (f, where, also) => ['warn', `${where} has an endless animation that is not a loop${also}: it starts again at each click and stops on a jump — give the element data-loop and its animation as --loop (or name a loop: data-loop="pulse")`],
   'hidden-loop': (f, where, also) => ['error', `${f.count} endless animation${f.count === 1 ? '' : 's'} on ${f.piece} keep${f.count === 1 ? 's' : ''} running while the slide is hidden${also} — make ${f.count === 1 ? 'it a loop' : 'each a loop'} (data-loop and its animation as --loop): a loop runs only on the slide shown`],
 };
@@ -58,7 +61,7 @@ export function layoutProblems(found, clicks) {
   const same = new Map();
   for (const f of found) {
     const at = f.kind === 'hidden-loop' ? f.slide : f.n;
-    const key = JSON.stringify(f.kind === 'hidden-loop' ? [f.kind, f.piece, f.count] : [f.kind, f.piece, f.text, Math.round(f.dx), Math.round(f.dy)]);
+    const key = JSON.stringify(f.kind === 'hidden-loop' ? [f.kind, f.piece, f.count] : [f.kind, f.piece, f.text, f.other ?? null, Math.round(f.dx), Math.round(f.dy)]);
     if (!same.has(key)) same.set(key, {...f, ns: new Set()});
     same.get(key).ns.add(at);
   }

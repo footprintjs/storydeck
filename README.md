@@ -477,6 +477,29 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   what is on its slide, and endless animations that are not loops (it needs Playwright installed beside
   StoryDeck: `npm i -D footprint-storydeck playwright-core`; without it, it says so and the other checks run). `mcp` serves the same tools to an AI assistant:
   `claude mcp add storydeck -- npx footprint-storydeck mcp my-talk`.
+- **Words pinned to a piece.** A bubble beside each piece is easy to tie to it, where one card listing everything is not.
+  `<div data-k="why" data-callout="server above">Most of the <b>wait</b> is here</div>` puts a bubble beside the server,
+  with a tail pointing at it: `above` (the default), `below`, `left` or `right`. It takes its size from its words, stays
+  on the slide, and follows its piece when you move the piece. It is a piece like any other, so a click brings it in
+  (`data-in="why"`), lights it, greys it and takes it out, and `server+` in a click takes in the server's callouts. It
+  unfolds from its tail just after its piece, on a forward step only. An inline `width` or `height` sets its size, and an
+  inline `left` and `top` place it by hand, with its tail still reaching the piece. It holds words: `<b>`, `<i>` and `<br>` are fine, and a block like `<p>` is refused.
+
+  It comes in the colours opposite the slide's, dark on light and light on dark, and all of it is yours to change in
+  theme.css:
+
+  ```css
+  :root { --callout-bg: #fde68a; --callout-fg: #422006; --callout-radius: 4px; --callout-lag: 0s; }   /* the lag: how long after its piece it comes in */
+  .callout { font-weight: 500; }        /* any rule of yours wins, no !important */
+  .callout-tail { display: none; }      /* or no tail at all */
+  ```
+
+  One can have its own colours (`style="--callout-bg: #b91c1c"`), and with `"look": "base"` class `ok`, `warn` or `bad`
+  colours it. Its size comes from the default type, so with a larger `--callout-size` give it a `width` or `height` too.
+  `check` warns about a callout shown without its piece (`callout-alone`). `check --layout` warns about words that spill, a
+  callout that meets another or the headline (`callout-overlap`), and a tail that no longer reaches its piece because
+  the piece moved (`tail-miss`). `review` says what each click's callouts say. A callout with a side it does not have, a
+  piece that is not there or no words is refused, and a deck with no callouts builds byte for byte as before.
 - **The helpers a diagram needs.** `<i data-k="w1" class="wire pkt" data-arrow="client to server"></i>` is a wire (an
   SVG arrow) from the edge of one piece's box to the edge of the other's. It follows them: move a box (in the file, or
   by Alt-drag in the dev page) and its wires go with it. Two wires between the same pieces each take a lane, keeping to

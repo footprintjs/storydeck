@@ -78,7 +78,9 @@ runs only on the slide shown, on one clock across clicks, and rests in its own s
 with `?motion=off` (a still deck, for screenshots). `"look": "base"` in deck.json (`init` writes it) brings the tokens,
 light and dark, and ready-made pieces: class `box`, `chip`, `area`, `group`, `card`, `title-block`, `points`, with
 `ok`, `warn` or `bad` to colour one; change a look by setting a token in theme.css (`--accent-ink`, `--sd-radius`,
-`--sans`, …) before writing rules, and any rule there wins. For an assistant: `claude mcp add storydeck -- npx footprint-storydeck mcp my-talk`
+`--sans`, …) before writing rules, and any rule there wins. `<div data-k="why" data-callout="server above">Words</div>` pins
+words to a piece with a tail (`above`, `below`, `left`, `right`), sized by its words; bring it in like any piece, `server+`
+takes it in, and `--callout-bg`, `--callout-fg` and the rest change its look. For an assistant: `claude mcp add storydeck -- npx footprint-storydeck mcp my-talk`
 gives it outline, review, feedback, check and build as tools.
 
 **Focus a diagram, click by click.** Every element with `data-k="name …"` and an inline `left/top`

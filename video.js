@@ -333,6 +333,8 @@ export function measureSlide() {
     }
     return true;
   };
+  const meets = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 2 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 2;
+  const textRects = (el) => { const r = document.createRange(); r.selectNodeContents(el); return [...r.getClientRects()]; };
   const out = [];
   for (const el of slide.querySelectorAll('*')) {
     if (el.namespaceURI === 'http://www.w3.org/2000/svg') continue;   // a drawing sizes itself by its viewBox
@@ -355,8 +357,6 @@ export function measureSlide() {
   // wider than its words) or a lit piece's box. Whichever is on top, one hides the other.
   const labels = [...slide.querySelectorAll('.differs span')].filter(shown).map((el) => el.getBoundingClientRect());
   if (labels.length) {
-    const meets = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 2 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 2;
-    const textRects = (el) => { const r = document.createRange(); r.selectNodeContents(el); return [...r.getClientRects()]; };
     for (const el of slide.querySelectorAll('*')) {
       if (el.closest('.differs, .foot') || !shown(el)) continue;
       const piece = el.matches('.sd-on');
@@ -364,6 +364,22 @@ export function measureSlide() {
       if ((piece ? [el.getBoundingClientRect()] : textRects(el)).some((r) => labels.some((l) => meets(r, l)))) out.push({ kind: 'differs-overlap', piece: pieceOf(el), text: textOf(el), dx: 0, dy: 0 });
     }
   }
+  // callouts (deck/callouts.js): one that meets a later one or the headline hides it; a tail whose piece moved away points at nothing
+  const bubbles = [...slide.querySelectorAll('[data-sd-callout]')].filter(shown);
+  const headline = bubbles.length ? [...slide.querySelectorAll('.head h2, .head .kicker')].flatMap(textRects) : [];
+  bubbles.forEach((b, i) => {
+    const r = b.getBoundingClientRect();
+    const met = bubbles.slice(i + 1).find((o) => meets(r, o.getBoundingClientRect()));
+    if (met) out.push({ kind: 'callout-overlap', piece: pieceOf(b), text: textOf(b), other: `"${pieceOf(met)}"`, dx: 0, dy: 0 });
+    if (headline.some((h) => meets(r, h))) out.push({ kind: 'callout-overlap', piece: pieceOf(b), text: textOf(b), other: 'the headline', dx: 0, dy: 0 });
+    const tail = b.querySelector('.callout-tail'), target = b.getAttribute('data-ends');
+    const goals = [...slide.querySelectorAll('[data-k]')].filter((p) => p.getAttribute('data-k').trim().split(/\s+/)[0] === target && shown(p)).map((p) => p.getBoundingClientRect());
+    if (!tail || !goals.length || !shown(tail)) return;
+    const t = tail.getBoundingClientRect(), box = tail.viewBox.baseVal, [tx, ty] = tail.getAttribute('data-sd-tip').split(' ').map(Number);
+    const x = t.left + (tx / box.width) * t.width, y = t.top + (ty / box.height) * t.height;
+    const off = Math.hypot(Math.max(0, Math.min(...goals.map((g) => g.left)) - x, x - Math.max(...goals.map((g) => g.right))), Math.max(0, Math.min(...goals.map((g) => g.top)) - y, y - Math.max(...goals.map((g) => g.bottom))));
+    if (off / scale > 24) out.push({ kind: 'tail-miss', piece: pieceOf(b), text: textOf(b), other: target, dx: 0, dy: 0 });
+  });
   // an endless animation on this slide that is not a loop (its computed style says so, even where a jump zeroed it)
   for (const el of [slide, ...slide.querySelectorAll('*')]) {
     if (el.hasAttribute('data-loop')) continue;

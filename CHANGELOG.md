@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Words pinned to a piece.** `<div data-k="why" data-callout="server above">Most of the wait is here</div>` puts a bubble
+  beside the piece with a tail pointing at it, sized by its words and kept on the slide. It is a piece like any other,
+  it follows its piece when the piece is moved, and `server+` in a click takes it in. Its look is yours to change in
+  theme.css: `--callout-bg`, `--callout-fg`, `--callout-size`, `--callout-radius`, `--callout-lag`, or any rule for `.callout`
+  and `.callout-tail`. `check` and `check --layout` warn about one shown without its piece, one that meets another or the
+  headline, and a tail that no longer reaches its piece. The starter shows one. A deck with none builds byte for byte
+  as before.
 - **A ready-made look, so a deck starts finished.** `"look": "base"` in deck.json brings the tokens, light and dark, and
   the pieces a picture is made of: `box`, `chip`, `area`, `group`, `card` (with `.cards` for a row of them on a plain
   slide), `title-block` and `points`, and `ok`, `warn` and `bad` to colour one. Change a token in theme.css to make it
