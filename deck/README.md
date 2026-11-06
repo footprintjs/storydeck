@@ -18,8 +18,8 @@ text. Each module does one job, and they compose in one direction:
 | `differs.js` | a part that differs from the real thing says so (`data-differs-*`): its declaration read and checked, its labels drawn with their CSS, its phrases looked for in the notes |
 | `pace.js` | how a part's pieces arrive and leave (`data-arrive`, its times): read and checked, carried on its slides, with the CSS the page adds only when a part asks |
 | `compile.js` | clicks planned (each map's focus state carried from click to click) and drawn as `<deck-stage>` slides |
-| `page.js` | the one page: slides, notes, every stylesheet and runtime inlined; the theme toggle |
-| `assets.js` | what the library ships that the page carries (the runtime, focus.css, narration.css, deck.css) |
+| `page.js` | the one page: slides, notes, every stylesheet and runtime inlined; the theme toggle. `deckStyles` is the one place a deck's stylesheets are put in order, for the page and for deck-data.json |
+| `assets.js` | what the library ships that the page carries (the runtime, focus.css, narration.css, deck.css, and each ready-made look, `look-<name>.css`, which only a deck that asks gets) |
 | `build.js` | read + compile + page, and the page written (never through a link, never outside the deck) |
 | `review.js` · `check.js` | the deck as text: an outline, one click reviewed, what to fix |
 | `layout.js` | the check only a browser can make (text that spills), through the video's driver |

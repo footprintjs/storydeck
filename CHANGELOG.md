@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **A ready-made look, so a deck starts finished.** `"look": "base"` in deck.json brings the tokens, light and dark, and
+  the pieces a picture is made of: `box`, `chip`, `area`, `group`, `card` (with `.cards` for a row of them on a plain
+  slide), `title-block` and `points`, and `ok`, `warn` and `bad` to colour one. Change a token in theme.css to make it
+  yours, and any rule you write wins without `!important`. New decks from `init` ask for it, and their theme.css is now a
+  few tokens. A deck that doesn't ask builds byte for byte as before.
+- **deck-data.json carries the same stylesheet as the page.** It was missing what a deck asks for beyond its theme, so in
+  the Read and Scroll lenses a part's label on how it differs and a named loop's moves had no styles. A deck that asks
+  for none of these (a look, a label, a named loop, `explore`, `data-enter`, `data-arrive`) writes the same file as
+  before.
 - **A part told as an analogy says so.** `data-differs-analogy="people stand in for the services"` shows "An analogy:
   people stand in for the services", or say it in the notes with `data-differs-said`. It is a statement like time and
   scale: it needs a line or a phrase of its own, it fits the label it goes on, and a deck in another language gives its

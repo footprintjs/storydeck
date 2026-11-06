@@ -75,7 +75,10 @@ pace: `"float 4s"`) on a piece, or `data-loop` alone with the piece's own `--loo
 theme.css — never an infinite animation of your own (`check --layout` refuses one running on a hidden slide). A named
 loop moves its element by `transform`: put it on an element without a transform of its own (wrap it). A loop
 runs only on the slide shown, on one clock across clicks, and rests in its own style under reduced motion, in print and
-with `?motion=off` (a still deck, for screenshots). For an assistant: `claude mcp add storydeck -- npx footprint-storydeck mcp my-talk`
+with `?motion=off` (a still deck, for screenshots). `"look": "base"` in deck.json (`init` writes it) brings the tokens,
+light and dark, and ready-made pieces: class `box`, `chip`, `area`, `group`, `card`, `title-block`, `points`, with
+`ok`, `warn` or `bad` to colour one; change a look by setting a token in theme.css (`--accent-ink`, `--sd-radius`,
+`--sans`, …) before writing rules, and any rule there wins. For an assistant: `claude mcp add storydeck -- npx footprint-storydeck mcp my-talk`
 gives it outline, review, feedback, check and build as tools.
 
 **Focus a diagram, click by click.** Every element with `data-k="name …"` and an inline `left/top`

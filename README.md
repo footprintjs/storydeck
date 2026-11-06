@@ -378,10 +378,10 @@ session spent its time. So a deck is now a **folder**, and the library builds it
 
 ```
 my-talk/
-  deck.json      { "title": "A request, end to end" }   — and footer, area, checks when you need them
+  deck.json      { "title": "A request, end to end" }   — and footer, look, area, checks when you need them
   clicks.html    a <section> per part; on a map, a <step> per click (data-in, data-on, data-focus, <h2>, notes)
   map.html       the picture: every data-k element with an inline left/top/width/height is a piece
-  theme.css      tokens (light, :root.dark) and the look of your pieces
+  theme.css      a few tokens to make it yours (light, :root.dark); any rule you write wins over the base look
   icons/*.svg    drawn identities, used as <i class="ic" data-icon="server"></i>
 ```
 
@@ -423,6 +423,31 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   the page does. A deck that shows no label builds byte for byte as if this did not exist. It reads what is declared, and
   cannot see a speed-up nobody declared. A part told as an analogy says that too: `data-differs-analogy="people stand in
   for the services"` shows "An analogy: people stand in for the services", and it counts as a statement of its own.
+- **A ready-made look to start from.** `"look": "base"` in deck.json, which `init` writes for you, brings the tokens,
+  light and dark, and the pieces a picture is made of, so a deck looks finished before anyone writes CSS, and `T` still
+  switches light and dark. Make it yours by changing a token in theme.css:
+
+  ```css
+  :root { --accent-ink: #7c3aed; --sd-radius: 6px; --sans: Georgia, serif; }   /* reaches light and dark */
+  :root.dark { --accent-ink: #c4b5fd; }                                        /* dark's own */
+  .box b { color: #be123c; }                                                   /* any rule of yours wins, no !important */
+  ```
+
+  | Class | What it is | What goes inside |
+  |---|---|---|
+  | `box` | one thing in the picture | an icon, `<b>`, `<small>` |
+  | `chip` | a small value with a label | `<b>`, `<small>` |
+  | `area` | a place the pieces stand in; write it before them in the map, so they sit on top | `<b>` names it |
+  | `group` | pieces that belong together | `<b>` is its heading |
+  | `card` | an icon with a title and a line beside it; `.cards` lays a row of them on a plain slide | an icon, `<b>`, `<small>` |
+  | `title-block`, `points` | a title slide, a list of points | `<h1>` and `<p class="sub">`; `<li>` |
+
+  Add `ok`, `warn` or `bad` to colour a piece's edge and icon, and the heading of an area or a group. On a wire, `req` is a
+  request and `ret` a dashed answer. The tokens: `--bg --bg-elev --fg --fg-muted --line --accent-ink --sd-accent --sd-glow
+  --sd-dim-opacity --sd-ok --sd-warn --sd-bad --sd-radius --sans --mono`. What a click lights (`--sd-accent`) follows
+  `--accent-ink` until you set it; a part with its own `data-theme` and a new accent sets both. The stylesheet is
+  `look-base.css`, every rule in `:where()`, and only a deck that asks carries it: one that doesn't builds byte for byte
+  as before. Its pieces are drawn only inside a slide, so a site showing a deck in its own page keeps its own `.card`.
 - **A part can have its own look.** `<section data-label="3 · Storage" … data-theme="ledger">` puts
   `data-theme="ledger"` on each of that part's slides, so `theme.css` can dress it: redefine the tokens for it
   (`[data-theme="ledger"] { --bg: …; --text: …; }`, and `:root.dark [data-theme="ledger"]` for dark) and give its pieces
@@ -580,7 +605,8 @@ const post = assemblePost({ meta, sections, bodyMd, deckSlides });
 ## Theming (bring your own)
 
 storydeck hardcodes **no colours** — it reads a CSS-variable token contract, so the consumer owns
-the look:
+the look (a deck from a folder can start from a ready-made one: `"look": "base"`, under
+[A deck from a folder](#a-deck-from-a-folder-storydeck)):
 
 ```
 --bg --bg-elev --fg --fg-muted --fg-faint --line --line2

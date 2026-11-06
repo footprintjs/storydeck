@@ -20,6 +20,8 @@ export interface DeckConfig {
   readonly area: readonly [number, number, number, number];
   readonly clicks: string;
   readonly theme: string;
+  /** A ready-made look under theme.css: tokens, light and dark, and pieces (look-base.css). Null: none, and the page carries none of it. */
+  readonly look: 'base' | null;
   readonly icons: string;
   /** A map's file, by name (default for a map not listed: <name>.html). */
   readonly maps: Readonly<Record<string, string>>;
@@ -119,8 +121,8 @@ export interface CompiledDeck {
 /** The deck's clicks planned (each map's state carried click to click) and drawn as <deck-stage> slides. */
 export function compileDeck(source: Pick<DeckSource, 'config' | 'parts' | 'maps'> & Partial<DeckSource>, options?: { dev?: boolean }): CompiledDeck;
 
-/** What the library ships that a page carries: the <deck-stage> runtime, focus.css, narration.css, deck.css, the version. */
-export interface PageAssets { readonly stageJs: string; readonly css: readonly string[]; readonly version: string }
+/** What the library ships that a page carries: the <deck-stage> runtime, focus.css, narration.css, deck.css, the ready-made looks by name, the version. */
+export interface PageAssets { readonly stageJs: string; readonly css: readonly string[]; readonly looks: Readonly<Record<'base', string>>; readonly version: string }
 export function pageAssets(): PageAssets;
 /** One self-contained page: slides, notes, every stylesheet and runtime inlined, the theme toggle. */
 export function deckPage(compiled: CompiledDeck, assets: PageAssets): string;

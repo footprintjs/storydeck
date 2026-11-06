@@ -88,6 +88,7 @@
     },
     "./storydeck.css": "./storydeck.css",
     "./deck.css": "./deck.css",
+    "./look-base.css": "./look-base.css",
     "./deck-stage.js": "./site/public/deck-stage.js"
   },
   "files": [
