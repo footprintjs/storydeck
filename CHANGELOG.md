@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.13.0 — narrate: one command for a deck's voice
 
 - **`storydeck narrate`: one command for a deck's voice.** It says what each click says and whether it is voiced, for nothing.
   With `--kit <folder>` it voices what is missing, and `--takes <folder>` uses your own recordings. `--only 1-3,7` picks a few
