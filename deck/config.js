@@ -11,11 +11,13 @@
 //     "out": "index.html",                                      the built page, inside the deck folder
 //     "post": "post.json", "deckData": "deck-data.json",       the Read/Scroll lenses' sources, when the deck has them
 //     "checks": { "maxWords": 12, "maxSlideWords": 40 },        what `storydeck check` asks: words in a headline, on a plain slide
-//     "explore": true }                                         a viewer may click a piece to go to the click about it (explore.js)
+//     "explore": true,                                          a viewer may click a piece to go to the click about it (explore.js)
+//     "lenses": true }                                          one page to read, scroll or click through (lenses.js)
 //
 // A key it does not know is refused with the keys it does, so a typo is never a silent default. A file name it gives
 // follows paths.js · deckPath (relative, inside the deck, nothing hidden).
 import {deckPath} from './paths.js';
+import {readLenses} from './lenses.js';
 
 export const DEFAULTS = Object.freeze({
   lang: 'en',
@@ -29,7 +31,7 @@ export const DEFAULTS = Object.freeze({
 });
 /** The ready-made looks a deck may ask for; each is look-<name>.css at the package's root (assets.js). */
 export const LOOKS = Object.freeze(['base']);
-const KEYS = ['title', 'description', 'lang', 'footer', 'area', 'canvas', 'clicks', 'theme', 'look', 'icons', 'maps', 'out', 'post', 'deckData', 'checks', 'explore'];
+const KEYS = ['title', 'description', 'lang', 'footer', 'area', 'canvas', 'clicks', 'theme', 'look', 'icons', 'maps', 'out', 'post', 'deckData', 'checks', 'explore', 'lenses'];
 const CHECK_KEYS = ['maxWords', 'maxSlideWords'];
 
 const isText = (v) => typeof v === 'string' && v.trim().length > 0;
@@ -85,6 +87,7 @@ export function readConfig(json) {
     deckData: raw.deckData === undefined ? null : deckPath(raw.deckData, 'deckData'),
     checks: Object.freeze({maxWords, maxSlideWords}),
     explore: raw.explore === true,
+    lenses: readLenses(raw.lenses, raw.lang ?? DEFAULTS.lang),
     given: Object.freeze(Object.keys(raw)),   // the keys deck.json wrote: a file it names must be there; a default may be absent
   });
 }

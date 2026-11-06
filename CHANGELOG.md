@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **One page to read, scroll or click through.** `"lenses": true` in deck.json adds Read (an article) and Scroll (the picture
+  stays while the words go by) to the built page, beside the slides, from the deck's own slides, headlines and notes.
+  No site or React is needed. A link ending `#read` or `#scroll` opens that one. A deck in another language gives its own
+  words. A deck that doesn't ask builds byte for byte as before.
 - **Words pinned to a piece.** `<div data-k="why" data-callout="server above">Most of the wait is here</div>` puts a bubble
   beside the piece with a tail pointing at it, sized by its words and kept on the slide. It is a piece like any other,
   it follows its piece when the piece is moved, and `server+` in a click takes it in. Its look is yours to change in

@@ -33,6 +33,8 @@ export interface DeckConfig {
   readonly checks: { readonly maxWords: number; readonly maxSlideWords: number };
   /** A viewer may click a piece to go to the click about it, and come back (false). */
   readonly explore: boolean;
+  /** One page to read, scroll or click through, in these words; null: Slide alone, and the page carries none of it. */
+  readonly lenses: { readonly read: string; readonly scroll: string; readonly slide: string } | null;
   /** The keys deck.json wrote (a file it names must be there; a default may be absent). */
   readonly given: readonly string[];
 }

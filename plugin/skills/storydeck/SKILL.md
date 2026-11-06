@@ -80,7 +80,8 @@ light and dark, and ready-made pieces: class `box`, `chip`, `area`, `group`, `ca
 `ok`, `warn` or `bad` to colour one; change a look by setting a token in theme.css (`--accent-ink`, `--sd-radius`,
 `--sans`, …) before writing rules, and any rule there wins. `<div data-k="why" data-callout="server above">Words</div>` pins
 words to a piece with a tail (`above`, `below`, `left`, `right`), sized by its words; bring it in like any piece, `server+`
-takes it in, and `--callout-bg`, `--callout-fg` and the rest change its look. For an assistant: `claude mcp add storydeck -- npx footprint-storydeck mcp my-talk`
+takes it in, and `--callout-bg`, `--callout-fg` and the rest change its look. `"lenses": true` adds Read and Scroll beside the
+slides in the one built page (`#read`, `#scroll`), from the same notes, so write them. For an assistant: `claude mcp add storydeck -- npx footprint-storydeck mcp my-talk`
 gives it outline, review, feedback, check and build as tools.
 
 **Focus a diagram, click by click.** Every element with `data-k="name …"` and an inline `left/top`
