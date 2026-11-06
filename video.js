@@ -224,7 +224,7 @@ export function offlineAllows(page, url) {
  * the frame (the deck's toolbar always; key hints and panels by selector). `offline` keeps the page off the network
  * (OFFLINE: it loads only its own file and inline data — the layout check measures a deck that way).
  */
-export function deckStageDriver({ chromium, executablePath, viewport = { width: 1920, height: 1080 }, hide = ['.fs-btn', '.notes-panel', '.train-panel'], offline = false }) {
+export function deckStageDriver({ chromium, executablePath, viewport = { width: 1920, height: 1080 }, hide = ['.fs-btn', '.notes-panel', '.train-panel', '.lens-switch', '.theme-toggle'], offline = false }) {
   let browser, page;
   const settle = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   return {

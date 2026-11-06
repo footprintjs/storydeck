@@ -9,9 +9,11 @@
 //
 // All three come from one source: Read and Scroll are the deck's own slides, copied as they rest, and its own headlines and
 // notes, so they cannot drift from it. The page opens on Slide; a link ending #read or #scroll opens that one. Its keys
-// are the page's: in Read and Scroll, the arrows and Space scroll, and only T still does what it does in Slide. The page
-// carries all this only when a deck asks, so any other deck is byte for byte as before.
-import {esc} from './html.js';
+// are the page's: in Read and Scroll, the arrows and Space scroll, and only T still does what it does in Slide. Leaving
+// Slide stops the speech and closes the notes. The page carries all this only when a deck asks, so any other deck is byte
+// for byte as before.
+import {closing, esc} from './html.js';
+import {plainText} from './parse.js';
 import {writtenText} from '../narration.js';
 
 const WORDS = Object.freeze({read: 'Read', scroll: 'Scroll', slide: 'Slide'});
@@ -50,13 +52,23 @@ function partsOf(clicks) {
   return [...parts.values()];
 }
 
+/** The text of a slide's first <h1>, or null. One pass: its closing tag is looked for once. */
+function firstHeading(html) {
+  const start = html.search(/<h1\b/i), open = start < 0 ? -1 : html.indexOf('>', start);
+  if (open < 0) return null;
+  const shut = closing('h1');
+  shut.lastIndex = open + 1;
+  const end = shut.exec(html);
+  return end ? plainText(html.slice(open + 1, end.index)).trim() : null;
+}
+
 /** The switch, and the Read and Scroll views, hidden until asked for: the words as plain HTML, the pictures copied in by lensRuntime. */
-export function lensHtml({config, clicks}) {
+export function lensHtml({config, clicks, slides}) {
   const {read, scroll, slide} = config.lenses, [w, h] = config.canvas;
   const frame = (attr) => `<div class="lens-slide" ${attr} style="--lens-w:${w}px;--lens-h:${h}px;aspect-ratio:${w}/${h}"></div>`;
   const all = partsOf(clicks), first = all[0]?.clicks;
   // a title slide says what the article's own title says: an article opens on what is said about it, with no picture of its title
-  const opens = first?.length === 1 && first[0].kind === 'plain' && first[0].text.trim().startsWith(config.title);
+  const opens = first?.length === 1 && first[0].kind === 'plain' && firstHeading(slides[0].html) === config.title;
   const parts = (opens ? all.slice(1) : all).map(({kicker, clicks: told}) => `<section class="lens-part">${kicker ? `<h2>${esc(kicker)}</h2>` : ''}${frame(`data-lens-slide="${told.at(-1).n - 1}"`)}${told.map((c) => `${heading(c)}${prose(c.notes)}`).join('')}</section>`);
   const steps = clicks.map((c) => `<section class="lens-step" data-lens-at="${c.n - 1}">${c.kicker ? `<h2>${esc(c.kicker)}</h2>` : ''}${heading(c)}${prose(c.notes)}</section>`);
   return `<nav class="lens-switch"><a href="#read">${esc(read)}</a><a href="#scroll">${esc(scroll)}</a><a href="#slide">${esc(slide)}</a></nav>
@@ -88,11 +100,16 @@ export function lensRuntime() {
     step.setAttribute('data-lens-on', '');
     copyInto(pin, Number(step.getAttribute('data-lens-at')));
   };
-  // the step at the middle of the window is the one the picture shows
-  const watch = new IntersectionObserver((seen) => { for (const e of seen) if (e.isIntersecting) showStep(e.target); }, {rootMargin: '-50% 0px -50% 0px'});
+  // the step crossing a line low in the window is the one the picture shows: low enough to be below a picture pinned above the words
+  const watch = new IntersectionObserver((seen) => { for (const e of seen) if (e.isIntersecting) showStep(e.target); }, {rootMargin: '-70% 0px -30% 0px'});
   let readFilled = false, watching = false;
   const links = [...document.querySelectorAll('.lens-switch a')];
   const show = (mode) => {
+    if (mode !== 'slide') {
+      // what belongs to the slides ends with them: listen answers Escape only while it plays, and the guard below lets it through until the view changes
+      if (stage.hasAttribute('data-listening')) window.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}));
+      document.body.classList.remove('practice');
+    }
     root.setAttribute('data-lens', mode);
     read.hidden = mode !== 'read';
     scroll.hidden = mode !== 'scroll';
@@ -111,12 +128,24 @@ export function lensRuntime() {
     const asked = location.hash.slice(1), mode = asked === 'read' || asked === 'scroll' ? asked : 'slide';
     show(mode);
     if (mode !== 'slide') return;
-    // back on the slides: the address names the slide again, as the stage keeps it, and the stage fits itself, having been hidden
-    try { history.replaceState(null, '', `#${stage.index + 1}`); } catch { /* an address it cannot write: a reload starts over */ }
-    window.dispatchEvent(new Event('resize'));
+    // on the slides: a number is a slide to go to, and otherwise the address names the slide again, as the stage keeps it
+    if (/^\d+$/.test(asked)) stage.goTo(Number(asked) - 1);
+    else { try { history.replaceState(null, '', `#${stage.index + 1}`); } catch { /* an address it cannot write: a reload starts over */ } }
+    window.dispatchEvent(new Event('resize'));   // the stage fits itself again, having been hidden
   });
-  // before the stage's and the notes' own keys (T comes first, being set up first), so the arrows and Space scroll here
-  window.addEventListener('keydown', (e) => { if (root.getAttribute('data-lens') !== 'slide') e.stopImmediatePropagation(); }, true);
+  // anything that moves the hidden stage (a presenter window, a print) writes its slide over the address: it says the view again
+  const keepAddress = () => {
+    const mode = root.getAttribute('data-lens');
+    if (mode === 'slide' || location.hash === `#${mode}`) return;
+    try { history.replaceState(null, '', `#${mode}`); } catch { /* an address it cannot write: the view still shows */ }
+  };
+  stage.addEventListener('slidechange', keepAddress);
+  window.addEventListener('afterprint', keepAddress);
+  // set up before every other key of the page, so the arrows and Space scroll here. T passes, and so do keys typed into a field
+  window.addEventListener('keydown', (e) => {
+    const t = e.target, typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+    if (root.getAttribute('data-lens') !== 'slide' && e.key !== 't' && e.key !== 'T' && !typing) e.stopImmediatePropagation();
+  }, true);
   const first = root.getAttribute('data-lens');
   // the stage has written its slide over what the link said: the address says the view again, so it can be sent on
   if (first !== 'slide') { try { history.replaceState(null, '', `#${first}`); } catch { /* an address it cannot write: the view still shows */ } }
@@ -131,6 +160,7 @@ export const LENS_CSS = `/* one page, three ways to take it in (deck/lenses.js) 
   border: 1.5px solid var(--line, #c9d0d9); background: var(--bg-elev, #f6f8fa); font: 600 14px/1 var(--sans, system-ui, sans-serif); opacity: .7;
 }
 :where(.lens-switch:hover, .lens-switch:focus-within, html[data-lens="read"] .lens-switch, html[data-lens="scroll"] .lens-switch) { opacity: 1; }
+:where(body:has(.sd-dev) .lens-switch) { top: 52px; }   /* below the dev page's bar */
 :where(.lens-switch a) { padding: 7px 12px; border-radius: 999px; color: var(--fg, #14181f); text-decoration: none; }
 :where(.lens-switch a[aria-current]) { background: var(--fg, #14181f); color: var(--bg-elev, #ffffff); }
 :where(.lens-read, .lens-scroll) { box-sizing: border-box; color: var(--fg, #14181f); font: 400 19px/1.6 var(--sans, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif); }
@@ -151,12 +181,16 @@ export const LENS_CSS = `/* one page, three ways to take it in (deck/lenses.js) 
 :where(.lens-scroll) { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 40px; padding: 64px 32px 0; }
 :where(.lens-pin) { position: sticky; top: 64px; align-self: start; }
 :where(.lens-steps) { padding-bottom: 50vh; }
-:where(.lens-step) { min-height: 60vh; opacity: .45; }
+:where(.lens-step) { min-height: 70vh; opacity: .45; }   /* tall enough that the first step holds the line at the top of the page */
 :where(.lens-step[data-lens-on]) { opacity: 1; }
 @media (max-width: 800px) {
   :where(.lens-scroll) { display: block; padding: 56px 16px 0; }
   :where(.lens-pin) { top: 0; z-index: 1; margin-top: -56px; padding: 56px 0 12px; background: var(--bg, #ffffff); }   /* no words pass above it, behind the switch */
-  :where(.lens-step) { min-height: 40vh; }
+  :where(.lens-step) { min-height: 45vh; }
+}
+/* a short window, such as a phone on its side: the picture leaves room for the words */
+@media (max-height: 600px) {
+  :where(.lens-pin .lens-slide) { height: 45vh; width: auto; max-width: 100%; margin-inline: auto; }
 }
 @media print { :where(.lens-switch) { display: none; } }
 /* last: a view's own display must not undo its hidden attribute */

@@ -5,6 +5,7 @@ import {readConfig} from './config.js';
 import {compileDeck} from './compile.js';
 import {deckPage, deckStyles} from './page.js';
 import {pageAssets} from './assets.js';
+import {deckStageDriver} from '../video.js';
 import {cleanDecks, sourceOf} from './test/helpers.js';
 
 afterEach(cleanDecks);
@@ -50,6 +51,13 @@ describe('the page', () => {
     expect(slidesOf(asked)).toBe(slidesOf(plain));
     expect(asked).toContain('class="lens-switch"');
     expect(asked).toContain('lens-read');
+  });
+
+  it('sets up its keys before any other runtime\'s, so its guard truly comes first', () => {
+    const asked = page({title: 'T', lenses: true});
+    const lens = asked.search(/querySelector\(["']\.lens-read["']\)/), notes = asked.search(/getElementById\(["']deck-notes["']\)/);
+    expect(lens).toBeGreaterThan(0);
+    expect(notes).toBeGreaterThan(lens);
   });
 
   it('reads which view the link asks for before the stage starts, as the stage writes over the address', () => {
@@ -115,6 +123,20 @@ describe('Read and Scroll', () => {
     expect(read).toContain('<h1>T</h1><section class="lens-part">');
   });
 
+  it('a first slide that only starts with the title\'s words keeps its picture too', () => {
+    const first = '<section data-label="P" data-kicker="K"><h1>Why we ship slowly</h1><p>A picture</p><aside class="notes">Words.</aside></section>' + CLICKS;
+    const out = lensHtml(compileDeck(sourceOf({deck: {title: 'Why', lenses: true}, clicks: first, maps: {map: MAP}})));
+    expect(out).toContain('data-lens-slide="0"');
+  });
+
+  it('a first slide with an unclosed heading keeps its picture, and costs one pass', () => {
+    const first = `<section data-label="P" data-kicker="K">${'<h1 '.repeat(100000)}></section>${CLICKS}`;
+    const t0 = performance.now();
+    const compiled = compileDeck(sourceOf({deck: {title: 'T', lenses: true}, clicks: first, maps: {map: MAP}}));
+    expect(lensHtml(compiled)).toContain('data-lens-slide="0"');
+    expect(performance.now() - t0).toBeLessThan(2000);
+  });
+
   it('Read gives each part its last click\'s picture, and every click\'s words as prose', () => {
     const read = html.slice(html.indexOf('lens-read'), html.indexOf('lens-scroll'));
     expect(read.match(/data-lens-slide="\d+"/g)).toEqual(['data-lens-slide="1"', 'data-lens-slide="2"']);
@@ -138,5 +160,16 @@ describe('Read and Scroll', () => {
 
   it('frames a picture in the deck\'s own proportions', () => {
     expect(lensHtml(deck({title: 'T', canvas: [1600, 900], lenses: true}))).toContain('--lens-w:1600px;--lens-h:900px;aspect-ratio:1600/900');
+  });
+});
+
+describe('a film or a PowerPoint', () => {
+  it('keeps the switch and the theme toggle out of its pictures', async () => {
+    let hidden = '';
+    const page = new Proxy({}, {get: (_, k) => (k === 'then' ? undefined : k === 'addStyleTag' ? async ({content}) => { hidden = content; } : async () => ({}))});
+    const driver = deckStageDriver({chromium: {launch: async () => ({newPage: async () => page, close: async () => {}})}});
+    await driver.open('file:///deck.html').catch(() => {});
+    expect(hidden).toContain('.lens-switch');
+    expect(hidden).toContain('.theme-toggle');
   });
 });

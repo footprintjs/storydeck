@@ -65,7 +65,8 @@ export function deckPage(compiled, assets, {dev = null} = {}) {
   const {config, slides} = compiled;
   const css = deckStyles(compiled, assets);
   const script = dev?.nonce ? `<script nonce="${esc(dev.nonce)}">` : '<script>';
-  const runtimes = [focusRuntime, notesRuntime, listenRuntime, themeRuntime, ...(compiled.explore ? [exploreRuntime] : []), ...(compiled.transitions ? [transitionRuntime] : []), ...(config.lenses ? [lensRuntime] : [])]
+  // the lenses first: their keys come before any other runtime's (lenses.js)
+  const runtimes = [...(config.lenses ? [lensRuntime] : []), focusRuntime, notesRuntime, listenRuntime, themeRuntime, ...(compiled.explore ? [exploreRuntime] : []), ...(compiled.transitions ? [transitionRuntime] : [])]
     .map((fn) => `${script}(${scriptSafe(fn)})();</script>`);
   return `<!doctype html>
 <html lang="${esc(config.lang)}">
