@@ -9,6 +9,7 @@ import {notesData, notesRuntime, listenRuntime} from '../narrationHtml.js';
 import {esc, scriptSafe, styleSafe} from './html.js';
 import {loopCss} from './loops.js';
 import {DIFFERS_CSS} from './differs.js';
+import {PACE_CSS} from './pace.js';
 import {EXPLORE_CSS, exploreData, exploreRuntime} from './explore.js';
 import {TRANSITION_CSS, transitionData, transitionRuntime} from './transitions.js';
 
@@ -47,7 +48,9 @@ export function deckPage(compiled, assets, {dev = null} = {}) {
   const loops = loopCss(compiled.loops ?? []);
   // the labels of a part that differs from the real thing (differs.js): only when one shows them, so a deck with none is as before
   const labelled = (compiled.clicks ?? []).some((c) => c.differs?.shown.length);
-  const css = [...assets.css, ...(loops ? [loops] : []), ...(compiled.explore ? [EXPLORE_CSS] : []), ...(compiled.transitions ? [TRANSITION_CSS] : []), ...(labelled ? [DIFFERS_CSS] : []), compiled.themeCss ?? ''].join('\n');
+  // how a part's pieces arrive and leave (pace.js): only when a part asks, and before theme.css, so the deck's own rules win
+  const paced = (compiled.clicks ?? []).some((c) => c.pace);
+  const css = [...assets.css, ...(loops ? [loops] : []), ...(compiled.explore ? [EXPLORE_CSS] : []), ...(compiled.transitions ? [TRANSITION_CSS] : []), ...(labelled ? [DIFFERS_CSS] : []), ...(paced ? [PACE_CSS] : []), compiled.themeCss ?? ''].join('\n');
   const script = dev?.nonce ? `<script nonce="${esc(dev.nonce)}">` : '<script>';
   const runtimes = [focusRuntime, notesRuntime, listenRuntime, themeRuntime, ...(compiled.explore ? [exploreRuntime] : []), ...(compiled.transitions ? [transitionRuntime] : [])]
     .map((fn) => `${script}(${scriptSafe(fn)})();</script>`);
