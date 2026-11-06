@@ -8,6 +8,8 @@
   doesn't ask builds byte for byte as before.
 - **`narrate` as an MCP tool.** It only reads, unless the server was started with a voice and the call says what to voice with
   `say`. A call can't name a kit, and `build` over MCP never carries a voice.
+- **A deck voiced by your own script:** run `storydeck narrate --kit <folder>` once. It finds the clips you have and voices only
+  what is missing, and from then on `narrate` and `build --voice` find them with no voice named.
 - **A clip cache from someone's folder is not trusted.** A link at a clip's name is never read into a page or written through,
   a link out of the deck at `voice/cache` is refused, and ffmpeg reads a clip's sound only as a WAV.
 

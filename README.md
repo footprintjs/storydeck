@@ -617,7 +617,8 @@ What to expect from it:
   do, so open a deck from someone you don't trust with care.
 - **A voice is yours to give.** `narrate` reads until you start the server with one: `storydeck mcp my-talk --kit ../voice-kit`.
   A call can't name a kit, because a kit runs Python on your machine. Voicing runs in its own process, so the server goes on
-  answering; it takes minutes, and a call that times out can be made again, because every clip it finished is kept.
+  answering. It takes minutes, and every clip it finishes is kept. A call that times out leaves it running, so call `narrate`
+  with no `say` to see how far it has got; a second `say` is refused until it is done.
   With a voice given, a deck's notes can be read aloud in it, so give one only for decks you trust. `build` over MCP
   never carries a voice: that page comes from your own `storydeck build --voice`.
 - **It doesn't make a deck from a storyboard yet.** The storyboard and its `shapes`, `brief` and `create` tools are in

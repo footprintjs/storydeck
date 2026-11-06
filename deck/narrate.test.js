@@ -1,6 +1,6 @@
 // @vitest-environment node
 import {afterEach, describe, it, expect} from 'vitest';
-import {existsSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync} from 'node:fs';
+import {existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import {runCli} from './cli.js';
 import {callTool} from './mcp.js';
@@ -60,6 +60,7 @@ describe('storydeck narrate', () => {
   it('refuses what it cannot do, naming the fix', async () => {
     const dir = deckWithNotes(), {kit, said} = fakeKit(tempDir());
     expect((await cli('narrate', dir, '--only', '1')).err).toContain('name the voice too');
+    expect((await cli('narrate', dir, '--kit', kit, '--only', '')).err).toContain('--only is empty');
     expect((await cli('narrate', dir, '--takes', 'x')).err).toContain('recordings need the voice kit too');
     expect((await cli('narrate', dir, '--kit', kit, '--only', 'first')).err).toContain('is not a step');
     expect((await cli('narrate', dir, '--kit', tempDir())).err).toContain('no voice settings');
@@ -121,8 +122,10 @@ describe('a deck someone sent you', () => {
     writeFileSync(secret, 'a secret');
     await cli('narrate', dir, '--kit', kit);
     const cache = path.join(dir, 'voice', 'cache'), wav = readdirSync(cache).find((f) => f.endsWith('.wav'));
-    symlinkSync(secret, path.join(cache, wav.replace('.wav', '.m4a')));
+    const m4a = path.join(cache, wav.replace('.wav', '.m4a'));
+    symlinkSync(secret, m4a);
     await cli('build', dir, '--voice');
+    expect(lstatSync(m4a, {throwIfNoEntry: false})?.isSymbolicLink() ?? false, 'the link is gone, whether or not ffmpeg is here').toBe(false);
     expect(page(dir)).not.toContain(Buffer.from('a secret').toString('base64'));
     expect(readFileSync(secret, 'utf8')).toBe('a secret');
   });
@@ -163,6 +166,16 @@ describe('narrate over MCP', () => {
     const broken = await callTool('narrate', {say: 'all'}, {dir, kit: tempDir()});
     expect(broken.isError).toBe(true);
     expect(textOf(broken)).toContain('no voice settings');
+  }, 30000);
+
+  it('voices one call at a time: a second say is refused, not started beside the first', async () => {
+    const dir = deckWithNotes(), {kit, said} = fakeKit(tempDir());
+    const [first, second] = await Promise.all([callTool('narrate', {say: 'all'}, {dir, kit}), callTool('narrate', {say: 'all'}, {dir, kit})]);
+    expect(first.isError).toBeUndefined();
+    expect(second.isError).toBe(true);
+    expect(textOf(second)).toContain('being voiced already');
+    expect(said()).toHaveLength(2);
+    expect((await callTool('narrate', {say: 'all'}, {dir, kit})).isError, 'and free again once it is done').toBeUndefined();
   }, 30000);
 
   it('never builds a page that carries a voice', async () => {

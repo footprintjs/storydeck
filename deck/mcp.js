@@ -33,7 +33,7 @@ export const MCP_TOOLS = Object.freeze([
   {name: 'check', description: 'What to fix, worst first, each with its click and its fix (headline words, pieces lit by coming in, clicks that change nothing, pieces never shown, missing notes). layout: true also opens the page in a browser to find text that spills.',
     inputSchema: {type: 'object', properties: {dir: DIR, layout: {type: 'boolean', description: 'measure the built page in a browser (needs playwright-core)'}}}},
   {name: 'narrate', description: 'What each click says in the speaker\'s voice: how many are voiced, and which are left. It only reads, unless say is given and the server was started with a voice.',
-    inputSchema: {type: 'object', properties: {dir: DIR, say: {type: 'string', description: 'voice what is missing: "all", or clicks like "1-3,7". Takes minutes; every clip it finishes is kept, so a call that times out can be made again.'}}}},
+    inputSchema: {type: 'object', properties: {dir: DIR, say: {type: 'string', description: 'voice what is missing: "all", or clicks like "1-3,7". Takes minutes, and every clip it finishes is kept. A call that times out leaves it running: call narrate with no say to see how far it has got.'}}}},
   {name: 'build', description: 'Write the deck\'s self-contained page (deck.json "out", index.html by default) and say what was written.',
     inputSchema: {type: 'object', properties: {dir: DIR}}},
 ]);
@@ -52,6 +52,8 @@ function deckFor(args, dir) {
 const BIN = fileURLToPath(new URL('./bin.js', import.meta.url));
 const NO_VOICE = 'restart the server with a voice to voice them: storydeck mcp <folder> --kit <your voice kit>';
 const LAST_WORDS = 2000;
+/** The decks this server is voicing: a call that timed out leaves its voicing running, so a second one is refused, not started beside it. */
+const voicing = new Set();
 
 /** `storydeck narrate` in a process of its own: its answer, or the end of what it said on the way to stopping. */
 function voiceInChild(deck, {kit, takes, only}) {
@@ -73,7 +75,9 @@ function narrateCall(deck, {say}, {kit, takes}) {
   if (!kit) throw new Error(`this server was started with no voice: ${NO_VOICE}`);
   const only = say.trim() === 'all' ? undefined : say.trim();
   pickSteps(only);   // refused here, naming the fix, before anything starts
-  return voiceInChild(deck, {kit, takes, only});
+  if (voicing.has(deck)) throw new Error('this deck is being voiced already: call narrate with no say to see how far it has got');
+  voicing.add(deck);
+  return voiceInChild(deck, {kit, takes, only}).finally(() => voicing.delete(deck));
 }
 
 /** One tool call: its text, or the reason it stopped, as MCP content. `kit` and `takes` are the server's start's. */

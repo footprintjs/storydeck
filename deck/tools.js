@@ -125,6 +125,7 @@ export function buildTool(dir, {out, voice = false} = {}) {
  * only the person's command or a server's start names it, never a deck (narrate.js). `hint`: the next step, in its caller's words.
  */
 export async function narrateTool(dir, {kit, takes, only, hint = 'storydeck narrate --kit <your voice kit> (add --takes <folder> for your own recordings)'} = {}) {
+  if (only !== undefined && !String(only).trim()) throw new Error('--only is empty: name the clicks to voice, like 1-3,7, or leave it out to voice them all');
   if (only && !kit) throw new Error('--only picks the clicks to voice: name the voice too, --kit <folder>');
   const {compiled} = loadDeck(dir), cache = voiceCache(deckRoot(dir)), {engine, profile} = narrationVoice({cache, kit, takes});
   const report = await narrate(clickLines(compiled), {cache, profile, engine, only});
