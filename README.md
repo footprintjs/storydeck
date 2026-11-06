@@ -423,6 +423,13 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   the page does. A deck that shows no label builds byte for byte as if this did not exist. It reads what is declared, and
   cannot see a speed-up nobody declared. A part told as an analogy says that too: `data-differs-analogy="people stand in
   for the services"` shows "An analogy: people stand in for the services", and it counts as a statement of its own.
+- **One page to read, scroll or click through.** A deck you send should work however it gets opened, on a phone too, with no
+  site behind it. `"lenses": true` in deck.json adds a switch to the built page: **Read** is an article, with each part's
+  picture and what is said about it as prose; **Scroll** keeps the picture in place while the words go by, and it changes
+  as they do; **Slide** is the deck as it always was. All three come from the deck's own slides, headlines and notes, so
+  they cannot drift. The page opens on Slide, and a link ending `#read` or `#scroll` opens that one. In a deck in another
+  language, give the words: `"lenses": {"read": "Lire", "scroll": "Défiler", "slide": "Diapos"}`. Clicks with no notes
+  have no prose in Read and Scroll, so write the notes. A deck that doesn't ask builds byte for byte as before.
 - **A ready-made look to start from.** `"look": "base"` in deck.json, which `init` writes for you, brings the tokens,
   light and dark, and the pieces a picture is made of, so a deck looks finished before anyone writes CSS, and `T` still
   switches light and dark. Make it yours by changing a token in theme.css:

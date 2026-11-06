@@ -11,6 +11,7 @@ import {loopCss} from './loops.js';
 import {DIFFERS_CSS} from './differs.js';
 import {PACE_CSS} from './pace.js';
 import {CALLOUT_CSS} from './callouts.js';
+import {LENS_CSS, LENS_FIRST, lensHtml, lensRuntime} from './lenses.js';
 import {EXPLORE_CSS, exploreData, exploreRuntime} from './explore.js';
 import {TRANSITION_CSS, transitionData, transitionRuntime} from './transitions.js';
 
@@ -51,7 +52,7 @@ export function deckStyles(compiled, assets) {
   const labelled = (compiled.clicks ?? []).some((c) => c.differs?.shown.length);
   // how a part's pieces arrive and leave (pace.js): only when a part asks
   const paced = (compiled.clicks ?? []).some((c) => c.pace);
-  return [...assets.css, ...look, ...(compiled.callouts ? [CALLOUT_CSS] : []), ...(loops ? [loops] : []), ...(compiled.explore ? [EXPLORE_CSS] : []), ...(compiled.transitions ? [TRANSITION_CSS] : []), ...(labelled ? [DIFFERS_CSS] : []), ...(paced ? [PACE_CSS] : []), compiled.themeCss ?? ''].join('\n');
+  return [...assets.css, ...look, ...(compiled.callouts ? [CALLOUT_CSS] : []), ...(compiled.config.lenses ? [LENS_CSS] : []), ...(loops ? [loops] : []), ...(compiled.explore ? [EXPLORE_CSS] : []), ...(compiled.transitions ? [TRANSITION_CSS] : []), ...(labelled ? [DIFFERS_CSS] : []), ...(paced ? [PACE_CSS] : []), compiled.themeCss ?? ''].join('\n');
 }
 
 /**
@@ -64,7 +65,8 @@ export function deckPage(compiled, assets, {dev = null} = {}) {
   const {config, slides} = compiled;
   const css = deckStyles(compiled, assets);
   const script = dev?.nonce ? `<script nonce="${esc(dev.nonce)}">` : '<script>';
-  const runtimes = [focusRuntime, notesRuntime, listenRuntime, themeRuntime, ...(compiled.explore ? [exploreRuntime] : []), ...(compiled.transitions ? [transitionRuntime] : [])]
+  // the lenses first: their keys come before any other runtime's (lenses.js)
+  const runtimes = [...(config.lenses ? [lensRuntime] : []), focusRuntime, notesRuntime, listenRuntime, themeRuntime, ...(compiled.explore ? [exploreRuntime] : []), ...(compiled.transitions ? [transitionRuntime] : [])]
     .map((fn) => `${script}(${scriptSafe(fn)})();</script>`);
   return `<!doctype html>
 <html lang="${esc(config.lang)}">
@@ -74,14 +76,14 @@ export function deckPage(compiled, assets, {dev = null} = {}) {
 <meta name="generator" content="footprint-storydeck ${esc(assets.version)}">
 <title>${esc(config.title)}</title>
 ${config.description ? `<meta name="description" content="${esc(config.description)}">\n` : ''}${dev ? `<meta name="storydeck-dev" content="${Number(dev.version)}">\n` : ''}${dev?.token ? `<meta name="storydeck-dev-token" content="${esc(dev.token)}">\n` : ''}${script}${THEME_FIRST}</script>
-<style>${styleSafe(css)}</style>
+${config.lenses ? `${script}${LENS_FIRST}</script>\n` : ''}<style>${styleSafe(css)}</style>
 </head>
 <body>
 <deck-stage width="${config.canvas[0]}" height="${config.canvas[1]}" no-rail${compiled.explore ? ' data-explore' : ''}>
 ${slides.map((s) => s.html).join('\n')}
 </deck-stage>
 ${TOGGLE}
-<!-- deck-stage.js, focus and narration runtimes: footprint-storydeck ${esc(assets.version)} (MIT) -->
+${config.lenses ? `${lensHtml(compiled)}\n` : ''}<!-- deck-stage.js, focus and narration runtimes: footprint-storydeck ${esc(assets.version)} (MIT) -->
 ${notesData(slides.map((s) => s.notes))}${compiled.explore ? `\n${exploreData(compiled.explore)}` : ''}${compiled.transitions ? `\n${transitionData(compiled.transitions)}` : ''}
 ${script}${scriptSafe(assets.stageJs)}</script>
 ${runtimes.join('\n')}
