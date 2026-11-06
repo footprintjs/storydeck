@@ -4,7 +4,7 @@ import {spawn} from 'node:child_process';
 import {initDeck} from './init.js';
 import {serveDeck} from './dev.js';
 import {serveMcp} from './mcp.js';
-import {outlineTool, reviewTool, checkTool, buildTool, feedbackTool, printable} from './tools.js';
+import {outlineTool, reviewTool, checkTool, buildTool, feedbackTool, narrateTool, printable} from './tools.js';
 import {packageVersion} from './assets.js';
 
 export const USAGE = `storydeck — make a deck: one picture, built click by click
@@ -20,14 +20,20 @@ export const USAGE = `storydeck — make a deck: one picture, built click by cli
   storydeck check [folder] [--layout] [--strict]
                                        what to fix, each with its click (--layout: a browser finds text that spills;
                                        --strict: a warning fails too)
-  storydeck build [folder] [--out <file>]
-                                       one self-contained page (deck.json "out", index.html by default)
-  storydeck mcp [folder]               the read-first tools for an AI assistant (MCP over stdio)
+  storydeck narrate [folder] [--kit <folder>] [--takes <folder>] [--only 1-3,7]
+                                       what each click says, voiced or not; a voice kit voices what is missing, cached by
+                                       its words (--takes: your own recordings, lined up by the kit)
+  storydeck build [folder] [--out <file>] [--voice]
+                                       one self-contained page (deck.json "out", index.html by default);
+                                       --voice carries the clips narrate made
+  storydeck mcp [folder] [--kit <folder>] [--takes <folder>]
+                                       the read-first tools for an AI assistant (MCP over stdio); a voice named
+                                       here lets its narrate tool voice, and only a voice named here
 
 The folder defaults to the current one. In the page: ← → Space step · T light/dark · N notes · P presenter · L listen.`;
 
-const BOOLEAN = new Set(['all', 'layout', 'strict', 'open', 'help', 'version']);
-const VALUED = new Set(['out', 'port', 'click']);
+const BOOLEAN = new Set(['all', 'layout', 'strict', 'open', 'help', 'version', 'voice']);
+const VALUED = new Set(['out', 'port', 'click', 'kit', 'takes', 'only']);
 
 /** argv → {command, dir, flags}; an unknown flag is refused, naming the ones the command takes. */
 export function parseArgs(argv) {
@@ -96,7 +102,10 @@ export async function runCli(argv, {stdout = process.stdout, stderr = process.st
         return 0;
       }
       case 'build':
-        out(buildTool(dir, {out: flags.out}));
+        out(buildTool(dir, {out: flags.out, voice: flags.voice}));
+        return 0;
+      case 'narrate':
+        out(await narrateTool(dir, {kit: flags.kit, takes: flags.takes, only: flags.only}));
         return 0;
       case 'outline':
         out(outlineTool(dir));
@@ -121,7 +130,7 @@ export async function runCli(argv, {stdout = process.stdout, stderr = process.st
         return untilStopped(server.close, (stop) => onStart?.({...server, stop}));
       }
       case 'mcp':
-        await serveMcp({dir, input: stdin, output: stdout});
+        await serveMcp({dir, input: stdin, output: stdout, kit: flags.kit, takes: flags.takes});
         return 0;
       default:
         err(`unknown command "${command}"\n\n${USAGE}`);

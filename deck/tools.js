@@ -14,6 +14,8 @@ import {deckFileText} from './source.js';
 import {UNSEEN} from './html.js';
 import {FEEDBACK, readFeedback} from './edit.js';
 import {noteKey, signedBy, storydeckHome} from './noteKey.js';
+import {narrate, narrationSummary, narrationVoice} from 'footprint-story/voice';
+import {clickLines, voiceCache} from './narrate.js';
 
 /** Text as a terminal or a model is shown it: what a reader cannot see (html.js · UNSEEN) shown as \uFFFD. */
 export const printable = (text) => String(text).replace(UNSEEN, '\uFFFD');
@@ -106,9 +108,26 @@ export async function checkTool(dir, {layout = false, chromium, home} = {}) {
   return {text: `${formatProblems(problems)}${note}`, errors, warnings};
 }
 
-/** Build the page; a line saying what was written. */
-export function buildTool(dir, {out} = {}) {
-  const r = buildDeck(dir, {out});
+const carriedVoice = ({have, wanted}) => (have === wanted
+  ? ` · your voice on ${have} click${have === 1 ? '' : 's'}`
+  : ` · your voice on ${have} of ${wanted} clicks, the browser's on the rest (voice them: storydeck narrate --kit <folder>; a page's copy of a clip needs ffmpeg)`);
+
+/** Build the page; a line saying what was written. `voice`: the page carries the clips (the person's own command only: buildDeck). */
+export function buildTool(dir, {out, voice = false} = {}) {
+  const r = buildDeck(dir, {out, voice});
   const rel = path.relative(process.cwd(), r.file) || r.file;
-  return `✓ ${rel} · ${r.clicks} clicks · ${kb(r.bytes)} · ${r.ms} ms${r.data ? ` · ${path.relative(process.cwd(), r.data)}` : ''}`;
+  return `✓ ${rel} · ${r.clicks} clicks · ${kb(r.bytes)} · ${r.ms} ms${r.data ? ` · ${path.relative(process.cwd(), r.data)}` : ''}${r.voice ? carriedVoice(r.voice) : ''}`;
+}
+
+/**
+ * The deck's narration as text: what is voiced, what is left. Names of a voice (`kit`, or `kit` and `takes` for your own
+ * recordings; `only`: "1-3,7", by click) voice what is missing; with none it only reads. A kit runs Python on this machine:
+ * only the person's command or a server's start names it, never a deck (narrate.js). `hint`: the next step, in its caller's words.
+ */
+export async function narrateTool(dir, {kit, takes, only, hint = 'storydeck narrate --kit <your voice kit> (add --takes <folder> for your own recordings)'} = {}) {
+  if (only && !kit) throw new Error('--only picks the clicks to voice: name the voice too, --kit <folder>');
+  const {compiled} = loadDeck(dir), cache = voiceCache(deckRoot(dir)), {engine, profile} = narrationVoice({cache, kit, takes});
+  const report = await narrate(clickLines(compiled), {cache, profile, engine, only});
+  const next = report.voiced && !report.toVoice ? '\nnext: storydeck build --voice carries your voice in the page; a cloned voice is your own, so keep that page to who you choose' : '';
+  return `${narrationSummary(report, {noun: 'clicks', hint})}${next}`;
 }

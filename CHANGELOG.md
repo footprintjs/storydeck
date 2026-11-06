@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- **`storydeck narrate`: one command for a deck's voice.** It says what each click says and whether it is voiced, for nothing.
+  With `--kit <folder>` it voices what is missing, and `--takes <folder>` uses your own recordings. `--only 1-3,7` picks a few
+  clicks. The clips stay in the deck's `voice/cache`. `storydeck build --voice` then carries them in the page. A deck that
+  doesn't ask builds byte for byte as before.
+- **`narrate` as an MCP tool.** It only reads, unless the server was started with a voice and the call says what to voice with
+  `say`. A call can't name a kit, and `build` over MCP never carries a voice.
+- **A clip cache from someone's folder is not trusted.** A link at a clip's name is never read into a page or written through,
+  a link out of the deck at `voice/cache` is refused, and ffmpeg reads a clip's sound only as a WAV.
+
 ## 0.12.0 — a base look, callouts, and one page to read, scroll or click through
 
 - **The deck as MCP tools, documented.** The README now shows an assistant's whole path over `outline`, `feedback`, `review`,

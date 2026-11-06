@@ -32,7 +32,7 @@ describe('serveMcp', () => {
     const byId = Object.fromEntries(out.map((m) => [m.id, m]));
     expect(byId[1].result).toMatchObject({protocolVersion: '2025-03-26', capabilities: {tools: {}}, serverInfo: {name: 'storydeck'}});
     expect(byId[1].result.instructions).toMatch(/^Read first, look last/);
-    expect(byId[2].result.tools.map((t) => t.name)).toEqual(['outline', 'review', 'feedback', 'check', 'build']);
+    expect(byId[2].result.tools.map((t) => t.name)).toEqual(['outline', 'review', 'feedback', 'check', 'narrate', 'build']);
     expect(byId[3].result.content[0].text).toContain('click 2 of 6');
     expect(byId[4].result).toEqual({});
   });
@@ -43,7 +43,7 @@ describe('serveMcp', () => {
     expect(out.filter((m) => m.error?.code === -32600)).toHaveLength(2);   // null and an array are not requests
     expect(out.find((m) => m.id === 8).result).toMatchObject({isError: true, content: [{text: expect.stringMatching(/^no tool called "undefined"/)}]});
     expect(out.find((m) => m.id === 5).error).toEqual({code: -32601, message: 'Method not found: resources/list'});
-    expect(out.find((m) => m.id === 6).result).toMatchObject({isError: true, content: [{text: 'no tool called "paint" (the tools are outline, review, feedback, check, build)'}]});
+    expect(out.find((m) => m.id === 6).result).toMatchObject({isError: true, content: [{text: 'no tool called "paint" (the tools are outline, review, feedback, check, narrate, build)'}]});
     expect(out.find((m) => m.id === 7).result.protocolVersion).toBe('2025-06-18');
   });
 });

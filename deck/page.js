@@ -59,9 +59,10 @@ export function deckStyles(compiled, assets) {
  * The page. `assets`: {stageJs, css: [stylesheet …] (focus.css, narration.css, deck.css), looks, version} — what the
  * library ships, read once by assets.js. `dev`: {client, version, token, nonce} adds the dev client (dev.js), the build
  * number it compares with and its token, and marks every script of StoryDeck's own with the nonce the dev server's
- * policy lets run (so no script a deck carries runs in the dev page) — or null for the page that ships.
+ * policy lets run (so no script a deck carries runs in the dev page) — or null for the page that ships. `voiceTags`: the
+ * clips the page carries (voice.js · embedClips), for listenRuntime.
  */
-export function deckPage(compiled, assets, {dev = null} = {}) {
+export function deckPage(compiled, assets, {dev = null, voiceTags = ''} = {}) {
   const {config, slides} = compiled;
   const css = deckStyles(compiled, assets);
   const script = dev?.nonce ? `<script nonce="${esc(dev.nonce)}">` : '<script>';
@@ -84,7 +85,7 @@ ${slides.map((s) => s.html).join('\n')}
 </deck-stage>
 ${TOGGLE}
 ${config.lenses ? `${lensHtml(compiled)}\n` : ''}<!-- deck-stage.js, focus and narration runtimes: footprint-storydeck ${esc(assets.version)} (MIT) -->
-${notesData(slides.map((s) => s.notes))}${compiled.explore ? `\n${exploreData(compiled.explore)}` : ''}${compiled.transitions ? `\n${transitionData(compiled.transitions)}` : ''}
+${notesData(slides.map((s) => s.notes))}${voiceTags ? `\n${voiceTags}` : ''}${compiled.explore ? `\n${exploreData(compiled.explore)}` : ''}${compiled.transitions ? `\n${transitionData(compiled.transitions)}` : ''}
 ${script}${scriptSafe(assets.stageJs)}</script>
 ${runtimes.join('\n')}
 ${dev ? `${script}(${scriptSafe(dev.client)})();</script>\n` : ''}</body>
