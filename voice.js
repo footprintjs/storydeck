@@ -5,13 +5,15 @@
 // The voice itself — the clip cache keyed by what is said, the voice port and the Chatterbox kit adapter — is
 // footprint-story's (Node door 'footprint-story/voice': voiceClips, clipFor, clipKey, chatterboxKit,
 // pickSteps). What is the deck's own is carrying the clips in the page for listenRuntime.
-import { existsSync, readFileSync } from 'node:fs';
+import { lstatSync, readFileSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { clipFor } from 'footprint-story/voice';
 
 /** Why a spawned process failed, or null when it ran and exited 0 (a missing binary or a signal is a failure). */
 const failure = (done) => (done?.error ? done.error.message : done?.signal ? `signal ${done.signal}` : done?.status !== 0 ? `exit ${done?.status}` : null);
+
+const isPlainFile = (file) => lstatSync(file, { throwIfNoEntry: false })?.isFile() === true;
 
 /**
  * The clips for a single-file page: each click's cached clip as a base64 <script> tag (an .m4a, made from the
@@ -26,9 +28,11 @@ export function embedClips(texts, { cache, profile, run = spawnSync }) {
     const clip = clipFor(text, { cache, profile });
     if (!clip) { steps.push(null); continue; }
     const m4a = path.join(cache, `${clip.key}.m4a`);
-    if (!existsSync(m4a)) {
-      const done = run('ffmpeg', ['-y', '-loglevel', 'error', '-i', path.join(cache, `${clip.key}.wav`), '-c:a', 'aac', '-b:a', '48k', '-ac', '1', m4a]);
-      if (failure(done) || !existsSync(m4a)) { steps.push(null); continue; }   // no ffmpeg, or it failed: the browser's voice there
+    if (!isPlainFile(m4a)) {
+      rmSync(m4a, { force: true });   // a link at its name: never read into the page, nor written through
+      // the sound is read as a WAV and nothing else: a cache may have come with someone's folder, and left to guess, ffmpeg also reads playlists that name other files
+      const done = run('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'wav', '-i', path.join(cache, `${clip.key}.wav`), '-c:a', 'aac', '-b:a', '48k', '-ac', '1', m4a]);
+      if (failure(done) || !isPlainFile(m4a)) { steps.push(null); continue; }   // no ffmpeg, or it failed: the browser's voice there
     }
     if (!clips[clip.key]) {
       clips[clip.key] = { d: clip.duration, s: clip.sentences };

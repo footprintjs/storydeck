@@ -46,6 +46,7 @@ npx footprint-storydeck outline my-talk         # the whole deck, a line per cli
 npx footprint-storydeck review my-talk --click 3    # one click: headline (words), focus, route, lit, greyed, enters, moves, notes
 npx footprint-storydeck check my-talk           # what to fix, each with its click and its fix (--layout: text that spills and stray endless animations, in a browser)
 npx footprint-storydeck build my-talk           # my-talk/index.html, self-contained
+npx footprint-storydeck narrate my-talk         # voiced or not, per click (--kit <folder> voices what is missing; then build --voice)
 npx footprint-storydeck dev my-talk             # for the person: a save reloads on the same click and replays it
 npx footprint-storydeck feedback my-talk        # the notes the person left in the dev page — read these first
 ```

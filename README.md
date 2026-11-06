@@ -275,6 +275,29 @@ page += notesData(clicks.map(c => c.notes)) + voice.tags
   + `<script>(${notesRuntime})();(${listenRuntime})();</script>`;
 ```
 
+Or leave the script to the command, which does all of that for a deck folder:
+
+```mermaid
+flowchart LR
+  said[What each click says] --> named{A voice named?}
+  named -- no --> read[Read the clips and say what is left]
+  named -- yes --> voice[Voice what is missing and keep each clip]
+  voice --> read
+  read --> build["storydeck build --voice carries the clips you have"]
+```
+
+```bash
+storydeck narrate my-talk                                     # what each click says, voiced or not; asking costs nothing
+storydeck narrate my-talk --kit ../voice-kit                  # voices what is missing, and keeps every clip it finishes
+storydeck narrate my-talk --kit ../voice-kit --takes takes    # your own recordings, lined up by the kit's aligner
+storydeck narrate my-talk --kit ../voice-kit --only 1-3,7     # a few clicks first, to hear them
+storydeck build my-talk --voice                               # the page carries the clips
+```
+
+The clips stay in `my-talk/voice/cache`, found by their words and the voice's settings, so changing one note re-voices one
+click. A deck names no voice: a voice kit runs Python on your machine, so only your command, or the MCP server's start,
+says where it is.
+
 A cloned voice is the speaker's own: keep a page that carries the clips internal, and build the public one
 without them (the listen mode falls back to the browser's voice).
 
@@ -586,9 +609,21 @@ claude mcp add storydeck -- npx footprint-storydeck mcp my-talk      # Claude Co
 | `feedback` | The notes the person left on clicks in the dev page: what to change. |
 | `review` `{click}` | One click as text: what it says, lights, greys, brings in and moves. Name a click, or `all: true`. |
 | `check` `{layout}` | What to fix, worst first, each with its click and its fix. With `layout: true`, a browser also finds text that spills, callouts that overlap, and a tail that no longer reaches its piece. |
+| `narrate` `{say}` | What each click says in your voice: how many are voiced, and which are left. It only reads, unless the server has a voice and `say` names what to voice (`"all"`, or clicks like `"1-3,7"`). |
 | `build` | Writes the one page, and says what it wrote. |
 
 The order that costs least: `outline`, then `feedback`, then `review` a click, edit the files, `check`, and `build` last.
+
+```mermaid
+flowchart LR
+  outline[outline: the whole deck] --> feedback[feedback: what the person asked for]
+  feedback --> review[review a click, as text]
+  review --> edit[Edit the deck's files]
+  edit --> check{check: anything to fix?}
+  check -- yes --> review
+  check -- no --> narrate[narrate: voice it, if you want]
+  narrate --> build[build: one page to send]
+```
 
 To start a deck, `npx footprint-storydeck init my-talk` writes one that builds and checks clean, using the base look and a
 callout. For a page to send, add `"lenses": true` to deck.json, so it opens as Read, Scroll or Slide with no site behind it.
@@ -600,6 +635,12 @@ What to expect from it:
   A call may only name a deck inside the folder the server was started with, and `build` writes only that deck's own page.
 - **Nothing runs a deck's code,** in any of these tools. A deck's own scripts do run in the page `build` writes, as any page's
   do, so open a deck from someone you don't trust with care.
+- **A voice is yours to give.** `narrate` reads until you start the server with one: `storydeck mcp my-talk --kit ../voice-kit`.
+  A call can't name a kit, because a kit runs Python on your machine. Voicing runs in its own process, so the server goes on
+  answering. It takes minutes, and every clip it finishes is kept. A call that times out leaves it running, so call `narrate`
+  with no `say` to see how far it has got; a second `say` is refused until it is done.
+  With a voice given, a deck's notes can be read aloud in it, so give one only for decks you trust. `build` over MCP
+  never carries a voice: that page comes from your own `storydeck build --voice`.
 - **It doesn't make a deck from a storyboard yet.** The storyboard and its `shapes`, `brief` and `create` tools are in
   [footprint-story](https://github.com/footprintjs/footprint-story) and [StoryReel](https://github.com/footprintjs/storyreel),
   which can make a film from one today.

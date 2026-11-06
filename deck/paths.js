@@ -83,6 +83,20 @@ export function servedFile(root, pathname) {
   }
 }
 
+/** The nearest thing on a path's way that exists, refused when it is a link to nothing. */
+function nearestExisting(root, at) {
+  while (presence(at) === 'missing') at = path.dirname(at);
+  if (presence(at) === 'dangling') throw new Error(`${path.relative(root, at) || at} is a link to nothing — nothing can be written through it`);
+  return at;
+}
+
+/** A folder the deck keeps files of its own in (it may not exist yet), refused when a link on the way leads out of the deck or to a hidden place. */
+export function folderInside(root, name) {
+  const dir = path.join(root, name), why = notDeckPlace(root, realPath(nearestExisting(root, dir)));
+  if (why) throw new Error(`${name} is reached through a link ${why === 'outside' ? 'out of the deck folder' : 'to a hidden folder'} — remove the link: a deck keeps its files inside itself`);
+  return dir;
+}
+
 /**
  * Write a built file: a new file beside it, renamed into place — never through a link at that name (a dangling or a
  * hard link included). A file deck.json names (`chosen` false) never lands outside the deck folder, a folder link on
@@ -96,10 +110,7 @@ export function writeInside(root, file, text, {chosen = false} = {}) {
     if (why === 'outside') throw new Error(`${name} would land outside the deck folder (a folder on the way is a link) — the build writes only inside the deck`);
     if (why === 'hidden') throw new Error(`${name} would land in a hidden folder (a folder on the way is a link to one) — the build never writes hidden files`);
   };
-  let existing = path.dirname(file);
-  while (presence(existing) === 'missing') existing = path.dirname(existing);
-  if (presence(existing) === 'dangling') throw new Error(`${path.relative(root, existing) || existing} is a link to nothing — the build cannot write through it`);
-  refuse(existing);   // before any folder is made
+  refuse(nearestExisting(root, path.dirname(file)));   // before any folder is made
   mkdirSync(path.dirname(file), {recursive: true});
   refuse(path.dirname(file));
   if (presence(file) !== 'missing' && lstatSync(file).isSymbolicLink()) {
