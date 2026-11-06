@@ -614,6 +614,17 @@ claude mcp add storydeck -- npx footprint-storydeck mcp my-talk      # Claude Co
 
 The order that costs least: `outline`, then `feedback`, then `review` a click, edit the files, `check`, and `build` last.
 
+```mermaid
+flowchart LR
+  outline[outline: the whole deck] --> feedback[feedback: what the person asked for]
+  feedback --> review[review a click, as text]
+  review --> edit[Edit the deck's files]
+  edit --> check{check: anything to fix?}
+  check -- yes --> review
+  check -- no --> narrate[narrate: voice it, if you want]
+  narrate --> build[build: one page to send]
+```
+
 To start a deck, `npx footprint-storydeck init my-talk` writes one that builds and checks clean, using the base look and a
 callout. For a page to send, add `"lenses": true` to deck.json, so it opens as Read, Scroll or Slide with no site behind it.
 Write the notes, because Read and Scroll are made from them.
