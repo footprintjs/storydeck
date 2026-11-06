@@ -2,7 +2,7 @@
 import path from 'node:path';
 import {readDeck} from './source.js';
 import {compileDeck} from './compile.js';
-import {deckPage} from './page.js';
+import {deckPage, deckStyles} from './page.js';
 import {pageAssets} from './assets.js';
 import {deckRoot, writeInside} from './paths.js';
 
@@ -35,8 +35,7 @@ export function buildDeck(dir, {out} = {}) {
   let data = null;
   if (compiled.config.deckData) {
     data = path.join(root, compiled.config.deckData);
-    const assets = pageAssets();
-    const deckCss = [...assets.css, compiled.themeCss].join('\n');
+    const deckCss = deckStyles(compiled, pageAssets());
     writeInside(root, data, JSON.stringify({deckCss, sections: compiled.slides.map(({label, html: h}) => ({label, html: h}))}, null, 1));
   }
   return {file, bytes: Buffer.byteLength(html), slides: compiled.slides.length, clicks: compiled.clicks.length, data, ms: Math.round(performance.now() - t0)};

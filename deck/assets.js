@@ -4,6 +4,7 @@
 import {existsSync, readFileSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {LOOKS} from './config.js';
 
 const NAME = 'footprint-storydeck';
 
@@ -27,7 +28,7 @@ export function packageVersion() {
   return version;
 }
 
-/** {stageJs, css: [focus.css, narration.css, deck.css], version}, read once per process. */
+/** {stageJs, css: [focus.css, narration.css, deck.css], looks: {name: its stylesheet}, version}, read once per process. */
 export function pageAssets() {
   if (cached) return cached;
   const root = packageRoot();
@@ -35,6 +36,7 @@ export function pageAssets() {
   cached = Object.freeze({
     stageJs: read('site/public/deck-stage.js'),
     css: Object.freeze([read('focus.css'), read('narration.css'), read('deck.css')]),
+    looks: Object.freeze(Object.fromEntries(LOOKS.map((name) => [name, read(`look-${name}.css`)]))),
     version: packageVersion(),
   });
   return cached;

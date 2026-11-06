@@ -6,6 +6,7 @@
 //     "area": [0, 220, 1920, 1000],                             where focus may move and blur: below the headline, above the footer
 //     "canvas": [1920, 1080],                                   the slide's design size
 //     "clicks": "clicks.html", "theme": "theme.css", "icons": "icons",
+//     "look": "base",                                           a ready-made look under theme.css (look-base.css); left out: none
 //     "maps": { "map": "map.html" },                            a map's file (default: <name>.html)
 //     "out": "index.html",                                      the built page, inside the deck folder
 //     "post": "post.json", "deckData": "deck-data.json",       the Read/Scroll lenses' sources, when the deck has them
@@ -26,7 +27,9 @@ export const DEFAULTS = Object.freeze({
   out: 'index.html',
   checks: Object.freeze({maxWords: 12, maxSlideWords: 40}),
 });
-const KEYS = ['title', 'description', 'lang', 'footer', 'area', 'canvas', 'clicks', 'theme', 'icons', 'maps', 'out', 'post', 'deckData', 'checks', 'explore'];
+/** The ready-made looks a deck may ask for; each is look-<name>.css at the package's root (assets.js). */
+export const LOOKS = Object.freeze(['base']);
+const KEYS = ['title', 'description', 'lang', 'footer', 'area', 'canvas', 'clicks', 'theme', 'look', 'icons', 'maps', 'out', 'post', 'deckData', 'checks', 'explore'];
 const CHECK_KEYS = ['maxWords', 'maxSlideWords'];
 
 const isText = (v) => typeof v === 'string' && v.trim().length > 0;
@@ -64,6 +67,7 @@ export function readConfig(json) {
   };
   const maxWords = count('maxWords'), maxSlideWords = count('maxSlideWords');
   if (raw.explore !== undefined && typeof raw.explore !== 'boolean') throw new Error(`deck.json "explore" is true or false, not ${JSON.stringify(raw.explore)}`);
+  if (raw.look !== undefined && !LOOKS.includes(raw.look)) throw new Error(`deck.json "look" is ${LOOKS.map((l) => `"${l}"`).join(' or ')}, or left out for none, not ${JSON.stringify(raw.look)}`);
   return Object.freeze({
     title: raw.title.trim(),
     description: raw.description ?? '',
@@ -73,6 +77,7 @@ export function readConfig(json) {
     area: Object.freeze([...area]),
     clicks: deckPath(raw.clicks ?? DEFAULTS.clicks, 'clicks'),
     theme: deckPath(raw.theme ?? DEFAULTS.theme, 'theme'),
+    look: raw.look ?? null,
     icons: deckPath(raw.icons ?? DEFAULTS.icons, 'icons'),
     maps: Object.freeze(Object.fromEntries(Object.entries(maps).map(([name, file]) => [name, deckPath(file, `maps.${name}`)]))),
     out: deckPath(raw.out ?? DEFAULTS.out, 'out'),

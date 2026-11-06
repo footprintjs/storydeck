@@ -6,7 +6,8 @@ import path from 'node:path';
 const DECK_JSON = `{
   "title": "A request, end to end",
   "description": "A starter deck: one picture, built click by click.",
-  "footer": "A request, end to end · a StoryDeck starter"
+  "footer": "A request, end to end · a StoryDeck starter",
+  "look": "base"
 }
 `;
 
@@ -19,6 +20,8 @@ const MAP = `<!--
   data-packets="2" data-speed="5" (packets that keep running along it). In a click, "server+" is the server, its wires
   and what they reach. <i class="ic" data-icon="name"> is icons/name.svg. data-loop="pulse" (float, marquee)
   keeps a piece moving while its slide is shown; data-loop alone runs its own --loop from theme.css.
+  Ready-made pieces, from "look": "base" in deck.json: class box, chip, area, group or card, with a <b> and a <small>
+  inside; add ok, warn or bad to colour one. An area goes before the pieces that stand in it.
 -->
 <div data-k="client" class="box" style="left:160px;top:420px;width:300px;height:210px"><i class="ic" data-icon="client"></i><b>Client</b><small>a browser</small></div>
 <i data-k="req1" class="wire req pkt" data-arrow="client to server"></i>
@@ -84,44 +87,18 @@ const CLICKS = `<!--
 </section>
 `;
 
-const THEME = `/* The deck's look. Tokens first (light on :root, dark on :root.dark — T switches, the choice is kept), then its own
-   pieces. StoryDeck's base (deck.css) styles the chrome, wires, packets and icons from these tokens. */
+const THEME = `/* The deck's look. "look": "base" in deck.json brings a ready-made one, light and dark: its tokens, and the pieces a
+   picture is made of (box, chip, area, group, card, title-block, points). Change a token here and everything that reads
+   it follows; any rule you write here wins over the base. A token on :root reaches light and dark (T switches, the
+   choice is kept); :root.dark gives dark its own. Also yours to set: --bg --bg-elev --fg --fg-muted --line --sd-accent
+   --sd-dim-opacity --sd-ok --sd-warn --sd-bad --sans --mono. */
 :root {
-  --bg: #f5f7fa; --bg-elev: #ffffff; --fg: #15202b; --fg-muted: #586574; --line: #c8d1dc;
-  --accent-ink: #0b6e99; --sd-accent: #0b6e99; --sd-glow: #e8a33d; --sd-dim-opacity: .3;
-  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  color-scheme: light;
+  --accent-ink: #0b6e99; --sd-glow: #e8a33d;
+  --sd-radius: 18px;
 }
 :root.dark {
-  --bg: #0e1319; --bg-elev: #161d26; --fg: #e9eef4; --fg-muted: #9aa7b6; --line: #354150;
-  --accent-ink: #5cc8f0; --sd-accent: #5cc8f0; --sd-glow: #f2b65a; --sd-dim-opacity: .28;
-  color-scheme: dark;
+  --accent-ink: #5cc8f0; --sd-glow: #f2b65a;
 }
-
-.title-block { position: absolute; left: 50px; right: 50px; top: 380px; }
-.title-block h1 { margin: 0; font-size: 104px; line-height: 1.02; letter-spacing: -.03em; font-weight: 750; }
-.title-block .sub { margin: 36px 0 0; font: 500 34px/1.2 var(--mono); color: var(--fg-muted); }
-
-.box {
-  border: 3px solid var(--line); background: var(--bg-elev); border-radius: 18px; padding: 16px 18px;
-  display: flex; flex-direction: column; justify-content: flex-start; gap: 4px;
-}
-.box b { font-size: 34px; font-weight: 700; }
-.box small { font-size: 21px; color: var(--fg-muted); }
-.box svg.ic { color: var(--accent-ink); margin-bottom: 6px; }
-
-.chip { border: 2.5px solid var(--accent-ink); background: var(--bg-elev); border-radius: 12px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-.chip b { font: 700 30px/1.1 var(--mono); }
-.chip small { font: 600 15px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--fg-muted); }
-
-svg.wire.req { color: var(--fg); }
-svg.wire.ret { color: var(--accent-ink); }
-svg.wire.ret path:not(.head) { stroke-dasharray: 9 8; }
-
-.points { position: absolute; left: 50px; right: 50px; top: 300px; margin: 0; padding: 0; list-style: none; display: grid; gap: 34px; }
-.points li { font-size: 54px; font-weight: 650; padding-left: 56px; position: relative; }
-.points li::before { content: ""; position: absolute; left: 0; top: .42em; width: 22px; height: 22px; border-radius: 50%; background: var(--accent-ink); }
 `;
 
 const ICONS = {
@@ -137,10 +114,10 @@ One picture, built click by click. Edit these files; the dev page reloads on the
 
 | File | What it holds |
 |---|---|
-| \`deck.json\` | title, description, footer (and \`area\`, \`canvas\`, \`checks\` when you need them) |
+| \`deck.json\` | title, description, footer, the ready-made look (and \`area\`, \`canvas\`, \`checks\` when you need them) |
 | \`clicks.html\` | the parts and their clicks: \`<section>\` per part, \`<step>\` per click on a map |
 | \`map.html\` | the picture: every \`data-k\` element with an inline left/top/width/height is a piece |
-| \`theme.css\` | tokens (light, \`:root.dark\`) and the look of your pieces |
+| \`theme.css\` | a few tokens to make it yours (light, \`:root.dark\`); any rule you write wins over the base look |
 | \`icons/*.svg\` | drawn identities, used as \`<i class="ic" data-icon="name"></i>\` |
 
 Run these from your project — the folder that holds this deck — naming the deck (\`npx\` would otherwise prefer a

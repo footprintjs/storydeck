@@ -1,0 +1,87 @@
+/* footprint-storydeck/look-base.css — the ready-made look a deck asks for with "look": "base" in deck.json: the tokens,
+   light and dark, and the pieces a picture is made of. It comes after deck.css and before the deck's theme.css, and
+   every rule is :where(), so a token or a rule in theme.css wins over any of it, whatever its selector. A deck that
+   does not ask for it carries none of it. */
+
+/* The tokens. In theme.css, one set on :root reaches light and dark; one on :root.dark gives dark its own. The highlight
+   (--sd-accent) follows the accent until a deck sets its own. */
+:where(:root) {
+  --bg: #f5f7fa; --bg-elev: #ffffff; --fg: #15202b; --fg-muted: #586574; --line: #c8d1dc;
+  --accent-ink: #0b6e99; --sd-accent: var(--accent-ink); --sd-glow: #e8a33d; --sd-dim-opacity: .3;
+  --sd-ok: #1a7a3e; --sd-warn: #8f5c00; --sd-bad: #c0322b;
+  --sd-radius: 18px;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+:where(:root.dark) {
+  --bg: #0e1319; --bg-elev: #161d26; --fg: #e9eef4; --fg-muted: #9aa7b6; --line: #354150;
+  --accent-ink: #5cc8f0; --sd-glow: #f2b65a; --sd-dim-opacity: .28;
+  --sd-ok: #5ad58a; --sd-warn: #f2b65a; --sd-bad: #ff8f85;
+  color-scheme: dark;
+}
+/* a part with its own data-theme keeps this link for itself, so setting its accent moves its highlight too */
+:where(deck-stage > section[data-theme]) { --sd-accent: var(--accent-ink); }
+
+/* class ok, warn or bad colours a piece's edge, icon and heading */
+:where(.ok) { --sd-tone: var(--sd-ok); }
+:where(.warn) { --sd-tone: var(--sd-warn); }
+:where(.bad) { --sd-tone: var(--sd-bad); }
+
+/* a box: one thing in the picture, an icon, a name and a small line */
+:where(.box) {
+  box-sizing: border-box; display: flex; flex-direction: column; justify-content: flex-start; gap: 4px; padding: 16px 18px;
+  border: 3px solid var(--sd-tone, var(--line)); border-radius: var(--sd-radius); background: var(--bg-elev);
+}
+:where(.box b) { font-size: 38px; line-height: 1.15; font-weight: 700; }
+:where(.box small) { font-size: 26px; line-height: 1.25; color: var(--fg-muted); }
+:where(.box svg.ic) { margin-bottom: 6px; color: var(--sd-tone, var(--accent-ink)); }
+
+/* a chip: a small value with a label under it */
+:where(.chip) {
+  box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px;
+  border: 3px solid var(--sd-tone, var(--accent-ink)); border-radius: calc(var(--sd-radius) * .66); background: var(--bg-elev);
+}
+:where(.chip b) { font: 700 32px/1.1 var(--mono); }
+:where(.chip small) { font: 600 20px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--fg-muted); }
+
+/* an area: a place the pieces stand in, written before them in the map so they sit on top; its <b> names it */
+:where(.area) {
+  box-sizing: border-box; padding: 16px 22px;
+  border: 3px dashed var(--sd-tone, var(--line)); border-radius: var(--sd-radius);
+  background: color-mix(in srgb, var(--sd-tone, var(--accent-ink)) 5%, transparent);
+}
+:where(.area b) { font: 600 24px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--sd-tone, var(--fg-muted)); }
+
+/* a group: pieces that belong together, under a heading (its <b>) */
+:where(.group) {
+  box-sizing: border-box;
+  border: 3px solid var(--sd-tone, var(--line)); border-radius: var(--sd-radius); background: var(--bg-elev);
+}
+:where(.group > b) {
+  display: block; padding: 12px 20px; font-size: 32px; line-height: 1.2; font-weight: 700;
+  color: var(--sd-tone, var(--fg)); border-bottom: 3px solid var(--sd-tone, var(--line));
+}
+
+/* a card: an icon with a title and a line beside it. As a piece it is placed like any other; on a plain slide, .cards lays them out */
+:where(.card) {
+  box-sizing: border-box; display: grid; grid-template-columns: auto 1fr; align-content: center; padding: 24px 28px;
+  border: 3px solid var(--sd-tone, var(--line)); border-radius: var(--sd-radius); background: var(--bg-elev);
+}
+:where(.card svg.ic) { grid-row: 1 / span 2; align-self: center; width: 84px; height: 84px; margin-right: 24px; color: var(--sd-tone, var(--accent-ink)); }
+:where(.card b) { grid-column: 2; font-size: 44px; line-height: 1.15; font-weight: 700; }
+:where(.card small) { grid-column: 2; font-size: 30px; line-height: 1.3; color: var(--fg-muted); }
+:where(.cards) { position: absolute; left: 50px; right: 50px; top: 300px; display: grid; grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); gap: 32px; }
+
+/* a title slide and a list of points */
+:where(.title-block) { position: absolute; left: 50px; right: 50px; top: 380px; }
+:where(.title-block h1) { margin: 0; font-size: 104px; line-height: 1.02; letter-spacing: -.03em; font-weight: 750; }
+:where(.title-block .sub) { margin: 36px 0 0; font: 500 34px/1.2 var(--mono); color: var(--fg-muted); }
+:where(.points) { position: absolute; left: 50px; right: 50px; top: 300px; margin: 0; padding: 0; list-style: none; display: grid; gap: 34px; }
+:where(.points li) { font-size: 54px; font-weight: 650; padding-left: 56px; position: relative; }
+:where(.points li)::before { content: ""; position: absolute; left: 0; top: .42em; width: 22px; height: 22px; border-radius: 50%; background: var(--accent-ink); }
+
+/* two kinds of wire: a request, and the answer coming back */
+:where(svg.wire.req) { color: var(--fg); }
+:where(svg.wire.ret) { color: var(--accent-ink); }
+:where(svg.wire.ret path:not(.head)) { stroke-dasharray: 9 8; }

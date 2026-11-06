@@ -37,20 +37,31 @@ const TOGGLE = '<button class="theme-toggle" type="button" aria-label="Switch th
   + '<svg class="moon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>';
 
 /**
- * The page. `assets`: {stageJs, css: [stylesheet …] (focus.css, narration.css, deck.css), version} — what the
+ * The one stylesheet a deck's slides need, for its page and for deck-data.json: what every page carries, what this deck
+ * asks for, and its theme.css last, so the deck's own rules win. A deck that asks for nothing gets only the first and
+ * the last, byte for byte as before each of these came to be.
+ */
+export function deckStyles(compiled, assets) {
+  // the ready-made look a deck asks for, right after deck.css
+  const look = compiled.config.look ? [assets.looks[compiled.config.look]] : [];
+  // the named loops the deck shows (loops.js)
+  const loops = loopCss(compiled.loops ?? []);
+  // the labels of a part that differs from the real thing (differs.js): only when one shows them
+  const labelled = (compiled.clicks ?? []).some((c) => c.differs?.shown.length);
+  // how a part's pieces arrive and leave (pace.js): only when a part asks
+  const paced = (compiled.clicks ?? []).some((c) => c.pace);
+  return [...assets.css, ...look, ...(loops ? [loops] : []), ...(compiled.explore ? [EXPLORE_CSS] : []), ...(compiled.transitions ? [TRANSITION_CSS] : []), ...(labelled ? [DIFFERS_CSS] : []), ...(paced ? [PACE_CSS] : []), compiled.themeCss ?? ''].join('\n');
+}
+
+/**
+ * The page. `assets`: {stageJs, css: [stylesheet …] (focus.css, narration.css, deck.css), looks, version} — what the
  * library ships, read once by assets.js. `dev`: {client, version, token, nonce} adds the dev client (dev.js), the build
  * number it compares with and its token, and marks every script of StoryDeck's own with the nonce the dev server's
  * policy lets run (so no script a deck carries runs in the dev page) — or null for the page that ships.
  */
 export function deckPage(compiled, assets, {dev = null} = {}) {
   const {config, slides} = compiled;
-  // the named loops the deck shows (loops.js), before theme.css: the deck's own rules win (a deck with none: as before)
-  const loops = loopCss(compiled.loops ?? []);
-  // the labels of a part that differs from the real thing (differs.js): only when one shows them, so a deck with none is as before
-  const labelled = (compiled.clicks ?? []).some((c) => c.differs?.shown.length);
-  // how a part's pieces arrive and leave (pace.js): only when a part asks, and before theme.css, so the deck's own rules win
-  const paced = (compiled.clicks ?? []).some((c) => c.pace);
-  const css = [...assets.css, ...(loops ? [loops] : []), ...(compiled.explore ? [EXPLORE_CSS] : []), ...(compiled.transitions ? [TRANSITION_CSS] : []), ...(labelled ? [DIFFERS_CSS] : []), ...(paced ? [PACE_CSS] : []), compiled.themeCss ?? ''].join('\n');
+  const css = deckStyles(compiled, assets);
   const script = dev?.nonce ? `<script nonce="${esc(dev.nonce)}">` : '<script>';
   const runtimes = [focusRuntime, notesRuntime, listenRuntime, themeRuntime, ...(compiled.explore ? [exploreRuntime] : []), ...(compiled.transitions ? [transitionRuntime] : [])]
     .map((fn) => `${script}(${scriptSafe(fn)})();</script>`);
