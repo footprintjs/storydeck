@@ -86,6 +86,20 @@ describe('where a callout stands', () => {
   });
 });
 
+describe('its tail, at a slant', () => {
+  it.each([[100, 100], [100, 700], [1500, 100], [1500, 700], [500, 100], [1200, 700]])('keeps its foot inside the bubble, from %i, %i', (left, top) => {
+    const html = drawn(say('server', ` style="left:${left}px;top:${top}px;width:400px;height:120px"`));
+    const tail = /callout-tail" style="left:(-?[\d.]+)px;top:(-?[\d.]+)px/.exec(html), d = /<path d="M(-?[\d.]+) (-?[\d.]+)L(-?[\d.]+) (-?[\d.]+)L(-?[\d.]+) (-?[\d.]+)Z/.exec(html);
+    for (const [x, y] of [[d[1], d[2]], [d[5], d[6]]]) {
+      const inX = Number(tail[1]) + Number(x), inY = Number(tail[2]) + Number(y);
+      expect(inX).toBeGreaterThanOrEqual(5.9);
+      expect(inX).toBeLessThanOrEqual(394.1);
+      expect(inY).toBeGreaterThanOrEqual(5.9);
+      expect(inY).toBeLessThanOrEqual(114.1);
+    }
+  });
+});
+
 describe('its tail', () => {
   it.each([['above', 950, 496], ['below', 950, 704], ['left', 796, 600], ['right', 1104, 600]])('on %s points at the piece\'s edge, just short of it', (side, x, y) => {
     expect(tipOf(drawn(say(`server ${side}`)))).toEqual([x, y]);
@@ -99,6 +113,15 @@ describe('its tail', () => {
 
   it('is left to its piece: the svg has no piece name, so it never counts as one', () => {
     expect(readPieces(drawn(say('server'))).pieces.map((p) => p.keys[0])).toEqual(['server', 'why']);
+  });
+});
+
+describe('a map that would make it work hard', () => {
+  it.each([['unfinished tags of its kind', '<div'], ['unfinished tags with something in them', '<div a'], ['closing tags left open', '</div']])('finds a callout never closed in one pass, among %s', (_, unit) => {
+    const crafted = `${SERVER}<div data-k="why" data-callout="server">Words${unit.repeat(400_000)}`;
+    const t0 = performance.now();
+    expect(() => callouts(crafted)).toThrow('is never closed');
+    expect(performance.now() - t0).toBeLessThan(1000);
   });
 });
 
@@ -117,8 +140,15 @@ describe('as a piece', () => {
     expect(drawn(say('server'))).not.toContain('data-callout=');
   });
 
-  it('holds tags of its own kind inside it', () => {
-    expect(drawn(say('server', '', '<div>Inner</div> after'))).toContain('<span class="callout-say"><div>Inner</div> after</span></div>');
+  it('holds inline tags of its own kind inside it', () => {
+    const html = `${SERVER}<span data-k="why" data-callout="server"><span>Inner</span> after</span>`;
+    expect(callouts(html)).toContain('<span class="callout-say"><span>Inner</span> after</span></span>');
+  });
+
+  it('keeps its style\'s own quote, as its value may hold the other', () => {
+    const html = drawn(say('server', ` style='font-family:"Foo Bar"'`));
+    expect(html).toMatch(/style='left:[^']*font-family:"Foo Bar"'/);
+    expect(boxOf(html).w).toBeGreaterThan(0);
   });
 
   it('reads back as data, for a reviewer', () => {
@@ -147,6 +177,14 @@ describe('what it refuses, each naming the fix', () => {
   it('never closed', () => refuses('<div data-k="why" data-callout="server">Words', 'its <div> is never closed'));
   it('a piece inside it', () => refuses(say('server', '', 'Hi <b data-k="x">there</b>'), 'pieces do not nest'));
   it('a misspelt attribute, so it is never silently a plain element', () => refuses('<div data-k="why" data-callout-for="server">Words</div>', 'data-callout-for="server": a callout is written data-callout="piece side"'));
+  it.each(['data-callout=server', 'data-callout = "server"', 'DATA-CALLOUT="server"', 'data-callout'])('%s, which a browser reads and this would miss', (attr) => {
+    refuses(`<div data-k="why" ${attr}>Words</div>`, 'a callout is written data-callout="piece side", in lower case and with quotes');
+  });
+  it('words about data-callout in another attribute are left alone', () => {
+    const html = `${SERVER}<div data-k="why" title=" data-callout">Words</div>`;
+    expect(callouts(html)).toBe(html);
+  });
+  it('a block inside it, whose height it cannot work out', () => refuses(say('server', '', '<p>One</p><p>Two</p>'), 'a callout holds words, not a <p> — use <b>, <i> and <br>'));
   it('a quote never closed', () => refuses('<div data-k="why" title="a data-callout="server">Words</div>', /a quote in its tag is never closed/));
   it('half a place', () => refuses(say('server', ' style="left:10px"'), 'it needs both a left and a top'));
   it('a place not in px', () => refuses(say('server', ' style="width:50%"'), 'its width is a number of px'));
@@ -219,6 +257,19 @@ describe('check', () => {
   it('warns once when a callout shows without the piece it points at', () => {
     const steps = '<step data-in="b why" data-on="b why"><h2>One</h2></step><step data-on="why"><h2>Two</h2></step>';
     expect(check(steps)).toEqual([{level: 'warn', rule: 'callout-alone', click: 1, label: 'P · 1', message: '"why" points at "a", which this click does not show — bring "a" in, or take the callout out with data-out'}]);
+  });
+
+  it('counts a piece nobody can see, under the hide look, as not shown', () => {
+    const steps = '<step data-in="a why" data-on="a why"><h2>One</h2></step><step data-on="why" data-focus="hide"><h2>Two</h2></step>';
+    expect(check(steps)).toMatchObject([{rule: 'callout-alone', click: 2}]);
+  });
+
+  it('says nothing of a callout that is itself hidden, and the reviewer does not read it out', () => {
+    const steps = '<step data-in="a b why" data-on="a b why"><h2>One</h2></step><step data-on="b" data-out="a" data-focus="hide"><h2>Two</h2></step>';
+    const compiled = compileDeck(sourceOf({clicks: `<section data-label="P" data-kicker="P" data-map="map">${steps}</section>`, maps: {map}}));
+    expect(checkDeck(compiled).filter((p) => p.rule === 'callout-alone')).toEqual([]);
+    expect(reviewClick(compiled, 1)).toContain('callouts (1)');
+    expect(reviewClick(compiled, 2)).not.toContain('callouts');
   });
 
   it('is quiet when the piece shows, greyed or lit', () => {

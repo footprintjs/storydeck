@@ -14,6 +14,7 @@ import {wordCount} from './parse.js';
 import {expandNames} from '../focus.js';
 import {LOOP_NAMES} from './loops.js';
 import {saidInNotes} from './differs.js';
+import {showsPiece} from './callouts.js';
 
 const names = (pieces, idx) => [...new Set(idx.map((i) => pieces[i].keys[0]))];
 const problem = (level, rule, click, message) => ({level, rule, click: click?.n ?? null, label: click?.label ?? null, message});
@@ -111,7 +112,7 @@ function aloneCallouts(compiled) {
   for (const c of compiled.clicks) {
     if (c.kind !== 'map') continue;
     const {pieces, callouts = []} = compiled.maps[c.map];
-    const shown = (name) => c.look.pieces.some((p, i) => p.state !== 'gone' && pieces[i].keys[0] === name);
+    const shown = (name) => showsPiece(c.look, pieces, name);
     for (const k of callouts) {
       if (seen.has(`${c.map}/${k.name}`) || !shown(k.name) || shown(k.target)) continue;
       seen.add(`${c.map}/${k.name}`);

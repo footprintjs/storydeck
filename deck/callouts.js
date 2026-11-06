@@ -18,31 +18,46 @@ import {boxFinder, exit} from './boxes.js';
 
 const SIDES = ['above', 'below', 'left', 'right'];
 const ATTR = /\sdata-callout([\w-]*)=(["'])(.*?)\2/;
+const LOOSE = /\sdata-callout/i;
+/** What makes more than a line of words, which a bubble's size cannot be worked out from. */
+const BLOCK = /<(p|div|ul|ol|li|h[1-6]|blockquote|pre|table|section|article)\b/i;
 const SPEC = /^\s*([^\s"'<>]+)(?:\s+(\S+))?\s*$/;
 const TEXT = {size: 28, line: 35, char: 15.7, padX: 20, padY: 12};   // CALLOUT_CSS's type, and a generous width per letter
 const WIDE = {most: 400, least: 120};   // px, for a bubble that takes its width from its words
 const CLEAR = 24;      // px a bubble stays inside the slide's edges
-const TAIL = {reach: 34, half: 14, into: 8, gap: 4, least: 10};   // how far a bubble stands off, half the tail's foot, how far the foot goes into the bubble, px left clear of the piece, the shortest tail
+const TAIL = {reach: 34, half: 14, into: 8, inset: 6, gap: 4, least: 10};   // how far a bubble stands off, half the tail's foot, how far the foot goes into the bubble, and the least it stays inside its edges, px left clear of the piece, the shortest tail
 /** The letters a line wraps as twice as wide. */
 const DOUBLE = /[\p{scx=Han}\p{scx=Hira}\p{scx=Kana}\p{scx=Hang}]/u;
 
 const fixed = (v) => +v.toFixed(1);
 const unitsOf = (word) => [...word].reduce((n, ch) => n + (DOUBLE.test(ch) ? 2 : 1), 0);
 
-/** The element's end: where its own closing tag is, counting those of its kind inside it. Throws when it is never closed. */
+/**
+ * The element's end: where its own closing tag is, counting those of its kind inside it. Throws when it is never closed.
+ * One pass: each tag's ">" is looked for once and the search goes on past it, so a file of unfinished tags costs no more
+ * than its length.
+ */
 function closeOf(html, tag, from, where) {
-  const scan = new RegExp(`<(/?)${tag}\\b[^>]*>`, 'gi');
+  const scan = new RegExp(`<(/?)${tag}\\b`, 'gi');
   scan.lastIndex = from;
   let depth = 1;
   for (let m = scan.exec(html); m; m = scan.exec(html)) {
+    const gt = html.indexOf('>', m.index);
+    if (gt < 0) break;
     depth += m[1] ? -1 : 1;
-    if (!depth) return {at: m.index, end: m.index + m[0].length};
+    if (!depth) return {at: m.index, end: gt + 1};
+    scan.lastIndex = gt + 1;
   }
   throw new Error(`${where}: its <${tag}> is never closed — end it with </${tag}>`);
 }
 
 /** Every callout as written, in order, checked: [{start, open, close, end, tag, attrs, where, name, target, side, inner, text}]. Throws, naming the fix. */
 function readCallouts(html) {
+  // written any other way a browser reads it as an attribute and this scan would not: refused, never silently a plain element
+  for (const {before, m, after} of tagsWith(html, LOOSE)) {
+    const run = before + m[0] + after, odd = readAttributes(run)?.find((a) => a.name.startsWith('data-callout'));
+    if (odd && !ATTR.test(run)) throw new Error(`${odd.name}: a callout is written data-callout="piece side", in lower case and with quotes`);
+  }
   return tagsWith(html, ATTR).map(({start, end: open, tag, before, m, after}) => {
     if (m[1]) throw new Error(`data-callout${m[1]}="${m[3]}": a callout is written data-callout="piece side" ("server above"), with no other data-callout attribute`);
     const where = `data-callout="${m[3]}"`, attrs = before + after, spec = SPEC.exec(m[3]);
@@ -53,11 +68,16 @@ function readCallouts(html) {
     if (name === spec[1]) throw new Error(`${where}: "${name}" is the callout itself — name the piece it is about`);
     const {at: close, end} = closeOf(html, tag, open, where), inner = html.slice(open, close);
     if (pieceTags(inner).length) throw new Error(`${where}: pieces do not nest, and this callout holds one — place it beside the callout`);
+    const block = BLOCK.exec(inner);
+    if (block) throw new Error(`${where}: a callout holds words, not a <${block[1]}> — use <b>, <i> and <br>`);
     const text = plainText(inner).replace(/\s+/g, ' ').trim();
     if (!text) throw new Error(`${where}: a callout says something — put its words inside its <${tag}>`);
     return {start, open, close, end, tag, attrs, where, name, target: spec[1], side: spec[2] ?? SIDES[0], inner, text};
   });
 }
+
+/** Whether a map click shows this piece: one under the `hide` look is there, but nobody can see it. */
+export const showsPiece = (look, pieces, name) => look.pieces.some((p, i) => pieces[i].keys[0] === name && p.state !== 'gone' && !(p.state === 'dim' && p.look === 'hide'));
 
 /** The callouts in a map's or a slide's HTML, for reading back: [{name, target, side, text}]. */
 export const calloutsIn = (html) => readCallouts(html).map(({name, target, side, text}) => ({name, target, side, text}));
@@ -96,7 +116,9 @@ function tailOf(b, t, c) {
   if (!len || reaches - leaves - TAIL.gap < TAIL.least) throw new Error(`${c.where}: "${c.name}" stands on "${c.target}", so its tail has nowhere to go — try another side, or give it a left and top clear of the piece`);
   const foot = leaves - TAIL.into, tip = reaches - TAIL.gap;
   const at = (d, off = 0) => [from[0] + u[0] * d - u[1] * off, from[1] + u[1] * d + u[0] * off];
-  return {corners: [at(foot, TAIL.half), at(tip), at(foot, -TAIL.half)], foot: at(leaves)};
+  // a tail leaving at a slant, or near a corner: its foot is kept inside the bubble, so neither of its corners pokes out
+  const inside = ([x, y]) => [Math.min(b.x + b.w - TAIL.inset, Math.max(b.x + TAIL.inset, x)), Math.min(b.y + b.h - TAIL.inset, Math.max(b.y + TAIL.inset, y))];
+  return {corners: [inside(at(foot, TAIL.half)), at(tip), inside(at(foot, -TAIL.half))], foot: at(leaves)};
 }
 
 /** The tail as an <svg> inside its bubble, in the bubble's own px. */
@@ -110,7 +132,7 @@ function tailSvg(b, {corners}) {
 
 /** One callout, drawn: its element with a place and a size, its tail, and its words. */
 function draw(c, html, boxOf, canvas) {
-  const style = attrValue(c.attrs, 'style')?.value ?? '';
+  const style = attrValue(c.attrs, 'style')?.value ?? '', quote = attrRule('style').exec(c.attrs)?.[1] ?? '"';   // its own quote: the value may hold the other
   const given = (prop) => {
     const n = styleLength(style, prop);
     if (!n && new RegExp(`(?:^|;)\\s*${prop}\\s*:`, 'i').test(style)) throw new Error(`${c.where}: its ${prop} is a number of px, so its tail can be drawn`);
@@ -127,7 +149,7 @@ function draw(c, html, boxOf, canvas) {
   const css = [...placed, origin, style.trim()].filter(Boolean).join(';');
   let at = c.attrs.replace(attrRule('style'), '');
   at = attrRule('class').test(at) ? at.replace(attrRule('class'), (_, q, v) => ` class=${q}${/(^|\s)callout(\s|$)/.test(v) ? v : `callout ${v}`}${q}`) : `${at} class="callout"`;
-  return `<${c.tag}${at} data-ends="${c.target}" data-sd-callout="${c.side}" style="${css}">${tailSvg(b, tail)}<span class="callout-say">${c.inner}</span>${html.slice(c.close, c.end)}`;
+  return `<${c.tag}${at} data-ends="${c.target}" data-sd-callout="${c.side}" style=${quote}${css}${quote}>${tailSvg(b, tail)}<span class="callout-say">${c.inner}</span>${html.slice(c.close, c.end)}`;
 }
 
 /** Every callout in some HTML drawn beside its piece; HTML without one comes back as it was. `canvas`, [w, h]: keep them on the slide. */

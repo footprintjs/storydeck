@@ -483,7 +483,7 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   on the slide, and follows its piece when you move the piece. It is a piece like any other, so a click brings it in
   (`data-in="why"`), lights it, greys it and takes it out, and `server+` in a click takes in the server's callouts. It
   unfolds from its tail just after its piece, on a forward step only. An inline `width` or `height` sets its size, and an
-  inline `left` and `top` place it by hand, with its tail still reaching the piece.
+  inline `left` and `top` place it by hand, with its tail still reaching the piece. It holds words: `<b>`, `<i>` and `<br>` are fine, and a block like `<p>` is refused.
 
   It comes in the colours opposite the slide's, dark on light and light on dark, and all of it is yours to change in
   theme.css:

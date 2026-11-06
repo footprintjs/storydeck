@@ -4,6 +4,7 @@
 // looks at a picture only to confirm. `outline` is the whole deck, a line per click; `reviewClick` is one click.
 import {wordCount} from './parse.js';
 import {enterText} from './transitions.js';
+import {showsPiece} from './callouts.js';
 
 /** A piece's name: its first data-k name (a wire and its label may share one; they are listed once). */
 const nameOf = (pieces, i) => pieces[i].keys[0];
@@ -22,7 +23,7 @@ const loopsLine = (c) => (c.loops?.length ? `loops (${c.loops.length}): ${list(c
 
 /** The callouts a map click shows, each by the piece it is about and its words — nothing when none shows. */
 function calloutsLine(c, {pieces, callouts = []}) {
-  const shown = callouts.filter((k) => c.look.pieces.some((p, i) => p.state !== 'gone' && pieces[i].keys[0] === k.name));
+  const shown = callouts.filter((k) => showsPiece(c.look, pieces, k.name));
   return shown.length ? `callouts (${shown.length}): ${shown.map((k) => `${k.name} ${k.side} ${k.target} ${quote(k.text, 80)}`).join('; ')}` : null;
 }
 
