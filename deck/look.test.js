@@ -116,10 +116,23 @@ describe('look-base.css', () => {
     }
   });
 
-  it('lets the highlight follow the accent: one token moves both, on the deck and on a part with its own theme', () => {
+  it('lets the highlight follow the accent in light and dark, until a deck sets its own', () => {
     expect(LIGHT['--sd-accent']).toBe('var(--accent-ink)');
     expect(tokensOf(':where(:root.dark)')['--sd-accent']).toBeUndefined();
-    expect(tokensOf(':where(deck-stage > section[data-theme])')['--sd-accent']).toBe('var(--accent-ink)');
+  });
+
+  it('sets its tokens on the root and nowhere lower, where one would beat a deck\'s own on :root in spite of having no weight', () => {
+    const lower = rules(BASE).filter((r) => !r.selector.endsWith(':root)') && !r.selector.endsWith(':root.dark)'));
+    const set = lower.flatMap((r) => [...r.body.matchAll(/(--[\w-]+):/g)].map((m) => m[1]));
+    expect([...new Set(set)]).toEqual(['--sd-tone']);   // a tone is a piece's own: nothing above it sets one
+  });
+
+  it('draws its pieces only inside a slide, so a site showing a deck in its own page keeps its own .card', () => {
+    const pieces = rules(BASE).map((r) => r.selector).filter((sel) => !sel.includes(':root'));
+    expect(pieces.length).toBeGreaterThan(20);
+    for (const sel of pieces) expect(sel, sel).toMatch(/^:where\(section\[data-label\] /);
+    const slides = compileDeck(readDeck(tempDeck())).slides;
+    for (const slide of slides) expect(slide.html.trimStart()).toMatch(/^<section data-label="/);
   });
 
   it('keeps words readable: text and tones reach 4.5:1 on both grounds, light and dark', () => {

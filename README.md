@@ -442,11 +442,12 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   | `card` | an icon with a title and a line beside it; `.cards` lays a row of them on a plain slide | an icon, `<b>`, `<small>` |
   | `title-block`, `points` | a title slide, a list of points | `<h1>` and `<p class="sub">`; `<li>` |
 
-  Add `ok`, `warn` or `bad` to colour a piece's edge, icon and heading. On a wire, `req` is a request and `ret` a dashed
-  answer. The tokens: `--bg --bg-elev --fg --fg-muted --line --accent-ink --sd-accent --sd-glow --sd-dim-opacity --sd-ok
-  --sd-warn --sd-bad --sd-radius --sans --mono`. What a click lights (`--sd-accent`) follows `--accent-ink` until you set
-  it, in a part with its own `data-theme` too. The stylesheet is `look-base.css`, every rule in `:where()`, and only a
-  deck that asks carries it: one that doesn't builds byte for byte as before.
+  Add `ok`, `warn` or `bad` to colour a piece's edge and icon, and the heading of an area or a group. On a wire, `req` is a
+  request and `ret` a dashed answer. The tokens: `--bg --bg-elev --fg --fg-muted --line --accent-ink --sd-accent --sd-glow
+  --sd-dim-opacity --sd-ok --sd-warn --sd-bad --sd-radius --sans --mono`. What a click lights (`--sd-accent`) follows
+  `--accent-ink` until you set it; a part with its own `data-theme` and a new accent sets both. The stylesheet is
+  `look-base.css`, every rule in `:where()`, and only a deck that asks carries it: one that doesn't builds byte for byte
+  as before. Its pieces are drawn only inside a slide, so a site showing a deck in its own page keeps its own `.card`.
 - **A part can have its own look.** `<section data-label="3 · Storage" … data-theme="ledger">` puts
   `data-theme="ledger"` on each of that part's slides, so `theme.css` can dress it: redefine the tokens for it
   (`[data-theme="ledger"] { --bg: …; --text: …; }`, and `:root.dark [data-theme="ledger"]` for dark) and give its pieces
