@@ -13,13 +13,14 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg   # the real-ffmpeg video test runs on CI, never skips
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg   # the real-ffmpeg video test runs on CI, never skips
+        timeout-minutes: 10
       - run: npm ci
       - run: npm run test:cov
       - run: npm run build          # the compiled dist/ the package ships (prepack builds it again for npm pack)
@@ -37,7 +38,7 @@ jobs:
 
   publish:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       id-token: write # OIDC trusted publishing — this job only
