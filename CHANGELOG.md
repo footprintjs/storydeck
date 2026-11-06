@@ -1,7 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.12.0 — a base look, callouts, and one page to read, scroll or click through
 
+- **The deck as MCP tools, documented.** The README now shows an assistant's whole path over `outline`, `feedback`, `review`,
+  `check` and `build`, and what to expect from them.
 - **One page to read, scroll or click through.** `"lenses": true` in deck.json adds Read (an article) and Scroll (the picture
   stays while the words go by) to the built page, beside the slides, from the deck's own slides, headlines and notes.
   No site or React is needed. A link ending `#read` or `#scroll` opens that one. A deck in another language gives its own
