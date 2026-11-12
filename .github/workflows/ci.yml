@@ -30,4 +30,4 @@ jobs:
       - run: npm run test:cov
       - run: npm run build          # the compiled dist/ the package ships (prepack builds it again for npm pack)
       - run: npm run check:dist     # every door loads in plain Node; no source JSX in the package
-      - run: npx publint
+      - run: npm run check:publint
