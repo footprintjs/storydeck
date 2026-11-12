@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.13.1 — works beside footprintjs 12
+
+- **The PowerPoint export works beside footprintjs 12.** footprintjs is an optional peer: StoryDeck needs it only to export a
+  deck as a PowerPoint file. Its range is now `^11.0.0 || ^12.0.0`. Before this, npm refused `npm i footprintjs` beside
+  StoryDeck as soon as footprintjs 12 was the newest version. The export's tests pass on footprintjs 11 and on the 12
+  candidate. Nothing else changes.
+
 ## 0.13.0 — narrate: one command for a deck's voice
 
 - **`storydeck narrate`: one command for a deck's voice.** It says what each click says and whether it is voiced, for nothing.
