@@ -765,6 +765,11 @@ npm run test:cov
 
 438 tests (and 2 that run where LibreOffice or the ECMA-376 schemas are found) · ~99% lines · coverage thresholds enforced (90% statements, 85% branches, 90% functions, 95% lines).
 
+## Releasing
+
+A release is a pull request that raises the version and writes its CHANGELOG section; merging it publishes. How, and what to do
+when a run is red: [RELEASING.md](https://github.com/footprintjs/storydeck/blob/main/RELEASING.md).
+
 ## License
 
 MIT © [Sanjay Krishna Anbalagan](https://github.com/sanjay1909) — part of the

@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "node": "22",
+  "systemPackages": ["ffmpeg"],
+  "install": "npm ci",
+  "checks": ["npm run test:cov", "npm run build", "npm run check:dist", "npx publint"],
+  "archive": ["dist/", "plugin/", "site/public/deck-stage.js", "*.d.ts", "*.css", "CHANGELOG.md"],
+  "changelog": "titled"
+}
