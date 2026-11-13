@@ -13,18 +13,34 @@ checks, what the tarball may hold, the changelog style) is `.github/release.json
    version's section in `CHANGELOG.md`: a heading `## <version> — <title>`, written once. The
    "Release check" on the pull request says "would publish x.y.z", or names what is missing.
 2. Merge it. The push to `main` runs "Publish to npm" as `publish`: plan, hold check, build, publish,
-   verify, release.
+   verify, release. Any push to `main` that raises the version releases it, whether or not it came
+   through a pull request; `main` is not protected today, so "a release is a pull request" is a rule
+   we keep, not one GitHub enforces.
 3. Read the run. The plan's summary says what it decided and why; verify says npm serves the bytes the
    run built; the release job writes the tag and the GitHub release.
 
-Never create the GitHub release or the tag by hand: the route does both, after it has proved the
-bytes on npm. A push to `main` that does not raise the version publishes nothing ("nothing to do: the
-version is tagged and on npm"), so a fix without a new version is safe to merge.
+Never create the GitHub release or the tag by hand, except in the two cases where the route's table
+tells you to: the route does both, after it has proved the bytes on npm. A push to `main` publishes
+nothing when the current version is already tagged and on npm ("nothing to do: the version is tagged
+and on npm"). If a raised version failed to publish (a red build, a hold), the next push to `main`
+publishes it, also one that does not touch the version, and that is how a fix gets it out.
 
 ## To try without publishing
 
 Actions, "Publish to npm", "Run workflow", action `dry-run` (the default), from any branch. It plans,
-builds and, for a version npm already has, compares the rebuild with npm. Nothing is written anywhere.
+builds and, for a version npm already has, compares the rebuild with npm. Nothing is published, tagged
+or released (the run keeps the built package for 30 days and its records for 90, as run artifacts).
+
+A dry run of a version that is already released compares the rebuild with what npm serves, so it is
+red at `verify` with `registry-differs` whenever a file that ships (for example `package.json` or
+`README.md`) has changed since that release. Between releases that is the normal state, not a fault:
+read the plan, hold and build jobs.
+
+## To hold a release
+
+Label any open issue or pull request `hold-release` (the label exists in this repository). To lift
+it, remove the label or close the item. The route checks it before the build and again directly
+before publishing; details in `footprintjs/ci` `docs/HOLD.md`.
 
 ## When a run is red
 

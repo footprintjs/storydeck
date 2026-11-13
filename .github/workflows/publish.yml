@@ -18,8 +18,11 @@ on:
 
 permissions: {}
 
+# Runs that may publish queue behind each other per ref and are never cancelled while running. A dry
+# run has a group of its own: GitHub keeps only ONE waiting run per group, so a dry run sharing the
+# group would cancel a release push that is still waiting, and that version would stay unpublished.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.ref }}-${{ github.event_name == 'push' && 'publish' || inputs.action }}
   cancel-in-progress: false
 
 jobs:
