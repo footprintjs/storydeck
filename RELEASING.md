@@ -35,7 +35,7 @@ names this commit, or npm has the version and there is no tag. Nothing is publis
 released (the run keeps the built package for 30 days and its records for 90, as run artifacts).
 
 A dry run of a version that is already released compares the rebuild with what npm serves only at
-the tagged commit. At any later commit it builds and compares nothing ("dry run: this commit is not
+the tagged commit. At any later commit it builds the package but compares nothing with npm ("dry run: this commit is not
 the one released as this version (its tag names another commit), so nothing is compared with npm"),
 so a file that ships (for example `package.json` or `README.md`) and has changed since that release
 does not turn the run red.
