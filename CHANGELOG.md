@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.13.2 — needs markdown-it 14.3.3 or newer
+
+- **StoryDeck now requires markdown-it `^14.3.3`** (it was `^14.1.0`). Versions before 14.3.3 have four published advisories about
+  very slow parsing of crafted Markdown, and the `linkify-it` package that comes with them has a fifth:
+  - [GHSA-r7fv-28h4-cvq7](https://github.com/advisories/GHSA-r7fv-28h4-cvq7): quadratic time in smart quotes with unmatched closing quotes.
+  - [GHSA-vfgh-jcmw-g37q](https://github.com/advisories/GHSA-vfgh-jcmw-g37q): quadratic time in inline HTML, only when `html` is on (StoryDeck keeps it off).
+  - [GHSA-gfr2-rv44-r23c](https://github.com/advisories/GHSA-gfr2-rv44-r23c): quadratic time for one multi-line link reference definition, with default options.
+  - [GHSA-253c-mchw-3w2r](https://github.com/advisories/GHSA-253c-mchw-3w2r): two quadratic paths when `linkify` is on, so a few hundred KB of Markdown can block the event loop.
+  - [GHSA-v245-v573-v5vm](https://github.com/advisories/GHSA-v245-v573-v5vm): `linkify-it` up to 5.0.1, quadratic time in its `mailto:` check.
+- **Who is affected:** someone who renders Markdown they did not write (a post from a stranger, a pasted file). The Markdown the
+  repository ships renders the same bytes before and after. A fresh install already took the fixed version, because the old range allowed
+  it; this release makes it the minimum, so everyone who updates gets it. Nothing in the published package changes except the
+  `markdown-it` range.
+- **First release made by the shared release route:** merging the release pull request publishes it. See `RELEASING.md`.
+
 ## 0.13.1 — works beside footprintjs 12
 
 - **The PowerPoint export works beside footprintjs 12.** footprintjs is an optional peer: StoryDeck needs it only to export a
