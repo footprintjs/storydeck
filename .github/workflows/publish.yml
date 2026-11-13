@@ -1,56 +1,37 @@
+# The release route for footprint-storydeck. Every step (plan, build, inspect, publish, compare with npm,
+# tag, GitHub release) lives in footprintjs/ci, pinned below by full commit; what differs for this
+# package is .github/release.json. Keep this file's name, publish.yml, and its name line: npm's trusted
+# publisher for the package is bound to the repository + publish.yml. How to release: RELEASING.md here,
+# and footprintjs/ci docs/RELEASE-ROUTE.md for the route itself.
 name: Publish to npm
 
 on:
-  release:
-    types: [published]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "dry-run = build and compare, publish nothing. publish = release what main names."
+        type: choice
+        options: [dry-run, publish]
+        default: dry-run
 
-# Least privilege: publish power (OIDC) only in the `publish` job, which takes the tarball packed and tested
-# in `build` and resolves no dependencies of its own. The first version goes up by hand (npm publish), then
-# npmjs.com → footprint-storydeck → Settings → Trusted publishing: GitHub Actions, footprintjs/storydeck, publish.yml.
-# (0.1.0 and 0.2.0 were published as `storydeck`; the package is `footprint-storydeck` from 0.3.0.)
-permissions:
-  contents: read
+permissions: {}
+
+# Runs that may publish queue behind each other per ref and are never cancelled while running. A dry
+# run has a group of its own: GitHub keeps only ONE waiting run per group, so a dry run sharing the
+# group would cancel a release push that is still waiting, and that version would stay unpublished.
+concurrency:
+  group: release-${{ github.ref }}-${{ github.event_name == 'push' && 'publish' || inputs.action }}
+  cancel-in-progress: false
 
 jobs:
-  build:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg   # the real-ffmpeg video test runs on CI, never skips   # a release restores no cache: packages come from the signed repository
-        timeout-minutes: 30
-      - run: npm ci
-      - run: npm run test:cov
-      - run: npm run build          # the compiled dist/ the package ships (prepack builds it again for npm pack)
-      - run: npm run check:dist     # every door loads in plain Node; no source JSX in the package
-      - run: npx publint
-      - name: Pack the publishable tarball
-        run: |
-          npm pack
-          mv ./*.tgz package.tgz
-      - uses: actions/upload-artifact@v4
-        with:
-          name: package-tarball
-          path: package.tgz
-          retention-days: 1
-
-  publish:
-    needs: build
-    runs-on: ubuntu-24.04
+  release:
+    uses: footprintjs/ci/.github/workflows/release-route.yml@67dc3738bfba1e8cdf960b0301450db6ff410692 # the reviewed ci commit
     permissions:
-      contents: read
-      id-token: write # OIDC trusted publishing — this job only
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: package-tarball
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org
-      # trusted publishing needs npm >= 11.5.1
-      - run: npm install -g npm@11
-      - name: Publish to npm
-        run: npm publish ./package.tgz --provenance --access public
+      contents: write
+      id-token: write
+      issues: read
+      pull-requests: read
+    with:
+      action: ${{ github.event_name == 'push' && 'publish' || inputs.action }}

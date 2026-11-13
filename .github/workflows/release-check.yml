@@ -1,0 +1,19 @@
+# What would the release route do with this pull request? The check is the route's plan with the action
+# fixed to dry-run: it builds nothing and publishes nothing. A pull request that leaves the version alone
+# reads "dry run: rebuild and compare"; one that raises it reads "would publish x.y.z"; a version with no
+# CHANGELOG section, or a bad .github/release.json, is red with a named refusal.
+# It is a file of its own (not a job of ci.yml) because ci.yml also runs on push to main, where the
+# publish.yml route already plans the same commit. Pinned to the SAME ci commit as publish.yml: change
+# both together, in a reviewed pull request. How it works: footprintjs/ci docs/RELEASE-ROUTE.md.
+name: Release check
+
+on:
+  pull_request:
+
+permissions: {}
+
+jobs:
+  release-check:
+    permissions:
+      contents: read
+    uses: footprintjs/ci/.github/workflows/release-check.yml@67dc3738bfba1e8cdf960b0301450db6ff410692 # the reviewed ci commit
