@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.13.3 — one copy of footprint-story, shared with StoryReel
+
+- **StoryDeck now needs footprint-story `^0.7.0`** (it was `^0.6.0`), the same range as StoryReel 0.29. For a 0.x version the two
+  ranges did not overlap, so an app that used both installed two copies of the package they exist to share; it now installs one.
+- **Nothing you use changes.** StoryDeck uses only footprint-story's main door, `/voice` and `/motion`, and those files are
+  byte for byte the same in 0.6.0 and 0.7.0; 0.7.0 adds the `/shot` door and storyboard briefs, which StoryDeck does not use.
+  A voice you have already paid for is found by both versions: a clip's key and its files in `voice/cache` are the same, so a
+  deck voiced with one is not voiced again by the other.
+- Nothing else in the published package changes.
+
 ## 0.13.2 — needs markdown-it 14.3.3 or newer
 
 - **StoryDeck now requires markdown-it `^14.3.3`** (it was `^14.1.0`). Versions before 14.3.3 have four published advisories about
