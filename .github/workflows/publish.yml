@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: "dry-run = build and compare, publish nothing. publish = release what main names."
+        description: "dry-run = plan and build, publish nothing; compares with npm only when npm has this version and its tag names this commit or there is no tag. publish = release what main names."
         type: choice
         options: [dry-run, publish]
         default: dry-run
@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   release:
-    uses: footprintjs/ci/.github/workflows/release-route.yml@67dc3738bfba1e8cdf960b0301450db6ff410692 # the reviewed ci commit
+    uses: footprintjs/ci/.github/workflows/release-route.yml@1ca5d7de9bde68c205b5d140c94dc475ae3b2520 # the reviewed ci commit
     permissions:
       contents: write
       id-token: write
