@@ -130,7 +130,7 @@
     "@vitejs/plugin-react": "^5.0.4",
     "@vitest/coverage-v8": "^4.1.9",
     "esbuild": "^0.28.2",
-    "footprintjs": "12.0.0",
+    "footprintjs": "12.1.0",
     "jsdom": "^29.1.1",
     "publint": "0.3.25",
     "react": "^19.0.0",
