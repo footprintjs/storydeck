@@ -11,9 +11,8 @@
   - [GHSA-v245-v573-v5vm](https://github.com/advisories/GHSA-v245-v573-v5vm): `linkify-it` up to 5.0.1, quadratic time in its `mailto:` check.
 - **Who is affected:** someone who renders Markdown they did not write (a post from a stranger, a pasted file). The Markdown the
   repository ships renders the same bytes before and after. A fresh install already took the fixed version, because the old range allowed
-  it; this release makes it the minimum, so everyone who updates gets it.
-- **Development dependencies were updated** (the test and build tools, in the lock file only). Nothing in the published package changes
-  except the `markdown-it` range.
+  it; this release makes it the minimum, so everyone who updates gets it. Nothing in the published package changes except the
+  `markdown-it` range.
 - **First release made by the shared release route:** merging the release pull request publishes it. See `RELEASING.md`.
 
 ## 0.13.1 — works beside footprintjs 12
