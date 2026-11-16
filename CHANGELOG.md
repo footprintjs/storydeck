@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Draft: admit the engine 13 prerelease as an optional peer.** The `footprintjs` range adds `^13.0.0-rc.0`
+  while retaining `^11.0.0 || ^12.0.0`. Migration: engine 13 consumers need validation against the exact
+  candidate archive before compatibility is claimed. The engine 12.1.0 development pin, real locked
+  resolutions, runtime code and optional-loading behavior are unchanged.
+
 ## 0.13.3 — one copy of footprint-story, shared with StoryReel
 
 - **StoryDeck now needs footprint-story `^0.7.0`** (it was `^0.6.0`), the same range as StoryReel 0.29. For a 0.x version the two
