@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # original PR head plus the tested merge; retention requires equal trees
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -28,6 +30,26 @@ jobs:
         timeout-minutes: 25
       - run: npm ci
       - run: npm run test:cov
-      - run: npm run build          # the compiled dist/ the package ships (prepack builds it again for npm pack)
+      - run: npm run build          # the compiled dist/ checked below; retention never builds again
       - run: npm run check:dist     # every door loads in plain Node; no source JSX in the package
       - run: npm run check:publint
+      - uses: actions/checkout@v4
+        with:
+          repository: footprintjs/ci
+          ref: 1ca5d7de9bde68c205b5d140c94dc475ae3b2520
+          path: .ci-tools
+          persist-credentials: false
+      - name: Test source-package admission
+        env:
+          STORYDECK_INSPECTOR_ROOT: ${{ github.workspace }}/.ci-tools/src/release-route/archive
+        run: node --test scripts/source-package/*.node-test.mjs
+      - name: Retain checked source package
+        env:
+          SOURCE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node scripts/source-package.mjs "$GITHUB_WORKSPACE/.ci-tools" "$RUNNER_TEMP/storydeck-source-package"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: storydeck-source-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/storydeck-source-package/*
+          if-no-files-found: error
+          retention-days: 7
