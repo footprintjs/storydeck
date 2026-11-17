@@ -2,10 +2,11 @@
 
 ## Unreleased
 
-- **Draft: admit the engine 13 prerelease as an optional peer.** The `footprintjs` range adds `^13.0.0-rc.0`
-  while retaining `^11.0.0 || ^12.0.0`. Migration: engine 13 consumers need validation against the exact
-  candidate archive before compatibility is claimed. The engine 12.1.0 development pin, real locked
-  resolutions, runtime code and optional-loading behavior are unchanged.
+- **Admit stable engine 13 as an optional peer.** The `footprintjs` range adds `^13.0.0` while retaining
+  `^11.0.0 || ^12.0.0`. The development pin and lock now target published engine 13.0.0 and its Foottrace 2
+  peer. Migration: install a supported engine beside StoryDeck when exporting PowerPoint; the engine stays
+  optional for browser-only users. Runtime code is unchanged, and engine 13 compatibility remains under
+  validation until the existing checks pass.
 
 ## 0.13.3 — one copy of footprint-story, shared with StoryReel
 
