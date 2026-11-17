@@ -36,6 +36,7 @@ export function identity(root, head) {
 
 export function requireClean(root, head) {
   assert.equal(git(root, ['rev-parse', 'HEAD']).toString().trim(), head);
+  git(root, ['diff', '--cached', '--exit-code', 'HEAD', '--']);
   git(root, ['diff', '--exit-code', 'HEAD', '--']);
 }
 
