@@ -362,11 +362,12 @@ footprintjs is an optional peer dependency: StoryDeck does not install it (a bro
 install it beside StoryDeck to export — `npm i footprintjs` — and an export without it is refused, saying so. It is
 loaded only when an export runs; the deck's browser runtime never loads it.
 
-**Migration: engine 13 support.** The optional peer now admits
-`^11.0.0 || ^12.0.0 || ^13.0.0`; the existing engine 11/12 arms stay. The development pin and committed lock
-target published engine 13.0.0 and its Foottrace 2 peer. Install a supported engine beside StoryDeck for
+**Migration: engine 14 release-candidate support.** The optional peer now admits
+`^11.0.0 || ^12.0.0 || ^13.0.0 || ^14.0.0-rc.0`; the existing engine 11/12/13 arms stay. The development pin
+and committed lock target published engine 14.0.0-rc.0 and its required Foottrace 2.1 peer. Install a supported engine beside StoryDeck for
 PowerPoint export; browser-only users still need no engine. The runtime code and optional-loading boundary
-are unchanged. Engine 13 compatibility remains under validation until the existing checks pass.
+are unchanged. Candidate compatibility remains under validation until the existing checks pass; admitting
+this prerelease does not promote it to stable or change StoryDeck's own version.
 
 ```js
 import { chromium } from 'playwright-core';
