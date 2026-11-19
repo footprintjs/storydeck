@@ -46,7 +46,7 @@ describe('runCli', () => {
     const dir = tempDeck();
     const built = await run(['build', dir]);
     expect(built.code).toBe(0);
-    expect(built.out).toMatch(/^✓ .*index\.html · 6 clicks · \d+ KB · \d+ ms\n$/);
+    expect(built.out).toMatch(/^clean — nothing to fix\n✓ .*index\.html · 6 clicks · \d+ KB · \d+ ms\n$/);   // the verdict first, then what was written
     const out = path.join(tempDir(), 'x.html');
     expect((await run(['build', dir, '--out', out])).code).toBe(0);
     expect(readFileSync(out, 'utf8')).toMatch(/^<!doctype html>/);
@@ -70,25 +70,62 @@ describe('runCli', () => {
   });
 
   it('check reports problems, failing on an error — and on a warning with --strict', async () => {
-    expect(await run(['check', tempDeck()])).toMatchObject({code: 0, out: 'no problems\n'});
+    expect(await run(['check', tempDeck()])).toMatchObject({code: 0, out: 'clean — nothing to fix\n'});
     const warned = tempDeck({...STARTER, 'deck.json': '{"title":"T","checks":{"maxWords":2}}'});
     const w = await run(['check', warned]);
     expect(w.code).toBe(0);
+    expect(w.out).toMatch(/^fix 4 — 0 errors, 4 warnings\nwarn  click \d+ /);   // the verdict first, then each problem
     expect(w.out).toContain('· words:');
     expect((await run(['check', warned, '--strict'])).code).toBe(1);
     const broken = tempDeck({...STARTER, 'deck.json': '{"title":"T","oops":1}'});
-    expect(await run(['check', broken])).toMatchObject({code: 1, out: expect.stringMatching(/^error deck · compile: deck.json has "oops"/)});
+    expect(await run(['check', broken])).toMatchObject({code: 1, out: expect.stringMatching(/^broken — the deck does not compile\nerror deck · compile: deck.json has "oops"/)});
   });
 
   it('check --layout says how to get the browser when it is not installed, and runs the other checks', async () => {
     const r = await run(['check', tempDeck(), '--layout']);
     expect(r.code).toBe(0);
-    expect(r.out).toContain('no problems\nlayout not checked: it needs Playwright installed beside StoryDeck — npm i -D footprint-storydeck playwright-core');
+    expect(r.out).toContain('clean — nothing to fix\nlayout not checked: it needs Playwright installed beside StoryDeck — npm i -D footprint-storydeck playwright-core');
+  });
+
+  it('build is the one call after an edit: it checks, writes the page, and says what changed since the run before', async () => {
+    const home = tempDir(), dir = tempDeck({...STARTER, 'deck.json': '{"title":"T","checks":{"maxWords":2}}'});
+    const first = await run(['build', dir], {home});
+    expect(first.code).toBe(0);   // a build with something to fix still writes its page: check --strict is the gate
+    expect(first.out).toMatch(/^fix 4 — 0 errors, 4 warnings\n(warn  click \d+ .*\n){4}✓ .*index\.html · 6 clicks · \d+ KB · \d+ ms\n$/);
+    expect((await run(['build', dir], {home})).out).toMatch(/\nsince the last run: nothing changed · round 2\n$/);
+    writeFileSync(path.join(dir, 'deck.json'), '{"title":"T"}');
+    expect((await run(['build', dir], {home})).out).toMatch(/^clean — nothing to fix\n✓ .*\nclean after 2 rounds of fixing \(it began with 4 to fix\)\n$/);
+    expect((await run(['build', dir, '--layout'], {home})).out).toMatch(/^clean — nothing to fix\n✓ .*\nlayout not checked: it needs Playwright installed beside StoryDeck/);
+  });
+
+  it('log reads back how a deck\'s fixing went, and one run in full', async () => {
+    const home = tempDir(), dir = tempDeck({...STARTER, 'deck.json': '{"title":"T","checks":{"maxWords":2}}'});
+    expect(await run(['log', dir], {home})).toMatchObject({code: 0, out: 'no runs kept yet: storydeck check and storydeck build each leave one\ntool calls: log 1\n'});
+    await run(['check', dir], {home});
+    await run(['outline', dir], {home});
+    writeFileSync(path.join(dir, 'deck.json'), '{"title":"T"}');
+    await run(['build', dir], {home});
+    const list = (await run(['log', dir], {home})).out.split('\n');
+    expect(list[0]).toBe('2 runs kept (the newest 30 are)');
+    expect(list[1]).toBe('1 series of fixing closed: 1 round each on average, beginning with 4 to fix');
+    expect(list[2]).toBe('tool calls: outline 1, check 1, build 1, log 2');
+    expect(list[3]).toMatch(/^ 1 {2}\d{4}-\d\d-\d\d \d\d:\d\d:\d\d {2}build {2}clean — nothing to fix · clean after 1 round · 6 clicks · \d+ ms$/);
+    expect(list[4]).toMatch(/^ 2 {2}.* {2}check {2}fix 4 — 0 errors, 4 warnings · round 1 · 6 clicks · \d+ ms$/);
+    const one = (await run(['log', dir, '--run', '2'], {home})).out;
+    expect(one).toMatch(/^2 {2}.* {2}check {2}fix 4 — 0 errors, 4 warnings · round 1/);
+    expect(one).toContain('stages: read deck ');
+    expect(one).toContain('[Condition]: It evaluated Rule 1 "There is a warning to fix": warnings 4 gt 0 ✓, and chose fix.');
+    expect(one).toMatch(/\nthe record itself: .*-check\.[0-9a-f]{6}\.record\.jsonl \(one JSON line an entry/);
+    expect(await run(['log', dir, '--run', '9'], {home})).toMatchObject({code: 1, err: '--run is a run\'s number in the list, 1 (the newest) to 2, not 9\n'});
+    expect(await run(['log', dir, '--run', 'x'], {home})).toMatchObject({code: 1, err: expect.stringMatching(/^--run is a run's number in the list/)});
+    expect(await run(['log', tempDeck(), '--run', '1'], {home})).toMatchObject({code: 1, err: 'no runs kept yet: storydeck check and storydeck build each leave one\n'});
+    expect(await run(['log', dir], {home: path.join(dir, '.storydeck')})).toMatchObject({code: 1, err: expect.stringMatching(/^this deck's runs are not kept: the StoryDeck folder .* is inside the deck folder/)});
   });
 
   it('a build that cannot be made stops with the reason', async () => {
     const dir = tempDeck({...STARTER, 'map.html': '<p>no pieces</p>'});
-    expect(await run(['build', dir])).toMatchObject({code: 1, err: 'map "map" has no pieces — a piece is an element with data-k="name" and an inline left/top (width/height)\n'});
+    expect(await run(['build', dir])).toMatchObject({code: 1, out: '', err: 'broken — the deck does not compile, so no page was written\n'
+      + 'error deck · compile: map "map" has no pieces — a piece is an element with data-k="name" and an inline left/top (width/height)\n'});
   });
 
   it('dev serves until stopped', async () => {

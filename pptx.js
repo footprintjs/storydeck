@@ -11,8 +11,8 @@
 // a package that does not read back as planned — and a refusal names each click and its fix. The browser is
 // video.js's port ({ open, step, freeze, seek, shot, close }; `deckStageDriver` from footprint-storydeck/video), so
 // a deck that films exports. The parts (pptxParts), the ZIP (zip) and the read-back (checkPptx) are plain
-// functions, also exported. footprintjs is an optional peer dependency, imported when an export runs — never by
-// the deck's browser runtime, and never installed with StoryDeck: `npm i footprintjs` beside it to export.
+// functions, also exported. footprintjs comes with StoryDeck, and is imported when an export runs — never by the
+// deck's browser runtime.
 import { Buffer } from 'node:buffer';
 import { closeSync, copyFileSync, existsSync, fstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -261,7 +261,7 @@ function exportChart(ctx) {
     .build();
 }
 
-/** footprintjs, loaded as an export starts — or a refusal naming the install, when it is not there (an optional peer). */
+/** footprintjs, loaded as an export starts — or a refusal naming the install, when it cannot be loaded (a broken install, a bundler that left it out). */
 async function footprintjs(load) {
   try {
     return await load();
@@ -281,8 +281,8 @@ const narrativeOf = (executor) => executor.getNarrativeEntries().map((e) => e.te
  * pictures are made in `work` (its pictures/ is replaced) — by default a temporary folder, removed afterwards. A
  * click whose clip or picture is not usable, or a package that does not read back, is refused, naming the fix, and
  * nothing is written to `out`. Returns { file, slides, voiced, runtime (s the deck runs by itself, or null), bytes,
- * clicks, narrative }; a refusal's error carries the `narrative` too. footprintjs is an optional peer: `load` imports it
- * (default `import('footprintjs')`), and a missing one is refused, naming the install.
+ * clicks, narrative }; a refusal's error carries the `narrative` too. `load` imports footprintjs (default
+ * `import('footprintjs')`: it comes with StoryDeck), and one that cannot be loaded is refused, naming the install.
  */
 export async function exportPptx({ url, steps, deck, voice, out, name = 'deck', title, lang = 'en-US', driver, gap = 0.6, noclip = 2.5, maxClip = 300,
   maxEntrance = 4000, only = null, work, log = () => {}, load = () => import('footprintjs') }) {

@@ -160,6 +160,46 @@ export function checkDeck(compiled: CompiledDeck): DeckProblem[];
 /** Problems as text, one per line, worst first; 'no problems' when there are none. */
 export function formatProblems(problems: readonly DeckProblem[]): string;
 
+/** One run of a deck, as `storydeck check` and `storydeck build` make it. */
+export interface DeckRun {
+  kind: 'check' | 'build';
+  /** clean: nothing to fix · fix: errors or warnings · broken: it does not compile (one problem, nothing written) */
+  verdict: 'clean' | 'fix' | 'broken';
+  problems: DeckProblem[];
+  errors: number;
+  warnings: number;
+  infos: number;
+  clicks: number;
+  /** a browser measured every click */
+  measured: boolean;
+  /** why a measure that was asked for was not made, as a line to show; or null */
+  layoutNote: string | null;
+  /** what was written (a build), or null */
+  written: { file: string; bytes: number; slides: number; clicks: number; data: string | null; voice?: { have: number; wanted: number } } | null;
+  ms: number;
+  /** this run's number in its series of runs with something to fix (0 when clean) */
+  round?: number;
+  /** what the series began with */
+  first?: { errors: number; warnings: number } | null;
+  /** set on the clean run that ends a series */
+  closed?: { rounds: number; first: { errors: number; warnings: number } } | null;
+  /** against the run before: how many problems went, how many are new; null on a deck's first kept run */
+  since?: { fixed: number; new: number } | null;
+  /** how many problems a browser found before that this run did not measure again: they stay open until a measure answers them */
+  carried?: number;
+  /** why the run was not kept for `storydeck log` */
+  unkept?: string;
+}
+/**
+ * Run a deck folder once: read and compiled once, read against every rule, measured in a browser when `layout` asks
+ * (`chromium`: Playwright's, or a `driver`; otherwise Playwright is looked for beside StoryDeck), and written when
+ * `write` asks (`out`, `voice`: as buildDeck takes them). A footprintjs flowchart: the run is kept in the person's
+ * StoryDeck folder (`home`: STORYDECK_HOME or ~/.storydeck) unless `keep` is false, and `storydeck log` reads it back.
+ * A deck that does not compile is the verdict 'broken', never a throw; a page that may not be written throws.
+ */
+export function runDeck(dir: string, options?: { write?: boolean; layout?: boolean; out?: string; voice?: boolean; chromium?: unknown; driver?: LayoutDriver;
+  limits?: { 'browser.open': number; 'browser.measure': number; 'browser.close': number }; home?: string; keep?: boolean }): Promise<DeckRun>;
+
 /** The browser port the layout check drives (the video's deckStageDriver, with measure). */
 export interface LayoutDriver {
   open(url: string): Promise<void>;
@@ -190,7 +230,7 @@ export function serveDeck(dir: string, options?: { port?: number; host?: '127.0.
 export function initDeck(dir: string): { dir: string; files: string[] };
 
 /**
- * The read-first tools (outline, review, check, build) over MCP: stdio, one JSON-RPC message per line. A call may name
+ * The read-first tools (outline, review, feedback, check, build, log, narrate) over MCP: stdio, one JSON-RPC message per line. A call may name
  * another deck only inside `dir`. Resolves when the input closes.
  */
 export function serveMcp(options?: { dir?: string; input?: NodeJS.ReadableStream; output?: { write(text: string): unknown } }): Promise<void>;

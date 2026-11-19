@@ -168,10 +168,13 @@ export function checkDeck(compiled) {
 /** A compile or read failure as the one problem a check reports. */
 export const failure = (error) => [problem('error', 'compile', null, error.message)];
 
+const RANK = {error: 0, warn: 1, info: 2};
+/** Problems in the order they are told: worst first, then by click. */
+export const worstFirst = (problems) => [...problems].sort((a, b) => RANK[a.level] - RANK[b.level] || (a.click ?? 0) - (b.click ?? 0));
+/** One problem as its line. */
+export const problemLine = (p) => `${p.level.padEnd(5)} ${p.click ? `click ${p.click} "${p.label}"` : 'deck'} · ${p.rule}: ${p.message}`;
+
 /** Problems as text, one per line, worst first; "no problems" when there are none. */
 export function formatProblems(problems) {
-  if (!problems.length) return 'no problems';
-  const rank = {error: 0, warn: 1, info: 2};
-  return [...problems].sort((a, b) => rank[a.level] - rank[b.level] || (a.click ?? 0) - (b.click ?? 0))
-    .map((p) => `${p.level.padEnd(5)} ${p.click ? `click ${p.click} "${p.label}"` : 'deck'} · ${p.rule}: ${p.message}`).join('\n');
+  return problems.length ? worstFirst(problems).map(problemLine).join('\n') : 'no problems';
 }

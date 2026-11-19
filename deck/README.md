@@ -30,6 +30,8 @@ text. Each module does one job, and they compose in one direction:
 | `dev.js` · `devClient.js` | the editing server and the client the page gets in development only |
 | `edit.js` | the two edits the dev page sends, written back as text: a piece moved (its map), a note left (feedback.md) |
 | `noteKey.js` | which notes are the person's: the key the dev server signs them with, kept with the person, not the deck |
+| `notes.js` | the open notes that are the person's own, kept apart from the lines that came with the deck |
+| `run/` | one run of a deck: `check` and `build` as one flowchart with a browser adapter, the one reply it answers, and the runs kept with the person for `storydeck log` — its own [README](run/README.md) |
 | `tools.js` | the read-first tools as text — one core for `cli.js` and `mcp.js` |
 | `init.js` | the starter deck |
 

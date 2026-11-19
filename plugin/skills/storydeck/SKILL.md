@@ -27,8 +27,8 @@ are footprint-story's, a package StoryDeck depends on and shares with footprint-
 | a clip per click in a voice, cached (`voiceClips`, `clipFor`, `chatterboxKit`, `pickSteps`) | `footprint-story/voice` | **Node only** |
 | those clips carried inside one page (`embedClips`) | `footprint-storydeck/voice` | **Node only** |
 | the deck as a narrated video | `footprint-storydeck/video` (+ ffmpeg 5.0 or newer on the path, Playwright's `chromium` passed in) | **Node only** |
-| the deck as PowerPoint (.pptx): a slide per click, its picture, notes and clip | `footprint-storydeck/pptx` — `exportPptx` (the same driver as the video; no ffmpeg; `npm i footprintjs` beside it, an optional peer) | **Node only** |
-| a deck from a folder: one page, a dev server that reloads on the same click, the deck read back as text | the `storydeck` command (`npx footprint-storydeck init · dev · outline · review · check · build · mcp`); `footprint-storydeck/deck` for scripts | **Node only** |
+| the deck as PowerPoint (.pptx): a slide per click, its picture, notes and clip | `footprint-storydeck/pptx` — `exportPptx` (the same driver as the video; no ffmpeg) | **Node only** |
+| a deck from a folder: one page, a dev server that reloads on the same click, the deck read back as text | the `storydeck` command (`npx footprint-storydeck init · dev · outline · review · check · build · log · mcp`); `footprint-storydeck/deck` for scripts | **Node only** |
 
 Never import `footprint-storydeck/voice`, `footprint-storydeck/video`, `footprint-storydeck/pptx` or `footprint-story/voice` into browser code: they use `node:fs`
 and child processes.
@@ -44,8 +44,10 @@ the project that holds the deck, naming its folder (npx would prefer a StoryDeck
 npx footprint-storydeck init my-talk            # a starter: deck.json, clicks.html, map.html, theme.css, icons/
 npx footprint-storydeck outline my-talk         # the whole deck, a line per click — read this before editing
 npx footprint-storydeck review my-talk --click 3    # one click: headline (words), focus, route, lit, greyed, enters, moves, notes
-npx footprint-storydeck check my-talk           # what to fix, each with its click and its fix (--layout: text that spills and stray endless animations, in a browser)
-npx footprint-storydeck build my-talk           # my-talk/index.html, self-contained
+npx footprint-storydeck build my-talk           # THE ONE CALL AFTER AN EDIT: checks, writes my-talk/index.html, and answers verdict first (clean · fix <n> · broken), each fix, what changed since the last run
+npx footprint-storydeck build my-talk --layout  # the same, and a browser measures every click (text that spills, stray endless animations): before you call a deck done
+npx footprint-storydeck check my-talk           # the same reply with nothing written (--strict: a warning fails too)
+npx footprint-storydeck log my-talk --run 1     # how the last run was made: each stage's time, each browser call, every decision and what it read
 npx footprint-storydeck narrate my-talk         # voiced or not, per click (--kit <folder> voices what is missing; then build --voice)
 npx footprint-storydeck dev my-talk             # for the person: a save reloads on the same click and replays it
 npx footprint-storydeck feedback my-talk        # the notes the person left in the dev page — read these first
@@ -83,7 +85,7 @@ light and dark, and ready-made pieces: class `box`, `chip`, `area`, `group`, `ca
 words to a piece with a tail (`above`, `below`, `left`, `right`), sized by its words; bring it in like any piece, `server+`
 takes it in, and `--callout-bg`, `--callout-fg` and the rest change its look. `"lenses": true` adds Read and Scroll beside the
 slides in the one built page (`#read`, `#scroll`), from the same notes, so write them. For an assistant: `claude mcp add storydeck -- npx footprint-storydeck mcp my-talk`
-gives it outline, review, feedback, check and build as tools.
+gives it outline, review, feedback, check, build and log as tools.
 
 **Focus a diagram, click by click.** Every element with `data-k="name …"` and an inline `left/top`
 (`width/height`) is a piece. A click names its subject (`on`) and a strategy; the rest is context.
@@ -174,7 +176,7 @@ const done = await renderVideo({ url: `file://${deckHtml}#1`, steps, out: 'out/v
 // → my-talk.mp4 · captions.srt/.vtt · chapters.txt (what YouTube will show; done.chapters.changes says what its rule merged or moved) · thumbnail.jpg · timeline.json
 ```
 
-**Export to PowerPoint.** The same steps and driver; no ffmpeg; footprintjs installed beside StoryDeck (`npm i footprintjs`).
+**Export to PowerPoint.** The same steps and driver; no ffmpeg.
 
 ```js
 import { exportPptx } from 'footprint-storydeck/pptx';
@@ -222,7 +224,7 @@ It is pictures + notes + sound, not editable PowerPoint shapes.
 ## Verify
 
 - `npx vitest run` in the StoryDeck repo (coverage thresholds enforced).
-- A deck folder: `storydeck check` says `no problems` (and `check --layout` where Playwright is installed); `storydeck
-  outline` before and after a change; a screenshot only to confirm a look the text cannot show.
+- A deck folder: `storydeck build` begins `clean — nothing to fix` (and `build --layout` where Playwright is installed);
+  `storydeck outline` before and after a change; a screenshot only to confirm a look the text cannot show.
 - In a deck: the build's `voiced N of M` count; listen mode (L) plays a clip and moves on; a video strip's
   `timeline.json` and `captions.srt` before and after.

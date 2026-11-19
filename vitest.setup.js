@@ -1,6 +1,15 @@
 import '@testing-library/jest-dom/vitest';
-import { afterEach, vi } from 'vitest';
+import { afterAll, afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+
+// A person's StoryDeck folder (their note key, their decks' kept runs) is never the real one in a test: each test
+// file gets an empty one of its own, removed when the file's tests end.
+const home = mkdtempSync(path.join(tmpdir(), 'storydeck-home-'));
+process.env.STORYDECK_HOME = home;
+afterAll(() => rmSync(home, { recursive: true, force: true }));
 
 afterEach(() => {
   if (typeof document === 'undefined') return;   // a test file in the node environment (deck/ servers and files)

@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.16.0 — one call after an edit, and a record of how it went
+
+- **`build` is the one call after an edit.** It reads the deck once, checks it, writes the page, and answers in one
+  order: the verdict first (`clean`, `fix <n>` or `broken`), then each thing to fix with its click and its fix, then
+  what was written, then what changed since the run before (`since the last run: 2 fixed, 1 new · round 3`).
+  `--layout` also measures the page in a browser. `check` is the same run with nothing written, so the two can never
+  disagree about a deck. A build that finds something to fix still writes its page; `check --strict` is the gate.
+- **The reply changed (breaking for anything that reads it).** A clean check says `clean — nothing to fix` where it
+  said `no problems`. A build's first line is the verdict, and its `✓` line follows the problems. A deck that does not
+  compile is the verdict `broken`: `build` prints it with the reason and exits 1, as before, and over MCP it is an
+  error result. A reply lists the first 30 problems and counts the rest by rule; `--all` (MCP: `all: true`) lists
+  every one. Notes (pieces never shown, missing notes, open feedback) follow what there is to fix.
+- **What a browser found stays open until a browser measures again.** A run without `--layout` cannot know whether a
+  spill is gone, so it never counts one as fixed: it begins `clean so far — 1 problem a browser found before was not
+  measured again (--layout measures)`, and only a measure that finds it gone says `clean`.
+- **`storydeck log`: how a result was made.** Every check and build leaves a small file with you (`STORYDECK_HOME`, or
+  `~/.storydeck`), never in the deck: its verdict, its counts, each stage's time, each browser call, and the run in
+  words, with every choice it made and the value it read. `log` lists a deck's last 30 runs, how its fixing went
+  (rounds, and how many problems it began with) and how often each tool was called; `--run 1` shows one run in full.
+  Over MCP it is the `log` tool. Beside each run the record itself is kept, written as the run goes. To count the
+  calls, every read-first command (`outline`, `review`, `feedback`, `narrate`, `log`, in the command line and over
+  MCP) now writes one small file there, `calls.json`; they wrote nothing before. A folder that cannot be written
+  counts nothing, and no command waits on it.
+- **`check` and `build` are a flowchart.** They run on [footprintjs](https://github.com/footprintjs/footPrint), as the
+  PowerPoint export does: each go or no-go is a recorded decision, and the browser is an adapter with a chart of its
+  own, each of its steps a named call. So `footprintjs` (14.1 or later) and `foottrace` now come with StoryDeck; they
+  were an optional peer you installed for the export. That adds about 20 MB to an install. They load only when a run
+  or an export starts: the page's browser runtime never loads them.
+- **What is checked is what is written.** A build read the deck twice, once to check and once to write, so an edit
+  made in between could put an unchecked page on disk. A run reads it once.
+- **Every browser call has a time limit of its own,** above the browser's own time-outs: opening the page (2
+  minutes), measuring a click (1 minute) and closing (30 seconds). A call that never answers ends there, the measure
+  stops as one error naming the call (`browser.measure did not answer within 60000 ms`), and the run goes on to say so.
+- **Fixed: `--layout` no longer reports a floor as past the slide's edge.** An isometric floor is ground: no view
+  frames it, so it runs past the edge by design. Every isometric deck got an `outside` warning for it. A piece that
+  says `data-ground="false"` is part of the picture, and is still measured.
+- **Fixed: a browser still starting is closed.** `deckStageDriver`'s `close()` did nothing when the browser had not
+  finished starting, so an opening that was given up on left it running. It now closes that browser as it arrives.
+- **`layoutCheck` rejects with the first step that failed.** A close that failed after a failed open or measure took
+  its place, and named the wrong step.
+- **`runDeck`** is exported from `footprint-storydeck/deck`: the run a script can make itself, returning the verdict,
+  the problems, what was written and where the run stands.
+
 ## 0.15.1 — a ring follows what a piece draws
 
 - **A ring round an isometric piece follows its faces.** In a deck that explores (`"explore": true`), a piece that

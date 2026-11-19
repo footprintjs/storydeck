@@ -49,6 +49,12 @@ function realPlace(p) {
   }
 }
 
+/**
+ * Whether the person's StoryDeck folder would sit inside a deck folder: nothing of the person's is kept there — the dev
+ * server serves the deck, and a deck may be someone else's folder.
+ */
+export const homeInsideDeck = (home, deck) => isInside(realPath(deck), realPlace(home));
+
 /** A new key file, made only where none is: 32 random bytes, readable by its owner only. */
 function makeKey(home, file) {
   mkdirSync(home, {recursive: true, mode: 0o700});
@@ -68,7 +74,7 @@ function makeKey(home, file) {
  */
 export function noteKey(home = storydeckHome(), {create = false, deck = null} = {}) {
   const file = path.join(home, 'key');
-  if (deck && isInside(realPath(deck), realPlace(home))) {
+  if (deck && homeInsideDeck(home, deck)) {
     return {key: null, why: `the note key folder ${home} is inside the deck folder, which the dev server serves — set STORYDECK_HOME elsewhere`};
   }
   let fd = openKey(file);

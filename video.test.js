@@ -326,6 +326,25 @@ describe('video · the deck-stage driver', () => {
     expect(f.page.addStyleTag).toHaveBeenCalledTimes(1);
   });
 
+  it('closes a browser that is still starting when close is asked for, and closes nothing that never started', async () => {
+    const f = fakeChromium();
+    let started;
+    f.chromium.launch = vi.fn(() => new Promise((done) => { started = done; }));   // a launch that takes its time
+    const driver = deckStageDriver({ chromium: f.chromium, hide: [] });
+    const opening = driver.open('u');           // given up on by its caller, still starting
+    const closing = driver.close();
+    expect(f.browser.close).not.toHaveBeenCalled();
+    started(f.browser);
+    await closing;
+    expect(f.browser.close).toHaveBeenCalledTimes(1);   // closed as it arrived: none is left running
+    await opening;
+    // a launch that fails leaves nothing to close, and a driver never opened closes nothing
+    const failing = deckStageDriver({ chromium: { launch: async () => { throw new Error('no browser'); } } });
+    await expect(failing.open('u')).rejects.toThrow('no browser');
+    await expect(failing.close()).resolves.toBeUndefined();
+    await expect(deckStageDriver({ chromium: f.chromium }).close()).resolves.toBeUndefined();
+  });
+
   it('makes a click forward, pauses every animation, steps them and takes a frame', async () => {
     const f = fakeChromium();
     const driver = deckStageDriver({ chromium: f.chromium });

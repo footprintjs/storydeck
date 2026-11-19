@@ -454,14 +454,13 @@ cannot play (not a .wav, .m4a or .mp3; an empty file; or bytes that do not begin
 ID3 or an MP3 frame, ftyp), one over `maxClip` (300 s), a click that says words with no clip;
 a click without a 16:9 PNG; a package that does not read back as planned. A refusal names each click and its fix,
 carries the record (`error.narrative`), and writes nothing to `out`. The clips are checked before a browser opens.
-footprintjs is an optional peer dependency: StoryDeck does not install it (a browser-only install stays small), so
-install it beside StoryDeck to export — `npm i footprintjs` — and an export without it is refused, saying so. It is
-loaded only when an export runs; the deck's browser runtime never loads it.
+footprintjs comes with StoryDeck (since 0.16.0, when `check` and `build` became a flowchart too). It is loaded only
+when an export or a run starts; the deck's browser runtime never loads it.
 
 ```js
 import { chromium } from 'playwright-core';
 import { deckStageDriver } from 'footprint-storydeck/video';
-import { exportPptx } from 'footprint-storydeck/pptx';   // and `npm i footprintjs` (14 or later): an optional peer, needed to export
+import { exportPptx } from 'footprint-storydeck/pptx';
 
 const done = await exportPptx({
   url: 'file:///…/deck.html', steps, out: 'out/my-talk.pptx',   // the steps the video takes; or `out` a folder → <name>.pptx
@@ -508,8 +507,30 @@ my-talk/
 npx footprint-storydeck init my-talk      # a starter deck that builds and checks clean
 npx footprint-storydeck dev my-talk       # live preview: a save rebuilds, reloads on the same click, plays it again
 npx footprint-storydeck feedback my-talk  # the notes left in the dev page, for whoever edits next
-npx footprint-storydeck build my-talk     # my-talk/index.html — one page, every runtime inside, no network request
+npx footprint-storydeck build my-talk     # checks, then my-talk/index.html — one page, every runtime inside, no network request
+npx footprint-storydeck log my-talk       # the last checks and builds: verdicts, rounds of fixing, tool calls
 ```
+
+`build` is the one call after an edit. It reads the deck once, checks it, writes the page, and answers in one order:
+the verdict first (`clean`, `fix <n>` or `broken`), then each thing to fix with its click and its fix, then what was
+written, then what changed since the run before.
+
+```text
+fix 2 — 0 errors, 2 warnings
+warn  click 4 "server" · words: the headline is 14 words (at most 12) — keep the canvas short and move the rest into the notes
+warn  click 9 "cache" · spills: text spills out of "cache" by 12 px wide ("Cache") — shorten it, or give the box more room
+✓ index.html · 57 clicks · 412 KB · 38 ms
+since the last run: 3 fixed, 0 new · round 2
+```
+
+What a browser found stays open until a browser measures again: a build without `--layout` after one that found a
+spill begins `clean so far — 1 problem a browser found before was not measured again (--layout measures)`.
+
+`check` is the same run with nothing written (`--strict` fails on a warning too; `--layout` also measures the page in
+a browser). Both are one [footprintjs](https://github.com/footprintjs/footPrint) flowchart, so every run leaves a
+record of each choice it made, and `storydeck log` reads it back: how many rounds a deck took to come clean, beginning
+with how many problems, and one run in full (`--run 1`). The runs are kept with you (`STORYDECK_HOME`, or
+`~/.storydeck`), never in the deck. How it is built: [deck/run](https://github.com/footprintjs/storydeck/tree/main/deck/run).
 
 - **One page, in development and in the room.** `dev` serves the very page `build` writes, with a small dev client
   added: a save reloads on the click you were on and plays that click again (*replay on save*), a save that breaks the
@@ -721,6 +742,10 @@ const { compiled } = loadDeck('my-talk');
 console.log(reviewClick(compiled, 3));      // click 3 of 6 · "1 · The route · 2" (map "map", step 2 of 3) …
 console.log(checkDeck(compiled));           // [{ level, rule, click, label, message }]
 buildDeck('my-talk');                       // { file, bytes, slides, clicks, ms }
+
+// what the command does after an edit: one run that checks, writes the page, and says where it stands
+const run = await runDeck('my-talk', { write: true });   // import { runDeck } from 'footprint-storydeck/deck'
+console.log(run.verdict, run.errors, run.warnings, run.written?.file, run.round);   // 'clean' | 'fix' | 'broken', …
 ```
 
 ## For an AI assistant: the deck as MCP tools
@@ -738,21 +763,23 @@ claude mcp add storydeck -- npx footprint-storydeck mcp my-talk      # Claude Co
 | `outline` | The whole deck, one line per click: start here. |
 | `feedback` | The notes the person left on clicks in the dev page: what to change. |
 | `review` `{click}` | One click as text: what it says, lights, greys, brings in and moves. Name a click, or `all: true`. |
-| `check` `{layout}` | What to fix, worst first, each with its click and its fix. With `layout: true`, a browser also finds text that spills, callouts that overlap, and a tail that no longer reaches its piece. |
+| `check` `{layout, all}` | What to fix, and nothing written: the verdict first (`clean`, `fix <n>`, `broken`), then each problem, worst first, with its click and its fix. With `layout: true`, a browser also finds text that spills, callouts that overlap, and a tail that no longer reaches its piece. |
 | `narrate` `{say}` | What each click says in your voice: how many are voiced, and which are left. It only reads, unless the server has a voice and `say` names what to voice (`"all"`, or clicks like `"1-3,7"`). |
-| `build` | Writes the one page, and says what it wrote. |
+| `build` `{layout, all}` | The one call after an edit: the same check, then the page written. One reply: the verdict, each thing to fix, what was written, and what changed since the run before (fixed, new, the round of fixing). A deck that does not compile is `broken`: nothing is written. |
+| `log` `{run}` | The deck's last checks and builds: each verdict, its round of fixing, how often each tool was called. `run: 1` gives the newest run in full, with every decision it made and what it read. |
 
-The order that costs least: `outline`, then `feedback`, then `review` a click, edit the files, `check`, and `build` last.
+The order that costs least: `outline`, then `feedback`, then `review` a click, edit the files, and `build`. One call
+after each edit says whether it worked; pass `layout: true` before you call a deck done.
 
 ```mermaid
 flowchart LR
   outline[outline: the whole deck] --> feedback[feedback: what the person asked for]
   feedback --> review[review a click, as text]
   review --> edit[Edit the deck's files]
-  edit --> check{check: anything to fix?}
-  check -- yes --> review
-  check -- no --> narrate[narrate: voice it, if you want]
-  narrate --> build[build: one page to send]
+  edit --> build{build: the verdict}
+  build -- fix or broken --> review
+  build -- clean --> narrate[narrate: voice it, if you want]
+  narrate --> done[the page is written]
 ```
 
 To start a deck, `npx footprint-storydeck init my-talk` writes one that builds and checks clean, using the base look and a

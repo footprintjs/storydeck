@@ -35,7 +35,7 @@ describe('checkTool --layout', () => {
     expect(f.browser.close).toHaveBeenCalled();
     expect(f.routed).toBe(true);   // measured offline
     expect(r).toMatchObject({errors: 0, warnings: 1});
-    expect(r.text).toBe('warn  click 1 "Title" · spills: text spills out of "server" by 12 px wide ("Server") (on clicks 1–6) — shorten it, or give the box more room');
+    expect(r.text).toBe('fix 1 — 0 errors, 1 warning\nwarn  click 1 "Title" · spills: text spills out of "server" by 12 px wide ("Server") (on clicks 1–6) — shorten it, or give the box more room');
   });
 
   it('reports a page that never settles as one error, closing the browser — the other checks still report', async () => {
@@ -43,7 +43,7 @@ describe('checkTool --layout', () => {
     const r = await checkTool(tempDeck(), {layout: true, chromium: f.chromium});
     expect(f.browser.close).toHaveBeenCalled();
     expect(r).toMatchObject({errors: 1, warnings: 0});
-    expect(r.text).toBe('error deck · layout: the layout check stopped: page.waitForFunction: Timeout 30000ms exceeded. — the page did not settle in the browser (a script in the deck may navigate away or keep it busy)');
+    expect(r.text).toBe('fix 1 — 1 error, 0 warnings\nerror deck · layout: the layout check stopped: page.waitForFunction: Timeout 30000ms exceeded. — the page did not settle in the browser (a script in the deck may navigate away or keep it busy)');
   });
 
   it('reports a deck that cannot be read as the one error, before any browser opens', async () => {
@@ -55,14 +55,14 @@ describe('checkTool --layout', () => {
 });
 
 describe('the read-first tools', () => {
-  it('outline, review and build answer in text', () => {
+  it('outline, review and build answer in text', async () => {
     const dir = tempDeck();
     expect(outlineTool(dir).split('\n')).toHaveLength(7);
     expect(reviewTool(dir, {click: 1})).toMatch(/^click 1 of 6/);
     expect(() => reviewTool(dir, {click: ''})).toThrow(/name a click/);
-    expect(buildTool(dir)).toMatch(/^✓ .* · 6 clicks · \d+ KB · \d+ ms$/);
-    expect(buildTool(tempDeck({...JSON.parse('{}'), 'deck.json': '{"title":"T","deckData":"deck-data.json"}', 'clicks.html': '<section data-label="P"><p>x</p></section>'})))
-      .toMatch(/ · .*deck-data\.json$/);
+    expect((await buildTool(dir)).text).toMatch(/^clean — nothing to fix\n✓ .* · 6 clicks · \d+ KB · \d+ ms$/);
+    expect((await buildTool(tempDeck({...JSON.parse('{}'), 'deck.json': '{"title":"T","deckData":"deck-data.json"}', 'clicks.html': '<section data-label="P"><p>x</p></section>'}))).text)
+      .toMatch(/ · .*deck-data\.json$/m);
   });
 });
 
@@ -107,7 +107,7 @@ describe('feedback', () => {
     const done = tempDeck();
     writeFileSync(path.join(done, 'feedback.md'), notes(home, done).replaceAll('- [ ]', '- [x]'));
     expect(feedbackTool(done, {home})).toBe('no open notes from your dev page');
-    expect((await checkTool(done, {home})).text).toBe('no problems');
+    expect((await checkTool(done, {home})).text).toBe('clean — nothing to fix');
   });
 
   it('never reads a feedback.md that is a link out of the deck — check reports it as an error', async () => {
