@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.17.0 — blocks nobody has to place
+
+- **An isometric map with no places typed.** Leave `data-at` off every block and say what is joined to what with the
+  wires (`data-arrow="you to server"`): the build places the blocks. On the slide a block stands one step to the right
+  of what leads to it, the blocks led to from one place stand one below the other, and they are far enough apart that
+  no block covers another and a wire has room for its arrow. So a system reads left to right and fills the slide. The
+  same map always gives the same picture. The placing is `footprint-story/isometric`'s `arrange` (0.10.0), so a film
+  can place the same blocks the same way.
+- **Nothing else needs a number either.** A block or a cylinder with no `data-size` is `2 2 1`. A floor with no
+  `data-size` is fitted round the blocks, a tile of floor on every side. With no `data-iso-grid`, a map the build
+  placed gets the tile that lets the blocks fill the slide's area, from 96 to 160 px wide; a picture too big for
+  that runs past the slide, `build --layout` says which block does, and a click's camera frames what the click shows. `data-iso-grid="fit"` asks for that
+  tile on a map that places its own blocks.
+- **A wire to a block ends on the block.** A wire between pieces ran from box to box, and the box a block is placed
+  by has empty corners: the arrow stopped short of the block, and two blocks standing clear of each other were refused
+  as "too close" because their boxes met. A wire to an isometric piece now runs to the outline of what it draws.
+  Wires in a deck that has isometric pieces move a little; wires between flat pieces are drawn exactly as before.
+- **It is all or none (breaking for one case).** A map that places some of its blocks and not the others is refused,
+  naming them. Before, a block with no `data-at` stood at `0 0`: write `data-at="0 0"` on it to keep that. A map with
+  one block and no `data-at`, and no `data-iso-grid`, now gets the fitted tile where it had a tile 120 px wide.
+- `footprint-story` 0.10.0 or later.
+
 ## 0.16.0 — one call after an edit, and a record of how it went
 
 - **`build` is the one call after an edit.** It reads the deck once, checks it, writes the page, and answers in one

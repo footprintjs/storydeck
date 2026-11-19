@@ -123,6 +123,7 @@ names, a `step` of 0–5 s, a text `line`, a `lineAt` of `'x y'` — and refused
 | the view to move on without changing size | `data-focus="pan"` |
 | a panel or a legend that stays put while the view moves | `data-stage="panel"` on its pieces |
 | a floor or a backdrop the view should not frame | `data-ground` on it |
+| blocks on a floor without working out where each goes | `data-iso="block"` with no `data-at` on any block, and a wire for each thing joined: the build places them |
 | pieces to come one after another | `data-focus="path"`, in the order of `data-on` or `data-focus-route` |
 | some to come together, or a turn to take longer | `data-focus-route="a (b c) w1:1.2"` |
 | the pieces to wait until the view has arrived | `camera` first in the route |
@@ -649,7 +650,30 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   the piece moved (`tail-miss`). `review` says what each click's callouts say. A callout with a side it does not have, a
   piece that is not there or no words is refused, and a deck with no callouts builds byte for byte as before.
 - **Blocks on a floor (the isometric look).** A system drawn as blocks seen from a corner reads at a glance. In
-  `map.html`, `data-iso` makes a piece one, standing where `data-at` says and as big as `data-size` says, in tiles:
+  `map.html`, `data-iso` makes a piece one. Say what is joined to what, and the build places them — no number to type:
+
+  ```html
+  <div data-k="floor" data-iso="floor"></div>
+  <div data-k="you" data-iso="block"><b>You</b><small>a browser</small></div>
+  <div data-k="dns" data-iso="block"><b>DNS</b></div>
+  <div data-k="server" data-iso="block" data-size="2 2 1.6"><b>Server</b></div>
+  <div data-k="db" data-iso="cylinder"><b>Database</b></div>
+  <i data-k="w1" class="wire" data-arrow="you to dns"></i>
+  <i data-k="w2" class="wire" data-arrow="you to server"></i>
+  <i data-k="w3" class="wire" data-arrow="server to db"></i>
+  ```
+
+  A map none of whose blocks has a `data-at` is placed from its wires: on the slide a block stands one step to the
+  right of what leads to it, and the blocks led to from one place stand one below the other, far enough apart that no
+  block covers another and a wire has room for its arrow. So a system reads left to right and fills the slide. A block
+  with no `data-size` is `2 2 1`, a floor with none is fitted round the blocks, and with no `data-iso-grid` the tile is
+  the one that lets the blocks fill the slide's area (below the headline, above the footer), from 96 to 160 px: a
+  picture too big for that runs past the slide, `storydeck build --layout` says which block does, and a click's camera
+  frames what the click shows (`data-focus="fit"`). The same map always gives the same picture. It is all or none: a
+  map that places some of its blocks and not the others is refused, naming them. `data-iso-grid="fit"` asks for the
+  fitted tile on a map that places its own blocks.
+
+  To place them yourself, each stands where `data-at` says and is as big as `data-size` says, in tiles:
 
   ```html
   <i data-iso-grid="150 at 1500 150"></i>                                  <!-- optional: a tile's width, and where the floor's far corner stands -->
@@ -672,9 +696,10 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   lighter and its sides darker; `--iso-ink`, `--iso-line`, `--iso-grid` and `--iso-floor` are the other tokens, and
   class `ok`, `warn` or `bad` colours one. The numbers come from `footprint-story/isometric`, the grid a film can draw
   with too. A block is what it draws, not the box it is placed by: on the slide shown its faces and its words take the
-  pointer (the empty corners of its box do not, so a block behind is not covered by them), and a ring round it — a highlight
-  (`data-hot`) or explore's hover — follows its faces. Not yet: a wire that runs along the floor (a wire goes straight
-  from box to box), and moving a block by dragging it in the dev page (change its `data-at`).
+  pointer (the empty corners of its box do not, so a block behind is not covered by them), a ring round it — a highlight
+  (`data-hot`) or explore's hover — follows its faces, and a wire to it ends on its outline. Not yet: a wire that runs
+  along the floor in the grid's own directions (a wire goes straight from one block to the other), and moving a block
+  by dragging it in the dev page (change its `data-at`).
   A deck to start from: [examples/a-request](examples/a-request) (blocks on a floor, a view that follows them, an order
   inside each click); a test builds and checks it.
 - **Ground: what lies under the picture.** `data-ground` on a piece (a floor has it by itself) says it lies under the

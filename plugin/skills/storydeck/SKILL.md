@@ -130,7 +130,13 @@ run of clicks does not pump in and out (`zoom` or `fit` once, then `pan`). `--sd
 arrived (0 when none moves, 0 on a jump): a deck's own animation waits with `animation-delay: var(--sd-arrive-at)`. For
 one piece whose `data-k` has several names, CSS is `[data-k~="name"]`.
 
-**Blocks on a floor (isometric).** In `map.html`: `<div data-k="server" data-iso="block" data-at="7 4"
+**Blocks on a floor (isometric).** TYPE NO PLACES: in `map.html` write `<div data-k="floor" data-iso="floor"></div>`,
+a `<div data-k="server" data-iso="block"><b>Server</b></div>` for each thing (`data-iso="cylinder"` for a round one)
+and a wire for each thing joined (`<i data-k="w1" class="wire" data-arrow="you to server"></i>`): with no `data-at` on
+any block, the build places them from the wires (left to right across the slide, what one block leads to one below the
+other), fits the floor round them and chooses the tile that fills the slide.
+A block with no `data-size` is `2 2 1`. All or none: a map that places some blocks and not the others is refused.
+To place them yourself: `<div data-k="server" data-iso="block" data-at="7 4"
 data-size="2 2 1.6"><b>Server</b></div>` draws a block seen from a corner; also `data-iso="cylinder"` (round: the same
 width and depth) and `data-iso="floor" data-size="16 9"` (the tile lines; write it first). `data-at` is "col row" in
 tiles (a third number lifts it), `data-size` "wide deep high". The build places, sizes and levels each one, so give it no

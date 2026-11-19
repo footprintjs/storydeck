@@ -61,10 +61,13 @@ export function parseClicks(html: string): DeckPart[];
 
 export interface DeckIcon { readonly viewBox: string; readonly body: string }
 /**
- * The built-in drawing helpers, icons then wires: <i data-icon="name"></i> becomes that icon's SVG, and
- * <i data-arrow="x1 y1 x2 y2 [bend]"></i> an SVG wire (class "pkt": a packet that rides it on a path click).
+ * The built-in drawing helpers, in the order they run: <i data-icon="name"></i> becomes that icon's SVG; isometric
+ * pieces (data-iso) are placed and drawn — by their own data-at, or, when no block has one, by the build from what the
+ * wires join; callouts stand beside their pieces; and <i data-arrow="…"></i> becomes an SVG wire, by numbers ("x1 y1 x2
+ * y2 [bend]") or between pieces ("from to to": class "pkt" adds a packet that rides it on a path click). `canvas`: the
+ * slide, [w, h]; `area`: [x0, y0, x1, y1], where a picture the build fits goes (the deck's area).
  */
-export function applyTransforms(html: string, options?: { icons?: Readonly<Record<string, DeckIcon>>; canvas?: readonly [number, number] | null }): string;
+export function applyTransforms(html: string, options?: { icons?: Readonly<Record<string, DeckIcon>>; canvas?: readonly [number, number] | null; area?: readonly [number, number, number, number] | null }): string;
 
 /** A deck folder as plain data. Every file is read by its real path, inside the folder, never a hidden one. */
 export interface DeckSource {
