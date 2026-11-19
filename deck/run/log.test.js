@@ -171,12 +171,17 @@ describe('where a run stands in a deck\'s fixing', () => {
     expect(progress(after(unmeasured, b), now('fix', [], {measured: true, layoutKeys: [['outside|Back', 1]]}))).toMatchObject({round: 3, since: {fixed: 1, new: 1}, layout: [['outside|Back', 1]], carried: 0});
   });
 
-  it('a measure that stopped answers nothing: its error is new, and what was open before it stays open', () => {
+  it('a measure that stopped found nothing about the deck: its error is that run\'s own — new each time, never carried, never fixed', () => {
     const a = now('fix', [], {measured: true, layoutKeys: [['spills|Title', 1]]}), found = progress(null, a);
-    const b = now('fix', [], {measured: false, layoutKeys: [['layout|', 1]], errors: 1}), stopped = progress(after(found, a), b);
-    expect(stopped).toMatchObject({round: 2, since: {fixed: 0, new: 1}, layout: [['spills|Title', 1], ['layout|', 1]], carried: 1});
-    expect(progress(after(stopped, b), b)).toMatchObject({since: {fixed: 0, new: 0}, layout: [['spills|Title', 1], ['layout|', 1]]});   // stopping twice is not two errors open
-    expect(progress(after(stopped, b), now('clean', [], {measured: true}))).toMatchObject({round: 0, since: {fixed: 2, new: 0}, closed: {rounds: 2}});
+    const b = {...now('fix', [], {errors: 1}), warnings: 0, stopKeys: [['layout|', 1]]}, stopped = progress(after(found, a), b);
+    expect(stopped).toMatchObject({round: 2, since: {fixed: 0, new: 1}, layout: [['spills|Title', 1]], carried: 1});   // the spill is still the one thing known open
+    expect(progress(after(stopped, b), b)).toMatchObject({round: 3, since: {fixed: 0, new: 1}, layout: [['spills|Title', 1]], carried: 1});   // it stops again: again its own error
+    expect(progress(after(stopped, b), now('clean'))).toMatchObject({round: 3, since: {fixed: 0, new: 0}, carried: 1, closed: null});   // a run that does not measure: the stop is not "fixed"
+    expect(progress(after(stopped, b), now('clean', [], {measured: true}))).toMatchObject({round: 0, since: {fixed: 1, new: 0}, closed: {rounds: 2}});
+    // on a deck no browser ever found anything on, a stopped measure leaves nothing open behind it
+    const alone = progress(null, b);
+    expect(alone).toMatchObject({round: 1, layout: [], carried: 0});
+    expect(progress(after(alone, b), now('clean'))).toMatchObject({round: 0, carried: 0, since: {fixed: 0, new: 0}, closed: {rounds: 1, first: {errors: 1, warnings: 0}}});
   });
 
   it('a run before it that says less than it should still gives counts to stand on', () => {

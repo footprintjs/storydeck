@@ -111,6 +111,18 @@ describe('runDeck: the browser, as an adapter', () => {
     expect(replyText(gone).split('\n')[0]).toBe('clean — nothing to fix');
   });
 
+  it('a measure that stopped is that run\'s own error: the next run carries nothing of it, and a stop is never one problem twice', async () => {
+    const dir = tempDeck(), home = tempDir(), failing = () => fakeDriver({open: async () => { throw new Error('did not open'); }});
+    const stopped = await runDeck(dir, {home, layout: true, driver: failing()});
+    expect(stopped).toMatchObject({verdict: 'fix', errors: 1, measured: false, round: 1, carried: 0});
+    const twice = await runDeck(dir, {home, layout: true, driver: failing()});
+    expect(twice).toMatchObject({verdict: 'fix', errors: 1, round: 2, carried: 0, since: {fixed: 0, new: 1}});
+    expect(replyText(twice)).not.toContain('a browser found before');
+    // no browser to find, or no measure asked for: nothing a browser found is open, so the run is clean and the series closes
+    expect(await runDeck(dir, {home, layout: true})).toMatchObject({verdict: 'clean', carried: 0, round: 0, closed: {rounds: 2, first: {errors: 1, warnings: 0}}});
+    expect(replyText(await runDeck(dir, {home})).split('\n')[0]).toBe('clean — nothing to fix');
+  });
+
   it('a browser that does not close when asked is one error naming the call, and the run still answers', async () => {
     const dir = tempDeck(), home = tempDir(), driver = fakeDriver();
     driver.close = () => new Promise(() => {});

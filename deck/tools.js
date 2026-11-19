@@ -68,16 +68,17 @@ export const buildTool = (dir, options = {}) => runTool(dir, {...options, write:
 
 /**
  * The deck's kept runs as text: the list, newest first — or one run in full (`run`: its number in that list, 1 the
- * newest), with each stage's time, each tool's calls and the run in words (`all`: every line).
+ * newest), with each stage's time, each tool's calls and the run in words (`all`: every line). `measure`: how its
+ * caller asks for a measure in a browser, for a run that left one unanswered.
  */
-export function logTool(dir, {home = storydeckHome(), run, all = false} = {}) {
+export function logTool(dir, {home = storydeckHome(), run, all = false, measure} = {}) {
   const {dir: folder, why} = runsFolder(home, deckRoot(dir));
   if (!folder) throw new Error(`this deck's runs are not kept: ${why}`);
   const runs = keptRuns(folder);
-  if (run === undefined || run === null || run === '') return listText(runs, callCounts(folder), {kept: RUNS_KEPT});
+  if (run === undefined || run === null || run === '') return listText(runs, callCounts(folder), {kept: RUNS_KEPT, measure});
   const n = Number(run);
   if (!Number.isInteger(n) || n < 1 || n > runs.length) throw new Error(runs.length ? `--run is a run's number in the list, 1 (the newest) to ${runs.length}, not ${run}` : 'no runs kept yet: storydeck check and storydeck build each leave one');
-  return runText(runs[n - 1], n, {all});
+  return runText(runs[n - 1], n, {all, measure});
 }
 
 /** One more call of a tool on a deck, counted for `log` (run/log.js): never a reason for the tool to fail. */

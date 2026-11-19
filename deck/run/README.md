@@ -114,7 +114,8 @@ stopped["stopped"]
   tool's calls counted by name. The log reads them; no stage reports about itself. (The time on a reply's `✓` line is
   the whole run, as whoever ran it waited for it.)
 - **What a browser found stays open until a browser measures again.** A run that did not measure cannot know, so it
-  never counts a browser's finding as fixed, and never closes a series that has one open (`log.js · progress`).
+  never counts a browser's finding as fixed, and never closes a series that has one open (`log.js · progress`). A
+  measure that stopped found nothing about the deck: its error is that run's own, new each time and never carried.
 - **An adapter reports, the run decides.** The browser adapter hands back `{measured, layoutProblems, layoutNote?}`.
   Whether that stops a build is the run's to say (it does not: a build says what to fix, and writes the page).
 

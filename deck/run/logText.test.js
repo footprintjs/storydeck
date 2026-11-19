@@ -32,6 +32,13 @@ describe('a deck\'s runs as text', () => {
       'one run in full: storydeck log --run <its number>']);
   });
 
+  it('a run that left a browser\'s finding unanswered says so in its reader\'s own words for a measure', () => {
+    const run = kept({carried: 1, round: 2, since: {fixed: 0, new: 0}});
+    expect(listText([run], {since: null, tools: {}}, {kept: 30}).split('\n')[1]).toContain('clean so far — 1 problem a browser found before was not measured again (--layout measures) · round 2');
+    expect(listText([run], {since: null, tools: {}}, {kept: 30, measure: 'layout: true'}).split('\n')[1]).toContain('(layout: true measures)');
+    expect(runText(run, 1, {measure: 'layout: true'}).split('\n')[0]).toContain('(layout: true measures)');
+  });
+
   it('one run in full: each stage\'s time, each tool\'s calls, what the engine warned of, and the run in words', () => {
     const run = kept({measured: true, stages: [{stage: 'read deck', ms: 12}, {stage: 'verdict', ms: 0}], engine: ['a stage wrote nothing'],
       calls: {'browser.open': {count: 1, ok: 1, failed: 0, timeout: 0, p50: 812, max: 812, slowest: null},

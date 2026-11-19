@@ -74,22 +74,18 @@ function changed(before, now) {
 }
 
 const total = (pairs) => pairs.reduce((n, [, c]) => n + c, 0);
-/** Two lists of counted keys as one: each key once, with the larger of its counts. */
-function merged(a, b) {
-  const all = new Map(a);
-  for (const [key, n] of b) all.set(key, Math.max(all.get(key) ?? 0, n));
-  return [...all].slice(0, MOST.keys);
-}
 const NONE = Object.freeze({errors: 0, warnings: 0});
 
 /**
  * Where a run stands in the deck's fixing, from the last run that finished (`prev`, or null): {round, first, closed,
- * since, layout, carried}. `now`: {verdict, errors, warnings, measured, keys, layoutKeys} — `keys` what the rules
- * found, `layoutKeys` what the browser found in this run.
+ * since, layout, carried}. `now`: {verdict, errors, warnings, measured, keys, layoutKeys, stopKeys} — `keys` what the
+ * rules found; `layoutKeys` what the browser found, when it measured every click; `stopKeys` what stopped a measure
+ * that did not.
  *
  * What is open is what is known to be open: what this run found, and what a browser found before that this run did not
  * measure again (`layout`, carried from run to run until a measure answers it; `carried`: how many of those this run
- * left unmeasured). A run that did not measure never counts a browser's finding as fixed.
+ * left unmeasured). A run that did not measure never counts a browser's finding as fixed. A measure that stopped found
+ * nothing about the deck: its error is this run's own — new when it happens, never carried, never counted as fixed.
  *
  * A round is a run that ended with something open; rounds in a row are one series, and a run with nothing open closes
  * it. `round`: this run's number in its series (0 when nothing is open). `first`: what the series began with.
@@ -97,13 +93,13 @@ const NONE = Object.freeze({errors: 0, warnings: 0});
  */
 export function progress(prev, now) {
   const before = prev?.layout ?? [];
-  const layout = now.measured ? now.layoutKeys : merged(before, now.layoutKeys), carried = now.measured ? 0 : total(before);
+  const layout = now.measured ? now.layoutKeys : before, carried = now.measured ? 0 : total(before);
   const open = now.verdict !== 'clean' || carried > 0, series = Boolean(prev && prev.round > 0);
   return {
     round: open ? (series ? prev.round + 1 : 1) : 0,
     first: open ? (series ? prev.first ?? NONE : {errors: now.errors, warnings: now.warnings}) : null,
     closed: !open && series ? {rounds: prev.round, first: prev.first ?? NONE} : null,
-    since: prev ? changed([...prev.keys, ...before], [...now.keys, ...layout]) : null,
+    since: prev ? changed([...prev.keys, ...before], [...now.keys, ...layout, ...(now.stopKeys ?? [])]) : null,
     layout, carried,
   };
 }
@@ -196,8 +192,9 @@ const keptLines = (lines) => lines.slice(0, MOST.lines).map((l) => `${l.type ===
  * lines, engine, failure?} — calls already hold which click was slowest, as a number.
  */
 export function keepRun(dir, files, run, at = new Date()) {
-  const keys = problemKeys(run.problems ?? []), layoutKeys = problemKeys(run.layoutProblems ?? []);
-  const stand = run.verdict === 'failed' ? OUTSIDE : progress(lastFinished(dir), {...run, keys, layoutKeys});
+  // what the adapter handed back is what a browser found only when it measured every click: else it is what stopped it
+  const keys = problemKeys(run.problems ?? []), handed = problemKeys(run.layoutProblems ?? []);
+  const stand = run.verdict === 'failed' ? OUTSIDE : progress(lastFinished(dir), {...run, keys, layoutKeys: run.measured ? handed : [], stopKeys: run.measured ? [] : handed});
   const body = {v: 1, at: at.toISOString(), kind: run.kind, verdict: run.verdict, errors: run.errors, warnings: run.warnings, infos: run.infos,
     clicks: run.clicks, measured: run.measured, written: run.written, ms: run.ms, ...stand, keys,
     stages: (run.stages ?? []).slice(0, 64).map((st) => ({stage: text(st.stage, 80), ms: whole(st.ms)})), calls: run.calls ?? {},
