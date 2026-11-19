@@ -268,12 +268,13 @@ function draw(p, html, shape, level) {
 export const isoPieces = (html, options) => isoDrawn(html, options).html;
 
 /**
- * isoPieces, with what a helper that draws between pieces needs of an isometric one: {html, shapes} — `shapes` a Map
- * from a block's or a cylinder's name to {outline: [[x, y], …], middle: [x, y]} in slide px: the points round what it
- * draws, and the middle of that. A block is not the box it is placed by: a wire runs from the outline of one to the
- * outline of the other (transforms.js), where a box would stop it short in the empty corner beside a face, and would
- * call two blocks that stand clear of each other too close. A name two pieces share has no shape: it is found by its
- * box, as before.
+ * isoPieces, with what a helper that draws between pieces needs of an isometric one: {html, shapes, floor} — `shapes`
+ * a Map from a block's or a cylinder's name to {outline: [[x, y], …], middle: [x, y]} in slide px (the points round
+ * what it draws, and the middle of that) and {kind, at: [col, row, lift], size} in tiles (where it stands);
+ * `floor(col, row, lift)`: where a point of the floor is on the slide, [x, y] (absent when the map has no isometric
+ * piece). A block is not the box it is placed by: a wire between two blocks is a cable along the floor, from the foot
+ * of one to the foot of the other (cable.js), and a wire from a block to a flat piece ends on the block's outline
+ * (transforms.js). A name two pieces share has no shape: it is found by its box, as before.
  */
 export function isoDrawn(html, {canvas = null, area = null, links = []} = {}) {
   const shapes = new Map();
@@ -297,9 +298,11 @@ export function isoDrawn(html, {canvas = null, area = null, links = []} = {}) {
   const twice = new Set(solid.map((p) => p.name).filter((name, i, all) => all.indexOf(name) !== i));
   for (const p of solid) {
     const {outline, box} = drawn[found.indexOf(p)];
-    if (!twice.has(p.name)) shapes.set(p.name, {outline: outline.map(({x, y}) => [x, y]), middle: [box.x + box.w / 2, box.y + box.h / 2]});
+    if (!twice.has(p.name)) {
+      shapes.set(p.name, {outline: outline.map(({x, y}) => [x, y]), middle: [box.x + box.w / 2, box.y + box.h / 2], kind: p.kind, at: [p.at[0], p.at[1], p.at[2] ?? 0], size: [...p.size]});
+    }
   }
-  return {html: out + map.slice(from), shapes};
+  return {html: out + map.slice(from), shapes, floor: (col, row, lift = 0) => { const point = grid.at(col, row, lift); return [point.x, point.y]; }};
 }
 
 const TONE = 'var(--iso-color, var(--sd-tone, #d9e4f3))';
