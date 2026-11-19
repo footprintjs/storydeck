@@ -52,12 +52,12 @@ export function reviewTool(dir, {click, all = false} = {}) {
 /**
  * One run of the deck as its reply: {text, verdict, errors, warnings}. `write` also writes the page (`out`, `voice`: the
  * build's own); `layout` also opens the page in a browser (Playwright) to find what only a browser can — text that
- * spills, lit pieces off the slide; `chromium` may be given (tests). `all` lists every problem, `more` says how its
- * caller asks for that. A deck that does not compile is the verdict "broken", never a throw.
+ * spills, lit pieces off the slide; `chromium` may be given (tests). `all` lists every problem; `more` and `measure` say
+ * how its caller asks for that, and for a measure. A deck that does not compile is the verdict "broken", never a throw.
  */
-async function runTool(dir, {write, out, voice, layout = false, chromium, home, all = false, more} = {}) {
+async function runTool(dir, {write, out, voice, layout = false, chromium, home, all = false, more, measure} = {}) {
   const r = await runDeck(dir, {write, out, voice, layout, chromium, home});
-  return {text: replyText(r, {all, more}), verdict: r.verdict, errors: r.errors, warnings: r.warnings};
+  return {text: replyText(r, {all, more, measure}), verdict: r.verdict, errors: r.errors, warnings: r.warnings};
 }
 
 /** What to fix, as a run's reply: the verdict first, then each problem with its click and its fix. Nothing is written. */

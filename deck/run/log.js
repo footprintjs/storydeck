@@ -1,7 +1,7 @@
 // log — the runs of a deck, kept with the person (Node). Every check and build leaves one small file: its verdict, its
 // counts, which problems were open, each stage's time, each tool's calls, and the run in words. So the next run can say
 // what changed since ("2 fixed, 1 new · round 3"), `storydeck log` can show how a deck's fixing went, and a run that
-// went wrong is read back instead of run again. Beside it the engine keeps the record itself (engine.js · runChart).
+// went wrong is read back instead of run again. What a browser found stays open until a browser measures again. Beside it the engine keeps the record itself (engine.js · runChart).
 //
 // Where: <the person's StoryDeck folder>/runs/<an id of the deck's real path>/ — with the person, never in the deck: a
 // deck may be someone else's folder, and nothing is written there but its own page. A folder that cannot be used (it is
@@ -73,21 +73,43 @@ function changed(before, now) {
   return {fixed, new: fresh};
 }
 
+const total = (pairs) => pairs.reduce((n, [, c]) => n + c, 0);
+/** Two lists of counted keys as one: each key once, with the larger of its counts. */
+function merged(a, b) {
+  const all = new Map(a);
+  for (const [key, n] of b) all.set(key, Math.max(all.get(key) ?? 0, n));
+  return [...all].slice(0, MOST.keys);
+}
+const NONE = Object.freeze({errors: 0, warnings: 0});
+
 /**
- * Where a run stands in the deck's fixing, from the run before it (`prev`, or null): {round, first, closed, since}.
- * A round is a run that ended with something to fix; rounds in a row are one series, and a clean run closes it.
- * `round`: this run's number in its series (0 when clean). `first`: what the series began with ({errors, warnings}).
- * `closed`: {rounds, first} when this clean run ends a series. `since`: {fixed, new} against the run before.
+ * Where a run stands in the deck's fixing, from the last run that finished (`prev`, or null): {round, first, closed,
+ * since, layout, carried}. `now`: {verdict, errors, warnings, measured, keys, layoutKeys} — `keys` what the rules
+ * found, `layoutKeys` what the browser found in this run.
+ *
+ * What is open is what is known to be open: what this run found, and what a browser found before that this run did not
+ * measure again (`layout`, carried from run to run until a measure answers it; `carried`: how many of those this run
+ * left unmeasured). A run that did not measure never counts a browser's finding as fixed.
+ *
+ * A round is a run that ended with something open; rounds in a row are one series, and a run with nothing open closes
+ * it. `round`: this run's number in its series (0 when nothing is open). `first`: what the series began with.
+ * `closed`: {rounds, first} when this run ends a series. `since`: {fixed, new} against the run before.
  */
 export function progress(prev, now) {
-  const open = now.verdict !== 'clean', series = Boolean(prev && prev.round > 0);
+  const before = prev?.layout ?? [];
+  const layout = now.measured ? now.layoutKeys : merged(before, now.layoutKeys), carried = now.measured ? 0 : total(before);
+  const open = now.verdict !== 'clean' || carried > 0, series = Boolean(prev && prev.round > 0);
   return {
     round: open ? (series ? prev.round + 1 : 1) : 0,
-    first: open ? (series ? prev.first : {errors: now.errors, warnings: now.warnings}) : null,
-    closed: !open && series ? {rounds: prev.round, first: prev.first} : null,
-    since: prev ? changed(prev.keys, now.keys) : null,
+    first: open ? (series ? prev.first ?? NONE : {errors: now.errors, warnings: now.warnings}) : null,
+    closed: !open && series ? {rounds: prev.round, first: prev.first ?? NONE} : null,
+    since: prev ? changed([...prev.keys, ...before], [...now.keys, ...layout]) : null,
+    layout, carried,
   };
 }
+
+/** A run that could not finish stands nowhere: it is kept to be read, and the deck's fixing goes on from the run before it. */
+const OUTSIDE = Object.freeze({round: 0, first: null, closed: null, since: null, layout: [], carried: 0});
 
 const counts = (v) => ({errors: whole(plain(v).errors), warnings: whole(plain(v).warnings)});
 
@@ -103,9 +125,10 @@ function readRun(data) {
   return {
     at: text(d.at, 30), kind: d.kind === 'build' ? 'build' : 'check', verdict: d.verdict, errors: whole(d.errors), warnings: whole(d.warnings), infos: whole(d.infos),
     clicks: whole(d.clicks), measured: d.measured === true, written: d.written === true, ms: whole(d.ms),
-    round: whole(d.round), first: d.first ? counts(d.first) : null, closed: d.closed ? {rounds: whole(plain(d.closed).rounds), first: counts(plain(d.closed).first)} : null,
+    // a run in a series always says what the series began with: whoever reads `first` or `closed.first` finds counts there
+    round: whole(d.round), first: whole(d.round) > 0 ? counts(d.first) : null, closed: d.closed ? {rounds: whole(plain(d.closed).rounds), first: counts(plain(d.closed).first)} : null,
     since: d.since ? {fixed: whole(plain(d.since).fixed), new: whole(plain(d.since).new)} : null,
-    keys: pairs(d.keys, MOST.keys),
+    keys: pairs(d.keys, MOST.keys), layout: pairs(d.layout, MOST.keys), carried: whole(d.carried),
     stages: (Array.isArray(d.stages) ? d.stages : []).slice(0, 64).map((s) => ({stage: text(plain(s).stage, 80), ms: whole(plain(s).ms)})),
     calls, failure: d.failure === null || d.failure === undefined ? null : text(d.failure, 2000),
     lines: (Array.isArray(d.lines) ? d.lines : []).slice(0, MOST.lines).map((l) => text(l)),
@@ -130,12 +153,22 @@ function readJson(file) {
 /** The names of a folder's kept runs, oldest first. */
 const runNames = (dir) => { try { return readdirSync(dir).filter((n) => RUN.test(n)).sort(); } catch { return []; } };
 
-/** The kept runs of a folder, newest first: each as readRun gives it, with its `id` and its `record` file. */
-export function keptRuns(dir) {
-  return runNames(dir).reverse().flatMap((name) => {
-    const run = readRun(readJson(path.join(dir, name))), id = name.slice(0, -'.json'.length);
-    return run ? [{id, record: path.join(dir, `${id}.record.jsonl`), ...run}] : [];
-  });
+/** One kept run by its file's name: as readRun gives it, with its `id` and its `record` file — or null. */
+function runNamed(dir, name) {
+  const run = readRun(readJson(path.join(dir, name))), id = name.slice(0, -'.json'.length);
+  return run && {id, record: path.join(dir, `${id}.record.jsonl`), ...run};
+}
+
+/** The kept runs of a folder, newest first. */
+export const keptRuns = (dir) => runNames(dir).reverse().map((name) => runNamed(dir, name)).filter(Boolean);
+
+/** The newest kept run that finished (a run that could not finish stands nowhere), or null: read newest first, no further than it. */
+export function lastFinished(dir) {
+  for (const name of runNames(dir).reverse()) {
+    const run = runNamed(dir, name);
+    if (run && run.verdict !== 'failed') return run;
+  }
+  return null;
 }
 
 /** A new file of the person's own, written whole: never an existing one, never through a link. */
@@ -157,19 +190,21 @@ function dropOld(dir) {
 const keptLines = (lines) => lines.slice(0, MOST.lines).map((l) => `${l.type === 'stage' ? '' : '  '}${String(l.text).replace(/\s*\r?\n\s*/g, ' ⏎ ')}`.slice(0, MOST.chars));
 
 /**
- * Keep one run: its file written in `files` (runFiles), and where it stands against the run before ({round, first,
- * closed, since}). `run`: {kind, verdict, problems, errors, warnings, infos, clicks, measured, written, ms, stages,
- * calls, lines, engine, failure?} — calls already hold which click was slowest, as a number.
+ * Keep one run: its file written in `files` (runFiles), and where it stands against the last run that finished
+ * ({round, first, closed, since, layout, carried}: progress). `run`: {kind, verdict, problems (what the rules found),
+ * layoutProblems (what the browser found), errors, warnings, infos, clicks, measured, written, ms, stages, calls,
+ * lines, engine, failure?} — calls already hold which click was slowest, as a number.
  */
 export function keepRun(dir, files, run, at = new Date()) {
-  const keys = problemKeys(run.problems ?? []), stand = progress(keptRuns(dir)[0] ?? null, {...run, keys});
+  const keys = problemKeys(run.problems ?? []), layoutKeys = problemKeys(run.layoutProblems ?? []);
+  const stand = run.verdict === 'failed' ? OUTSIDE : progress(lastFinished(dir), {...run, keys, layoutKeys});
   const body = {v: 1, at: at.toISOString(), kind: run.kind, verdict: run.verdict, errors: run.errors, warnings: run.warnings, infos: run.infos,
     clicks: run.clicks, measured: run.measured, written: run.written, ms: run.ms, ...stand, keys,
     stages: (run.stages ?? []).slice(0, 64).map((st) => ({stage: text(st.stage, 80), ms: whole(st.ms)})), calls: run.calls ?? {},
     failure: run.failure ? text(run.failure, 2000) : null, engine: (run.engine ?? []).slice(0, 20).map((w) => text(w)), lines: keptLines(run.lines ?? [])};
   let out = JSON.stringify(body);
   // text in another script is three bytes a character: a run in words that would not fit goes, and the counts stay
-  if (Buffer.byteLength(out) > MOST.bytes) out = JSON.stringify({...body, lines: [], keys: keys.slice(0, 50), cut: true});
+  if (Buffer.byteLength(out) > MOST.bytes) out = JSON.stringify({...body, lines: [], keys: keys.slice(0, 50), layout: stand.layout.slice(0, 50), cut: true});
   writeNew(files.file, out);
   dropOld(dir);
   return stand;

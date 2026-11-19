@@ -1,10 +1,12 @@
 // @vitest-environment node
 import {afterEach, describe, it, expect} from 'vitest';
-import {existsSync, readFileSync, readdirSync, symlinkSync, writeFileSync} from 'node:fs';
+import {existsSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import {readRecordFile} from 'footprintjs/sinks';
 import {runDeck, runMermaid} from './run.js';
+import {replyText} from './reply.js';
+import {CALL_LIMITS, limitOf} from './measure.js';
 import {keptRuns, runsFolder} from './log.js';
 import {deckRoot} from '../paths.js';
 import {STARTER} from '../init.js';
@@ -94,6 +96,44 @@ describe('runDeck: the browser, as an adapter', () => {
     expect(run.lines.join('\n')).toContain('[Condition]: No rules matched, fell back to default "Every click was measured": measure/measured.');
   });
 
+  it('what a browser found stays open until a browser measures again: a build without a measure does not call it fixed', async () => {
+    const dir = tempDeck(), home = tempDir(), spill = [{kind: 'spills', piece: 'server', text: 'Server', dx: 12, dy: 0}];
+    const found = await runDeck(dir, {home, write: true, layout: true, driver: fakeDriver({found: (n) => (n === 2 ? spill : [])})});
+    expect(found).toMatchObject({verdict: 'fix', warnings: 1, round: 1, carried: 0});
+    const plain = await runDeck(dir, {home, write: true});   // nothing was edited, and nothing is measured
+    expect(plain).toMatchObject({verdict: 'clean', warnings: 0, carried: 1, round: 2, closed: null, since: {fixed: 0, new: 0}});
+    expect(replyText(plain).split('\n')[0]).toBe('clean so far — 1 problem a browser found before was not measured again (--layout measures)');
+    expect(replyText(plain, {measure: 'layout: true'}).split('\n').at(-1)).toBe('since the last run: nothing changed · round 2');
+    const again = await runDeck(dir, {home, write: true, layout: true, driver: fakeDriver({found: (n) => (n === 2 ? spill : [])})});
+    expect(again).toMatchObject({verdict: 'fix', round: 3, carried: 0, since: {fixed: 0, new: 0}});   // still there, as the reply said it might be
+    const gone = await runDeck(dir, {home, write: true, layout: true, driver: fakeDriver()});
+    expect(gone).toMatchObject({verdict: 'clean', round: 0, carried: 0, since: {fixed: 1, new: 0}, closed: {rounds: 3, first: {errors: 0, warnings: 1}}});
+    expect(replyText(gone).split('\n')[0]).toBe('clean — nothing to fix');
+  });
+
+  it('a browser that does not close when asked is one error naming the call, and the run still answers', async () => {
+    const dir = tempDeck(), home = tempDir(), driver = fakeDriver();
+    driver.close = () => new Promise(() => {});
+    const r = await runDeck(dir, {home, layout: true, driver, limits: {'browser.close': 40}});   // the other calls keep their own limits
+    expect(r.problems).toEqual([expect.objectContaining({rule: 'layout', message: expect.stringContaining('the layout check stopped: browser.close did not answer within 40 ms')})]);
+    expect(runsOf(home, dir)[0].calls).toMatchObject({'browser.measure': {count: 6, ok: 6}, 'browser.close': {count: 1, timeout: 1}});
+  });
+
+  it('every call has a limit, whatever a caller gives: its own when that is a time, else the one this folder sets', () => {
+    expect(limitOf({'browser.open': 50}, 'browser.open')).toBe(50);
+    expect(limitOf({'browser.open': 50}, 'browser.measure')).toBe(CALL_LIMITS['browser.measure']);   // a limit left out is never no limit
+    for (const not of [undefined, null, 'soon', 0, -5, NaN, Infinity]) expect(limitOf({'browser.close': not}, 'browser.close')).toBe(CALL_LIMITS['browser.close']);
+    expect(limitOf(undefined, 'browser.open')).toBe(120_000);
+  });
+
+  it('says in its record where the browser came from, and whether the page carries the person\'s voice', async () => {
+    const dir = tempDeck(), home = tempDir();
+    await runDeck(dir, {home, layout: true, driver: fakeDriver()});
+    const words = runsOf(home, dir)[0].lines.join('\n');
+    expect(words).toContain('Write browserFrom = "given by the caller"');
+    expect(words).toContain('Write voiceAsked = false');
+  });
+
   it('names the click whose measure took longest', async () => {
     const dir = tempDeck(), home = tempDir();
     const driver = fakeDriver({measure: (n) => new Promise((done) => setTimeout(() => done([]), n === 4 ? 60 : 1))});
@@ -117,7 +157,7 @@ describe('runDeck: the browser, as an adapter', () => {
     expect(driver.asked.at(-1)).toBe('close');
     expect(driver.asked).not.toContain('measure 4');
     expect(r).toMatchObject({verdict: 'fix', errors: 1, measured: false});
-    expect(r.problems).toEqual([expect.objectContaining({level: 'error', rule: 'layout', message: expect.stringMatching(/^the layout check stopped: .*40ms.* — the page did not settle in the browser/)})]);
+    expect(r.problems).toEqual([expect.objectContaining({level: 'error', rule: 'layout', message: expect.stringMatching(/^the layout check stopped: browser\.measure did not answer within 40 ms — the page did not settle in the browser/)})]);
     expect(r.written).toMatchObject({clicks: 6});   // the page is still written: a build says what to fix, it does not hold the page back
     expect(runsOf(home, dir)[0].calls['browser.measure']).toMatchObject({count: 3, ok: 2, timeout: 1});
   });
@@ -162,7 +202,18 @@ describe('runDeck: what it keeps, and what it never lets cost the answer', () =>
     expect(error.message).toMatch(/index\.html is a link — the build writes a file, never through a link/);
     expect(error.run.state).toMatchObject({compiled: true, clicks: 6});   // what it got to
     expect(readFileSync(victim, 'utf8')).toBe('keep');
-    expect(runsOf(home, dir)[0]).toMatchObject({verdict: 'failed', failure: expect.stringContaining('index.html is a link'), round: 1});
+    expect(runsOf(home, dir)[0]).toMatchObject({verdict: 'failed', failure: expect.stringContaining('index.html is a link'), round: 0});
+    // it is no round of fixing the deck: with the link gone, the next run is clean and closes nothing
+    rmSync(path.join(dir, 'index.html'));
+    expect(await runDeck(dir, {home})).toMatchObject({verdict: 'clean', round: 0, closed: null});
+  });
+
+  it('a kept run that says less than it should never costs the next run its answer', async () => {
+    const dir = tempDeck(), home = tempDir(), {dir: folder} = runsFolder(home, deckRoot(dir));
+    writeFileSync(path.join(folder, '2026-01-01T00-00-00-000Z-check.abcdef.json'), JSON.stringify({v: 1, verdict: 'fix', round: 2}));   // a series, and not what it began with
+    const r = await runDeck(dir, {home});
+    expect(r).toMatchObject({verdict: 'clean', closed: {rounds: 2, first: {errors: 0, warnings: 0}}});
+    expect(replyText(r)).toBe('clean — nothing to fix\nclean after 2 rounds of fixing (it began with 0 to fix)');
   });
 
   it('a build that carries the person\'s voice says how many clicks have it', async () => {

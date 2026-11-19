@@ -13,7 +13,7 @@ const average = (list) => (list.length ? Math.round((list.reduce((a, b) => a + b
 /** One run on one line. */
 function runLine(run, n) {
   const stand = run.closed ? `clean after ${plural(run.closed.rounds, 'round')}`
-    : run.round ? `round ${run.round}${run.since ? ` · ${run.since.fixed} fixed, ${run.since.new} new` : ''}` : null;
+    : run.round ? `round ${run.round}${run.since ? ` · ${run.since.fixed} fixed, ${run.since.new} new` : ''}` : null;   // a run that could not finish stands nowhere
   return [`${String(n).padStart(2)}  ${when(run.at)}  ${run.kind.padEnd(5)}  ${run.verdict === 'failed' ? `failed — ${run.failure ?? 'the run stopped'}` : verdictLine(run)}`,
     stand, `${plural(run.clicks, 'click')}`, run.measured ? 'measured' : null, `${run.ms} ms`].filter(Boolean).join(' · ');
 }

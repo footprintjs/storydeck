@@ -5,7 +5,7 @@
 // Its port is the video's browser port (video.js · deckStageDriver): open(url), measure(n), close(). Each step through
 // it is a named call (scope.$call: browser.open, browser.measure, browser.close), so the record holds one line a call,
 // with its time and how it ended, and a call that never answers ends at its time limit instead of holding the run.
-// What it hands back is facts: {measured, problems, layoutNote?}. The host decides what follows.
+// What it hands back is facts: {measured, layoutProblems, layoutNote?}. The host decides what follows.
 import {mkdtempSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
@@ -20,14 +20,18 @@ export const CALL_LIMITS = Object.freeze({'browser.open': 120_000, 'browser.meas
 /** Which click a recorded browser.measure call measured, from its place among the stage's calls: the page is opened first. */
 export const clickOfCall = (ordinal) => ordinal - 1;
 
+/** A call's limit: the caller's own for it when that is a time (a number over 0), else the one above — never none. */
+export const limitOf = (given, target) => (Number.isFinite(given?.[target]) && given[target] > 0 ? given[target] : CALL_LIMITS[target]);
+
 const firstLine = (error) => String(error?.message ?? error).split('\n')[0];
 
 /** A browser to measure with: one the caller gave (a test's), or Playwright's, found beside StoryDeck. */
 async function findBrowser(scope, run) {
-  const {driver, chromium} = run.options;
-  const found = driver || chromium ? {chromium: chromium ?? null, why: null} : await findChromium({deckRoot: run.root});
+  const {driver, chromium} = run.options, given = Boolean(driver || chromium);
+  const found = given ? {chromium: chromium ?? null, why: null} : await findChromium({deckRoot: run.root});
   run.chromium = found.chromium;
-  scope.browserFound = Boolean(driver || found.chromium);
+  scope.browserFound = given || Boolean(found.chromium);
+  scope.browserFrom = given ? 'given by the caller' : found.chromium ? 'Playwright, beside StoryDeck' : 'nowhere';   // a fact for the record: where it came from
   scope.browserWhy = scope.browserFound ? '' : found.why ?? NO_BROWSER;
 }
 
@@ -51,8 +55,14 @@ function noBrowser(scope) {
 async function measureClicks(scope, run) {
   const work = mkdtempSync(path.join(tmpdir(), 'storydeck-layout-'));
   const port = run.options.driver ?? deckStageDriver({chromium: run.chromium, offline: true});   // the page is whole; it needs no network
-  const limits = run.options.limits ?? CALL_LIMITS;
-  const call = (target, step) => scope.$call(target, step, {attempts: 1, timeoutMs: limits[target]});
+  const call = async (target, step) => {
+    const timeoutMs = limitOf(run.options.limits, target);
+    try {
+      return await scope.$call(target, step, {attempts: 1, timeoutMs});
+    } catch (error) {   // a call cut at its limit says which call it was: the engine's own words name an attempt, not a tool
+      throw error?.name === 'AttemptTimeoutError' ? new Error(`${target} did not answer within ${timeoutMs} ms`, {cause: error}) : error;
+    }
+  };
   try {
     const file = path.join(work, 'index.html');
     writeFileSync(file, pageHtml(run));
@@ -98,8 +108,8 @@ export const measureWiring = (run) => [
   ]},
 ];
 
-/** How the host mounts it: the number of clicks in, the facts out (its problems join the host's). */
+/** How the host mounts it: the number of clicks in, the facts out — its problems under a name of their own, so a run always knows which a browser found. */
 export const measureMount = Object.freeze({
   input: (host) => ({clicks: host.clicks}),
-  output: (out) => ({problems: out.problems, measured: out.measured, ...(out.layoutNote ? {layoutNote: out.layoutNote} : {})}),
+  output: (out) => ({layoutProblems: out.problems, measured: out.measured, ...(out.layoutNote ? {layoutNote: out.layoutNote} : {})}),
 });

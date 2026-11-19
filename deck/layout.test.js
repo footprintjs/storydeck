@@ -58,6 +58,14 @@ describe('layoutFindings', () => {
     await expect(layoutFindings(port(), 'u', 2, async (target, step) => { failing.push(target); if (target === 'browser.measure') throw new Error('cut'); return step(); })).rejects.toThrow('cut');
     expect(failing).toEqual(['browser.open', 'browser.measure', 'browser.close']);
   });
+
+  it('rejects with the first step that failed: a close that fails after it does not take its place', async () => {
+    const broken = {open: async () => { throw new Error('did not open'); }, measure: async () => [], close: async () => { throw new Error('did not close'); }};
+    await expect(layoutFindings(broken, 'u', 2)).rejects.toThrow('did not open');
+    await expect(layoutFindings({...broken, open: async () => {}}, 'u', 2)).rejects.toThrow('did not close');   // a close that fails alone is told
+    const odd = {open: async () => { throw undefined; }, measure: async () => [], close: async () => { throw new Error('did not close'); }};   // eslint-disable-line no-throw-literal
+    await expect(layoutFindings(odd, 'u', 1)).rejects.toBe(undefined);   // whatever was thrown first, even nothing at all
+  });
 });
 
 describe('layoutCheck', () => {
@@ -162,6 +170,7 @@ describe('measureSlide (in the page)', () => {
         <svg data-k="w"><text>svg text is drawn</text></svg>
         <div data-k="far" class="sd-on" style="display:block"></div>
         <div data-k="floor" class="sd-on" data-ground style="display:block"></div>
+        <div data-k="backdrop" class="sd-on" data-ground=" FALSE " style="display:block"></div>
         <p style="display:block;overflow-x:auto">scrolls</p></section>
       <section data-label="two"></section></deck-stage>`;
     const stage = document.querySelector('deck-stage');
@@ -179,6 +188,8 @@ describe('measureSlide (in the page)', () => {
     far.getBoundingClientRect = () => ({left: 900, top: 100, right: 1000 * 1, bottom: 200});   // 2000 px in slide px: past 1920
     // ground runs past every edge and is not a piece pushed off the slide: a view frames what stands on it
     slide.querySelector('[data-k="floor"]').getBoundingClientRect = () => ({left: -400, top: -200, right: 2400, bottom: 1300});
+    // …unless it says it is part of the picture after all (data-ground="false"): then it is a piece like any other
+    slide.querySelector('[data-k="backdrop"]').getBoundingClientRect = () => ({left: 0, top: 0, right: 990, bottom: 100});
     for (const el of slide.querySelectorAll('[data-k="net"], .kicker')) el.getBoundingClientRect = () => ({left: 10, top: 10, right: 50, bottom: 30});
     return stage;
   }
@@ -190,6 +201,7 @@ describe('measureSlide (in the page)', () => {
     expect(measureSlide()).toEqual([
       {kind: 'spills', piece: 'net', text: 'Network', dx: 17, dy: 0},
       {kind: 'outside', piece: 'far', text: '', dx: 80, dy: 0},
+      {kind: 'outside', piece: 'backdrop', text: '', dx: 60, dy: 0},
     ]);
     expect(finish).toHaveBeenCalled();
     delete document.getAnimations;

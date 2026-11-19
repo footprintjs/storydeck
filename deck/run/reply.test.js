@@ -34,6 +34,21 @@ describe('a run\'s reply', () => {
     expect(replyText(run({verdict: 'fix', warnings: 39, problems}), {all: true}).split('\n')).toHaveLength(1 + problems.length);
   });
 
+  it('past the first problems, notes alone are counted without being called something to fix', () => {
+    const problems = [...Array.from({length: MOST_LISTED}, (_, i) => problem('warn', 'words', i + 1)), ...Array.from({length: 3}, (_, i) => problem('info', 'never-shown', i + 1))];
+    expect(replyText(run({verdict: 'fix', warnings: MOST_LISTED, problems})).split('\n').at(-1)).toBe('… and 3 more (never-shown 3) — list every one with --all');
+  });
+
+  it('a run that found nothing while a browser\'s finding went unmeasured is not called clean', () => {
+    expect(verdictLine(run({carried: 1}))).toBe('clean so far — 1 problem a browser found before was not measured again (--layout measures)');
+    expect(verdictLine(run({carried: 3}), 'layout: true')).toBe('clean so far — 3 problems a browser found before were not measured again (layout: true measures)');
+    expect(verdictLine(run({carried: 0}))).toBe('clean — nothing to fix');
+    const fixing = run({verdict: 'fix', warnings: 1, problems: [problem('warn', 'words', 1)], carried: 2, round: 2, since: {fixed: 0, new: 1}});
+    expect(replyText(fixing, {measure: 'layout: true'}).split('\n')).toEqual(['fix 1 — 0 errors, 1 warning', 'warn  click 1 "c1" · words: words here — fix it',
+      'and 2 problems a browser found before were not measured again (layout: true measures)', 'since the last run: 1 new · round 2']);
+    expect(verdictLine(run({verdict: 'broken', errors: 1, carried: 2}))).toBe('broken — the deck does not compile');   // first things first
+  });
+
   it('then what was written, as a build has always said it', () => {
     const written = {file: '/decks/talk/index.html', bytes: 91 * 1024, clicks: 6, slides: 6, data: null};
     expect(replyText(run({kind: 'build', written}), {cwd: '/decks'})).toBe('clean — nothing to fix\n✓ talk/index.html · 6 clicks · 91 KB · 9 ms');

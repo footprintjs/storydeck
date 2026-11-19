@@ -4,7 +4,8 @@
 right, and if not, what do I fix. This folder is that one answer. `storydeck check` and `storydeck build` are the same
 run: a build is a check that also writes the page, so the two can never disagree. The run is a
 [footprintjs](https://github.com/footprintjs/footPrint) flowchart, so every choice it makes is on its record with the
-rule that chose and the value it read, and the reply is made from that record: nothing is worked out twice.
+rule that chose and the value it read. The reply is made from what the run found and where the log says it stands:
+nothing is worked out twice.
 
 ```bash
 storydeck build my-talk            # the one call after an edit
@@ -20,8 +21,15 @@ since the last run: 2 fixed, 1 new · round 3
 ```
 
 The first line is the verdict: `clean`, `fix <n>`, or `broken` (the deck does not compile, and nothing is written).
-Then only what there is to fix, worst first, at most 30 lines (`--all` lists every one). Then what was written, and
-where this run stands against the one before.
+Then each problem, worst first — what there is to fix, then the notes — at most 30 lines (`--all` lists every one).
+Then what was written, and where this run stands against the one before.
+
+A run that finds nothing is not always clean. What a browser found stays open until a browser measures again, so a
+build without `--layout` after one that found a spill begins:
+
+```text
+clean so far — 1 problem a browser found before was not measured again (--layout measures)
+```
 
 ## The chart
 
@@ -93,17 +101,22 @@ stopped["stopped"]
 
 - **One reading.** The deck is read and compiled once. That reading is checked, measured and written, so an edit made
   while a run measures is not in its page: what was checked is what was written.
-- **A choice is a decision.** Where a run goes one way or another (compiled or not, measured or not, written or not, fix
-  or clean), a decider chooses with `decide()`. No stage hides an `if` that the record cannot explain.
+- **Where a run goes next is a decision.** Compiled or not, measured or not, a browser or none, settled or not, written
+  or not, fix or clean: a decider chooses with `decide()`. How a stage does its own job is a fact it writes (where the
+  browser came from, whether the page carries the person's voice), so the record can say that too.
 - **The record holds facts.** Counts, verdicts, and the problems found (the tool's own words about the deck). The
   compiled deck and its page are too big to be facts: they stay in the run's working memory.
 - **A tool outside is a named call.** Each step through the browser is `scope.$call('browser.measure', …)`: one line of
-  the record a call, with its time and how it ended. A call has a time limit (`measure.js · CALL_LIMITS`), so a page
-  that hangs ends as a recorded time-out, and the run goes on to say so.
+  the record a call, with its time and how it ended. Every call has a time limit (`measure.js · CALL_LIMITS`), above the
+  browser's own time-outs: a call that never answers ends as a recorded time-out that names it, and the run goes on to
+  say so.
 - **Recorders are attached once, at the top** (`engine.js · runChart`): the run in words, each stage's time, each
-  tool's calls counted by name. The reply and the log read them; no stage reports about itself.
-- **An adapter reports, the run decides.** The browser adapter hands back `{measured, problems, layoutNote?}`. Whether
-  that stops a build is the run's to say (it does not: a build says what to fix, and writes the page).
+  tool's calls counted by name. The log reads them; no stage reports about itself. (The time on a reply's `✓` line is
+  the whole run, as whoever ran it waited for it.)
+- **What a browser found stays open until a browser measures again.** A run that did not measure cannot know, so it
+  never counts a browser's finding as fixed, and never closes a series that has one open (`log.js · progress`).
+- **An adapter reports, the run decides.** The browser adapter hands back `{measured, layoutProblems, layoutNote?}`.
+  Whether that stops a build is the run's to say (it does not: a build says what to fix, and writes the page).
 
 ## The log
 
@@ -127,9 +140,11 @@ tool calls: outline 1, review 4, check 1, build 2, log 1
 one run in full: storydeck log --run <its number>
 ```
 
-A round is a run that ended with something to fix; rounds in a row are one series, and a clean run closes it. So the
-log answers how much work a deck took: how many rounds, beginning with how many problems, and how many tool calls.
-What it cannot count is what happens outside StoryDeck: an assistant's own model calls, or pictures it looked at.
+A round is a run that ended with something open; rounds in a row are one series, and a run with nothing open closes
+it. So the log answers how much work a deck took: how many rounds, beginning with how many problems, and how many
+tool calls (each read-first tool counts its call in `calls.json`, in the same folder). A run that could not finish (a
+page that may not be written) is kept to be read, and stands outside the rounds. What the log cannot count is what
+happens outside StoryDeck: an assistant's own model calls, or pictures it looked at.
 
 To read the record itself: `readRecordFile(file)` from `footprintjs/sinks` gives its entries, and
 [foottrace](https://github.com/footprintjs/foottrace)'s readers walk them.
@@ -144,5 +159,6 @@ To read the record itself: `readRecordFile(file)` from `footprintjs/sinks` gives
 - **A deck's words are in the record.** A problem names a click's label and quotes a few words. The log is the person's
   own, readable by them alone (0700 folder, 0600 files).
 - **The log never costs the answer.** A folder that cannot be written keeps nothing; the reply says so in one line.
-- **A page that hangs.** Every call through the browser has a time limit; the browser is closed whatever happens, and
-  the folder the page was opened from is removed.
+- **A page that hangs.** Every call through the browser has a time limit; the browser is closed whatever happens (one
+  still starting when its opening was given up on is closed as it arrives), and the folder the page was opened from is
+  removed. A browser that does not close when asked is recorded as timed out: StoryDeck cannot end it, and says so.

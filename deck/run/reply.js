@@ -1,7 +1,8 @@
 // reply — what a run answers, as text: one reply, in one order, short. The verdict first (clean, fix or broken), then
-// only what there is to fix, worst first, each with its click and its fix; then what was written; then what changed
-// since the run before. Whoever reads it — a person at a terminal, an assistant over MCP — reads the first line and
-// knows whether to go on. Everything in it comes from the run's record (run.js): nothing is worked out again here.
+// each problem, worst first — what there is to fix, then the notes — each with its click and its fix; then what was
+// written; then what changed since the run before. Whoever reads it — a person at a terminal, an assistant over MCP —
+// reads the first line and knows whether to go on. It is made from what the run found and where the log says it
+// stands (run.js): nothing is worked out again here.
 import path from 'node:path';
 import {problemLine, worstFirst} from '../check.js';
 import {plural} from './words.js';
@@ -11,10 +12,16 @@ export const MOST_LISTED = 30;
 
 const kb = (n) => `${Math.round(n / 1024)} KB`;
 
-/** The verdict's line: what the run found, in a few words. */
-export function verdictLine(r) {
+/** What a browser found before and this run did not measure again: it stays open, and the reply says so. */
+const unmeasured = (n, measure) => `${plural(n, 'problem')} a browser found before ${n === 1 ? 'was' : 'were'} not measured again (${measure} measures)`;
+
+/**
+ * The verdict's line: what the run found, in a few words. A run that found nothing while a browser's earlier finding
+ * went unmeasured is not "clean": its first line says what is still open. `measure`: how its caller asks for a measure.
+ */
+export function verdictLine(r, measure = '--layout') {
   if (r.verdict === 'broken') return `broken — the deck does not compile${r.kind === 'build' ? ', so no page was written' : ''}`;
-  if (r.verdict === 'clean') return 'clean — nothing to fix';
+  if (r.verdict === 'clean') return r.carried ? `clean so far — ${unmeasured(r.carried, measure)}` : 'clean — nothing to fix';
   return `fix ${r.errors + r.warnings} — ${plural(r.errors, 'error')}, ${plural(r.warnings, 'warning')}`;
 }
 
@@ -24,7 +31,8 @@ function problemLines(problems, {all, more}) {
   if (!rest.length) return shown.map(problemLine);
   const byRule = new Map();
   for (const p of rest) byRule.set(p.rule, (byRule.get(p.rule) ?? 0) + 1);
-  return [...shown.map(problemLine), `… and ${rest.length} more (${[...byRule].map(([rule, n]) => `${rule} ${n}`).join(', ')}) — fix these first, or list every one with ${more}`];
+  const first = rest.some((p) => p.level !== 'info') ? 'fix these first, or list' : 'list';   // notes alone are nothing to fix
+  return [...shown.map(problemLine), `… and ${rest.length} more (${[...byRule].map(([rule, n]) => `${rule} ${n}`).join(', ')}) — ${first} every one with ${more}`];
 }
 
 const carriedVoice = ({have, wanted}) => (have === wanted
@@ -46,13 +54,14 @@ function standingLine(r) {
 }
 
 /**
- * A run as its reply. `all` lists every problem; `more` names how to ask for that, in the caller's words (a flag, or a
- * tool's argument); `cwd` is what file names are shown against.
+ * A run as its reply. `all` lists every problem; `more` names how to ask for that, and `measure` how to ask for a
+ * measure in a browser, in the caller's words (a flag, or a tool's argument); `cwd` is what file names are shown against.
  */
-export function replyText(r, {all = false, more = '--all', cwd = process.cwd()} = {}) {
+export function replyText(r, {all = false, more = '--all', measure = '--layout', cwd = process.cwd()} = {}) {
   return [
-    verdictLine(r),
+    verdictLine(r, measure),
     ...problemLines(r.problems, {all, more}),
+    r.verdict === 'fix' && r.carried ? `and ${unmeasured(r.carried, measure)}` : null,
     r.written ? writtenLine(r.written, r.ms, cwd) : null,
     standingLine(r),
     r.layoutNote ?? null,

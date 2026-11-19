@@ -101,11 +101,11 @@ async function answerTool(name, args, dir, home, voice) {
       case 'feedback': return {content: [{type: 'text', text: feedbackTool(deck, {home})}]};
       case 'review': return {content: [{type: 'text', text: reviewTool(deck, {click: args.click === undefined ? undefined : String(args.click), all: args.all === true})}]};
       case 'check': {
-        const r = await checkTool(deck, {layout: args.layout === true, all: args.all === true, more: 'all: true', home});
+        const r = await checkTool(deck, {layout: args.layout === true, all: args.all === true, more: 'all: true', measure: 'layout: true', home});
         return {content: [{type: 'text', text: r.text}]};
       }
       case 'build': {
-        const r = await buildTool(deck, {layout: args.layout === true, all: args.all === true, more: 'all: true', home});
+        const r = await buildTool(deck, {layout: args.layout === true, all: args.all === true, more: 'all: true', measure: 'layout: true', home});
         return {...(r.verdict === 'broken' && {isError: true}), content: [{type: 'text', text: r.text}]};   // broken: nothing was written
       }
       case 'log': return {content: [{type: 'text', text: logTool(deck, {home, run: args.run === undefined ? undefined : String(args.run), all: args.all === true})}]};

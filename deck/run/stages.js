@@ -1,8 +1,8 @@
 // stages — what each step of a run does, in the order chart.js wires them. A stage reads what the record holds and
 // writes facts into it: counts, verdicts, and the problems found (the tool's own words about the deck). What is too big
 // to be a fact — the deck as compiled, its page — stays in `run`, the one run's working memory, and never enters the
-// record. A choice between two ways on is never an `if` in a stage: it is a decider, made with decide(), so the
-// record says which rule chose and what it read.
+// record. Where the run goes next is never an `if` in a stage: it is a decider, made with decide(), so the record says
+// which rule chose and what it read. How a stage does its own job (with the person's clips or without) is a fact it writes.
 import {loadDeck, pageOf, writeDeck} from '../build.js';
 import {checkDeck, failure} from '../check.js';
 import {noteProblems} from '../notes.js';
@@ -14,6 +14,7 @@ const count = (problems, level) => problems.filter((p) => p.level === level).len
 export function readDeck(scope, run) {
   scope.writeAsked = run.options.write === true;
   scope.layoutAsked = run.options.layout === true;
+  scope.voiceAsked = run.options.voice === true;   // a fact for the record: the page carries the person's clips, or not
   try {
     run.loaded = loadDeck(run.dir);
     run.root = deckRoot(run.dir);
@@ -74,9 +75,9 @@ export function writePage(scope, run) {
   scope.written = writeDeck(run.dir, made, {out});
 }
 
-/** How many of each: the numbers the verdict reads. */
+/** How many of each, from the rules and from the browser: the numbers the verdict reads. */
 export function countProblems(scope) {
-  const problems = scope.$getValue('problems');
+  const problems = [...scope.$getValue('problems'), ...(scope.$getValue('layoutProblems') ?? [])];
   scope.errors = count(problems, 'error');
   scope.warnings = count(problems, 'warn');
   scope.infos = count(problems, 'info');

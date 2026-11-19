@@ -225,11 +225,12 @@ export function offlineAllows(page, url) {
  * (OFFLINE: it loads only its own file and inline data — the layout check measures a deck that way).
  */
 export function deckStageDriver({ chromium, executablePath, viewport = { width: 1920, height: 1080 }, hide = ['.fs-btn', '.notes-panel', '.train-panel', '.lens-switch', '.theme-toggle'], offline = false }) {
-  let browser, page;
+  let launching = null, browser, page;
   const settle = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   return {
     async open(url) {
-      browser = await chromium.launch({ ...(executablePath ? { executablePath } : {}), ...(offline ? { args: [...OFFLINE.args] } : {}) });
+      launching = chromium.launch({ ...(executablePath ? { executablePath } : {}), ...(offline ? { args: [...OFFLINE.args] } : {}) });
+      browser = await launching;
       if (offline) {
         const context = await browser.newContext({ viewport, reducedMotion: 'no-preference', ...OFFLINE.context });
         await context.route('**/*', (route) => (offlineAllows(url, route.request().url()) ? route.continue() : route.abort()));
@@ -293,7 +294,11 @@ export function deckStageDriver({ chromium, executablePath, viewport = { width: 
       await settle();
       return page.evaluate(measureSlide);
     },
-    close: () => browser?.close(),
+    // a browser still starting when close is asked for (an open that was given up on) is closed as it arrives: none is left running
+    async close() {
+      const started = browser ?? await launching?.catch(() => null);
+      await started?.close();
+    },
   };
 }
 
@@ -347,8 +352,10 @@ export function measureSlide() {
     if (dx > 2 || dy > Math.max(2, size * 0.35)) out.push({ kind: 'spills', piece: pieceOf(el), text: textOf(el), dx: dx > 2 ? dx : 0, dy: dy > Math.max(2, size * 0.35) ? dy : 0 });
   }
   for (const el of slide.querySelectorAll('.sd-on, [data-chrome]')) {
-    // ground (a floor) is what the pieces stand on: no view frames it, so it runs past the edge by design
-    if (!shown(el) || el.hasAttribute('data-ground')) continue;
+    // ground (a floor) is what the pieces stand on: no view frames it, so it runs past the edge by design —
+    // unless it says it is part of the picture after all (data-ground="false": focusHtml.js reads it the same way)
+    const ground = el.hasAttribute('data-ground') && el.getAttribute('data-ground').trim().toLowerCase() !== 'false';
+    if (!shown(el) || ground) continue;
     const r = el.getBoundingClientRect();
     const x0 = (r.left - box.left) / scale, y0 = (r.top - box.top) / scale, x1 = (r.right - box.left) / scale, y1 = (r.bottom - box.top) / scale;
     const dx = Math.max(0, -x0, x1 - W), dy = Math.max(0, -y0, y1 - H);

@@ -3,14 +3,14 @@ import {afterEach, describe, it, expect} from 'vitest';
 import {existsSync, mkdirSync, readFileSync, readdirSync, statSync, symlinkSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
-import {COUNTED, MOST, RUNS_KEPT, callCounts, countCall, keepRun, keptRuns, problemKeys, progress, runFiles, runsFolder} from './log.js';
+import {COUNTED, MOST, RUNS_KEPT, callCounts, countCall, keepRun, keptRuns, lastFinished, problemKeys, progress, runFiles, runsFolder} from './log.js';
 import {tempDeck, tempDir, cleanDecks} from '../test/helpers.js';
 import {deckRoot} from '../paths.js';
 
 afterEach(cleanDecks);
 
 const problem = (level, rule, label = null) => ({level, rule, click: label ? 1 : null, label, message: 'm'});
-const aRun = (over = {}) => ({kind: 'check', verdict: 'clean', problems: [], errors: 0, warnings: 0, infos: 0, clicks: 6, measured: false, written: false, ms: 12,
+const aRun = (over = {}) => ({kind: 'check', verdict: 'clean', problems: [], layoutProblems: [], errors: 0, warnings: 0, infos: 0, clicks: 6, measured: false, written: false, ms: 12,
   stages: [{stage: 'read deck', ms: 3}], calls: {}, lines: [{type: 'stage', text: 'Stage 1: read deck.'}, {type: 'step', text: 'Write clicks = 6'}], engine: [], ...over});
 const folder = () => { const home = tempDir(), root = deckRoot(tempDeck()); return {home, root, dir: runsFolder(home, root).dir}; };
 /** Keep one run at a moment of its own (a name sorts by its time). */
@@ -56,6 +56,7 @@ describe('a kept run', () => {
       first: {errors: 1, warnings: 1}, closed: null, since: null, failure: null, stages: [{stage: 'read deck', ms: 3}],
       calls: {'browser.measure': {count: 6, ok: 6, failed: 0, timeout: 0, p50: 4, max: 60, slowest: 4}}});
     expect(run.keys).toEqual([['words|Title', 1], ['hidden-loop|Back', 1]]);   // what there is to fix; a note is not
+    expect(run).toMatchObject({layout: [], carried: 0});
     expect(run.lines).toEqual(['Stage 1: read deck.', '  Write clicks = 6']);
     expect(run.record).toBe(path.join(dir, `${run.id}.record.jsonl`));
   });
@@ -121,28 +122,77 @@ describe('what is read back is read as a file anyone may have put there', () => 
   it('takes each field by its type: what is not a count is no count, what is not text is no text', () => {
     const {dir} = folder();
     writeFileSync(path.join(dir, NAME), JSON.stringify({v: 1, verdict: 'fix', kind: 'rm -rf', errors: -4, warnings: '12', infos: 1.5, clicks: 1e99, round: {a: 1}, first: 'no',
-      since: {fixed: 'many', new: 2}, closed: [1], keys: [['a|b', 2], 'x', [3, 4], ['c|d', -1]], stages: [{stage: 7, ms: 'x'}, null], calls: {'browser.measure': {count: 'six', slowest: '4'}, x: null},
+      since: {fixed: 'many', new: 2}, closed: [1], keys: [['a|b', 2], 'x', [3, 4], ['c|d', -1]], layout: {spills: 9}, carried: '3', stages: [{stage: 7, ms: 'x'}, null], calls: {'browser.measure': {count: 'six', slowest: '4'}, x: null},
       lines: ['ok', 5, {text: 'no'}, 'y'.repeat(MOST.chars * 3)], engine: 'loud', failure: {message: 'x'}, at: 12}));
     const [run] = keptRuns(dir);
-    expect(run).toMatchObject({kind: 'check', verdict: 'fix', errors: 0, warnings: 0, infos: 0, clicks: 0, round: 0, first: {errors: 0, warnings: 0}, since: {fixed: 0, new: 2},
-      closed: {rounds: 0, first: {errors: 0, warnings: 0}}, keys: [['a|b', 2], ['c|d', 0]], stages: [{stage: '', ms: 0}, {stage: '', ms: 0}], engine: [], failure: '', at: ''});
+    expect(run).toMatchObject({kind: 'check', verdict: 'fix', errors: 0, warnings: 0, infos: 0, clicks: 0, round: 0, first: null, since: {fixed: 0, new: 2},
+      closed: {rounds: 0, first: {errors: 0, warnings: 0}}, keys: [['a|b', 2], ['c|d', 0]], layout: [], carried: 0, stages: [{stage: '', ms: 0}, {stage: '', ms: 0}], engine: [], failure: '', at: ''});
     expect(run.calls).toEqual({'browser.measure': {count: 0, ok: 0, failed: 0, timeout: 0, p50: 0, max: 0, slowest: 0}, x: {count: 0, ok: 0, failed: 0, timeout: 0, p50: 0, max: 0, slowest: 0}});
     expect(run.lines).toEqual(['ok', '', '', 'y'.repeat(MOST.chars)]);
+  });
+
+  it('a run in a series always says what the series began with, whatever its file left out', () => {
+    const {dir} = folder();
+    writeFileSync(path.join(dir, NAME), JSON.stringify({v: 1, verdict: 'fix', round: 2}));   // no `first`, no `keys`
+    expect(keptRuns(dir)[0]).toMatchObject({round: 2, first: {errors: 0, warnings: 0}, keys: [], layout: []});
+    const stand = keepAt(dir, 5, aRun());   // the next clean run closes that series, and has counts to say it with
+    expect(stand).toMatchObject({round: 0, closed: {rounds: 2, first: {errors: 0, warnings: 0}}});
   });
 });
 
 describe('where a run stands in a deck\'s fixing', () => {
-  const now = (verdict, keys = [], errors = 0, warnings = keys.reduce((n, [, c]) => n + c, 0)) => ({verdict, keys, errors, warnings});
+  const count = (keys) => keys.reduce((n, [, c]) => n + c, 0);
+  /** A run as progress takes it: what the rules found (`keys`), and what a browser found if it measured (`layoutKeys`). */
+  const now = (verdict, keys = [], {measured = false, layoutKeys = [], errors = 0} = {}) => ({verdict, keys, layoutKeys, measured, errors, warnings: count(keys) + count(layoutKeys) - errors});
+  const after = (stand, run) => ({...stand, keys: run.keys});   // a run as the next one finds it kept
 
   it('a first run with something to fix opens a series; each next one is a round; a clean run closes it', () => {
-    const one = progress(null, now('fix', [['words|a', 2]]));
-    expect(one).toEqual({round: 1, first: {errors: 0, warnings: 2}, closed: null, since: null});
-    const two = progress({...one, keys: [['words|a', 2]]}, now('fix', [['words|a', 1], ['spills|b', 1]]));
-    expect(two).toEqual({round: 2, first: {errors: 0, warnings: 2}, closed: null, since: {fixed: 1, new: 1}});
-    const done = progress({...two, keys: [['words|a', 1], ['spills|b', 1]]}, now('clean'));
-    expect(done).toEqual({round: 0, first: null, closed: {rounds: 2, first: {errors: 0, warnings: 2}}, since: {fixed: 2, new: 0}});
-    expect(progress({...done, keys: []}, now('clean'))).toEqual({round: 0, first: null, closed: null, since: {fixed: 0, new: 0}});
-    expect(progress({...done, keys: []}, now('broken', [['compile|', 1]], 1, 0))).toMatchObject({round: 1, first: {errors: 1, warnings: 0}});   // a new series
+    const a = now('fix', [['words|a', 2]]), one = progress(null, a);
+    expect(one).toEqual({round: 1, first: {errors: 0, warnings: 2}, closed: null, since: null, layout: [], carried: 0});
+    const b = now('fix', [['words|a', 1], ['view-far|b', 1]]), two = progress(after(one, a), b);
+    expect(two).toEqual({round: 2, first: {errors: 0, warnings: 2}, closed: null, since: {fixed: 1, new: 1}, layout: [], carried: 0});
+    const c = now('clean'), done = progress(after(two, b), c);
+    expect(done).toEqual({round: 0, first: null, closed: {rounds: 2, first: {errors: 0, warnings: 2}}, since: {fixed: 2, new: 0}, layout: [], carried: 0});
+    expect(progress(after(done, c), now('clean'))).toMatchObject({round: 0, first: null, closed: null, since: {fixed: 0, new: 0}});
+    expect(progress(after(done, c), now('broken', [['compile|', 1]], {errors: 1}))).toMatchObject({round: 1, first: {errors: 1, warnings: 0}});   // a new series
+  });
+
+  it('what a browser found stays open until a browser measures again: a run that did not measure never counts it as fixed', () => {
+    const a = now('fix', [], {measured: true, layoutKeys: [['spills|Title', 1]]}), found = progress(null, a);
+    expect(found).toMatchObject({round: 1, first: {errors: 0, warnings: 1}, layout: [['spills|Title', 1]], carried: 0});
+    // nothing was edited, and this run did not measure: its own rules find nothing, and the spill is still counted open
+    const b = now('clean'), unmeasured = progress(after(found, a), b);
+    expect(unmeasured).toEqual({round: 2, first: {errors: 0, warnings: 1}, closed: null, since: {fixed: 0, new: 0}, layout: [['spills|Title', 1]], carried: 1});
+    expect(progress(after(unmeasured, b), now('clean'))).toMatchObject({round: 3, closed: null, carried: 1});   // however many times
+    // a measure that finds it gone closes the series, and only then
+    const fixed = progress(after(unmeasured, b), now('clean', [], {measured: true}));
+    expect(fixed).toEqual({round: 0, first: null, closed: {rounds: 2, first: {errors: 0, warnings: 1}}, since: {fixed: 1, new: 0}, layout: [], carried: 0});
+    // a measure that finds another instead says one went and one came
+    expect(progress(after(unmeasured, b), now('fix', [], {measured: true, layoutKeys: [['outside|Back', 1]]}))).toMatchObject({round: 3, since: {fixed: 1, new: 1}, layout: [['outside|Back', 1]], carried: 0});
+  });
+
+  it('a measure that stopped answers nothing: its error is new, and what was open before it stays open', () => {
+    const a = now('fix', [], {measured: true, layoutKeys: [['spills|Title', 1]]}), found = progress(null, a);
+    const b = now('fix', [], {measured: false, layoutKeys: [['layout|', 1]], errors: 1}), stopped = progress(after(found, a), b);
+    expect(stopped).toMatchObject({round: 2, since: {fixed: 0, new: 1}, layout: [['spills|Title', 1], ['layout|', 1]], carried: 1});
+    expect(progress(after(stopped, b), b)).toMatchObject({since: {fixed: 0, new: 0}, layout: [['spills|Title', 1], ['layout|', 1]]});   // stopping twice is not two errors open
+    expect(progress(after(stopped, b), now('clean', [], {measured: true}))).toMatchObject({round: 0, since: {fixed: 2, new: 0}, closed: {rounds: 2}});
+  });
+
+  it('a run before it that says less than it should still gives counts to stand on', () => {
+    expect(progress({round: 3, first: null, keys: [], layout: []}, now('clean'))).toMatchObject({closed: {rounds: 3, first: {errors: 0, warnings: 0}}});
+    expect(progress({round: 3, keys: []}, now('fix', [['words|a', 1]]))).toMatchObject({round: 4, first: {errors: 0, warnings: 0}, since: {fixed: 0, new: 1}});
+  });
+
+  it('a run that could not finish stands nowhere: the deck\'s fixing goes on from the run before it', () => {
+    const {dir} = folder();
+    const open = keepAt(dir, 1, aRun({verdict: 'fix', warnings: 1, problems: [problem('warn', 'words', 'a')]}));
+    expect(open).toMatchObject({round: 1, first: {errors: 0, warnings: 1}});
+    expect(keepAt(dir, 2, aRun({kind: 'build', verdict: 'failed', failure: 'index.html is a link'}))).toEqual({round: 0, first: null, closed: null, since: null, layout: [], carried: 0});
+    expect(keptRuns(dir).map((r) => r.verdict)).toEqual(['failed', 'fix']);   // kept, to be read
+    expect(lastFinished(dir)).toMatchObject({verdict: 'fix', round: 1});
+    expect(keepAt(dir, 3, aRun())).toMatchObject({round: 0, closed: {rounds: 1, first: {errors: 0, warnings: 1}}, since: {fixed: 1, new: 0}});   // one round, not two
+    expect(lastFinished(folder().dir)).toBe(null);
   });
 
   it('tells problems apart by rule and label, and counts only what there is to fix', () => {
@@ -153,16 +203,21 @@ describe('where a run stands in a deck\'s fixing', () => {
   it('for any two runs, what was fixed and what is new account for every problem (2,000 seeded pairs)', () => {
     let s = 20261119;
     const next = () => { s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-    const some = () => Array.from({length: Math.floor(next() * 9)}, () => problem(next() < 0.3 ? 'error' : 'warn', ['words', 'spills', 'no-change'][Math.floor(next() * 3)], ['a', 'b', null][Math.floor(next() * 3)]));
-    const seen = {empty: 0, same: 0, grew: 0, shrank: 0};
+    const some = (rules) => Array.from({length: next() < 0.3 ? 0 : Math.floor(next() * 7)}, () => problem(next() < 0.3 ? 'error' : 'warn', rules[Math.floor(next() * rules.length)], ['a', 'b', null][Math.floor(next() * 3)]));
+    const seen = {measuredBoth: 0, unmeasuredNow: 0, same: 0, nothing: 0};
     for (let i = 0; i < 2000; i++) {
-      const before = some(), after = next() < 0.1 ? before : some(), was = problemKeys(before), is = problemKeys(after);
-      const {since} = progress({round: 1, first: {errors: 0, warnings: 0}, keys: was}, {verdict: after.length ? 'fix' : 'clean', keys: is, errors: 0, warnings: 0});
-      const still = before.length - since.fixed;
-      expect(still).toBe(after.length - since.new);     // what stayed open is the same number, counted from either side
-      expect(still).toBeGreaterThanOrEqual(0);
-      if (before === after) expect(since).toEqual({fixed: 0, new: 0});
-      seen[!before.length && !after.length ? 'empty' : before === after ? 'same' : after.length > before.length ? 'grew' : 'shrank'] += 1;
+      const rulesBefore = some(['words', 'view-far', 'no-change']), browserBefore = some(['spills', 'outside']);
+      const same = next() < 0.1, measured = next() < 0.5;
+      const rulesNow = same ? rulesBefore : some(['words', 'view-far', 'no-change']), browserNow = measured ? (same ? browserBefore : some(['spills', 'outside'])) : [];
+      const prev = {round: 1, first: {errors: 0, warnings: 0}, keys: problemKeys(rulesBefore), layout: problemKeys(browserBefore)};
+      const stand = progress(prev, {verdict: rulesNow.length + browserNow.length ? 'fix' : 'clean', keys: problemKeys(rulesNow), layoutKeys: problemKeys(browserNow), measured, errors: 0, warnings: 0});
+      const openBefore = rulesBefore.length + browserBefore.length, openNow = rulesNow.length + count(stand.layout);
+      expect(openBefore - stand.since.fixed).toBe(openNow - stand.since.new);   // what stayed open is one number, counted from either side
+      expect(stand.carried).toBe(measured ? 0 : browserBefore.length);
+      if (!measured) expect(stand.layout).toEqual(problemKeys(browserBefore));   // carried whole: none fixed, none new
+      if (!measured && browserBefore.length) expect(stand.closed).toBe(null);   // never closed while a browser's finding is unanswered
+      if (same && measured) expect(stand.since).toEqual({fixed: 0, new: 0});
+      seen[same ? 'same' : !openBefore && !openNow ? 'nothing' : measured ? 'measuredBoth' : 'unmeasuredNow'] += 1;
     }
     for (const n of Object.values(seen)) expect(n).toBeGreaterThan(20);   // every kind of pair was really tried
   });

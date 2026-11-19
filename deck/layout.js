@@ -78,18 +78,24 @@ const plainly = (_target, step) => step();
 
 /**
  * Every click of an open page measured, in order, through the browser port: what it found, each with its click's
- * number ({n, kind, …}). The port is closed whatever happens — a page that never comes up still closes its browser.
+ * number ({n, kind, …}). The port is closed whatever happens — a page that never comes up still closes its browser —
+ * and it rejects with the first step that failed.
  * `call(target, step)` makes each step (`browser.open`, `browser.measure`, `browser.close`): a caller that records its
  * calls passes its own (run/measure.js), and the loop stays this one.
  */
 export async function layoutFindings(port, url, count, call = plainly) {
   const found = [];
+  let failed = false, failure;
   try {
-    await call('browser.open', () => port.open(url));   // inside the try: a page that never comes up still closes its browser
+    await call('browser.open', () => port.open(url));
     for (let n = 1; n <= count; n++) for (const f of await call('browser.measure', () => port.measure(n))) found.push({n, ...f});
-  } finally {
-    await call('browser.close', () => port.close());
+  } catch (error) {
+    failed = true;
+    failure = error;
   }
+  // closed whatever happened; and when a step failed, that is what is told — a close that fails after it would name the wrong step
+  try { await call('browser.close', () => port.close()); } catch (error) { if (!failed) { failed = true; failure = error; } }
+  if (failed) throw failure;
   return found;
 }
 

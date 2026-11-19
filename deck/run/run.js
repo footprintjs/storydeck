@@ -23,10 +23,15 @@ function placeFor(home, dir, kind, at) {
 const callsKept = (calls) => Object.fromEntries(Object.entries(calls).map(([target, c]) =>
   [target, {...c, slowest: target === 'browser.measure' && c.count > 1 && c.slowest ? clickOfCall(c.slowest) : null}]));
 
-/** The run kept: where it stands against the one before ({round, first, closed, since}), or {unkept: why}. */
+/** The run kept: where it stands against the one before ({round, first, closed, since, carried}), or {unkept: why}. */
 function keep(place, run, at) {
   if (!place.files) return place.why ? {unkept: place.why} : {};
-  try { return keepRun(place.dir, place.files, run, at); } catch (error) { return {unkept: firstLine(error)}; }
+  try {
+    const {layout: _keys, ...stand} = keepRun(place.dir, place.files, run, at);   // which problems are open is the log's own to hold
+    return stand;
+  } catch (error) {
+    return {unkept: firstLine(error)};
+  }
 }
 
 /**
@@ -36,7 +41,8 @@ function keep(place, run, at) {
  * StoryDeck folder (`home`) unless `keep` is false.
  *
  * Returns {kind, verdict ('clean' | 'fix' | 'broken'), problems, errors, warnings, infos, clicks, measured, layoutNote,
- * written, ms}, and where it stands against the run before: {round, first, closed, since} — or {unkept: why}. A run
+ * written, ms}, and where it stands against the run before: {round, first, closed, since, carried} — or {unkept: why}.
+ * `carried`: how many problems a browser found before that this run did not measure again (they stay open). A run
  * that cannot finish (a page that may not be written) throws what stopped it, as a build always has, and is kept too.
  */
 export async function runDeck(dir, {write = false, layout = false, out, voice = false, chromium, driver, limits, home = storydeckHome(), keep: kept = true} = {}) {
@@ -50,12 +56,12 @@ export async function runDeck(dir, {write = false, layout = false, out, voice = 
     failure = error;
     taken = error?.run ?? null;
   }
-  const state = taken?.state ?? {};
-  const result = {kind, verdict: failure ? 'failed' : state.verdict, problems: state.problems ?? [], errors: state.errors ?? 0, warnings: state.warnings ?? 0,
+  const state = taken?.state ?? {}, found = state.problems ?? [], measured = state.layoutProblems ?? [];   // by the rules, and by the browser
+  const result = {kind, verdict: failure ? 'failed' : state.verdict, problems: [...found, ...measured], errors: state.errors ?? 0, warnings: state.warnings ?? 0,
     infos: state.infos ?? 0, clicks: state.clicks ?? 0, measured: state.measured === true, layoutNote: state.layoutNote ?? null, written: state.written ?? null,
-    ms: Math.round(performance.now() - t0)};
-  const stand = keep(place, {...result, written: Boolean(result.written), stages: taken?.stages ?? [], calls: callsKept(taken?.calls ?? {}), lines: taken?.lines ?? [],
-    engine: said, failure: failure ? firstLine(failure) : null}, at);
+    ms: Math.round(performance.now() - t0)};   // the time in all, as whoever ran it waited for it
+  const stand = keep(place, {...result, problems: found, layoutProblems: measured, written: Boolean(result.written), stages: taken?.stages ?? [],
+    calls: callsKept(taken?.calls ?? {}), lines: taken?.lines ?? [], engine: said, failure: failure ? firstLine(failure) : null}, at);
   if (failure) throw failure;
   return {...result, ...stand};
 }

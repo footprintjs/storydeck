@@ -185,6 +185,8 @@ export interface DeckRun {
   closed?: { rounds: number; first: { errors: number; warnings: number } } | null;
   /** against the run before: how many problems went, how many are new; null on a deck's first kept run */
   since?: { fixed: number; new: number } | null;
+  /** how many problems a browser found before that this run did not measure again: they stay open until a measure answers them */
+  carried?: number;
   /** why the run was not kept for `storydeck log` */
   unkept?: string;
 }

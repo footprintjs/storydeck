@@ -523,6 +523,9 @@ warn  click 9 "cache" · spills: text spills out of "cache" by 12 px wide ("Cach
 since the last run: 3 fixed, 0 new · round 2
 ```
 
+What a browser found stays open until a browser measures again: a build without `--layout` after one that found a
+spill begins `clean so far — 1 problem a browser found before was not measured again (--layout measures)`.
+
 `check` is the same run with nothing written (`--strict` fails on a warning too; `--layout` also measures the page in
 a browser). Both are one [footprintjs](https://github.com/footprintjs/footPrint) flowchart, so every run leaves a
 record of each choice it made, and `storydeck log` reads it back: how many rounds a deck took to come clean, beginning
