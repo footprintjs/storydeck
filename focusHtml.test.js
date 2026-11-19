@@ -95,6 +95,15 @@ describe('focusHtml · drawing a click', () => {
     expect(wrapStage('<x/>', looks[3])).toBe(`<div class="sd-stage sd-move" style="--sd-tx:${z.x}px;--sd-ty:${z.y}px;--sd-ts:${z.s};--sd-tx0:0px;--sd-ty0:0px;--sd-ts0:1"><x/></div>`);
   });
 
+  it('a view with a turn on the route waits for it and takes its time: both written on the stage', () => {
+    const stage = { move: { s: 0.5, x: 10, y: 20 }, from: { s: 1, x: 0, y: 0 }, turn: { at: 0.7, takes: 1.5 } };
+    expect(wrapStage('<x/>', { stage })).toBe('<div class="sd-stage sd-move sd-stage-turn" style="--sd-tx:10px;--sd-ty:20px;--sd-ts:0.5;--sd-tx0:0px;--sd-ty0:0px;--sd-ts0:1;--sd-stage-delay:0.7s;--sd-stage-time:1.5s"><x/></div>');
+    // without a turn nothing of it is written: the stage is as it was before turns
+    expect(wrapStage('<x/>', { stage: { move: stage.move, from: stage.from } })).not.toMatch(/sd-stage-turn|--sd-stage-/);
+    // a view that does not move has no turn to wait for
+    expect(wrapStage('<x/>', { stage: { move: stage.move, from: null, turn: stage.turn } })).toBe('<div class="sd-stage" style="--sd-tx:10px;--sd-ty:20px;--sd-ts:0.5"><x/></div>');
+  });
+
   it('draws the blur over the area with a hole and a labelled frame; on the way out, only the blur', () => {
     const o = focusOverlay(looks[1], { area });
     const [x, y, w, h] = looks[1].overlay.rects[0];
@@ -132,13 +141,13 @@ describe('focusHtml · drawing a click', () => {
   it("keeps its motion rules weak, so a deck's own rule for a piece wins", () => {
     const css = readFileSync(path.join(process.cwd(), 'focus.css'), 'utf8');
     expect(css).not.toMatch(/^\s*\[data-deck-active\]/m);
-    expect(css.match(/:where\(\[data-deck-active\]:not\(\[data-sd-instant\]\):not\(\[data-deck-static\]\)\)/g).length).toBe(6);   // + the path's line
+    expect(css.match(/:where\(\[data-deck-active\]:not\(\[data-sd-instant\]\):not\(\[data-deck-static\]\)\)/g).length).toBe(7);   // + the path's line, + the view's turn on a path
   });
 
   it('ships a stylesheet for every class it writes', () => {
     const css = readFileSync(path.join(process.cwd(), 'focus.css'), 'utf8');
     for (const c of ['sd-dim', 'sd-gone', 'sd-hide', 'sd-keep', 'sd-hot', 'sd-hot-in', 'sd-enter', 'sd-arrive', 'sd-light', 'sd-fade', 'sd-leave',
-      'sd-moved', 'sd-move', 'sd-origin-tl', 'sd-twin-off', 'sd-relook', 'sd-from-grey', 'sd-from-hide', 'sd-from-keep', 'sd-stage', 'sd-veil', 'sd-veil-in-new', 'sd-veil-out', 'sd-frame', 'sd-new', 'sd-focus-new', 'sd-path', 'sd-path-line', 'sd-twin-turn'])
+      'sd-moved', 'sd-move', 'sd-origin-tl', 'sd-twin-off', 'sd-relook', 'sd-from-grey', 'sd-from-hide', 'sd-from-keep', 'sd-stage', 'sd-veil', 'sd-veil-in-new', 'sd-veil-out', 'sd-frame', 'sd-new', 'sd-focus-new', 'sd-path', 'sd-path-line', 'sd-twin-turn', 'sd-stage-turn'])
       expect(css, c).toMatch(new RegExp(`\\.${c}\\b`));
   });
 });
@@ -284,7 +293,23 @@ describe('focusHtml · a path, in focus.css', () => {
     const outside = css.replace(motion, '').replace(/\/\*[\s\S]*?\*\//g, '');
     expect(outside).not.toMatch(/--sd-a-[\w-]+\s*:|--sd-turn\s*:|(^|[\s;{])animation\s*:/m);
     const animated = rules.filter(([, body]) => /(^|[\s;])animation\s*:/.test(body));
-    expect(animated.length).toBe(6);
+    expect(animated.length).toBe(7);   // the pieces, the path's line, the stage, the stage with a turn, the veil in, the frame, the veil out
     for (const [selector] of animated) expect(selector.startsWith(':where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) '), selector).toBe(true);
+  });
+});
+
+describe('focusHtml · ground', () => {
+  it('reads data-ground on a piece, and leaves the key out of every other piece', () => {
+    const { pieces } = readPieces('<div data-k="floor" data-ground style="left:0px;top:0px;width:9px;height:9px"></div><div data-k="a" data-grounded style="left:0px;top:0px"></div><div data-k="b" data-ground="yes" style="left:1px;top:1px"></div>');
+    expect(pieces.map((p) => p.ground)).toEqual([true, undefined, true]);
+    expect('ground' in pieces[1]).toBe(false);
+  });
+});
+
+describe('focusHtml · ground is the tag\'s own attribute', () => {
+  it('found in review: the words inside another attribute are not it, and data-ground="false" says it is part of the picture', () => {
+    const box = 'style="left:0px;top:0px;width:9px;height:9px"';
+    const { pieces } = readPieces(`<div data-k="a" title="x data-ground" ${box}></div><div data-k="b" data-ground="false" ${box}></div><div data-k="c" data-ground="FALSE " ${box}></div><div data-k="d" data-ground="" ${box}></div><div data-k="e" DATA-GROUND ${box}></div>`);
+    expect(pieces.map((p) => p.ground)).toEqual([undefined, undefined, undefined, true, true]);
   });
 });

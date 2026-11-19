@@ -312,3 +312,18 @@ describe('the layout check says', () => {
     expect(p.message).toContain('the tail of "a" no longer reaches "server"');
   });
 });
+
+describe('callouts · a piece off the slide (found in review)', () => {
+  const at = (style) => {
+    const html = callouts(`<div data-k="p" class="box" style="${style}">P</div><div data-k="why" data-callout="p above">It lives here</div>`, {canvas: [1920, 1080]});
+    const tag = /<div data-k="why"[^>]*>/.exec(html)[0];
+    return {x: Number(/left:(-?[\d.]+)px/.exec(tag)[1]), y: Number(/top:(-?[\d.]+)px/.exec(tag)[1])};
+  };
+
+  it('a piece partly on the slide keeps its bubble on the slide, as always; only one wholly off it keeps its bubble beside it', () => {
+    expect(at('left:-150px;top:500px;width:300px;height:200px').x).toBe(24);          // half off the left edge: held 24 px inside, as before
+    expect(at('left:1800px;top:500px;width:300px;height:200px').x).toBeLessThan(1920 - 24);
+    expect(at('left:2400px;top:500px;width:300px;height:200px').x).toBeGreaterThan(2300);   // wholly off: above its piece
+    expect(at('left:400px;top:-900px;width:300px;height:200px').y).toBeLessThan(-900);
+  });
+});

@@ -10,6 +10,7 @@
 //   loop-unset     a loop of the deck's own (a bare data-loop) that nothing gives a --loop: nothing loops
 //   differs-unsaid a part names a phrase of its notes that says how it differs from the real thing, and they do not hold it
 //   callout-alone  a callout shown on a click that does not show the piece it points at: its tail points at nothing
+//   view-far       a click whose view stands further out than half size (a fit over a wide picture): its words are small
 import {wordCount} from './parse.js';
 import {expandNames} from '../focus.js';
 import {LOOP_NAMES} from './loops.js';
@@ -122,6 +123,16 @@ function aloneCallouts(compiled) {
   return out;
 }
 
+/** Half size: further out than this, words drawn at a slide's usual sizes are hard to read from a seat. A starting choice, not a measurement. */
+const FAR_VIEW = 0.5;
+
+/** A map click whose view stands further out than half size: every word on the picture shows that much smaller. */
+function farView(c) {
+  const s = c.kind === 'map' ? c.look.stage?.move?.s : undefined;
+  if (!(s < FAR_VIEW)) return [];
+  return [problem('warn', 'view-far', c, `the view stands at ${s}× here, so words drawn 26 px tall show about ${Math.round(26 * s)} px tall — show less at once (take pieces out with data-out, or tell it in two parts), or stand the pieces closer together`)];
+}
+
 /** Every problem of a compiled deck: [{level: 'error' | 'warn' | 'info', rule, click, label, message}]. */
 export function checkDeck(compiled) {
   const out = [];
@@ -129,6 +140,7 @@ export function checkDeck(compiled) {
     out.push(...words(c, compiled.config.checks));
     if (c.kind === 'map') out.push(...litOnEntry(c, compiled.maps[c.map].pieces));
     out.push(...noChange(c, compiled.clicks[i - 1]));
+    out.push(...farView(c));
   });
   out.push(...neverShown(compiled), ...missingNotes(compiled), ...unstyledThemes(compiled), ...unsetLoops(compiled), ...unsaidDiffers(compiled), ...aloneCallouts(compiled));
   return out;

@@ -42,15 +42,23 @@ function pieceGroups(click, pieces) {
   };
 }
 
-/** The route of a path click, in the order it lights, each turn's names together. */
+/**
+ * The route of a path click, in the order it plays, each turn's names together: "the view" where the view's move has
+ * a turn, and a turn's own seconds after it when the route gives them ("w1 (1.2 s)").
+ */
 function routeOf(click, pieces) {
-  const turns = new Map();
+  // A turn is known by when it starts and what it takes of its own: two turns may start at the same moment (a turn of
+  // 0 s before another), and are still two. The view's turn is its own. Turns come out in the order they start, a turn
+  // with its own time before one without at the same moment (it is the one that took 0 s).
+  const turns = new Map(), at = (start, takes, own) => { const key = `${start}|${own}`; if (!turns.has(key)) turns.set(key, {start, names: [], takes, rank: turns.size}); return turns.get(key); };
+  const view = click.look.stage?.turn;
+  if (view) at(view.at, view.takes, 'view').names.push('the view');
   click.look.pieces.forEach((p, i) => {
     if (p.path === null || p.path === undefined) return;
-    if (!turns.has(p.path)) turns.set(p.path, []);
-    turns.get(p.path).push(nameOf(pieces, i));
+    const takes = p.turnTime ?? null;
+    at(p.path, takes, takes === null ? '' : `t${takes}`).names.push(nameOf(pieces, i));
   });
-  return [...turns.entries()].sort((a, b) => a[0] - b[0]).map(([, names]) => unique(names).join(' + '));
+  return [...turns.values()].sort((a, b) => a.start - b.start || (a.takes === null) - (b.takes === null) || a.rank - b.rank).map((t) => `${unique(t.names).join(' + ')}${t.takes === null ? '' : ` (${t.takes} s)`}`);
 }
 
 /** What moves the view or the parts on a map click, in words. */
@@ -104,7 +112,7 @@ export function reviewClick(compiled, which, {maxWords = compiled.config?.checks
     const g = pieceGroups(c, pieces);
     const route = routeOf(c, pieces);
     const focus = [`focus: ${c.look.strategies.length ? c.look.strategies.join(', ') : 'grey (default)'}`];
-    if (route.length) focus.push(`route: ${route.join(' → ')}${c.look.path ? `, ${c.look.path.step} s apart` : ''}${c.look.path?.line ? ` · line ${quote(c.look.path.line, 80)}` : ''}`);
+    if (route.length) focus.push(`route: ${route.join(' → ')}${c.look.path ? `, ${c.look.path.step} s apart${route.some((r) => / s\)$/.test(r)) ? ' where a turn does not say' : ''}` : ''}${c.look.path?.line ? ` · line ${quote(c.look.path.line, 80)}` : ''}`);
     lines.push(focus.join(' · '));
     lines.push(`lit (${g.lit.length}): ${list(g.lit)}`);
     lines.push(`greyed (${g.greyed.length}): ${list(g.greyed)}`);

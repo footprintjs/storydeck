@@ -98,3 +98,25 @@ describe('formatProblems', () => {
     expect(formatProblems([])).toBe('no problems');
   });
 });
+
+describe('checkDeck · view-far', () => {
+  const wide = `<div data-k="a" class="box" style="left:0px;top:400px;width:400px;height:200px">A</div>
+<div data-k="b" class="box" style="left:1800px;top:400px;width:400px;height:200px">B</div>
+<div data-k="c" class="box" style="left:4800px;top:400px;width:400px;height:200px">C</div>`;
+  const deck = (focus) => compileDeck(sourceOf({clicks: `<section data-label="Wide" data-map="map">
+  <step data-in="a" data-focus="${focus}"><h2>One</h2></step>
+  <step data-in="b" data-focus="${focus}"><h2>Two</h2></step>
+  <step data-in="c" data-focus="${focus}"><h2>Three</h2></step>
+</section>`, maps: {map: wide}}));
+
+  it('warns on the click where a fit stands further out than half size, with what the words shrink to and what to do', () => {
+    const found = checkDeck(deck('fit')).filter((p) => p.rule === 'view-far');
+    expect(found.map((p) => [p.level, p.click])).toEqual([['warn', 3]]);   // 2200 wide is 0.70×: fine; 5200 wide is 0.30×
+    expect(found[0].message).toMatch(/^the view stands at 0\.2954× here, so words drawn 26 px tall show about 8 px tall — show less at once/);
+  });
+
+  it('says nothing of a deck whose view never goes that far out, or has no camera', () => {
+    expect(checkDeck(deck('grey')).filter((p) => p.rule === 'view-far')).toEqual([]);
+    expect(checkDeck(deck('zoom')).filter((p) => p.rule === 'view-far')).toEqual([]);
+  });
+});

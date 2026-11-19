@@ -1,0 +1,12 @@
+/* The deck's look. "look": "base" in deck.json brings a ready-made one, light and dark: its tokens, and the pieces a
+   picture is made of (box, chip, area, group, card, title-block, points). Change a token here and everything that reads
+   it follows; any rule you write here wins over the base. A token on :root reaches light and dark (T switches, the
+   choice is kept); :root.dark gives dark its own. Also yours to set: --bg --bg-elev --fg --fg-muted --line --sd-accent
+   --sd-dim-opacity --sd-ok --sd-warn --sd-bad --sans --mono. */
+:root {
+  --accent-ink: #0b6e99; --sd-glow: #e8a33d;
+  --sd-radius: 18px;
+}
+:root.dark {
+  --accent-ink: #5cc8f0; --sd-glow: #f2b65a;
+}

@@ -3,6 +3,12 @@ import {outline, reviewClick, findClick} from './review.js';
 import {compileDeck} from './compile.js';
 import {sourceOf, MAP} from './test/helpers.js';
 
+const ordered = compileDeck(sourceOf({clicks: `
+<section data-label="Order" data-kicker="1" data-map="map">
+  <step data-in="a" data-focus="zoom"><h2>Close on A</h2></step>
+  <step data-in="w1 b w2 c" data-focus="path" data-focus-route="camera a w1:1.2 (b w2) c"><h2>Back out, then across</h2></step>
+</section>`, maps: {map: MAP}}));
+
 const compiled = compileDeck(sourceOf({clicks: `
 <section data-label="Title"><h1>A deck about three boxes and the wires between them all</h1><aside class="notes">Hello there.</aside></section>
 <section data-label="Route" data-kicker="1" data-map="map">
@@ -85,5 +91,26 @@ describe('reviewClick', () => {
     expect(reviewClick(c, 2)).toContain('this click: nothing changes on the map');
     expect(reviewClick(c, 2)).toContain('headline: —');
     expect(outline(c)).toContain('(no headline)');
+  });
+});
+
+describe('reviewClick · an order inside a click', () => {
+  it('reads the route as it plays: the view\'s turn, what comes together, and a turn\'s own seconds', () => {
+    const r = reviewClick(ordered, 2);
+    expect(r).toContain('focus: path · route: the view (1 s) → a → w1 (1.2 s) → b + w2 → c, 0.35 s apart where a turn does not say');
+    expect(r).toContain('view back to the whole map');
+  });
+});
+
+describe('reviewClick · turns that start at the same moment (found in review)', () => {
+  const deck = (route) => compileDeck(sourceOf({clicks: `<section data-label="O" data-map="map">
+  <step data-in="a" data-focus="zoom"><h2>x</h2></step>
+  <step data-in="w1 b w2 c" data-focus="path" data-focus-route="${route}"><h2>y</h2></step></section>`, maps: {map: MAP}}));
+  const route = (r) => reviewClick(deck(r), 2).split('\n').find((l) => l.startsWith('focus'));
+
+  it('a turn of 0 s and the one after it are two turns, each with what is its own', () => {
+    expect(route('a:0 b c')).toBe('focus: path · route: a (0 s) → b → c, 0.35 s apart where a turn does not say');
+    expect(route('camera:0 a b')).toBe('focus: path · route: the view (0 s) → a → b, 0.35 s apart where a turn does not say');
+    expect(route('a b c')).toBe('focus: path · route: a → b → c, 0.35 s apart');
   });
 });

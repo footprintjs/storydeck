@@ -115,7 +115,19 @@ later click without it; a line carrying a group's name moves with it; `apart pla
 each its own click); overlay `blur`; order `path` (the
 subject lit piece after piece along a route, a `line` naming it; write `on` — or `route` — in the order the pieces
 light: only lit pieces take a turn, a ring and a dashed twin keep their piece's turn, and a new blur delays the
-whole path .4 s).
+whole path .4 s). A route is written as turns, the order inside the click:
+`data-focus-route="camera w1:1.2 dns (w2 server)"` — names alone one after another, `(a b)` together in one turn,
+`name:seconds` a turn that takes that long (a wire's packet rides it), and the word `camera` the view's move as a turn
+(1 s, or `camera:0.6`), so what follows waits until the view has arrived; `review` reads the route back as it plays).
+
+**Blocks on a floor (isometric).** In `map.html`: `<div data-k="server" data-iso="block" data-at="7 4"
+data-size="2 2 1.6"><b>Server</b></div>` draws a block seen from a corner; also `data-iso="cylinder"` (round: the same
+width and depth) and `data-iso="floor" data-size="16 9"` (the tile lines; write it first). `data-at` is "col row" in
+tiles (a third number lifts it), `data-size` "wide deep high". The build places, sizes and levels each one, so give it no
+left/top/width/height; `<i data-iso-grid="150 at 1500 150"></i>` sets the tile's width and the floor's far corner.
+Colour one with `style="--iso-color:#bcd6f3"`. It is a piece like any other: clicks, `fit`, routes, wires and callouts
+all work on it. A floor is ground (`data-ground`): no camera frames it, so `fit` follows the pieces. `check` warns
+(`view-far`) when a view stands further out than half size, where words get small.
 
 **Narrate a deck in a voice.**
 

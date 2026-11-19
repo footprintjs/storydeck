@@ -12,6 +12,7 @@ text. Each module does one job, and they compose in one direction:
 | `parse.js` | clicks.html read into parts and clicks (a step holds its `<h2>` and notes; anything else is refused) |
 | `transforms.js` | the built-in drawing helpers: `data-arrow` wires (with packets) — by numbers, or between pieces ("client to server": edge to edge, in lanes, carrying `data-ends` for a click's `name+`), with a label, a halo and running packets (loops) — and `data-icon` icons |
 | `boxes.js` | where a map's pieces stand, for the helpers that draw between them (a wire, a callout) |
+| `iso.js` | blocks on a floor seen from a corner (`data-iso`: block, cylinder, floor; `data-iso-grid`): each placed, sized and given its level by `footprint-story/isometric`, its faces drawn, with the CSS the page adds only when a deck has one |
 | `callouts.js` | words pinned to a piece (`data-callout`): a bubble beside it with a tail, read back for `review` and `check`, with the CSS the page adds only when a deck has one |
 | `loops.js` | what loops on each click (`data-loop`), checked, and the named loops (footprint-story/motion's endless moves) drawn as CSS — only those a deck shows |
 | `source.js` | the folder read from disk (Node) — only its own files, never through a link that leaves it |

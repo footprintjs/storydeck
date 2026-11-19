@@ -711,3 +711,197 @@ describe('focus · the camera: fit frames everything shown', () => {
     }
   });
 });
+
+describe('focus · a route written as turns: together, a turn\'s own time, and the view\'s turn', () => {
+  // five pieces in a row on a floor wider than the slide, and a note beside them
+  const row = ['a', 'w1', 'b', 'w2', 'c'].map((k, i) => ({ keys: [k], box: { x: i * 900, y: 400, w: 400, h: 200 } }));
+  const d = { pieces: [...row, { keys: ['note'], box: { x: 0, y: 900, w: 200, h: 80 } }], area: [0, 200, 1920, 1000] };
+  const delays = (look) => look.pieces.map((p) => p.path);
+  const path = (route, more = {}) => ({ in: ['*'], on: ['a', 'w1', 'b', 'w2', 'c'], quiet: true, focus: { strategy: 'path', route, ...more } });
+
+  it('names in a (group) take one turn together; names alone still take one each', () => {
+    const look = planFocus([path('a (w1 b) (w2 c)')], d).looks[0];
+    expect(delays(look)).toEqual([0, 0.35, 0.35, 0.7, 0.7, null]);
+    expect(look.path).toMatchObject({ turns: 3, step: 0.35, done: 0.7 });
+    expect(delays(planFocus([path('a w1 b w2 c')], d).looks[0])).toEqual([0, 0.35, 0.7, 1.05, 1.4, null]);
+  });
+
+  it('a turn\'s own time moves every turn after it, and is carried on its pieces (a packet rides that long)', () => {
+    const look = planFocus([path('a w1:1.2 b (w2 c):0.5')], d).looks[0];
+    expect(delays(look)).toEqual([0, 0.35, 1.55, 1.9, 1.9, null]);
+    expect(look.pieces.map((p) => p.turnTime)).toEqual([undefined, 1.2, undefined, 0.5, 0.5, undefined]);
+    expect(look.path.done).toBe(1.9);
+    // a plain route says nothing of a turn's time: the key is not there at all, as before turns
+    expect(planFocus([path('a w1 b')], d).looks[0].pieces.every((p) => !('turnTime' in p))).toBe(true);
+  });
+
+  it('a plain route starts every turn exactly where it did before turns: the k-th at k × step, to the millisecond', () => {
+    const names = Array.from({ length: 40 }, (_, i) => `p${i}`), many = { pieces: names.map((k, i) => ({ keys: [k], box: { x: i * 10, y: 0, w: 5, h: 5 } })) };
+    for (const step of [0, 0.05, 0.1235, 0.35, 0.7, 1.111, 5]) {
+      const got = planFocus([{ in: ['*'], focus: { strategy: 'path', route: names.join(' '), step } }], many).looks[0];
+      expect(got.pieces.map((p) => p.path)).toEqual(names.map((_, k) => Math.round(k * step * 1000) / 1000));
+      expect(got.path.done).toBe(Math.round(39 * step * 1000) / 1000);
+    }
+  });
+
+  it('a turn with nothing lit takes none, with or without a time of its own; a greyed piece in a group takes no part', () => {
+    const look = planFocus([{ in: ['*'], on: ['a', 'b', 'c'], quiet: true, focus: { strategy: 'path', route: 'a (w1):3 (b w2) c' } }], d).looks[0];
+    expect(delays(look)).toEqual([0, null, 0.35, null, 0.7, null]);
+    expect(look.path.turns).toBe(3);
+  });
+
+  it('`camera` gives the view\'s move a turn: the pieces after it wait until the view has arrived', () => {
+    const { looks } = planFocus([{ in: ['a'], focus: 'fit' }, { in: ['*'], on: ['w1', 'b'], quiet: true, focus: { strategy: 'fit', route: 'camera w1 b' } }], d);
+    expect(looks[1].stage.turn).toBe(undefined);                // no order on this click: the view moves at once, as before
+    const ordered = planFocus([{ in: ['a'], focus: 'fit' }, { in: ['*'], on: ['w1', 'b'], quiet: true, focus: ['fit', { strategy: 'path', route: 'camera w1 b' }] }], d).looks[1];
+    expect(ordered.strategies).toEqual(['fit', 'path']);
+    expect(ordered.stage.turn).toEqual({ at: 0, takes: 1 });    // the view's move, its usual second
+    expect(delays(ordered)).toEqual([null, 1, 1.35, null, null, null]);
+    expect(ordered.path).toMatchObject({ turns: 3, done: 1.35 });
+  });
+
+  it('the view\'s turn takes its own time when the route says, comes where it is written, and can share a turn', () => {
+    const second = (route) => planFocus([{ in: ['a'], focus: 'fit' }, { in: ['*'], on: ['w1', 'b'], quiet: true, focus: ['fit', { strategy: 'path', route }] }], d).looks[1];
+    const quick = second('camera:0.5 w1 b');
+    expect(quick.stage.turn).toEqual({ at: 0, takes: 0.5 });
+    expect(delays(quick)).toEqual([null, 0.5, 0.85, null, null, null]);
+    const last = second('w1 b camera');
+    expect(last.stage.turn).toEqual({ at: 0.7, takes: 1 });
+    expect(delays(last)).toEqual([null, 0, 0.35, null, null, null]);
+    expect(last.path.done).toBe(0.7);
+    const together = second('(camera w1) b');
+    expect(together.stage.turn).toEqual({ at: 0, takes: 1 });
+    expect(delays(together)).toEqual([null, 0, 1, null, null, null]);
+    const both = second('(camera w1):2 b');
+    expect(both.stage.turn).toEqual({ at: 0, takes: 2 });
+    expect(both.pieces[1].turnTime).toBe(2);
+    expect(delays(both)).toEqual([null, 0, 2, null, null, null]);
+  });
+
+  it('when the view does not move on a click, its turn takes none', () => {
+    // the first click of a map: the slide arrives with the view in place
+    const first = planFocus([{ in: ['a', 'w1'], focus: ['fit', { strategy: 'path', route: 'camera a w1' }] }], d).looks[0];
+    expect(first.stage.turn).toBe(undefined);
+    expect(delays(first)).toEqual([0, 0.35, null, null, null, null]);
+    expect(first.path.turns).toBe(2);
+    // a later click that frames the same picture
+    const same = planFocus([{ in: ['a', 'w1'], focus: 'fit' }, { on: ['w1'], focus: ['fit', { strategy: 'path', route: 'camera w1' }] }], d).looks[1];
+    expect(same.stage.turn).toBe(undefined);
+    expect(delays(same)).toEqual([null, 0, null, null, null, null]);
+  });
+
+  it('the view gliding back after a zoom is a move too, so it can take a turn on a click with no camera', () => {
+    const back = planFocus([{ in: ['a', 'w1'] }, { on: ['a'], focus: 'zoom' }, { on: ['w1'], focus: { strategy: 'path', route: 'camera w1' } }], d).looks[2];
+    expect(back.stage).toMatchObject({ move: null, turn: { at: 0, takes: 1 } });
+    expect(delays(back)).toEqual([null, 1, null, null, null, null]);
+  });
+
+  it('refuses the view\'s turn on a click where the view cannot move, naming the fix', () => {
+    expect(() => planFocus([{ in: ['*'] }, { on: ['a'], focus: { strategy: 'path', route: 'camera a' } }], d))
+      .toThrow(/focus route: "camera" is the view's turn, and on this click the view does not move — add a camera \(zoom, fit\) to data-focus, or take "camera" out of the route/);
+  });
+
+  it('a piece really called camera is itself, as a piece called name+ is', () => {
+    const film = { pieces: [{ keys: ['camera'], box: { x: 0, y: 0, w: 100, h: 100 } }, { keys: ['lens'], box: { x: 200, y: 0, w: 100, h: 100 } }] };
+    const look = planFocus([{ in: ['lens'], focus: 'fit' }, { in: ['camera'], focus: ['fit', { strategy: 'path', route: 'lens camera' }] }], film).looks[1];
+    expect(look.pieces.map((p) => p.path)).toEqual([0.35, 0]);
+    expect(look.stage.turn).toBe(undefined);
+  });
+
+  it('a piece whose name looks like the written form is itself', () => {
+    const odd = { pieces: [{ keys: ['w1:2'], box: { x: 0, y: 0, w: 10, h: 10 } }, { keys: ['(x'], box: { x: 20, y: 0, w: 10, h: 10 } }, { keys: ['w1'], box: { x: 40, y: 0, w: 10, h: 10 } }] };
+    const look = planFocus([{ in: ['*'], focus: { strategy: 'path', route: '(x w1:2 w1:3' } }], odd).looks[0];
+    expect(look.pieces.map((p) => [p.path, p.turnTime])).toEqual([[0.35, undefined], [0, undefined], [0.7, 3]]);
+  });
+
+  it('refuses a route it cannot read, as a focus refusal that says what to write', () => {
+    const bad = (route) => () => planFocus([path(route)], d);
+    expect(bad('a (w1 b')).toThrow(/focus "path": "\(" opens names that come together and "\)" closes them/);
+    expect(bad('a ()')).toThrow(/focus "path": "\(\)" names nothing/);
+    expect(bad('a w1:99')).toThrow(/focus "path": "w1" takes seconds, a number from 0 to 60 — not "99"/);
+    expect(bad('a (w1:2 b)')).toThrow(/focus "path": a time follows the "\)" and is the whole turn's — write "\(w1 b\):2"/);
+    expect(bad('a (w1 ghost)')).toThrow(/focus route: no piece "ghost"/);
+    expect(delays(planFocus([path('* a (w1 *)')], d).looks[0])).toEqual([0, 0.35, null, null, null, null]);   // '*' names no order, in a group too
+  });
+
+  it('a deck\'s own order may give turns: several names together and a turn\'s seconds, held to the same checks', () => {
+    const run = (route) => planFocus([{ in: ['*'], focus: 'mine' }], { ...d, strategies: { mine: { kind: 'order', route: () => route } } }).looks[0];
+    const look = run(Object.freeze({ names: ['a'], turns: Object.freeze([Object.freeze({ names: ['a', 'w1'] }), { names: ['b'], takes: 2 }, { names: ['c'] }]), step: 0.2 }));
+    expect(delays(look)).toEqual([0, 0, 0.2, null, 2.2, null]);
+    expect(look.pieces[2].turnTime).toBe(2);
+    expect(() => run({ names: [], turns: 'a b', step: 0.2 })).toThrow(/focus "mine": a route's turns are a list of \{names, takes\?\}, or left out — not "a b"/);
+    expect(() => run({ names: [], turns: ['a'], step: 0.2 })).toThrow(/focus "mine": a route's turn is \{names, takes\?\} — not "a"/);
+    expect(() => run({ names: [], turns: [{ names: ['a'], takes: -1 }], step: 0.2 })).toThrow(/focus "mine": a turn takes seconds, a number from 0 to 60, or nothing — not -1/);
+    expect(() => run({ names: [], turns: [{ names: [] }], step: 0.2 })).toThrow(/focus "mine": a turn's names are a list of one name or more/);
+  });
+});
+
+describe('focus · ground: what lies under the picture is never framed', () => {
+  // a floor four slides wide with two small pieces on it
+  const pieces = [
+    { keys: ['floor'], box: { x: 0, y: 0, w: 8000, h: 1000 }, ground: true },
+    { keys: ['a'], box: { x: 100, y: 400, w: 400, h: 200 } },
+    { keys: ['b'], box: { x: 1700, y: 400, w: 400, h: 200 } },
+  ];
+  const d = { pieces, area: [0, 200, 1920, 1000] };
+  const onSlide = (stage, [x, y]) => [stage.s * x + stage.x, stage.s * y + stage.y];
+
+  it('fit frames what stands on the ground, so the view follows the pieces though the whole floor is shown', () => {
+    const { looks } = planFocus([{ in: ['floor', 'a'], focus: 'fit' }, { in: ['b'], focus: 'fit' }], d);
+    expect(looks[0].stage.move.s).toBe(2.5);                                  // close on a, not far out over the floor
+    expect(onSlide(looks[0].stage.move, [300, 500])).toEqual([960, 600]);
+    expect(looks[1].stage.move.s).toBeCloseTo(0.8 * 1920 / 2000, 4);          // a and b, 2000 wide
+    // without the mark the same floor is part of the picture, and the view goes out to its limit to show it
+    const plain = { ...d, pieces: pieces.map(({ ground, ...p }) => p) };
+    expect(planFocus([{ in: ['floor', 'a'], focus: 'fit' }], plain).looks[0].stage.move.s).toBe(0.25);
+  });
+
+  it('zoom and a blur leave the ground out too; a click about the ground alone moves no view', () => {
+    const zoomed = planFocus([{ in: ['*'] }, { on: ['floor', 'a'], focus: 'zoom blur' }], d).looks[1];
+    expect(onSlide(zoomed.stage.move, [300, 500])[0]).toBeCloseTo(960, 1);    // closes in on a, though the floor is lit with it
+    const [x, , w] = zoomed.overlay.rects[0];
+    expect(w).toBeLessThan(1920);                                              // the frame is round a, not round the floor
+    expect(x).toBeGreaterThan(0);
+    expect(planFocus([{ in: ['floor'], focus: 'fit' }], d).looks[0].stage).toBe(null);
+  });
+
+  it('the ground is still a piece: it comes in, greys and is lit like any other', () => {
+    const look = planFocus([{ in: ['*'] }, { on: ['a'] }], d).looks[1];
+    expect(look.pieces.map((p) => p.state)).toEqual(['dim', 'on', 'dim']);
+  });
+});
+
+describe('focus · a route of names alone is read as it always was (found in review)', () => {
+  const big = (n, name = (i) => `p${i}`) => ({ pieces: Array.from({ length: n }, (_, i) => ({ keys: [name(i)], box: { x: i * 10, y: 0, w: 5, h: 5 } })) });
+  const delays = (look) => look.pieces.map((p) => p.path);
+
+  it('a map may light more pieces than the written form\'s 256 turns: 300 names, by `on` or by `route`, each at k × step', () => {
+    const d = big(300), all = d.pieces.map((p) => p.keys[0]), want = all.map((_, k) => Math.round(k * 0.35 * 1000) / 1000);
+    expect(delays(planFocus([{ in: all, focus: 'path' }], d).looks[0])).toEqual(want);                                       // the order `in` gives
+    expect(delays(planFocus([{ in: ['*'], focus: { strategy: 'path', route: all.join(' ') } }], d).looks[0])).toEqual(want);  // the same order, written
+    expect(planFocus([{ in: ['*'], focus: { strategy: 'path', route: all } }], d).looks[0].path).toMatchObject({ turns: 300, done: want[299] });
+  });
+
+  it('a piece may be called anything it could be before: a long name, an emoji with its selector', () => {
+    const long = 'k'.repeat(200), heart = 'db❤️';
+    const d = { pieces: [{ keys: [long], box: { x: 0, y: 0, w: 5, h: 5 } }, { keys: [heart], box: { x: 10, y: 0, w: 5, h: 5 } }] };
+    expect(delays(planFocus([{ in: [long, heart], focus: 'path' }], d).looks[0])).toEqual([0, 0.35]);
+    expect(delays(planFocus([{ in: ['*'], focus: { strategy: 'path', route: `${heart} ${long}` } }], d).looks[0])).toEqual([0.35, 0]);
+    // a deck's own order strategy too: its names are the deck's
+    const mine = { kind: 'order', route: () => ({ names: [], turns: [{ names: [heart, long] }], step: 0.2 }) };
+    expect(delays(planFocus([{ in: ['*'], focus: 'mine' }], { ...d, strategies: { mine } }).looks[0])).toEqual([0, 0]);
+  });
+
+  it('a route that uses the written form is held to its bounds, and says so', () => {
+    const d = big(300), all = d.pieces.map((p) => p.keys[0]);
+    expect(() => planFocus([{ in: ['*'], focus: { strategy: 'path', route: `(${all[0]} ${all[1]}) ${all.slice(2).join(' ')}` } }], d)).toThrow(/focus "path": an order has at most 256 turns/);
+  });
+
+  it('the view moves once on a click: a second camera in a route is refused', () => {
+    const d = big(3);
+    const run = (route) => () => planFocus([{ in: ['p0'], focus: 'fit' }, { in: ['*'], focus: ['fit', { strategy: 'path', route }] }], d);
+    expect(run('camera p1 camera:3 p2')).toThrow(/focus route: "camera" is written more than once, and the view moves once on a click — keep one/);
+    expect(run('(camera camera) p1')).toThrow(/"camera" is written more than once/);
+    expect(run('camera p1 p2')).not.toThrow();
+  });
+});
