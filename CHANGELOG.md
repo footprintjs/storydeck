@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.15.0 — stages that stay put, a camera that pans, and when the view has arrived
 
 - **Stages: what stays put while the view moves.** `data-stage="panel"` on a piece puts it on a stage of its own. Every
   stage has its own view, and a click's camera moves one of them: the main stage, or the one it names
