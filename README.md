@@ -668,8 +668,8 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   block covers another and a wire has room for its arrow. So a system reads left to right and fills the slide. A block
   with no `data-size` is `2 2 1`, a floor with none is fitted round the blocks, and with no `data-iso-grid` the tile is
   the one that lets the blocks fill the slide's area (below the headline, above the footer), from 96 to 160 px: a
-  picture too big for that runs past the slide, `storydeck build --layout` says which block does, and a click's camera
-  frames what the click shows (`data-focus="fit"`). The same map always gives the same picture. It is all or none: a
+  picture too big for that runs past the slide, `storydeck build --layout` names a lit block that does, and a click's
+  camera frames what the click shows (`data-focus="fit"`). The same map always gives the same picture. It is all or none: a
   map that places some of its blocks and not the others is refused, naming them. `data-iso-grid="fit"` asks for the
   fitted tile on a map that places its own blocks.
 

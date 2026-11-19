@@ -59,11 +59,14 @@ export const USUAL_SIZE = Object.freeze([2, 2, 1]);
 /**
  * A fitted grid's tile, in px: no wider than the first, and no narrower than the second — a block's words are drawn
  * at one size whatever the tile, and under 96 px a block's top has no room for them. A picture too big for the slide
- * at that tile runs past it, and a click's camera frames what the click shows (data-focus="fit").
+ * at that tile runs past it, and a click's camera frames what the click shows (data-focus="fit"); the layout check
+ * names a lit piece that runs past the slide's edge.
  */
 export const FITTED_TILE = Object.freeze({most: 160, least: 96});
 /** The px a fitted picture keeps clear of the area's edges, and the tiles of floor a fitted floor shows round the blocks. */
 const INSET = 40, MARGIN = 1;
+/** The most tiles a floor has along one side (the grid's own limit: footprint-story/isometric · floor). */
+export const MOST_FLOOR = 256;
 const FIT = 'fit';
 
 const fixed = (v) => +v.toFixed(1);
@@ -163,6 +166,9 @@ function place(found, links) {
   }
   const placedHere = unplaced.length > 0;
   if (placedHere) {
+    // a piece is known by the first name in its data-k: the wires say it, and the build places by it
+    const twice = solid.map((p) => p.name).find((name, i, all) => all.indexOf(name) !== i);
+    if (twice !== undefined) throw new Error(`the build places a map's blocks by the first name in their data-k, and two are called "${twice}" — give each a first name of its own, or give every block its data-at`);
     // each block's size first, by the rule that draws it: a size that is none is refused naming the piece, as it always was
     for (const p of solid) {
       try { readThing({at: [0, 0], size: p.size}, `a ${p.kind}`); } catch (e) { throw new Error(`${p.where}: ${e.message.replace(/^isometric: /, '')}`, {cause: e}); }
@@ -171,7 +177,7 @@ function place(found, links) {
     try {
       arranged = arrange(solid.map((p) => ({name: p.name, size: p.size})), links, {across: true});   // a slide is wider than it is tall
     } catch (e) {
-      throw new Error(`the build places a map's blocks by their names, and cannot place these: ${e.message.replace(/^isometric: /, '')} — or give every block its data-at`, {cause: e});
+      throw new Error(`the build cannot place this map's blocks: ${e.message.replace(/^isometric: /, '')} — or give every block its data-at`, {cause: e});
     }
     solid.forEach((p, i) => { p.at = [...arranged.things[i].at]; });
   }
@@ -182,6 +188,8 @@ function place(found, links) {
     const reach = (axis, end) => (end ? Math.ceil(Math.max(...solid.map((p) => p.at[axis] + p.size[axis])) - 1e-9) : Math.floor(Math.min(...solid.map((p) => p.at[axis])) + 1e-9));
     floor.at = [reach(0, false) - MARGIN, reach(1, false) - MARGIN];
     floor.size = [reach(0, true) + MARGIN - floor.at[0], reach(1, true) + MARGIN - floor.at[1]];
+    // refused here, in the map's own terms: the author wrote no size, so the grid's "not [271,271]" would name numbers nobody typed
+    if (Math.max(...floor.size) > MOST_FLOOR) throw new Error(`${floor.where}: fitted round this map's blocks the floor would be ${floor.size[0]} by ${floor.size[1]} tiles, and a floor is at most ${MOST_FLOOR} a side — take the floor out, or give it a data-at and a data-size of its own (it is ground: it need not lie under every block)`);
   }
   return placedHere;
 }
@@ -197,7 +205,11 @@ function gridOf(found, {fit, canvas, area}) {
   if (!fit) return isometric({tile: 120, origin: [w / 2, 240]});
   const things = found.filter((p) => p.kind !== 'floor').map((p) => ({at: p.at, size: p.size}));
   if (!things.length) throw new Error('data-iso-grid="fit": the grid is fitted to the blocks, and this map has none — add a block, or write the grid in numbers ("120 at 960 240")');
-  const [x0, y0, x1, y1] = area ?? [0, 0, w, h], inset = Math.min(INSET, (x1 - x0) / 4, (y1 - y0) / 4);
+  const into = area ?? [0, 0, w, h];
+  if (!(Array.isArray(into) && into.length === 4 && into.every(Number.isFinite) && into[2] > into[0] && into[3] > into[1])) {
+    throw new Error(`a fitted picture goes into the slide's area, [x0, y0, x1, y1] in slide px with x1 past x0 and y1 past y0 (deck.json "area") — not ${JSON.stringify(into)}`);
+  }
+  const [x0, y0, x1, y1] = into, inset = Math.min(INSET, (x1 - x0) / 4, (y1 - y0) / 4);   // a small area keeps half of itself
   return gridFor(things, [x0 + inset, y0 + inset, x1 - inset, y1 - inset], FITTED_TILE);
 }
 

@@ -295,10 +295,34 @@ describe('a wire to an isometric piece ends on what the piece draws, not on the 
     expect(Math.hypot(go.from[0] - back.tip[0], go.from[1] - back.tip[1])).toBeGreaterThan(20);   // a lane each: the request does not lie on its answer
   });
 
-  it('a map with no isometric piece draws its wires exactly as before', () => {
-    const flat = '<div data-k="client" style="left:160px;top:420px;width:300px;height:210px"></div><div data-k="server" style="left:720px;top:420px;width:300px;height:210px"></div><i data-k="req" data-arrow="client to server"></i>';
-    expect(applyTransforms(flat, {canvas})).toBe(wires(flat));
+  it('a map with no isometric piece draws its wires exactly as 0.16.0 did', () => {
+    const flat = '<div data-k="client" style="left:160px;top:420px;width:300px;height:210px"></div><div data-k="server" style="left:720px;top:420px;width:300px;height:210px"></div><i data-k="req" class="wire pkt" data-arrow="client to server" data-label="GET"></i><i data-k="res" data-arrow="server to client 30"></i>';
+    const out = applyTransforms(flat, {canvas, area: [0, 220, 1920, 1000]});
+    // the opening tags as 0.16.0 wrote them (built from that release's own source and compared whole, byte for byte, when this was written)
+    expect(out.match(/<svg data-ends="client server"[^>]*>/)[0]).toBe('<svg data-ends="client server" data-k="req" class="wire pkt" data-label="GET" style="left:446px;top:437px;width:288px;height:68px;--sd-angle:90deg" viewBox="0 0 288 68" aria-hidden="true">');
+    expect(out).toHaveLength(882);
+    expect(applyTransforms(flat, {canvas})).toBe(out);     // an area changes nothing for a map the build does not fit
     expect(wires(flat, new Map())).toBe(wires(flat));
+  });
+
+  it('a name a block shares with another piece is one box round them all, as it always was: the block\'s own outline is not the whole of it', () => {
+    const shared = `${blocks}<div data-k="a tag" class="chip" style="left:100px;top:900px;width:120px;height:40px">t</div><i data-k="w" class="wire" data-arrow="a to b"></i>`;
+    const alone = `${blocks}<i data-k="w" class="wire" data-arrow="a to b"></i>`;
+    const [together] = drawn(applyTransforms(shared, {canvas})), [own] = drawn(applyTransforms(alone, {canvas}));
+    expect(together.from).not.toEqual(own.from);                                        // it starts from the box round the block and its tag…
+    expect(applyTransforms(shared, {canvas})).toBe(wires(isoDrawn(shared, {canvas}).html));   // …exactly as a box-only wire is drawn
+  });
+
+  it('three wires between two blocks, both ways, keep a lane each: side by side, none crossing, every tip on a block', () => {
+    const map = `${blocks}<i data-k="w1" class="wire" data-arrow="a to b"></i><i data-k="w2" class="wire" data-arrow="b to a"></i><i data-k="w3" class="wire" data-arrow="a to b"></i>`;
+    const {shapes} = isoDrawn(map, {canvas}), lanes = drawn(applyTransforms(map, {canvas})), a = shapes.get('a'), b = shapes.get('b');
+    const u = [b.middle[0] - a.middle[0], b.middle[1] - a.middle[1]], len = Math.hypot(...u), n = [-u[1] / len, u[0] / len];
+    const across = lanes.map((w) => (w.from[0] - a.middle[0]) * n[0] + (w.from[1] - a.middle[1]) * n[1]), tips = lanes.map((w) => (w.tip[0] - a.middle[0]) * n[0] + (w.tip[1] - a.middle[1]) * n[1]);
+    lanes.forEach((w, i) => expect(across[i]).toBeCloseTo(tips[i], 0));                 // each runs level with the line between the middles: none crosses another
+    const order = [...across].sort((x, y) => x - y);
+    expect(order[1] - order[0]).toBeGreaterThan(10);
+    expect(order[2] - order[1]).toBeCloseTo(order[1] - order[0], 0);                     // evenly apart
+    for (const [i, w] of lanes.entries()) expect(off(i === 1 ? a.outline : b.outline, w.tip)).toBeLessThan(7);   // the middle one runs back, to a
   });
 });
 

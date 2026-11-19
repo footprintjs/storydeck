@@ -136,7 +136,8 @@ function wiresBetween(html, found, shapes) {
   const boxOf = boxFinder(html);
   /** One end of a wire: its middle, how far a line may stand off that middle and still cross it, and where a ray leaves it. */
   const endOf = (name, where) => {
-    const shape = shapes.get(name);
+    // an isometric piece's own outline, when the name is that piece alone: a name several pieces share is one box round them all, as ever
+    const shape = boxOf.alone(name) ? shapes.get(name) : undefined;
     if (shape) return {middle: shape.middle, across: (n) => Math.min(exitOutline(shape.outline, shape.middle, n), exitOutline(shape.outline, shape.middle, [-n[0], -n[1]])), exit: (p, u) => exitOutline(shape.outline, p, u)};
     const box = boxOf(name, where);
     // half the box measured across the line: a lane closer to the middle than this, less 8 px, crosses the box, so its

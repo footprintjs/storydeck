@@ -2,7 +2,7 @@ import {describe, it, expect} from 'vitest';
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
 import {arrange, gridFor, isometric} from 'footprint-story/isometric';
-import {isoPieces, isoDrawn, isoIn, isoRing, ISO_CSS, MOST_ISO_PIECES, USUAL_SIZE, FITTED_TILE} from './iso.js';
+import {isoPieces, isoDrawn, isoIn, isoRing, ISO_CSS, MOST_ISO_PIECES, MOST_FLOOR, USUAL_SIZE, FITTED_TILE} from './iso.js';
 import {applyTransforms, wireLinks} from './transforms.js';
 import {compileDeck} from './compile.js';
 import {deckStyles} from './page.js';
@@ -226,6 +226,9 @@ describe('iso · in a deck', () => {
   it('a piece on the floor is moved in its file, not by a drag: the refusal says where', () => {
     const at = readPieces(isoPieces(MAP, {canvas})).pieces.findIndex((p) => p.keys[0] === 'server');
     expect(() => nudgePiece(MAP, {index: at, name: 'server'}, 10, 10)).toThrow(/"server" stands on the floor where its data-at says \("col row"\) — change its data-at in the file/);
+    // a block the build placed has no data-at to change: the message says what would place it, for every block of the map
+    const unplaced = '<div data-k="a" data-iso="block"></div><div data-k="b" data-iso="block"></div>';
+    expect(() => nudgePiece(unplaced, {index: 1, name: 'b'}, 10, 10)).toThrow('"b" was placed by the build, from the map\'s wires — to place the blocks yourself, give every block of the map a data-at ("col row") in the file');
   });
 });
 
@@ -309,8 +312,12 @@ describe('iso · no places to type: the build places the blocks from what is joi
   });
 
   it('refuses two blocks with one name when it has to place them by name', () => {
-    expect(() => isoPieces('<div data-k="a" data-iso="block"></div><div data-k="a" data-iso="block"></div>', {canvas}))
-      .toThrow('the build places a map\'s blocks by their names, and cannot place these: two things are named "a": a name tells one thing from another — or give every block its data-at');
+    const fix = 'the build places a map\'s blocks by the first name in their data-k, and two are called "a" — give each a first name of its own, or give every block its data-at';
+    expect(() => isoPieces('<div data-k="a" data-iso="block"></div><div data-k="a" data-iso="block"></div>', {canvas})).toThrow(fix);
+    expect(() => isoPieces('<div data-k="a x" data-iso="block"></div><div data-k="a y" data-iso="block"></div>', {canvas})).toThrow(fix);   // the first name is the name
+    // what the kit itself cannot place is said in its words, with the way out
+    expect(() => isoPieces('<div data-k="a" data-iso="block" data-size="70 2 1"></div>', {canvas}))
+      .toThrow(/^the build cannot place this map's blocks: "a"'s size is \[wide, deep, high\] with wide and deep above 0, high 0 or more, none over 64 — not \[70,2,1\] — or give every block its data-at$/);
     // placed by the map, two of a name are drawn as they always were
     expect(() => isoPieces('<div data-k="a" data-iso="block" data-at="0 0"></div><div data-k="a" data-iso="block" data-at="4 0"></div>', {canvas})).not.toThrow();
   });
@@ -322,6 +329,28 @@ describe('iso · no places to type: the build places the blocks from what is joi
     // a floor the map sized keeps its size, and its place when none is written is 0 0, as before
     expect(boxIn(isoPieces('<i data-iso-grid="100 at 500 100"></i><div data-k="f" data-iso="floor" data-size="3 2"></div><div data-k="a" data-iso="block" data-at="5 5"></div>', {canvas}), 'f'))
       .toEqual(round(grid.floor({cols: 3, rows: 2}).box));
+  });
+
+  it('a floor fitted round a map too long for one is refused in the map\'s own terms, with the fix — never in numbers nobody typed', () => {
+    const far = `<div data-k="f" data-iso="floor"></div><div data-k="a" data-iso="block" data-at="0 0"></div><div data-k="b" data-iso="block" data-at="300 0"></div>`;
+    expect(() => isoPieces(far, {canvas})).toThrow('"f" (data-iso="floor"): fitted round this map\'s blocks the floor would be 304 by 4 tiles, and a floor is at most 256 a side — take the floor out, or give it a data-at and a data-size of its own (it is ground: it need not lie under every block)');
+    const many = Array.from({length: 90}, (_, i) => `<div data-k="b${i}" data-iso="block"></div>`).join(''), chain = Array.from({length: 89}, (_, i) => [`b${i}`, `b${i + 1}`]);
+    expect(() => isoPieces(`<div data-k="f" data-iso="floor"></div>${many}`, {canvas, area, links: chain})).toThrow(/fitted round this map's blocks the floor would be \d+ by \d+ tiles, and a floor is at most 256 a side/);
+    expect(() => isoPieces(many, {canvas, area, links: chain})).not.toThrow();   // the same blocks with no floor are placed
+    expect(() => isoPieces(`<div data-k="f" data-iso="floor" data-at="0 0" data-size="20 20"></div>${many}`, {canvas, area, links: chain})).not.toThrow();   // or with a floor the map sized
+    // the limit is the grid's own: a floor one tile over it is what the grid refuses
+    expect(() => isometric().floor({cols: MOST_FLOOR, rows: 1})).not.toThrow();
+    expect(() => isometric().floor({cols: MOST_FLOOR + 1, rows: 1})).toThrow(/whole numbers from 1 to 256/);
+  });
+
+  it('a fitted picture goes into the area given: a small one keeps half of itself clear, and one that is no area is refused by name', () => {
+    const blocks = '<div data-k="a" data-iso="block"></div>', one = [{at: [0, 0], size: [2, 2, 1]}];
+    const small = [100, 100, 220, 180];   // 120 by 80: 40 px each side would leave nothing, so a quarter each way
+    expect(boxIn(isoPieces(blocks, {canvas, area: small}), 'a')).toEqual(round(gridFor(one, [120, 120, 200, 160], FITTED_TILE).block(one[0]).box));
+    expect(boxIn(isoPieces(blocks, {canvas: [400, 300]}), 'a')).toEqual(round(gridFor(one, [40, 40, 360, 260], FITTED_TILE).block(one[0]).box));
+    for (const not of [[0, 0, 0, 100], [10, 0, 5, 100], [0, 0, NaN, 100], [0, 0, 100], 'wide']) {
+      expect(() => isoPieces(blocks, {canvas, area: not})).toThrow(/^a fitted picture goes into the slide's area, \[x0, y0, x1, y1\] in slide px with x1 past x0 and y1 past y0 \(deck\.json "area"\) — not /);
+    }
   });
 
   it('data-iso-grid="fit" fits the grid on a map that places its own blocks; a floor the map sized is ground, and is not what the tile is chosen for', () => {

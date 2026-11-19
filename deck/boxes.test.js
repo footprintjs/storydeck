@@ -36,5 +36,8 @@ describe('boxes · where a piece stands, and where a line leaves it', () => {
     const find = boxFinder('<div data-k="a" style="left:10px;top:20px;width:30px;height:40px"></div><div data-k="a twin" style="left:100px;top:20px;width:30px;height:40px"></div><b data-k="loose">x</b>');
     expect(find('a', 'here')).toEqual({x: 10, y: 20, w: 120, h: 40});
     expect(() => find('loose', 'here')).toThrow('here: no piece "loose" with a box (data-k, and an inline left, top, width and height) — the placed pieces are a');
+    // whether a name is one placed piece alone: only then is that piece's own shape all the name stands for
+    const one = boxFinder('<div data-k="a" style="left:10px;top:20px;width:30px;height:40px"></div><div data-k="b a" style="left:100px;top:20px;width:30px;height:40px"></div>');
+    expect([find.alone('a'), one.alone('a'), one.alone('b'), one.alone('nobody')]).toEqual([false, true, true, false]);
   });
 });

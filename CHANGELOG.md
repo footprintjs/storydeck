@@ -11,12 +11,15 @@
 - **Nothing else needs a number either.** A block or a cylinder with no `data-size` is `2 2 1`. A floor with no
   `data-size` is fitted round the blocks, a tile of floor on every side. With no `data-iso-grid`, a map the build
   placed gets the tile that lets the blocks fill the slide's area, from 96 to 160 px wide; a picture too big for
-  that runs past the slide, `build --layout` says which block does, and a click's camera frames what the click shows. `data-iso-grid="fit"` asks for that
+  that runs past the slide, `build --layout` names a lit block that does, and a click's camera frames what the click
+  shows. A floor is at most 256 tiles a side: a map so long that its fitted floor would pass that is refused, with the
+  fix (take the floor out, or size it yourself). `data-iso-grid="fit"` asks for that
   tile on a map that places its own blocks.
 - **A wire to a block ends on the block.** A wire between pieces ran from box to box, and the box a block is placed
   by has empty corners: the arrow stopped short of the block, and two blocks standing clear of each other were refused
   as "too close" because their boxes met. A wire to an isometric piece now runs to the outline of what it draws.
-  Wires in a deck that has isometric pieces move a little; wires between flat pieces are drawn exactly as before.
+  Wires in a deck that has isometric pieces move a little; wires between flat pieces are drawn exactly as before, and
+  so is a wire to a name that a block shares with another piece (one box round them all).
 - **It is all or none (breaking for one case).** A map that places some of its blocks and not the others is refused,
   naming them. Before, a block with no `data-at` stood at `0 0`: write `data-at="0 0"` on it to keep that. A map with
   one block and no `data-at`, and no `data-iso-grid`, now gets the fitted tile where it had a tile 120 px wide.
