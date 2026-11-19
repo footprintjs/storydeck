@@ -42,15 +42,21 @@ function pieceGroups(click, pieces) {
   };
 }
 
-/** The route of a path click, in the order it lights, each turn's names together. */
+/**
+ * The route of a path click, in the order it plays, each turn's names together: "the view" where the view's move has
+ * a turn, and a turn's own seconds after it when the route gives them ("w1 (1.2 s)").
+ */
 function routeOf(click, pieces) {
-  const turns = new Map();
+  const turns = new Map(), at = (t) => { if (!turns.has(t)) turns.set(t, {names: [], takes: null}); return turns.get(t); };
+  const view = click.look.stage?.turn;
+  if (view) { const t = at(view.at); t.names.push('the view'); t.takes = view.takes; }
   click.look.pieces.forEach((p, i) => {
     if (p.path === null || p.path === undefined) return;
-    if (!turns.has(p.path)) turns.set(p.path, []);
-    turns.get(p.path).push(nameOf(pieces, i));
+    const t = at(p.path);
+    t.names.push(nameOf(pieces, i));
+    if (p.turnTime !== null && p.turnTime !== undefined) t.takes = p.turnTime;
   });
-  return [...turns.entries()].sort((a, b) => a[0] - b[0]).map(([, names]) => unique(names).join(' + '));
+  return [...turns.entries()].sort((a, b) => a[0] - b[0]).map(([, t]) => `${unique(t.names).join(' + ')}${t.takes === null ? '' : ` (${t.takes} s)`}`);
 }
 
 /** What moves the view or the parts on a map click, in words. */
@@ -104,7 +110,7 @@ export function reviewClick(compiled, which, {maxWords = compiled.config?.checks
     const g = pieceGroups(c, pieces);
     const route = routeOf(c, pieces);
     const focus = [`focus: ${c.look.strategies.length ? c.look.strategies.join(', ') : 'grey (default)'}`];
-    if (route.length) focus.push(`route: ${route.join(' → ')}${c.look.path ? `, ${c.look.path.step} s apart` : ''}${c.look.path?.line ? ` · line ${quote(c.look.path.line, 80)}` : ''}`);
+    if (route.length) focus.push(`route: ${route.join(' → ')}${c.look.path ? `, ${c.look.path.step} s apart${route.some((r) => / s\)$/.test(r)) ? ' where a turn does not say' : ''}` : ''}${c.look.path?.line ? ` · line ${quote(c.look.path.line, 80)}` : ''}`);
     lines.push(focus.join(' · '));
     lines.push(`lit (${g.lit.length}): ${list(g.lit)}`);
     lines.push(`greyed (${g.greyed.length}): ${list(g.greyed)}`);

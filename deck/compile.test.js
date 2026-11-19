@@ -156,3 +156,44 @@ describe('compileDeck · a picture larger than the slide (fit)', () => {
     expect(compiled.slides[2].html).toContain(`--sd-ts0:${scale(1)}`);
   });
 });
+
+describe('compileDeck · an order inside a click (turns on a route)', () => {
+  const wide = `<div data-k="a" class="box" style="left:0px;top:400px;width:400px;height:200px">A</div>
+<i data-k="w1" class="wire pkt" data-arrow="a to b"></i>
+<div data-k="b" class="box" style="left:1800px;top:400px;width:400px;height:200px">B</div>
+<i data-k="w2" class="wire pkt" data-arrow="b to c"></i>
+<div data-k="c" class="box" style="left:3000px;top:400px;width:400px;height:200px">C</div>`;
+  const clicks = `
+<section data-label="Order" data-kicker="1 · Order" data-map="map">
+  <step data-in="a" data-focus="fit"><h2>One piece</h2></step>
+  <step data-in="w1 b w2 c" data-focus="fit path" data-focus-route="camera w1:1.2 b (w2 c)"><h2>The view first, then a slow packet, then the rest</h2></step>
+  <step data-on="b" data-focus="fit path" data-focus-route="camera b"><h2>The same picture: the view stays</h2></step>
+</section>`;
+  const compiled = compileDeck(sourceOf({clicks, maps: {map: wide}}));
+  const piece = (k, name) => new RegExp(`<[^>]*data-k="${name}"[^>]*>`).exec(compiled.slides[k].html)[0];
+
+  it('the view takes the first turn, and every piece after it waits until the view has arrived', () => {
+    const look = compiled.clicks[1].look;
+    expect(look.strategies).toEqual(['fit', 'path']);
+    expect(look.stage.turn).toEqual({at: 0, takes: 1});
+    expect(look.path).toMatchObject({turns: 4, step: 0.35, done: 2.55});   // view 0 · w1 1 (1.2 s) · b 2.2 · w2 + c 2.55
+    expect(compiled.slides[1].html).toMatch(/<div class="sd-stage sd-move sd-stage-turn" style="[^"]*--sd-stage-delay:0s;--sd-stage-time:1s">/);
+    expect(piece(1, 'w1')).toContain('--sd-path-delay:1s');
+    expect(piece(1, 'w1')).toContain('--sd-turn-time:1.2s');               // its packet rides that long
+    expect(piece(1, 'b')).toContain('--sd-path-delay:2.2s');
+    expect(piece(1, 'b')).not.toContain('--sd-turn-time');
+    expect(piece(1, 'w2')).toContain('--sd-path-delay:2.55s');
+    expect(piece(1, 'c')).toContain('--sd-path-delay:2.55s');
+  });
+
+  it('on a click where the view stays, its turn takes none, and a deck with no turns writes nothing of them', () => {
+    expect(compiled.clicks[2].look.stage.turn).toBe(undefined);
+    expect(compiled.slides[2].html).not.toMatch(/sd-stage-turn|--sd-stage-delay|--sd-turn-time/);
+    expect(compiled.slides[0].html).not.toMatch(/sd-stage-turn|--sd-stage-delay|--sd-turn-time/);
+  });
+
+  it('refuses a route it cannot read while the deck is compiled, naming the click and the fix', () => {
+    const bad = clicks.replace('camera w1:1.2 b (w2 c)', 'camera w1:1.2 b (w2 c');
+    expect(() => compileDeck(sourceOf({clicks: bad, maps: {map: wide}}))).toThrow(/focus "path": "\(" opens names that come together and "\)" closes them/);
+  });
+});

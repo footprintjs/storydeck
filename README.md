@@ -138,6 +138,32 @@ on one `filter` would flash), its ring (`hot`) comes .3 s after its turn, and a 
 twin's turn and only then steps aside, so the wire is never missing. Under a new blur the whole path, line included,
 waits .4 s for it, as what a click adds does.
 
+**An order you write inside a click.** "The view moves, then the request leaves, then two things answer together" is
+one click, and its order is written once, in the route (`data-focus-route`), as turns:
+
+```html
+<step data-in="w1 dns w2 server" data-focus="fit path"
+      data-focus-route="camera w1:1.2 dns (w2 server)"></step>
+```
+
+| You write | It means |
+|---|---|
+| `a b c` | one after another, `step` seconds apart (0.35): a route as it always was |
+| `(w2 server)` | together, in one turn |
+| `w1:1.2` | this turn takes 1.2 s before the next starts; a wire's packet rides that long |
+| `camera` | the view's move takes this turn. It takes 1 s, or what you write (`camera:0.6`), and that is the move's time |
+
+So the click above plays: the view slides to take the new pieces in (1 s); then `w1` comes on and its packet rides for
+1.2 s; then the dns lights; then `w2` and the server together. Without `camera` in the route the view moves at once,
+with the first turn, as before. On a click where the view stays, its turn takes none. A piece really called `camera`
+is itself, as a piece called `gw+` is. `review` reads the route back as it plays: `route: the view (1 s) → w1 (1.2 s)
+→ dns → w2 + server`.
+
+Why written in the route and not as more options: an order is one thing, and written once it reads the way it plays.
+The same written form is read by `footprint-story/motion` (`readTurns`), so a film says an order the same way. A route
+that cannot be read is refused while the deck builds, with what to write. Not yet a turn: a mover's glide and a blur
+(the blur still comes first), and a click does not start by itself after the one before.
+
 **An exploded view, on a figure of parts.** A figure built of parts — an engine, a stack, a page and the layers
 under it — explains itself best when the parts come apart: the audience sees what it is made of, then sees it whole
 again. Name the parts as groups and the way each one leaves:

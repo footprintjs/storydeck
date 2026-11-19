@@ -55,7 +55,7 @@
 @keyframes sdReveal { from { --sd-reveal: -12%; } }
 @media screen and (prefers-reduced-motion: no-preference) {
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) :where(.sd-path) :where(.pkt) {
-    animation: sdPkt .6s ease-in-out var(--sd-path-delay, 0s) both, sdPktShow .6s linear var(--sd-path-delay, 0s) both;
+    animation: sdPkt var(--sd-turn-time, .6s) ease-in-out var(--sd-path-delay, 0s) both, sdPktShow var(--sd-turn-time, .6s) linear var(--sd-path-delay, 0s) both;   /* a turn with its own seconds (`w1:1.2`): the ride takes them */
   }
   :where([data-deck-active].sd-focus-new:not([data-sd-instant]):not([data-deck-static])) :where(.sd-path) :where(.pkt) {
     animation-delay: calc(var(--sd-path-delay, 0s) + .4s);
