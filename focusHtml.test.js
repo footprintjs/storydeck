@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
-import { readPieces, readStep, drawFocus, wrapStage, focusOverlay, focusRuntime, slideClass } from './focusHtml';
+import { readPieces, readStep, drawFocus, wrapStage, focusOverlay, focusRuntime, slideClass, slideStyle } from './focusHtml';
 import { planFocus } from './focus';
 
 /** The veil's rectangles, from its clip path, as [x0, y0, x1, y1]; and how much of the slide they blur. */
@@ -141,13 +141,13 @@ describe('focusHtml · drawing a click', () => {
   it("keeps its motion rules weak, so a deck's own rule for a piece wins", () => {
     const css = readFileSync(path.join(process.cwd(), 'focus.css'), 'utf8');
     expect(css).not.toMatch(/^\s*\[data-deck-active\]/m);
-    expect(css.match(/:where\(\[data-deck-active\]:not\(\[data-sd-instant\]\):not\(\[data-deck-static\]\)\)/g).length).toBe(7);   // + the path's line, + the view's turn on a path
+    expect(css.match(/:where\(\[data-deck-active\]:not\(\[data-sd-instant\]\):not\(\[data-deck-static\]\)\)/g).length).toBe(9);   // + the path's line, + the view's turn on a path, + the two that say when a view has arrived (--sd-arrive-at)
   });
 
   it('ships a stylesheet for every class it writes', () => {
     const css = readFileSync(path.join(process.cwd(), 'focus.css'), 'utf8');
     for (const c of ['sd-dim', 'sd-gone', 'sd-hide', 'sd-keep', 'sd-hot', 'sd-hot-in', 'sd-enter', 'sd-arrive', 'sd-light', 'sd-fade', 'sd-leave',
-      'sd-moved', 'sd-move', 'sd-origin-tl', 'sd-twin-off', 'sd-relook', 'sd-from-grey', 'sd-from-hide', 'sd-from-keep', 'sd-stage', 'sd-veil', 'sd-veil-in-new', 'sd-veil-out', 'sd-frame', 'sd-new', 'sd-focus-new', 'sd-path', 'sd-path-line', 'sd-twin-turn', 'sd-stage-turn'])
+      'sd-moved', 'sd-move', 'sd-origin-tl', 'sd-twin-off', 'sd-relook', 'sd-from-grey', 'sd-from-hide', 'sd-from-keep', 'sd-stage', 'sd-veil', 'sd-veil-in-new', 'sd-veil-out', 'sd-frame', 'sd-new', 'sd-focus-new', 'sd-path', 'sd-path-line', 'sd-twin-turn', 'sd-stage-turn', 'sd-stage-own'])
       expect(css, c).toMatch(new RegExp(`\\.${c}\\b`));
   });
 });
@@ -311,5 +311,74 @@ describe('focusHtml · ground is the tag\'s own attribute', () => {
     const box = 'style="left:0px;top:0px;width:9px;height:9px"';
     const { pieces } = readPieces(`<div data-k="a" title="x data-ground" ${box}></div><div data-k="b" data-ground="false" ${box}></div><div data-k="c" data-ground="FALSE " ${box}></div><div data-k="d" data-ground="" ${box}></div><div data-k="e" DATA-GROUND ${box}></div>`);
     expect(pieces.map((p) => p.ground)).toEqual([undefined, undefined, undefined, true, true]);
+  });
+});
+
+describe('focusHtml · stages of their own', () => {
+  const box = (x) => `style="left:${x}px;top:0px;width:10px;height:10px"`;
+  const map = `<div data-k="a" ${box(0)}>A</div><i data-k="w" class="wire" data-ends="r1 r2" ${box(5)}></i>`
+    + `<div data-k="r1" data-stage="panel" ${box(20)}><span>one</span><div>in</div></div><img data-k="pic" data-stage="panel" ${box(30)}>`
+    + `<div data-k="b" ${box(40)}>B</div><div data-k="r2" data-stage="panel" ${box(50)}>two</div><div data-k="why" data-ends="a" ${box(60)}>why</div>`;
+
+  it('reads the stage a piece names; a piece that touches others stands on theirs when they share one', () => {
+    const { pieces, html } = readPieces(map);
+    expect(pieces.map((p) => p.stage)).toEqual([undefined, 'panel', 'panel', 'panel', undefined, 'panel', undefined]);
+    expect('stage' in pieces[0]).toBe(false);
+    expect(html).toContain('<i data-k="w" data-sd-i="1" class="wire" data-ends="r1 r2" style="left:5px;top:0px;width:10px;height:10px" data-stage="panel">');   // the wire between two rows of the panel is the panel's
+    expect(html).toContain('<div data-k="why" data-sd-i="6" data-ends="a" ');                                    // about a piece of the main stage: it stays there
+    // touching pieces of two stages, it is left where it was written (check warns: across-stages)
+    const mixed = readPieces(`<div data-k="a" ${box(0)}></div><div data-k="r" data-stage="panel" ${box(9)}></div><i data-k="w" data-ends="a r" ${box(5)}></i>`).pieces;
+    expect(mixed[2].stage).toBe(undefined);
+    // its own word wins, and an end that is no piece decides nothing
+    expect(readPieces(`<div data-k="r" data-stage="panel" ${box(9)}></div><i data-k="w" data-stage="top" data-ends="r" ${box(5)}></i><i data-k="v" data-ends="r ghost" ${box(5)}></i>`).pieces.map((p) => p.stage)).toEqual(['panel', 'top', undefined]);
+  });
+
+  it('refuses a stage that is not one plain name, and reads the tag\'s own attribute only', () => {
+    expect(() => readPieces(`<div data-k="a" data-stage="side panel" ${box(0)}></div>`)).toThrow(/data-stage="side panel": a stage is one name of letters, digits, - and _, in quotes \(data-stage="panel"\)/);
+    expect(() => readPieces(`<div data-k="a" data-stage=panel ${box(0)}></div>`)).toThrow(/data-stage: a stage is one name/);
+    expect(() => readPieces(`<div data-k="a" data-stage="" ${box(0)}></div>`)).toThrow(/a stage is one name/);
+    expect(readPieces(`<div data-k="a" title="see data-stage" ${box(0)}></div>`).pieces[0].stage).toBe(undefined);
+  });
+
+  it('draws each stage\'s pieces together in its own element, after the main stage, in the order written', () => {
+    const { html, pieces } = readPieces(map);
+    const { looks } = planFocus([{ in: ['*'] }, { on: ['r2'], focus: 'zoom', options: { stage: 'panel' } }], { pieces, area: [0, 0, 1920, 1080] });
+    const out = wrapStage(drawFocus(html, looks[1]), looks[1]);
+    const [, main, panel] = /^<div class="sd-stage">(.*)<\/div><div class="sd-stage sd-move sd-stage-own" data-sd-stage="panel" style="[^"]*">(.*)<\/div>$/s.exec(out);
+    const order = (text) => [...text.matchAll(/data-k="(\w+)"/g)].map((m) => m[1]);
+    expect(order(main)).toEqual(['a', 'b', 'why']);                      // the main stage keeps its pieces, in order
+    expect(order(panel)).toEqual(['w', 'r1', 'pic', 'r2']);              // the panel's, in order — a wire, a piece with elements inside, an image
+    expect(panel).toContain('<span>one</span><div>in</div></div><img ');  // each piece whole, the image with no end tag
+    expect(out).toContain('--sd-tx0:0px;--sd-ty0:0px;--sd-ts0:1');
+    // every piece once, none lost
+    expect(order(out).sort()).toEqual(order(html).sort());
+    // on the click before, nothing moves: every stage still has its element, so a piece is in the same place on every click
+    expect(wrapStage(drawFocus(html, looks[0]), looks[0])).toMatch(/^<div class="sd-stage">.*<\/div><div class="sd-stage sd-stage-own" data-sd-stage="panel">.*<\/div>$/s);
+  });
+
+  it('leaves a map with no stage of its own exactly as it was drawn before stages', () => {
+    const plain = map.replaceAll(' data-stage="panel"', ''), { html, pieces } = readPieces(plain);
+    const { looks } = planFocus([{ in: ['*'] }, { on: ['a'], focus: 'zoom' }], { pieces, area: [0, 0, 1920, 1080] });
+    expect(wrapStage('<x/>', looks[0])).toBe('<x/>');
+    expect(wrapStage(drawFocus(html, looks[1]), looks[1])).toMatch(/^<div class="sd-stage sd-move" style="[^"]*"><div data-k="a"/);
+    expect(html).not.toContain('data-stage');
+  });
+
+  it('slideStyle says when a view with a turn has arrived, and nothing otherwise', () => {
+    const { pieces } = readPieces(map);
+    const turn = planFocus([{ in: ['*'] }, { on: ['a', 'b'], focus: ['zoom', { strategy: 'path', route: 'b camera:0.6 a' }] }], { pieces, area: [0, 0, 1920, 1080] }).looks[1];
+    expect(turn.stage.turn).toEqual({ at: 0.35, takes: 0.6 });
+    expect(slideStyle(turn)).toBe('--sd-view-at:0.95s');
+    const plain = planFocus([{ in: ['*'] }, { on: ['a'], focus: 'zoom' }], { pieces, area: [0, 0, 1920, 1080] }).looks;
+    expect(plain.map(slideStyle)).toEqual(['', '']);
+    const own = planFocus([{ in: ['*'] }, { on: ['r2', 'a'], focus: ['zoom', { strategy: 'path', route: 'camera r2' }], options: { stage: 'panel' } }], { pieces, area: [0, 0, 1920, 1080] }).looks[1];
+    expect(slideStyle(own)).toBe('--sd-view-at:1s');
+  });
+
+  it('focus.css gives --sd-arrive-at only behind the motion gate: 0 at rest, the view\'s time when one moves', () => {
+    const css = readFileSync(path.join(process.cwd(), 'focus.css'), 'utf8');
+    expect(css).toContain("@property --sd-arrive-at { syntax: '<time>'; inherits: true; initial-value: 0s; }");
+    expect(css).toContain(':where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])):has(.sd-stage.sd-move) { --sd-arrive-at: var(--sd-view-at, var(--sd-move-time, 1s)); }');
+    expect(css.split('@media screen and (prefers-reduced-motion: no-preference)')[0]).not.toMatch(/--sd-arrive-at\s*:/);   // never set outside the gate
   });
 });

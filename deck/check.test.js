@@ -120,3 +120,24 @@ describe('checkDeck · view-far', () => {
     expect(checkDeck(deck('zoom')).filter((p) => p.rule === 'view-far')).toEqual([]);
   });
 });
+
+describe('checkDeck · across-stages, and a far view on a stage of its own', () => {
+  const box = (name, x, more = '') => `<div data-k="${name}" class="box" ${more} style="left:${x}px;top:400px;width:300px;height:200px">${name}</div>`;
+  const deck = (map, clicks) => compileDeck(sourceOf({clicks: `<section data-label="S" data-map="map">${clicks}</section>`, maps: {map}}));
+
+  it('warns about a wire that joins pieces standing on different stages: it is left behind when one moves', () => {
+    const found = checkDeck(deck(`${box('a', 0)}${box('r', 900, 'data-stage="panel"')}<i data-k="w" class="wire" data-arrow="a to r"></i>`, '<step data-in="*"><h2>All</h2></step>')).filter((p) => p.rule === 'across-stages');
+    expect(found.map((p) => [p.level, p.click])).toEqual([['warn', 1]]);
+    expect(found[0].message).toBe('"w" stands on the main stage and touches "a" and "r" on the main stage and stage "panel" — each stage has its own view, so it is left behind when one moves: stand them on one stage (data-stage)');
+    // a wire between two pieces of one stage is that stage's by itself, and a deck with one stage is never asked
+    expect(checkDeck(deck(`${box('q', 0, 'data-stage="panel"')}${box('r', 900, 'data-stage="panel"')}<i data-k="w" class="wire" data-arrow="q to r"></i>`, '<step data-in="*"><h2>All</h2></step>')).filter((p) => p.rule === 'across-stages')).toEqual([]);
+    expect(checkDeck(deck(`${box('a', 0)}${box('b', 900)}<i data-k="w" class="wire" data-arrow="a to b"></i>`, '<step data-in="*"><h2>All</h2></step>')).filter((p) => p.rule === 'across-stages')).toEqual([]);
+  });
+
+  it('view-far names the stage whose view stands far out', () => {
+    const wide = `${box('a', 0)}${box('p', 0, 'data-stage="panel"')}${box('q', 6000, 'data-stage="panel"')}`;
+    const found = checkDeck(deck(wide, '<step data-in="*" data-focus="fit" data-focus-stage="panel"><h2>All</h2></step><step data-on="a"><h2>Then</h2></step>')).filter((p) => p.rule === 'view-far');
+    expect(found.map((p) => p.click)).toEqual([1, 2]);                      // the panel's view stays far out on the next click too
+    expect(found[0].message).toMatch(/^the view of stage "panel" stands at 0\.25× here/);
+  });
+});

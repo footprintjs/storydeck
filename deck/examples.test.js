@@ -15,8 +15,8 @@ describe('examples/a-request: blocks on a floor, a view that follows, an order i
     expect(formatProblems(checkDeck(compiled))).toBe('no problems');
   });
 
-  it('is three clicks on isometric pieces, the floor under them as ground', () => {
-    expect(outline(compiled).split('\n')).toHaveLength(3);
+  it('is five clicks on isometric pieces, the floor under them as ground', () => {
+    expect(outline(compiled).split('\n')).toHaveLength(5);
     expect(compiled.iso).toBe(true);
     const pieces = compiled.maps.map.pieces;
     expect(pieces.filter((p) => p.ground).map((p) => p.keys[0])).toEqual(['floor']);
@@ -28,10 +28,19 @@ describe('examples/a-request: blocks on a floor, a view that follows, an order i
     expect(reviewClick(compiled, 2)).toContain('focus: fit, path · route: the view (1 s) → w1 (1.2 s) → dns, 0.35 s apart where a turn does not say');
     expect(reviewClick(compiled, 3)).toContain('route: the view (0.6 s) → w2 → server → w3 + db → why');
     // the view follows the pieces: it is closest on the first click and stands further out on each one after
-    const scale = compiled.clicks.map((c) => c.look.stage.move.s);
+    const scale = compiled.clicks.slice(0, 3).map((c) => c.look.stage.move.s);
     expect(scale[0]).toBeGreaterThan(scale[1]);
     expect(scale[1]).toBeGreaterThan(scale[2]);
     expect(scale[2]).toBeGreaterThan(0.5);   // and never so far that words get small (check's view-far)
+  });
+
+  it('keeps the legend on a stage of its own, as drawn on every click, while the map\'s view moves; then pans at one size', () => {
+    expect(compiled.maps.map.pieces.find((p) => p.keys[0] === 'legend').stage).toBe('panel');
+    for (const c of compiled.clicks) expect(c.look.stages).toEqual([{name: 'panel', move: null, from: null}]);
+    for (const s of compiled.slides) expect(s.html).toMatch(/<div class="sd-stage sd-stage-own" data-sd-stage="panel"><div data-k="legend"/);
+    const [, , , close, over] = compiled.clicks.map((c) => c.look.stage.move);
+    expect(over.s).toBe(close.s);            // pan keeps the size zoom chose
+    expect(over.x).not.toBe(close.x);
   });
 
   it('builds into one page that carries the isometric stylesheet', () => {

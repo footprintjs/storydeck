@@ -16,6 +16,12 @@ export interface FocusPiece {
   readonly ends?: readonly string[];
   /** It lies under the picture (data-ground: a floor, a backdrop): a camera and an overlay frame what stands on it, never it. */
   readonly ground?: boolean;
+  /**
+   * The stage it stands on when not the main one (data-stage="panel"). Each stage has its own view; a click's camera
+   * moves one of them (its `stage` option, data-focus-stage; the main stage when it names none) and the others stay
+   * where the last click left them. A stage no camera ever names stays put.
+   */
+  readonly stage?: string;
 }
 
 /** A focus as written on a click: a strategy name ('left'), several ('left blur'), or {strategy, …options}. */
@@ -53,6 +59,8 @@ export interface FocusContext {
   readonly context: FocusBox | null;
   /** A camera only: how the context looks on this click. Under 'hide' it is not shown. */
   readonly look?: 'grey' | 'hide' | 'keep';
+  /** A camera only: the view the last click left its stage at (null: as drawn). A camera that keeps its size reads `was.s`. */
+  readonly was?: { readonly s: number; readonly x: number; readonly y: number } | null;
   /** The area moved things may use, in map px. */
   readonly area: FocusBox;
   /** How the map sits on the slide (slide px = s · map px + [x, y]). */
@@ -158,6 +166,12 @@ export interface FocusLook {
    * and the view moves: the seconds it waits and the seconds the move takes. Left out otherwise.
    */
   readonly stage: { readonly move: { s: number; x: number; y: number } | null; readonly from: { s: number; x: number; y: number } | null; readonly turn?: { readonly at: number; readonly takes: number } } | null;
+  /**
+   * The stages of their own (pieces with `stage`), in the order the map first names them — a later one is drawn over an
+   * earlier — each with its view, where it came from when it moved on this click, and its turn. Left out for a map
+   * whose pieces all stand on the main stage.
+   */
+  readonly stages?: readonly { readonly name: string; readonly move: { s: number; x: number; y: number } | null; readonly from: { s: number; x: number; y: number } | null; readonly turn?: { readonly at: number; readonly takes: number } }[];
   /** The blur: 'in-new' when the last click had none, 'in' while it stays, 'out' as it melts away; frameNew when its frame moved or appeared. */
   readonly overlay: { readonly rects: readonly (readonly number[])[]; readonly label: string; readonly phase: 'in-new' | 'in' | 'out'; readonly frameNew: boolean } | null;
   /** A path: how many turns (the view's too, when it has one), the seconds a turn takes when it does not say, when the last starts (done), and its line ('' for none) and where it goes (null: the area's bottom left); null when nothing took a turn — no lit piece, and not the view. */
@@ -178,13 +192,14 @@ export interface FocusLook {
 export type FocusState = { readonly __focusState: true } & Record<string, unknown>;
 
 /**
- * The built-in strategies. `zoom` and `fit` are the cameras: zoom closes in on what the click is about; fit frames
- * everything shown (options `share` 0.8, `least` 0.25, `most` 2.5), so the view slides to a new piece and pulls back
- * as the picture grows. `apart` (a mover) is the exploded view: its option `apart` — data-focus-apart — is
+ * The built-in strategies. `zoom`, `fit` and `pan` are the cameras: zoom closes in on what the click is about; fit
+ * frames everything shown (options `share` 0.8, `least` 0.25, `most` 2.5), so the view slides to a new piece and pulls
+ * back as the picture grows; pan moves to the subject and keeps the size the view had. A camera's option `stage`
+ * (data-focus-stage) names the stage it moves, on a map with stages of its own. `apart` (a mover) is the exploded view: its option `apart` — data-focus-apart — is
  * 'names: dx dy [scale] | …' (slide px; each group scaled around its own centre), `stagger` the ms between two
  * groups (35); a later click without it brings the groups back together, the last one out first.
  */
-export const FOCUS: Readonly<Record<'grey' | 'hide' | 'keep' | 'zoom' | 'fit' | 'left' | 'right' | 'up' | 'down' | 'place' | 'apart' | 'path' | 'blur', FocusStrategy>>;
+export const FOCUS: Readonly<Record<'grey' | 'hide' | 'keep' | 'zoom' | 'fit' | 'pan' | 'left' | 'right' | 'up' | 'down' | 'place' | 'apart' | 'path' | 'blur', FocusStrategy>>;
 export function readFocus(spec: FocusSpec | undefined | null, shared?: Readonly<Record<string, unknown>>): { strategy: string; options: Record<string, unknown> }[];
 export function focusStep(prev: FocusState | null, click: FocusClick, deck: FocusDeck): { state: FocusState; look: FocusLook };
 /** Names as a click writes them, each `name+` read as that piece, the wires with it as an end, and the pieces at their other ends. */

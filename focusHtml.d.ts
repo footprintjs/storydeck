@@ -19,6 +19,8 @@ export function drawFocus(html: string, look: FocusLook): string;
 export function wrapStage(inner: string, look: FocusLook): string;
 /** Classes for the slide around a click: 'sd-focus-new' while its blur comes in, else ''. */
 export function slideClass(look: FocusLook): string;
+/** An inline style for the slide around a click, or '': the moment a view with a turn on a route has arrived (--sd-view-at), from which focus.css makes --sd-arrive-at. */
+export function slideStyle(look: FocusLook): string;
 /** The overlay of a click in slide px — the blur, its frame and label, and a path's line (once its route is done, .4 s later under a new blur) — put outside the map's box; '' when the click has none. */
 export function focusOverlay(look: FocusLook, options?: { canvas?: { w: number; h: number }; area?: readonly [number, number, number, number] }): string;
 /**

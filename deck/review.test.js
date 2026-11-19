@@ -114,3 +114,14 @@ describe('reviewClick · turns that start at the same moment (found in review)',
     expect(route('a b c')).toBe('focus: path · route: a → b → c, 0.35 s apart');
   });
 });
+
+describe('reviewClick · a stage of its own', () => {
+  it('says where a stage\'s view stands and when it moves', () => {
+    const staged = compileDeck(sourceOf({clicks: `<section data-label="S" data-map="map">
+  <step data-in="a p"><h2>x</h2></step><step data-on="p" data-focus="zoom" data-focus-stage="panel"><h2>y</h2></step><step data-on="a"><h2>z</h2></step></section>`,
+      maps: {map: '<div data-k="a" class="box" style="left:100px;top:400px;width:200px;height:150px">A</div><div data-k="p" data-stage="panel" class="box" style="left:900px;top:400px;width:200px;height:150px">P</div>'}}));
+    expect(reviewClick(staged, 2)).toMatch(/motion: stage "panel" at 2\.5× \(x -?[\d.]+, y -?[\d.]+\), moving/);
+    expect(reviewClick(staged, 3)).toMatch(/motion: stage "panel" at 2\.5× \(x -?[\d.]+, y -?[\d.]+\)$/m);
+    expect(reviewClick(staged, 1)).not.toContain('stage "panel"');
+  });
+});

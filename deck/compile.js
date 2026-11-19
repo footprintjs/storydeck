@@ -6,7 +6,7 @@
 // HTML) in the middle, the footer with the count at the bottom — each carrying data-chrome, so an additive build
 // shows only the shared canvas underneath.
 import {focusStep} from '../focus.js';
-import {readPieces, readStep, drawFocus, wrapStage, slideClass, focusOverlay} from '../focusHtml.js';
+import {readPieces, readStep, drawFocus, wrapStage, slideClass, slideStyle, focusOverlay} from '../focusHtml.js';
 import {applyTransforms, icons as drawIcons} from './transforms.js';
 import {calloutsIn} from './callouts.js';
 import {isoIn} from './iso.js';
@@ -118,7 +118,8 @@ function drawClick(c, i, total, {footer, area, canvas}) {
   // a part's theme rides on each of its slides, for the deck's theme.css ([data-theme="…"])
   const open = `<section data-label="${esc(c.label)}"${c.part.theme ? ` data-theme="${esc(c.part.theme)}"` : ''}${paceAttrs(c.part.pace)}`;
   if (c.kind === 'plain') return `${open} class="slide plain">${head(c.part.kicker, '')}${differsHtml(c.part.differs)}${c.inner}${foot(footer, i + 1, total)}</section>`;
-  return `${open} class="slide on-map ${slideClass(c.look)}">${head(c.part.kicker, c.headline)}${differsHtml(c.part.differs)}`
+  const arrives = slideStyle(c.look);   // when the view of this click has arrived, for the deck's own animations (focus.css · --sd-arrive-at)
+  return `${open} class="slide on-map ${slideClass(c.look)}"${arrives ? ` style="${arrives}"` : ''}>${head(c.part.kicker, c.headline)}${differsHtml(c.part.differs)}`
     + `<div class="map map-${c.map.name}">${wrapStage(drawFocus(c.map.html, c.look), c.look)}</div>`
     + `${focusOverlay(c.look, {area, canvas: {w: canvas[0], h: canvas[1]}})}${foot(footer, i + 1, total)}</section>`;
 }

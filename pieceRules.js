@@ -93,3 +93,22 @@ export function ownAttribute(run, name) {
   if (!m) return {bare: true, value: a.value, twice: found.length > 1};
   return {value: m[2], quote: m[1], before: run.slice(0, a.at).replace(/[\s/]$/, ''), after: run.slice(a.at + m[0].length), twice: found.length > 1};
 }
+
+/**
+ * The element's end: where its own closing tag is, counting those of its kind inside it. Throws when it is never closed.
+ * One pass: each tag's ">" is looked for once and the search goes on past it, so a file of unfinished tags costs no more
+ * than its length.
+ */
+export function closeOf(html, tag, from, where) {
+  const scan = new RegExp(`<(/?)${tag}\\b`, 'gi');
+  scan.lastIndex = from;
+  let depth = 1;
+  for (let m = scan.exec(html); m; m = scan.exec(html)) {
+    const gt = html.indexOf('>', m.index);
+    if (gt < 0) break;
+    depth += m[1] ? -1 : 1;
+    if (!depth) return {at: m.index, end: gt + 1};
+    scan.lastIndex = gt + 1;
+  }
+  throw new Error(`${where}: its <${tag}> is never closed — end it with </${tag}>`);
+}

@@ -102,6 +102,7 @@ decision every click makes again, so it is data on the click, and the library do
 | look | `grey` (default) · `hide` · `keep` | how the context looks: greyed in place, hidden, or left as it is |
 | camera | `zoom` | the view closes in on the subject — where the click's mover leaves it (`share`, `most`): so a click can close in while its parts fly apart (`zoom apart`) or move (`zoom place`). With `left`/`right`/`up`/`down`, which keep the context in view beside the subject, it is refused |
 | camera | `fit` | the view frames everything shown, lit and greyed, where the click's mover leaves it: it slides to a piece that comes in and pulls back as the picture grows (`share` 0.8 of the area, never closer than `most` 2.5, never further than `least` 0.25). Under `hide` only what is lit is shown, so only that is framed. It keeps the context in view, so it goes with every mover |
+| camera | `pan` | the view moves to the subject and keeps its size: the scale the last click left it at. Choose the size once with `zoom` or `fit`, then pan: a run of clicks that each `zoom` on their own subject pumps the view in and out |
 | mover | `left` · `right` · `up` · `down` | the context steps aside that way, smaller (`scale`), and the subject grows into the room it leaves (`grow`, `fill`, `gap`, `align`; `move: 'aside'` keeps the subject where it is) |
 | mover | `place` | named groups moved by the amounts you give (`groups: 'page floor: -90 -200 0.5 \| tl: 0 -230 1.1 @ 960 968'`): a layout you art-direct, still animated from wherever the last click left it |
 | mover | `apart` | the exploded view: named groups fly apart along the vectors you give (`apart: 'lid: 0 -120 \| core: 160 0 \| base: 0 120 1.1'`), one spring each, `stagger` ms apart (35), and come back together on a later click without it — the last one out is the first one back |
@@ -112,6 +113,56 @@ decision every click makes again, so it is data on the click, and the library do
 the right, framed. `'path grey'` lights a route in turn and greys the rest. Bring your own strategy of any kind
 (`strategies: { name: { kind, … } }`); what your own order's `route()` gives is checked like the built-in's — piece
 names, a `step` of 0–5 s, a text `line`, a `lineAt` of `'x y'` — and refused with the fix when it is not.
+
+**I want this, write that.** The questions a deck author asks most, and where the answer is:
+
+| I want | Write |
+|---|---|
+| the view to close in on what the click is about | `data-focus="zoom"` |
+| the whole picture kept in view as it grows | `data-focus="fit"` |
+| the view to move on without changing size | `data-focus="pan"` |
+| a panel or a legend that stays put while the view moves | `data-stage="panel"` on its pieces |
+| a floor or a backdrop the view should not frame | `data-ground` on it |
+| pieces to come one after another | `data-focus="path"`, in the order of `data-on` or `data-focus-route` |
+| some to come together, or a turn to take longer | `data-focus-route="a (b c) w1:1.2"` |
+| the pieces to wait until the view has arrived | `camera` first in the route |
+| my own animation to wait for the view | `animation-delay: var(--sd-arrive-at)` |
+| a wire between two pieces, with a dot riding it | `<i class="wire pkt" data-arrow="a to b"></i>` |
+| the old piece gone before the new one comes | `data-leave-time` and `data-arrive-delay` on the part |
+| a part to arrive with a fade, a push, a wipe | `data-enter="fade"` on its `<section>` |
+| words pinned to a piece | `data-callout="server above"` |
+| a rule for one piece whose `data-k` has several names | CSS `[data-k~="name"]` (one word of several), not `[data-k="name"]` |
+
+**Stages: what stays put while the view moves.** A panel beside a map, a legend, a small overview in a corner: each
+must keep its place while the map's view moves. `data-stage="name"` on a piece puts it on a stage of its own. Every
+stage has its own view, and a click's camera moves one of them: the main stage, or the one it names.
+
+```html
+<!-- map.html -->
+<div data-k="server" class="box" style="…">Server</div>                           <!-- the main stage, as always -->
+<div data-k="layers" data-stage="panel" class="chip" style="…">Layer 2</div>      <!-- a stage of its own -->
+
+<!-- clicks.html -->
+<step data-in="dns" data-focus="fit"></step>                                        <!-- the map's view moves; the panel stays -->
+<step data-on="layers" data-focus="zoom" data-focus-stage="panel"></step>          <!-- the panel's view moves; the map stays -->
+```
+
+A stage no camera ever names simply stays put. One stage moves on a click, and every other keeps the view the last
+click left it; the main stage alone goes back to the whole map on a click with no camera, as it always did. A camera
+sees the pieces of its stage only, so `fit` on the map does not pull back to take the panel in. A wire or a callout
+that names no stage stands on the stage of the pieces it touches, when they share one; `check` warns when it joins two
+stages (`across-stages`), since it would be left behind when one moves. Each stage's pieces are drawn together, in
+the order the map first names the stages, so a later stage is drawn over an earlier one. A piece on a stage is still
+a piece: it greys when a click is about something else, so name it in `data-on` to keep it lit.
+
+Why stages and not a "pinned" mark: a deck that could not say "this stays put" built a camera of its own out of a
+mover, and lost what a camera gives (pieces that come and go with the view, a turn on a route). A piece that stays put
+is the plain case of a stage that has its own view; the same rule gives an overview that stays whole, and two pictures
+side by side that each close in on their own subject. A map with no stage of its own builds byte for byte as before.
+
+**Waiting for the view.** `--sd-arrive-at` is when the view of this click has arrived: 0 when no view moves and on an
+arrival that plays nothing (a jump, a step back, reduced motion), the view's move time when one moves, and the end of
+its turn when a route gives it one. A deck's own animation waits on it: `animation-delay: var(--sd-arrive-at)`.
 
 **A picture larger than the slide.** A system drawn at a readable size is often wider than one slide. `zoom` closes in
 on what a click is about and never goes further out than the picture as drawn; `fit` shows all of it so far, so the

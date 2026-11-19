@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+- **Stages: what stays put while the view moves.** `data-stage="panel"` on a piece puts it on a stage of its own. Every
+  stage has its own view, and a click's camera moves one of them: the main stage, or the one it names
+  (`data-focus-stage`). Every other stage keeps the view the last click left it, so a panel, a legend or a small overview
+  stays where it is while the map's view moves. A camera sees the pieces of its stage only. A wire or a callout stands on
+  the stage of the pieces it touches when they share one, and `check` warns when it joins two (`across-stages`). From a
+  field report: a deck that could not say "this stays put" built its own camera out of a mover and lost what a camera
+  gives. A map with no stage of its own builds byte for byte as before (40,000 random maps compared with 0.14.1).
+- **A camera that keeps its size: `pan`.** `data-focus="pan"` moves the view to the subject at the scale the last click
+  left it. Choose the size once with `zoom` or `fit`, then pan. The same report counted 27 of 62 moves that changed scale
+  by more than a quarter, alternating in and out.
+- **`--sd-arrive-at`: when the view of this click has arrived.** 0 when no view moves and on an arrival that plays
+  nothing (a jump, a step back, reduced motion), the view's move time when one moves, the end of its turn when a route
+  gives it one. A deck's own animation waits on it: `animation-delay: var(--sd-arrive-at)`. `slideStyle(look)` is the
+  new export that writes the turn's moment on the slide.
+- **A table of "I want this, write that"** in the README and the skill. Four of ten asks in the report were for things
+  StoryDeck already did (wires and packets, leave timing, a part arriving with a fade, one name of several in a CSS
+  rule), which says the guide was hard to find things in.
+- `closeOf` moved to `pieceRules.js` (the deck's callouts and isometric pieces still use it); nothing else in the
+  published package changes for a deck without stages.
+
 ## 0.14.1 — one engine: footprintjs 14
 
 - **The optional footprintjs peer is `^14.0.0`** (0.14.0 said `^11 || ^12 || ^13 || ^14`). StoryDeck's PowerPoint export is

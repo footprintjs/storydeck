@@ -197,3 +197,48 @@ describe('compileDeck · an order inside a click (turns on a route)', () => {
     expect(() => compileDeck(sourceOf({clicks: bad, maps: {map: wide}}))).toThrow(/focus "path": "\(" opens names that come together and "\)" closes them/);
   });
 });
+
+describe('compileDeck · stages of their own, and a camera that pans', () => {
+  const map = `<div data-k="a" class="box" style="left:0px;top:400px;width:400px;height:200px">A</div>
+<i data-k="w1" class="wire pkt" data-arrow="a to b"></i>
+<div data-k="b" class="box" style="left:1800px;top:400px;width:400px;height:200px">B</div>
+<div data-k="row1" data-stage="panel" class="chip" style="left:1500px;top:60px;width:300px;height:70px">Layer 1</div>
+<div data-k="row2" data-stage="panel" class="chip" style="left:1500px;top:230px;width:300px;height:70px">Layer 2</div>
+<i data-k="link" class="wire" data-arrow="row1 to row2"></i>`;
+  const clicks = `
+<section data-label="Map" data-kicker="1 · Map" data-map="map">
+  <step data-in="a row1 row2 link" data-on="a" data-quiet data-focus="zoom"><h2>Close on A</h2></step>
+  <step data-in="w1 b" data-on="w1 b" data-focus="pan path" data-focus-route="camera w1 b"><h2>Across to B, the same size</h2></step>
+  <step data-on="row2" data-focus="zoom" data-focus-stage="panel"><h2>Now the panel</h2></step>
+</section>`;
+  const compiled = compileDeck(sourceOf({clicks, maps: {map}}));
+  const stageOf = (k, name) => new RegExp(`<div class="sd-stage[^"]*"${name ? ` data-sd-stage="${name}"` : ''}[^>]*>`).exec(compiled.slides[k].html)[0];
+
+  it('the panel stays as drawn while the map\'s view moves, and the map\'s view stays while the panel\'s moves', () => {
+    const [one, two, three] = compiled.clicks.map((c) => c.look);
+    expect(two.stage.move.s).toBe(one.stage.move.s);                       // pan: the size zoom chose
+    expect(two.stage.move.x).not.toBe(one.stage.move.x);
+    expect(two.stages).toEqual([{name: 'panel', move: null, from: null}]);
+    expect(three.stage).toEqual({move: two.stage.move, from: null});       // the map holds
+    expect(three.stages[0].from).toEqual({s: 1, x: 0, y: 0});
+    expect(compiled.maps.map.pieces.find((p) => p.keys[0] === 'link').stage).toBe('panel');   // a wire between two rows of the panel is the panel's
+  });
+
+  it('writes each stage as its own element on every click, the panel\'s pieces inside it', () => {
+    for (const k of [0, 1, 2]) {
+      expect(stageOf(k, 'panel')).toContain('sd-stage-own');
+      const panel = compiled.slides[k].html.split('data-sd-stage="panel"')[1];
+      expect([...panel.matchAll(/data-k="(\w+)"/g)].map((m) => m[1])).toEqual(['row1', 'row2', 'link']);
+      expect(compiled.slides[k].html.split('data-sd-stage="panel"')[0]).not.toMatch(/data-k="row1"/);
+    }
+    expect(stageOf(1)).toMatch(/^<div class="sd-stage sd-move sd-stage-turn" style="[^"]*--sd-stage-delay:0s;--sd-stage-time:1s">$/);
+    expect(stageOf(2, 'panel')).toMatch(/^<div class="sd-stage sd-move sd-stage-own" data-sd-stage="panel" style="[^"]*--sd-ts0:1">$/);
+    expect(stageOf(2)).not.toContain('sd-move');
+  });
+
+  it('tells the slide when a view with a turn has arrived, so the deck\'s own animations can wait for it', () => {
+    expect(compiled.slides[1].html).toMatch(/^<section data-label="Map · 2" class="slide on-map " style="--sd-view-at:1s">/);
+    expect(compiled.slides[0].html).not.toContain('--sd-view-at');
+    expect(compiled.slides[2].html).not.toContain('--sd-view-at');           // it moves with no turn: focus.css takes the theme's move time
+  });
+});

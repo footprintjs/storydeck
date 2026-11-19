@@ -148,13 +148,13 @@ describe('focus · strategies', () => {
 
   it('a click takes one strategy of each kind, from the built-ins or the deck\'s own', () => {
     expect(() => focusStep(null, { ...lit, focus: 'left right' }, deck)).toThrow(/one mover at most.*"left" and "right"/);
-    expect(() => focusStep(null, { ...lit, focus: 'spin' }, deck)).toThrow(/no focus strategy "spin" \(there are grey, hide, keep, zoom, fit, left, right, up, down, place, apart, path, blur\)/);
+    expect(() => focusStep(null, { ...lit, focus: 'spin' }, deck)).toThrow(/no focus strategy "spin" \(there are grey, hide, keep, zoom, fit, pan, left, right, up, down, place, apart, path, blur\)/);
     const tilt = { kind: 'mover', place: ({ subject }) => ({ subject: { o: [subject.x, subject.y], s: 2, t: [0, 0] } }) };
     const look = focusStep(null, { ...lit, focus: 'tilt' }, { ...deck, strategies: { tilt } }).look;
     expect(look.strategies).toEqual(['tilt']);
     expect(look.pieces[1].move.s).toBe(2);
     expect(() => focusStep(null, { ...lit, focus: 'odd' }, { ...deck, strategies: { odd: { kind: 'paint' } } })).toThrow(/a look, a camera, a mover, an overlay or an order/);
-    expect(Object.keys(FOCUS)).toEqual(['grey', 'hide', 'keep', 'zoom', 'fit', 'left', 'right', 'up', 'down', 'place', 'apart', 'path', 'blur']);
+    expect(Object.keys(FOCUS)).toEqual(['grey', 'hide', 'keep', 'zoom', 'fit', 'pan', 'left', 'right', 'up', 'down', 'place', 'apart', 'path', 'blur']);
   });
 });
 
@@ -903,5 +903,120 @@ describe('focus · a route of names alone is read as it always was (found in rev
     expect(run('camera p1 camera:3 p2')).toThrow(/focus route: "camera" is written more than once, and the view moves once on a click — keep one/);
     expect(run('(camera camera) p1')).toThrow(/"camera" is written more than once/);
     expect(run('camera p1 p2')).not.toThrow();
+  });
+});
+
+describe('focus · stages: each with its own view, and a click\'s camera moves one', () => {
+  // a map of two boxes far apart, and beside it a panel of two rows that must stay put while the map's view moves
+  const pieces = [
+    { keys: ['a'], box: { x: 0, y: 400, w: 400, h: 200 } },
+    { keys: ['b'], box: { x: 1700, y: 400, w: 400, h: 200 } },
+    { keys: ['row1'], box: { x: 1500, y: 100, w: 300, h: 80 }, stage: 'panel' },
+    { keys: ['row2'], box: { x: 1500, y: 200, w: 300, h: 80 }, stage: 'panel' },
+  ];
+  const d = { pieces, area: [0, 200, 1920, 1000] };
+  const onSlide = (v, [x, y]) => [v.s * x + v.x, v.s * y + v.y];
+
+  it('a camera that names no stage moves the main one: it frames the main stage\'s pieces only, and the panel stays as drawn', () => {
+    const look = planFocus([{ in: ['*'], on: ['a', 'row1'], focus: 'fit' }], d).looks[0];
+    expect(look.stage.move.s).toBeCloseTo(0.8 * 1920 / 2100, 4);       // a and b (2100 wide): the panel's rows are not part of this view
+    expect(look.stages).toEqual([{ name: 'panel', move: null, from: null }]);
+    // zoom closes in on what is lit ON ITS STAGE: a, not the lit row
+    const zoomed = planFocus([{ in: ['*'], on: ['a', 'row1'], quiet: true, focus: 'zoom' }], d).looks[0];
+    expect(onSlide(zoomed.stage.move, [200, 500])).toEqual([960, 600]);
+  });
+
+  it('a camera that names a stage moves that one, and every other stage stays where the last click left it', () => {
+    const { looks } = planFocus([
+      { in: ['*'], on: ['a'], focus: 'zoom' },
+      { on: ['row2'], focus: 'zoom', options: { stage: 'panel' } },
+      { on: ['row1'], focus: { strategy: 'zoom', stage: 'panel' } },
+    ], d);
+    const main = looks[0].stage.move;
+    expect(looks[1].stage).toEqual({ move: main, from: null });          // the main view holds: it does not go back to the whole map
+    expect(looks[1].stages[0]).toMatchObject({ name: 'panel', from: { s: 1, x: 0, y: 0 } });
+    expect(onSlide(looks[1].stages[0].move, [1650, 240])).toEqual([960, 600]);   // row2's middle on the area's middle
+    expect(looks[2].stage).toEqual({ move: main, from: null });
+    expect(looks[2].stages[0].from).toEqual(looks[1].stages[0].move);    // the panel moves on from where it was
+    expect(onSlide(looks[2].stages[0].move, [1650, 140])).toEqual([960, 600]);
+  });
+
+  it('on a click with no camera the main stage goes back to the whole map, as it always did, and a stage of its own stays', () => {
+    const { looks } = planFocus([{ in: ['*'], on: ['a'], focus: 'zoom' }, { on: ['row2'], focus: 'zoom', options: { stage: 'panel' } }, { on: ['b'] }], d);
+    expect(looks[2].stage).toEqual({ move: null, from: looks[0].stage.move });
+    expect(looks[2].stages[0]).toEqual({ name: 'panel', move: looks[1].stages[0].move, from: null });
+  });
+
+  it('one stage moves on a click; a map with no stage of its own has no stages at all', () => {
+    const { looks, end } = planFocus([{ in: ['*'], on: ['a'], focus: 'zoom' }, { on: ['row2'], focus: 'zoom', options: { stage: 'panel' } }, { on: ['b'], focus: 'zoom' }], d);
+    for (const look of looks.slice(1)) expect([look.stage, ...look.stages].filter((st) => st?.from).length).toBe(1);
+    expect(Object.keys(end.stages)).toEqual(['panel']);
+    const plain = planFocus([{ in: ['*'], on: ['a'], focus: 'zoom' }], { ...d, pieces: pieces.map(({ stage, ...p }) => p) });
+    expect('stages' in plain.looks[0]).toBe(false);
+    expect('stages' in plain.end).toBe(false);
+  });
+
+  it('a route gives the moving view its turn, whichever stage it is', () => {
+    const { looks } = planFocus([{ in: ['*'] }, { on: ['row2', 'a'], focus: ['zoom', { strategy: 'path', route: 'camera row2 a' }], options: { stage: 'panel' } }], d);
+    expect(looks[1].stages[0].turn).toEqual({ at: 0, takes: 1 });
+    expect(looks[1].stage).toBe(null);                                   // the main stage did not move: it has no turn
+    expect(looks[1].pieces.map((p) => p.path)).toEqual([1.35, null, null, 1]);
+  });
+
+  it('a blur frames the subject where each piece ends up: by its own stage\'s view', () => {
+    const look = planFocus([{ in: ['*'] }, { on: ['row2'], focus: 'zoom blur', options: { stage: 'panel', pad: 0 } }], d).looks[1];
+    const v = look.stages[0].move, [x, y, w, h] = look.overlay.rects[0];
+    expect([x, y]).toEqual(onSlide(v, [1500, 200]).map(Math.round));
+    expect([w, h]).toEqual([Math.round(300 * v.s), Math.round(80 * v.s)]);
+  });
+
+  it('refuses a stage the map does not have, a stage with no camera to move it, and says what there is', () => {
+    expect(() => focusStep(null, { in: ['*'], focus: 'zoom', options: { stage: 'side' } }, d)).toThrow(/focus stage: no stage "side" \(the stages are panel\) — a piece says which stage it stands on with data-stage="name"/);
+    expect(() => focusStep(null, { in: ['*'], options: { stage: 'panel' } }, d)).toThrow(/focus stage: "panel" names the stage a camera moves, and this click has no camera — add zoom or fit to data-focus, or take data-focus-stage out/);
+    expect(() => focusStep(null, { in: ['*'], focus: 'path', options: { stage: 'panel' } }, d)).toThrow(/this click has no camera/);
+    expect(() => focusStep(null, { in: ['a'], focus: 'zoom', options: { stage: 'panel' } }, { ...d, pieces: pieces.slice(0, 2) })).toThrow(/no stage "panel" \(every piece of this map stands on the main stage\)/);
+    expect(focusStep(null, { in: ['*'], on: ['a'], focus: 'zoom', options: { stage: ' ' } }, d).look.stage.move).not.toBe(null);   // a blank name is the main stage
+  });
+});
+
+describe('focus · the camera: pan moves the view and keeps its size', () => {
+  const pieces = ['a', 'b', 'c'].map((k, i) => ({ keys: [k], box: { x: i * 900, y: 400 + i * 150, w: 300 + i * 200, h: 150 + i * 100 } }));
+  const d = { pieces, area: [0, 200, 1920, 1000] };
+  const onSlide = (v, [x, y]) => [v.s * x + v.x, v.s * y + v.y];
+  const middle = (i) => { const b = pieces[i].box; return [b.x + b.w / 2, b.y + b.h / 2]; };
+
+  it('after a zoom chose the size, each pan puts its subject in the middle at that same size', () => {
+    const { looks } = planFocus([{ in: ['*'], on: ['a'], focus: 'zoom' }, { on: ['b'], focus: 'pan' }, { on: ['c'], focus: 'pan' }], d);
+    const size = looks[0].stage.move.s;
+    expect(looks[1].stage.move.s).toBe(size);
+    expect(looks[2].stage.move.s).toBe(size);
+    expect(onSlide(looks[1].stage.move, middle(1)).map(Math.round)).toEqual([960, 600]);
+    expect(onSlide(looks[2].stage.move, middle(2)).map(Math.round)).toEqual([960, 600]);
+    // the same clicks with zoom on each change the size every time: what a pan is for
+    const pumped = planFocus([{ in: ['*'], on: ['a'], focus: 'zoom' }, { on: ['b'], focus: 'zoom' }, { on: ['c'], focus: 'zoom' }], d).looks.map((l) => l.stage.move.s);
+    expect(new Set(pumped).size).toBe(3);
+  });
+
+  it('on a view no camera has moved it keeps the size as drawn; with nothing to go to, it does not move', () => {
+    const first = planFocus([{ in: ['*'], on: ['b'], quiet: true, focus: 'pan' }], d).looks[0].stage.move;
+    expect(first.s).toBe(1);
+    expect(onSlide(first, middle(1)).map(Math.round)).toEqual([960, 600]);
+    expect(focusStep(null, { in: ['note'], focus: 'pan' }, { pieces: [{ keys: ['note'], box: null }] }).look.stage).toBe(null);
+    // after a click with no camera the view is back as drawn, and a pan starts from that size again
+    const back = planFocus([{ in: ['*'], on: ['a'], focus: 'zoom' }, { on: ['b'] }, { on: ['c'], focus: 'pan' }], d).looks[2].stage.move;
+    expect(back.s).toBe(1);
+  });
+
+  it('on a stage of its own it keeps that stage\'s size, not the main one\'s', () => {
+    const staged = { ...d, pieces: [...pieces, { keys: ['r1'], box: { x: 100, y: 100, w: 200, h: 50 }, stage: 'panel' }, { keys: ['r2'], box: { x: 100, y: 800, w: 200, h: 50 }, stage: 'panel' }] };
+    const { looks } = planFocus([{ in: ['*'], on: ['a'], focus: 'zoom' }, { on: ['r1'], focus: 'zoom', options: { stage: 'panel', most: 4 } }, { on: ['r2'], focus: 'pan', options: { stage: 'panel' } }], staged);
+    expect(looks[2].stages[0].move.s).toBe(looks[1].stages[0].move.s);
+    expect(looks[2].stages[0].move.s).not.toBe(looks[0].stage.move.s);
+    expect(onSlide(looks[2].stages[0].move, [200, 825]).map(Math.round)).toEqual([960, 600]);
+  });
+
+  it('is a camera: one a click, and refused beside a mover that keeps the context in view', () => {
+    expect(() => focusStep(null, { in: ['*'], focus: 'pan zoom' }, d)).toThrow(/a click takes one camera at most: "pan" and "zoom" are both cameras/);
+    expect(() => focusStep(null, { in: ['*'], on: ['a'], quiet: true, focus: 'pan left' }, d)).toThrow(/"pan" closes in on the subject, and "left" keeps the context in view/);
   });
 });
