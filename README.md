@@ -595,6 +595,8 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   class `ok`, `warn` or `bad` colours one. The numbers come from `footprint-story/isometric`, the grid a film can draw
   with too. Not yet: a wire that runs along the floor (a wire goes straight from box to box), and moving a block by
   dragging it in the dev page (change its `data-at`).
+  A deck to start from: [examples/a-request](examples/a-request) (blocks on a floor, a view that follows them, an order
+  inside each click); a test builds and checks it.
 - **Ground: what lies under the picture.** `data-ground` on a piece (a floor has it by itself) says it lies under the
   picture: a camera and a blur frame what stands on it, never the ground. Without it a floor shown from the first click
   would be all `fit` ever frames, and the view would never move.
