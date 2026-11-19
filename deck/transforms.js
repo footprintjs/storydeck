@@ -38,7 +38,7 @@ import {readAttributes} from '../pieceRules.js';
 import {boxFinder, exit, exitOutline} from './boxes.js';
 import {callouts} from './callouts.js';
 import {isoDrawn} from './iso.js';
-import {cables, cableWalk, labelPlace} from './cable.js';
+import {cables, cableWalk, held, labelPlace, LABEL_LOOKS} from './cable.js';
 
 const fixed = (v) => +v.toFixed(1);
 /** A wire written by the pieces it joins: "from to to [bend]". */
@@ -212,23 +212,28 @@ export const wireTags = (html) => emptyI(html, /\sdata-arrow="([^"<>]+)"/);
 /**
  * Every <i data-arrow="…"></i> as its wire; one written between pieces runs between them and carries data-ends.
  * `shapes` and `floor`: what the isometric pieces draw and where the floor is (iso.js · isoDrawn) — a wire between two
- * of them is a cable along the floor, and a wire from one to a flat piece ends on its outline.
+ * of them is a cable along the floor, and a wire from one to a flat piece ends on its outline. `looks`: {left}, what
+ * the map's cable labels may spend finding their places (cable.js · LABEL_LOOKS).
  */
-export function wires(html, shapes = new Map(), floor = null) {
+export function wires(html, shapes = new Map(), floor = null, looks = {left: LABEL_LOOKS}) {
   const found = wireTags(html), between = wiresBetween(html, found, shapes, floor);
   // what a cable's label keeps clear of: what stands on the floor (a block is drawn over the floor's wires), each
   // label placed before it, and the other cables — so the labels of a request and its answer, lying side by side,
   // never cover each other, and neither's line runs through the other's words where there is room to avoid it
-  const taken = [...shapes.values()].map((shape) => shape.outline), runs = between.map((b) => (Array.isArray(b) ? cableWalk(b) : null));
-  const place = (i) => (cable, [wide, high]) => {
-    const [x, y] = labelPlace(cable, [wide, high], taken, runs.filter((run, k) => run && k !== i));
-    taken.push([[x - wide, y - high], [x + wide, y - high], [x + wide, y + high], [x - wide, y + high]]);
+  // The cables are walked when the first label asks, and the map's labels share one count of looks: a map with no
+  // labelled cable pays nothing, and none pays more than that count.
+  const taken = [...shapes.values()].map((shape) => held(shape.outline));
+  let runs = null;
+  const place = (cable, [wide, high]) => {
+    runs ??= between.filter(Array.isArray).map((laid) => ({...held(cableWalk(laid)), of: laid}));
+    const [x, y] = labelPlace(cable, [wide, high], taken, runs, looks);
+    taken.push(held([[x - wide, y - high], [x + wide, y - high], [x + wide, y + high], [x - wide, y + high]]));
     return [x, y];
   };
   return replaceEach(html, found, ({before, m, after}, i) => {
     if (!between[i]) return wireSvg(before + after, m[1]);
     const [, from, to] = BETWEEN.exec(m[1]), named = ` data-ends="${from} ${to}"${before}${after}`;
-    return typeof between[i] === 'string' ? wireSvg(named, between[i]) : wireSvg(named, m[1], between[i], place(i));   // its numbers, or a cable's four points
+    return typeof between[i] === 'string' ? wireSvg(named, between[i]) : wireSvg(named, m[1], between[i], place);   // its numbers, or a cable's four points
   });
 }
 

@@ -1,6 +1,6 @@
 import {describe, it, expect} from 'vitest';
 import {arrange, isometric} from 'footprint-story/isometric';
-import {cables, cablePoint, cableWalk, labelPlace, HANDLE, LABEL_PLACES} from './cable.js';
+import {cables, cablePoint, cableWalk, held, labelPlace, HANDLE, LABEL_LOOKS, LABEL_PLACES, WALK_MOST} from './cable.js';
 
 const grid = isometric({tile: 120, origin: [960, 240]});
 const floor = (col, row, lift = 0) => { const p = grid.at(col, row, lift); return [p.x, p.y]; };
@@ -160,7 +160,7 @@ describe('cable · a wire along the floor between two isometric pieces', () => {
 
 describe('cable · where its label stands', () => {
   const run = [[0, 0], [100, 0], [200, 0], [300, 0]];   // a level run: the point t of the way along is at x = 300·t
-  const square = (left, right) => [[left, -50], [right, -50], [right, 50], [left, 50]];
+  const square = (left, right) => held([[left, -50], [right, -50], [right, 50], [left, 50]]);
 
   it('a point of the curve: its start, its end, and its middle an eighth of each end and three of each handle', () => {
     const cable = [[10, 20], [110, 40], [150, 220], [300, 200]];
@@ -187,6 +187,13 @@ describe('cable · where its label stands', () => {
     expect(labelPlace(run, [30, 13], [square(-1000, 1000)])).toEqual([150, 0]);
   });
 
+  it('points held: the box round them, asked before the points are', () => {
+    expect(held([[3, 9], [-4, 2], [10, 5]])).toEqual({points: [[3, 9], [-4, 2], [10, 5]], left: -4, top: 2, right: 10, bottom: 9});
+    // what a box says is far away is never looked at: an outline that would hide the label, held in a box that says it is elsewhere
+    const lying = {...square(110, 190), left: 900, right: 990};
+    expect(labelPlace(run, [30, 13], [lying])).toEqual([150, 0]);
+  });
+
   it('a cable walked: from its start to its end, never more than 6 px between two points', () => {
     const level = cableWalk(run);
     expect(level).toHaveLength(51);   // its longest leg is 100 px, so no step in 50 is over 6
@@ -195,19 +202,65 @@ describe('cable · where its label stands', () => {
     expect([bent[0], bent.at(-1)]).toEqual([[10, 20], [300, 200]]);
     for (let k = 1; k < bent.length; k++) expect(Math.hypot(bent[k][0] - bent[k - 1][0], bent[k][1] - bent[k - 1][1])).toBeLessThanOrEqual(6);
     expect(cableWalk([[5, 5], [5, 5], [5, 5], [5, 5]])).toEqual([[5, 5], [5, 5]]);   // a cable of no length is still a start and an end
+    // a cable far longer than a slide is walked more coarsely, never in more points
+    expect(WALK_MOST).toBe(512);
+    const long = cableWalk([[0, 0], [1e6, 0], [2e6, 0], [3e6, 0]]);
+    expect(long).toHaveLength(513);
+    expect(long.at(-1)).toEqual([3e6, 0]);
+  });
+
+  it('its own run is passed over: a cable is never in the way of its own label', () => {
+    const own = {...held(cableWalk(run)), of: run}, other = {...held(cableWalk(run)), of: [[0, 0], [100, 0], [200, 0], [300, 0]]};
+    const mine = {left: 1000}, theirs = {left: 1000};
+    expect(labelPlace(run, [30, 13], [], [own], mine)).toEqual([150, 0]);
+    expect(mine.left).toBe(999);   // found near, known as its own, not asked: the middle is free
+    labelPlace(run, [30, 13], [], [other], theirs);   // the same points as another cable's: in the way at every place
+    expect(theirs.left).toBeLessThan(1000 - 13 * 10);
+    const crossing = {...held(Array.from({length: 41}, (_, k) => [150, -100 + 5 * k])), of: [[150, -100], [150, 0], [150, 50], [150, 100]]};
+    expect(labelPlace(run, [30, 13], [], [own, crossing])).toEqual([expect.closeTo(105, 9), 0]);
+  });
+
+  it('a map\'s labels share one count of looks: a place that costs more than is left is not asked, nor any after it', () => {
+    expect(LABEL_LOOKS).toBe(60_000_000);
+    // a label 60 by 26 is 11 by 6 points; a square has 4 sides: a place the square is near costs 11·6·4 looks and 1 to find it near.
+    // The square is near at the nine places from 0.3 to 0.7 of the way, and the tenth, a quarter of the way, is free: 9·265 + 1
+    const all = {left: 5000};
+    expect(labelPlace(run, [30, 13], [square(110, 190)], [], all)).toEqual([75, 0]);
+    expect(all.left).toBe(5000 - 9 * 265 - 1);
+    const exact = {left: 9 * 265 + 1};
+    expect(labelPlace(run, [30, 13], [square(110, 190)], [], exact)).toEqual([75, 0]);
+    expect(exact.left).toBe(0);
+    // one look short of the tenth place: the best of the nine asked — the least hidden, the earlier of two alike
+    const short = {left: 9 * 265};
+    expect(labelPlace(run, [30, 13], [square(110, 190)], [], short)).toEqual([expect.closeTo(90, 9), 0]);
+    expect(short.left).toBe(0);
+    // not enough for the first place: the cable's middle, and nothing spent
+    const little = {left: 264};
+    expect(labelPlace(run, [30, 13], [square(110, 190)], [], little)).toEqual([150, 0]);
+    expect(little.left).toBe(264);
+    const none = {left: 0};
+    expect(labelPlace(run, [30, 13], [square(110, 190)], [], none)).toEqual([150, 0]);
+    expect(labelPlace(run, [30, 13], [], [], none)).toEqual([150, 0]);   // nothing to look at costs nothing
+    // another cable's points are looks too: 41 of them near, and 1 to find it
+    const down = held(Array.from({length: 41}, (_, k) => [500, -100 + 5 * k])), far = {left: 1000};
+    expect(labelPlace(run, [30, 13], [], [down], far)).toEqual([150, 0]);
+    expect(far.left).toBe(999);   // not near: only the look that found it far
+    const through = held(Array.from({length: 41}, (_, k) => [150, -100 + 5 * k])), spent = {left: 1000};
+    labelPlace(run, [30, 13], [], [through], spent);
+    expect(spent.left).toBe(1000 - 5 * 42 - 1);   // near at the five places from 0.4 to 0.6 of the way; free at the sixth, where it is not near
   });
 
   it('off another cable\'s line too: where one runs through the middle, along to the nearest place it does not', () => {
-    const down = (x) => Array.from({length: 41}, (_, k) => [x, -100 + 5 * k]);   // another cable, walked: straight down the slide at x
+    const down = (x) => held(Array.from({length: 41}, (_, k) => [x, -100 + 5 * k]));   // another cable, walked: straight down the slide at x
     // a label 60 wide keeps 3 px off a line: one at x 150 runs through it wherever it stands from 0.4 to 0.6 of the way
     expect(labelPlace(run, [30, 13], [], [down(150)])).toEqual([expect.closeTo(105, 9), 0]);
     expect(labelPlace(run, [30, 13], [], [down(150), down(100)])).toEqual([expect.closeTo(195, 9), 0]);   // the start's side crossed too: the other way
     expect(labelPlace(run, [30, 13], [], [down(500)])).toEqual([150, 0]);
-    expect(labelPlace(run, [30, 13], [], [Array.from({length: 41}, (_, k) => [150, 17 + 5 * k])])).toEqual([150, 0]);   // a line that passes under it, 3 px clear: not through it
+    expect(labelPlace(run, [30, 13], [], [held(Array.from({length: 41}, (_, k) => [150, 17 + 5 * k]))])).toEqual([150, 0]);   // a line that passes under it, 3 px clear: not through it
   });
 
   it('a line through its words rather than a block over them: hidden counts first, then crossed, then how near the middle', () => {
-    const down = (x) => Array.from({length: 41}, (_, k) => [x, -100 + 5 * k]);
+    const down = (x) => held(Array.from({length: 41}, (_, k) => [x, -100 + 5 * k]));
     // a block over everything right of x 110, and a line down x 60: the only places not under the block have the line through them
     expect(labelPlace(run, [30, 13], [square(110, 400)], [down(60)])).toEqual([75, 0]);   // a quarter of the way: tried before a fifth, and no more crossed
     // every place as much hidden: the nearest the middle that no line runs through

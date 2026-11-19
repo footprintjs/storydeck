@@ -707,7 +707,8 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   them from crossing; a cylinder's feet are on its round base. A packet rides the curve. Its `data-label` stands on the
   cable itself, on a plate of the ground's colour (`--bg`): at the cable's middle, or along it at the nearest place
   where no block is over it, no label placed before it is under it and no other cable runs through it — and where
-  there is no such place, where the least of it is hidden.
+  there is no such place, where the least of it is hidden. (The search has a fixed amount of work for one map, enough
+  for some hundreds of labelled cables; a label after that takes its cable's middle.)
 
   A cable lies on the floor, so a block standing nearer the viewer is drawn over it: it does not go round blocks, and
   one to a block two steps away may pass behind the block between. To keep a wire straight, give it a bend, `0` too:

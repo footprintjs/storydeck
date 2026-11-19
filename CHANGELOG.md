@@ -13,6 +13,8 @@
   ground's colour (`--bg`), where a wire's label stands beside it. It takes the cable's middle, or the nearest place
   along the cable where no block is drawn over it, no label placed before it is under it and no other cable runs
   through it; where there is no such place, the one where the least of it is hidden. A packet passes under the plate.
+  The search has a fixed amount of work for one map (enough for some hundreds of labelled cables), so a map of
+  thousands still builds in about a second; a label past that takes its cable's middle.
 - **What changes in a deck you have (the picture, not the files).** Every wire written between two isometric pieces
   with no bend is now drawn as a cable, and its label moves onto it. To keep one straight, give it a bend, `0` too:
   `data-arrow="you to server 0"`. Drawn exactly as before: wires between flat pieces, wires by numbers, a wire from a
