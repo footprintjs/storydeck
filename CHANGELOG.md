@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.14.0 — the isometric look, a view that follows, and an order inside a click
 
 - **A camera that keeps the whole picture in view: `fit`.** `data-focus="fit"` frames everything a click shows, lit and
   greyed, so the view slides to a piece that comes in and pulls back as the picture grows. It is for a picture larger than
