@@ -191,11 +191,18 @@ describe('iso · in a deck', () => {
     for (const rule of rules) expect(rule.startsWith(':where(section[data-label]'), rule).toBe(true);
     // what plays is behind the motion gate, as every animation of a click is
     expect(ISO_CSS).toMatch(/@media screen and \(prefers-reduced-motion: no-preference\) \{\n  :where\(section\[data-label\]\[data-deck-active\]:not\(\[data-sd-instant\]\):not\(\[data-deck-static\]\) \.sd-hot-in:is\([^)]*\) \.iso-art\) \{ animation: sdIsoRing /);
+    // the ring waits as a box's does (.3s after --sd-turn): the piece hands its faces that moment, which is not inherited
+    expect(ISO_CSS).toContain('--sd-hot-width: 0px; --iso-turn: var(--sd-turn, 0s); }');
+    expect(ISO_CSS).toContain('animation: sdIsoRing .6s ease calc(.3s + var(--iso-turn, 0s)) both;');
+    expect(pageAssets().css.join('\n')).toContain('.sd-hot-in { --sd-a-hot: sdRing .6s var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) calc(.3s + var(--sd-turn, 0s)) both; }');
   });
 
   it('a piece is what it draws: its faces and its words take the pointer, never the corners of its box', () => {
-    expect(ISO_CSS).toContain(':where(section[data-label] [data-sd-iso]) { position: absolute; box-sizing: border-box; pointer-events: none; --sd-hot-width: 0px; }');
-    expect(ISO_CSS).toContain(':where(section[data-label] [data-sd-iso] :is(.iso-art > *, .iso-say)) { pointer-events: auto; }');
+    expect(ISO_CSS).toContain(':where(section[data-label][data-deck-active] [data-sd-iso]) { pointer-events: none; }');
+    expect(ISO_CSS).toContain(':where(section[data-label][data-deck-active] [data-sd-iso] :is(.iso-art > *, .iso-say)) { pointer-events: auto; }');
+    // only on the slide shown: "auto" written on a face would make a slide that takes no pointer (one leaving, one under) take it there
+    expect(ISO_CSS.match(/pointer-events: (?:none|auto)/g)).toHaveLength(3);
+    expect(ISO_CSS).not.toMatch(/:where\(section\[data-label\] \[data-sd-iso\][^{]*\{[^}]*pointer-events/);
     // the drawing itself stays out of the way: only what is painted inside it is hit
     expect(ISO_CSS).toMatch(/:where\(section\[data-label\] \.iso-art\) \{[^}]*pointer-events: none;/);
   });
@@ -209,6 +216,7 @@ describe('iso · in a deck', () => {
     // its highlight (data-hot): the box's ring is off (focus.css reads the width), the faces are ringed in the same colour
     expect(ISO_CSS).toContain(isoRing('section[data-label] .sd-hot', 'var(--sd-hot, #ef4444)', '5px'));
     expect(pageAssets().css.join('\n')).toContain('.sd-hot { outline: var(--sd-hot-width, 5px) solid var(--sd-hot, #ef4444); outline-offset: 8px; }');
+    expect(ISO_CSS).toContain(':where(section[data-label] [data-sd-iso]) { position: absolute; box-sizing: border-box; --sd-hot-width: 0px;');
   });
 
   it('a piece on the floor is moved in its file, not by a drag: the refusal says where', () => {

@@ -6,13 +6,13 @@
   leads to another click shows a ring on hover. The ring was drawn round the piece's box, so a block seen from a corner
   got a flat rectangle over it, and a wire got one round its whole box. Now a block or a cylinder is ringed round its
   faces, a floor along its edge, and a wire is marked along its line (its colour and a thicker line). A box keeps the
-  ring it had. A highlight (`data-hot`) on an isometric piece follows its faces too, and comes in .3 s after the click
-  as a box's ring does.
-- **An isometric piece takes the pointer where it is drawn.** Its faces and its words do; the empty corners of the box
-  it is placed by do not. Before, a nearer block's box covered part of the block behind it, so a hover or a click on
-  the further block could land on the nearer one.
-- **`--sd-hot-width`** is a new token: the width of the highlight ring (5px). An isometric piece sets it to 0, because
-  it draws its own ring.
+  ring it had. A highlight (`data-hot`) on an isometric piece follows its faces too, and comes in when a box's ring
+  does (.3 s after the click, or after its turn on a route). A highlighted piece keeps the highlight's ring on hover.
+- **An isometric piece takes the pointer where it is drawn.** On the slide shown, its faces and its words do; the empty
+  corners of the box it is placed by do not. Before, a nearer block's box covered part of the block behind it, so a
+  hover or a click on the further block could land on the nearer one.
+- **`--sd-hot-width`** is a new token: the width of the highlight's ring round a box (5px). An isometric piece sets it
+  to 0 and draws its own ring round its faces, 5px wide.
 
 ## 0.15.0 — stages that stay put, a camera that pans, and when the view has arrived
 

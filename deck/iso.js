@@ -22,8 +22,8 @@
 // --iso-grid, --iso-floor. Class ok, warn or bad from the base look colours one.
 //
 // A piece is what it draws, not the box it is placed by. The box of a block seen from a corner has four empty corners,
-// and a nearer block's box lies over the block behind it: so only its faces and its words take the pointer, and a ring
-// round it (a highlight, explore's hover) follows its faces — isoRing, for whoever rings a piece.
+// and a nearer block's box lies over the block behind it: so on the slide shown only its faces and its words take the
+// pointer, and a ring round it (a highlight, explore's hover) follows its faces — isoRing, for whoever rings a piece.
 import {isometric} from 'footprint-story/isometric';
 import {attrRule, ownAttribute, pieceTags, tagsWith} from '../pieceRules.js';
 import {closeOf} from './callouts.js';
@@ -193,9 +193,12 @@ export const isoRing = (piece, colour, width = '4px') => `:where(${piece}:is(${S
  * left would leave them. Its words are drawn flat on its top face, in --iso-ink (dark by default, as the faces are light).
  */
 export const ISO_CSS = `/* isometric pieces: blocks on a floor seen from a corner (deck/iso.js) */
-:where(section[data-label] [data-sd-iso]) { position: absolute; box-sizing: border-box; pointer-events: none; --sd-hot-width: 0px; }
-/* what it draws takes the pointer: its faces and its words, never the empty corners of its box */
-:where(section[data-label] [data-sd-iso] :is(.iso-art > *, .iso-say)) { pointer-events: auto; }
+:where(section[data-label] [data-sd-iso]) { position: absolute; box-sizing: border-box; --sd-hot-width: 0px; --iso-turn: var(--sd-turn, 0s); }
+/* what it draws takes the pointer: its faces and its words, never the empty corners of its box. Only on the slide
+   shown (deck-stage's [data-deck-active]): a slide that takes no pointer stays that way — "auto" written on a face
+   would bring it back there — and a piece shown anywhere else (a Read lens) is left as it was */
+:where(section[data-label][data-deck-active] [data-sd-iso]) { pointer-events: none; }
+:where(section[data-label][data-deck-active] [data-sd-iso] :is(.iso-art > *, .iso-say)) { pointer-events: auto; }
 :where(section[data-label] .iso-art) {
   position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none;
   stroke: var(--iso-line, ${INK}); stroke-width: var(--iso-line-width, 2.5px); stroke-linejoin: round;
@@ -215,9 +218,10 @@ export const ISO_CSS = `/* isometric pieces: blocks on a floor seen from a corne
 :where(section[data-label] [data-sd-callout]) { z-index: ${MOST_ISO_PIECES + 1}; }
 /* its highlight (data-hot) rings what it draws; the box's own ring is off (--sd-hot-width: 0, read by focus.css) */
 ${isoRing('section[data-label] .sd-hot', HOT, HOT_WIDTH)}
-/* on a forward click the ring comes as a flat piece's does, .3s after the click (or its turn on a route) */
+/* on a forward click the ring comes when a box's does: .3s after the piece's moment (--sd-turn: 0 off a route, its turn
+   on one, later under a new blur). That moment is not inherited, so the piece hands it to its faces as --iso-turn */
 @keyframes sdIsoRing { from { filter: ${ringFilter('transparent', HOT_WIDTH)}; } }
 @media screen and (prefers-reduced-motion: no-preference) {
-  :where(section[data-label][data-deck-active]:not([data-sd-instant]):not([data-deck-static]) .sd-hot-in:is(${SOLID}) .iso-art) { animation: sdIsoRing .6s ease calc(.3s + var(--sd-path-delay, 0s)) both; }
+  :where(section[data-label][data-deck-active]:not([data-sd-instant]):not([data-deck-static]) .sd-hot-in:is(${SOLID}) .iso-art) { animation: sdIsoRing .6s ease calc(.3s + var(--iso-turn, 0s)) both; }
 }
 `;

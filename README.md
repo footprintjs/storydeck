@@ -650,8 +650,8 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   The floor is ground (see below), so the view follows the pieces. One colour a piece (`--iso-color`): its top is drawn
   lighter and its sides darker; `--iso-ink`, `--iso-line`, `--iso-grid` and `--iso-floor` are the other tokens, and
   class `ok`, `warn` or `bad` colours one. The numbers come from `footprint-story/isometric`, the grid a film can draw
-  with too. A block is what it draws, not the box it is placed by: its faces and its words take the pointer (the
-  empty corners of its box do not, so a block behind is not covered by them), and a ring round it — a highlight
+  with too. A block is what it draws, not the box it is placed by: on the slide shown its faces and its words take the
+  pointer (the empty corners of its box do not, so a block behind is not covered by them), and a ring round it — a highlight
   (`data-hot`) or explore's hover — follows its faces. Not yet: a wire that runs along the floor (a wire goes straight
   from box to box), and moving a block by dragging it in the dev page (change its `data-at`).
   A deck to start from: [examples/a-request](examples/a-request) (blocks on a floor, a view that follows them, an order

@@ -61,7 +61,8 @@ describe('the page', () => {
     expect(rules[2]).toBe(`:where(${leads}:is(svg.wire, [data-sd-iso])) { outline: none; }`);
     expect(rules[3]).toBe(`:where(${leads}:is(svg.wire)) { color: var(--sd-accent, var(--accent-ink, #0b6e99)); }`);
     expect(rules[4]).toBe(`:where(${leads}:is(svg.wire) path:not(.head)) { stroke-width: 7; }`);
-    expect(EXPLORE_CSS).toContain(isoRing(leads, 'var(--sd-accent, var(--accent-ink, #0b6e99))'));
+    // a highlighted piece keeps its highlight's ring on hover: a box by its rule's weight, an isometric piece by :not(.sd-hot)
+    expect(EXPLORE_CSS).toContain(isoRing(`${leads}:not(.sd-hot)`, 'var(--sd-accent, var(--accent-ink, #0b6e99))'));
     // every rule without weight, so a theme restyles the ring
     for (const rule of EXPLORE_CSS.replace(/@media[^{]*\{/, '').split('}').map((r) => r.trim()).filter(Boolean)) expect(rule.startsWith(':where('), rule).toBe(true);
   });
