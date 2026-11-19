@@ -570,6 +570,34 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   callout that meets another or the headline (`callout-overlap`), and a tail that no longer reaches its piece because
   the piece moved (`tail-miss`). `review` says what each click's callouts say. A callout with a side it does not have, a
   piece that is not there or no words is refused, and a deck with no callouts builds byte for byte as before.
+- **Blocks on a floor (the isometric look).** A system drawn as blocks seen from a corner reads at a glance. In
+  `map.html`, `data-iso` makes a piece one, standing where `data-at` says and as big as `data-size` says, in tiles:
+
+  ```html
+  <i data-iso-grid="150 at 1500 150"></i>                                  <!-- optional: a tile's width, and where the floor's far corner stands -->
+  <div data-k="floor" data-iso="floor" data-at="-1 -1" data-size="16 9"></div>
+  <div data-k="you" data-iso="block" data-at="0 5" data-size="2 2 0.3"><b>You</b><small>a browser</small></div>
+  <div data-k="server" data-iso="block" data-at="7 4" data-size="2 2 1.6" style="--iso-color:#bcd6f3"><b>Server</b></div>
+  <div data-k="db" data-iso="cylinder" data-at="12 2" data-size="1.8 1.8 1.4"><b>Database</b></div>
+  <i data-k="w1" class="wire pkt" data-arrow="you to server"></i>
+  ```
+
+  `data-at` is "col row" (col runs down and to the right of the slide, row down and to the left; a third number lifts
+  the piece), `data-size` is "wide deep high" for a `block` or a `cylinder` (round: the same width and depth) and
+  "cols rows" for a `floor`. Its words stand flat on its top face. It is a piece like any other: every click, `fit`,
+  `zoom`, a route, a wire to it and a callout beside it work as they do on a box.
+
+  Why the build places it: where a block lands, how big it is and which block is painted over which all follow from
+  the floor, so a left, top, width or height of its own is refused, with the fix. The nearer block is painted over the
+  further by a level each; the map's own order never moves. Write the floor first: it and the wires share a level.
+  The floor is ground (see below), so the view follows the pieces. One colour a piece (`--iso-color`): its top is drawn
+  lighter and its sides darker; `--iso-ink`, `--iso-line`, `--iso-grid` and `--iso-floor` are the other tokens, and
+  class `ok`, `warn` or `bad` colours one. The numbers come from `footprint-story/isometric`, the grid a film can draw
+  with too. Not yet: a wire that runs along the floor (a wire goes straight from box to box), and moving a block by
+  dragging it in the dev page (change its `data-at`).
+- **Ground: what lies under the picture.** `data-ground` on a piece (a floor has it by itself) says it lies under the
+  picture: a camera and a blur frame what stands on it, never the ground. Without it a floor shown from the first click
+  would be all `fit` ever frames, and the view would never move.
 - **The helpers a diagram needs.** `<i data-k="w1" class="wire pkt" data-arrow="client to server"></i>` is a wire (an
   SVG arrow) from the edge of one piece's box to the edge of the other's. It follows them: move a box (in the file, or
   by Alt-drag in the dev page) and its wires go with it. Two wires between the same pieces each take a lane, keeping to

@@ -22,6 +22,8 @@ const MAP = `<!--
   keeps a piece moving while its slide is shown; data-loop alone runs its own --loop from theme.css.
   Ready-made pieces, from "look": "base" in deck.json: class box, chip, area, group or card, with a <b> and a <small>
   inside; add ok, warn or bad to colour one. An area goes before the pieces that stand in it.
+  data-iso="block" data-at="3 1" data-size="2 2 1.4" draws a piece as a block on a floor seen from a corner (also
+  cylinder, and floor with data-size="cols rows"); data-at is "col row" in tiles, and the build places and sizes it.
   data-callout="server above" pins words to a piece, with a tail (or below, left, right). It sizes itself and comes in
   like any piece; "server+" in a click takes in its callouts. Change its colours in theme.css: --callout-bg, --callout-fg.
 -->

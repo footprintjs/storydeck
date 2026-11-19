@@ -368,9 +368,13 @@ export function focusStep(prev, step, deck) {
   if (chosen.camera && placed.stage) throw new Error(`a click moves the view once: "${chosen.mover.name}" moves it and so does "${chosen.camera.name}" — keep one`);
   if (chosen.camera && !chosen.camera.s.keepsContext && chosen.mover?.s.withCamera === false) throw new Error(`"${chosen.camera.name}" closes in on the subject, and "${chosen.mover.name}" keeps the context in view beside it — together they push the context off the slide: keep one, and give the other a click of its own`);
   const movedBox = i => { const g = groupOf(i), b = pieces[i].box; return g && b ? moveBox(g, b) : b; };
+  // Ground (a floor, a backdrop: `ground` on a piece) lies under the picture: a camera and an overlay frame what
+  // stands on it, never the ground itself — or a view that should follow the pieces would always show the whole floor.
+  // A map without ground takes the lines below exactly as before.
+  const grounded = pieces.some(p => p.ground), framed = l => (grounded ? l.filter(i => !pieces[i].ground) : l);
   // The whole subject moved as one group (a side mover): the group's own arithmetic, exactly as before; else piece by piece.
-  const moved = subject && placed.subject && subjectIdx.every(i => groupOf(i) === placed.subject) ? moveBox(placed.subject, subject) : union(subjectIdx.map(movedBox));
-  const cameraSees = {subject: moved, context: union(contextIdx.map(movedBox)), look, area, view, canvas,
+  const moved = !grounded && subject && placed.subject && subjectIdx.every(i => groupOf(i) === placed.subject) ? moveBox(placed.subject, subject) : union(framed(subjectIdx).map(movedBox));
+  const cameraSees = {subject: moved, context: union(framed(contextIdx).map(movedBox)), look, area, view, canvas,
     boxOf: l => union(all.filter(i => states[i] !== 'gone' && has(i, known(names([].concat(l)), 'focus group: '))).map(movedBox))};
   const viewMove = placed.stage ?? (chosen.camera ? chosen.camera.s.place({...cameraSees, options: chosen.camera.options})?.stage ?? null : null);
   const stage = viewMove ? {s: round(viewMove.s, 4), x: round(viewMove.o[0] * (1 - viewMove.s) + viewMove.t[0]), y: round(viewMove.o[1] * (1 - viewMove.s) + viewMove.t[1])} : null;

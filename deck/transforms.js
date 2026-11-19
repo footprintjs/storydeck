@@ -5,6 +5,7 @@
 //   <i data-k="req" class="wire" data-arrow="client to server"></i>         a wire between two pieces, edge to edge
 //   <i class="ic" data-icon="server"></i>                                  a drawn identity: icons/server.svg inline
 //   <div data-k="why" data-callout="server above">Why it waits</div>        words pinned to a piece (callouts.js)
+//   <div data-k="server" data-iso="block" data-at="3 1" data-size="2 2 1.4">  a block on a floor seen from a corner (iso.js)
 //
 // A wire is `x1 y1 x2 y2` and an optional bend (px off the straight line, + to the left of travel), or the pieces it
 // joins, `from to to` and an optional bend ("client to server 24"; words, as a ">" would end the tag): it runs from the
@@ -28,6 +29,7 @@ import {stripComments} from './html.js';
 import {readAttributes} from '../pieceRules.js';
 import {boxFinder, exit} from './boxes.js';
 import {callouts} from './callouts.js';
+import {isoPieces} from './iso.js';
 
 const fixed = (v) => +v.toFixed(1);
 /** A wire written by the pieces it joins: "from to to [bend]". */
@@ -199,9 +201,10 @@ export function icons(html, set = {}) {
 }
 
 /**
- * The built-in helpers, in the order they run: icons first (a wire never holds one), then callouts (so a wire may reach
- * one), then wires. `canvas`, [w, h]: the slide a callout is kept on.
+ * The built-in helpers, in the order they run: icons first (a wire never holds one, a block's words may), then the
+ * isometric pieces (so a callout may stand beside one and a wire reach it), then callouts (so a wire may reach one),
+ * then wires. `canvas`, [w, h]: the slide a callout is kept on, and whose middle a floor starts from.
  */
 export function applyTransforms(html, {icons: set = {}, canvas = null} = {}) {
-  return wires(callouts(icons(html, set), {canvas}));
+  return wires(callouts(isoPieces(icons(html, set), {canvas}), {canvas}));
 }

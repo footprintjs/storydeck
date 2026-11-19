@@ -835,3 +835,38 @@ describe('focus · a route written as turns: together, a turn\'s own time, and t
     expect(() => run({ names: [], turns: [{ names: [] }], step: 0.2 })).toThrow(/focus "mine": a turn's names are a list of one name or more/);
   });
 });
+
+describe('focus · ground: what lies under the picture is never framed', () => {
+  // a floor four slides wide with two small pieces on it
+  const pieces = [
+    { keys: ['floor'], box: { x: 0, y: 0, w: 8000, h: 1000 }, ground: true },
+    { keys: ['a'], box: { x: 100, y: 400, w: 400, h: 200 } },
+    { keys: ['b'], box: { x: 1700, y: 400, w: 400, h: 200 } },
+  ];
+  const d = { pieces, area: [0, 200, 1920, 1000] };
+  const onSlide = (stage, [x, y]) => [stage.s * x + stage.x, stage.s * y + stage.y];
+
+  it('fit frames what stands on the ground, so the view follows the pieces though the whole floor is shown', () => {
+    const { looks } = planFocus([{ in: ['floor', 'a'], focus: 'fit' }, { in: ['b'], focus: 'fit' }], d);
+    expect(looks[0].stage.move.s).toBe(2.5);                                  // close on a, not far out over the floor
+    expect(onSlide(looks[0].stage.move, [300, 500])).toEqual([960, 600]);
+    expect(looks[1].stage.move.s).toBeCloseTo(0.8 * 1920 / 2000, 4);          // a and b, 2000 wide
+    // without the mark the same floor is part of the picture, and the view goes out to its limit to show it
+    const plain = { ...d, pieces: pieces.map(({ ground, ...p }) => p) };
+    expect(planFocus([{ in: ['floor', 'a'], focus: 'fit' }], plain).looks[0].stage.move.s).toBe(0.25);
+  });
+
+  it('zoom and a blur leave the ground out too; a click about the ground alone moves no view', () => {
+    const zoomed = planFocus([{ in: ['*'] }, { on: ['floor', 'a'], focus: 'zoom blur' }], d).looks[1];
+    expect(onSlide(zoomed.stage.move, [300, 500])[0]).toBeCloseTo(960, 1);    // closes in on a, though the floor is lit with it
+    const [x, , w] = zoomed.overlay.rects[0];
+    expect(w).toBeLessThan(1920);                                              // the frame is round a, not round the floor
+    expect(x).toBeGreaterThan(0);
+    expect(planFocus([{ in: ['floor'], focus: 'fit' }], d).looks[0].stage).toBe(null);
+  });
+
+  it('the ground is still a piece: it comes in, greys and is lit like any other', () => {
+    const look = planFocus([{ in: ['*'] }, { on: ['a'] }], d).looks[1];
+    expect(look.pieces.map((p) => p.state)).toEqual(['dim', 'on', 'dim']);
+  });
+});

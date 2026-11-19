@@ -297,3 +297,11 @@ describe('focusHtml · a path, in focus.css', () => {
     for (const [selector] of animated) expect(selector.startsWith(':where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) '), selector).toBe(true);
   });
 });
+
+describe('focusHtml · ground', () => {
+  it('reads data-ground on a piece, and leaves the key out of every other piece', () => {
+    const { pieces } = readPieces('<div data-k="floor" data-ground style="left:0px;top:0px;width:9px;height:9px"></div><div data-k="a" data-grounded style="left:0px;top:0px"></div><div data-k="b" data-ground="yes" style="left:1px;top:1px"></div>');
+    expect(pieces.map((p) => p.ground)).toEqual([true, undefined, true]);
+    expect('ground' in pieces[1]).toBe(false);
+  });
+});

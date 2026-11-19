@@ -27,7 +27,8 @@ const px = (style, prop) => styleLength(style, prop)?.value ?? null;
 
 /**
  * The pieces of a slide: every element carrying `attr` (data-k) — its names, its box when its inline style
- * places it, its twin, and a wire's ends (data-ends: the pieces it joins). Returns {html, pieces}: the same HTML with each piece numbered (data-sd-i), and the
+ * places it, its twin, a wire's ends (data-ends: the pieces it joins), and whether it is ground (data-ground: it lies
+ * under the picture, so no camera frames it). Returns {html, pieces}: the same HTML with each piece numbered (data-sd-i), and the
  * pieces in order. Which tags are pieces is pieceRules.js · pieceTags, read in one pass.
  */
 export function readPieces(html, {attr = 'data-k'} = {}) {
@@ -38,7 +39,8 @@ export function readPieces(html, {attr = 'data-k'} = {}) {
     const attrPx = name => { const v = attrOf(at, name); return v !== null && /^[\d.]+$/.test(v) ? Number(v) : null; };
     const x = px(style, 'left'), y = px(style, 'top'), w = px(style, 'width') ?? attrPx('width'), h = px(style, 'height') ?? attrPx('height');
     const twin = attrOf(at, 'data-twin')?.trim().split(/\s+/), ends = attrOf(at, 'data-ends')?.trim().split(/\s+/).filter(Boolean);
-    pieces.push({keys: k.trim().split(/\s+/), box: x === null || y === null ? null : {x, y, w: w ?? 0, h: h ?? 0}, ...(twin ? {twin} : {}), ...(ends?.length ? {ends} : {})});
+    const ground = /\sdata-ground(?![\w-])/.test(at);   // it lies under the picture (a floor, a backdrop): no camera frames it
+    pieces.push({keys: k.trim().split(/\s+/), box: x === null || y === null ? null : {x, y, w: w ?? 0, h: h ?? 0}, ...(twin ? {twin} : {}), ...(ends?.length ? {ends} : {}), ...(ground ? {ground: true} : {})});
     out += `${html.slice(from, start)}<${tag}${before} ${attr}=${q}${k}${q} data-sd-i="${pieces.length - 1}"${after}>`;
     from = end;
   }

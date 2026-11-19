@@ -14,6 +14,8 @@ export interface FocusPiece {
   readonly twin?: readonly string[];
   /** A wire's ends: the pieces it joins (data-ends; a wire written "from to to" carries them), for a click's `name+`. */
   readonly ends?: readonly string[];
+  /** It lies under the picture (data-ground: a floor, a backdrop): a camera and an overlay frame what stands on it, never it. */
+  readonly ground?: boolean;
 }
 
 /** A focus as written on a click: a strategy name ('left'), several ('left blur'), or {strategy, …options}. */

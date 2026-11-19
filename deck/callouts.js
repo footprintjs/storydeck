@@ -37,7 +37,7 @@ const unitsOf = (word) => [...word].reduce((n, ch) => n + (DOUBLE.test(ch) ? 2 :
  * One pass: each tag's ">" is looked for once and the search goes on past it, so a file of unfinished tags costs no more
  * than its length.
  */
-function closeOf(html, tag, from, where) {
+export function closeOf(html, tag, from, where) {
   const scan = new RegExp(`<(/?)${tag}\\b`, 'gi');
   scan.lastIndex = from;
   let depth = 1;
@@ -99,11 +99,15 @@ function sizeOf({inner}, width, height) {
   return {w: width ?? Math.min(WIDE.most, Math.max(WIDE.least, Math.ceil(widest * TEXT.char + 2 * TEXT.padX))), h: height ?? lines * TEXT.line + 2 * TEXT.padY};
 }
 
-/** Where a bubble of this size stands on this side of the piece, kept on the slide. */
+/**
+ * Where a bubble of this size stands on this side of the piece, kept on the slide — unless the piece itself stands off
+ * the slide (a picture larger than the slide, which a camera shows piece by piece): its bubble then stays beside it,
+ * since held on the slide it would stand far from what it is about.
+ */
 function besidePiece(side, t, {w, h}, canvas) {
   const midX = t.x + t.w / 2 - w / 2, midY = t.y + t.h / 2 - h / 2;
   const at = {above: [midX, t.y - TAIL.reach - h], below: [midX, t.y + t.h + TAIL.reach], left: [t.x - TAIL.reach - w, midY], right: [t.x + t.w + TAIL.reach, midY]}[side];
-  if (!canvas) return at;
+  if (!canvas || t.x < 0 || t.y < 0 || t.x + t.w > canvas[0] || t.y + t.h > canvas[1]) return at;
   const keep = (v, room, size) => Math.max(CLEAR, Math.min(v, Math.max(CLEAR, room - CLEAR - size)));
   return [keep(at[0], canvas[0], w), keep(at[1], canvas[1], h)];
 }

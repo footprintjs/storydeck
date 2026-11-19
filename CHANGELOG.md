@@ -19,6 +19,20 @@
   order strategy may give `turns`, and is told `isName`. A route written before turns plays exactly as it did: each
   turn starts at the same millisecond (a test pins it), and nothing new is written into its slides. `focus.css` gains
   one rule, for a view with a turn.
+- **Blocks on a floor: the isometric look.** In a map, `data-iso="block"` (or `cylinder`, or `floor`) with
+  `data-at="col row"` and `data-size="wide deep high"` draws a piece as seen from a corner: three faces, its words flat on
+  its top. The build places it, sizes it and gives it its level, so the nearer block is painted over the further and the
+  map's own order never moves. `<i data-iso-grid="150 at 1500 150"></i>` sets the tile and where the floor stands. It
+  is a piece like any other, so every click, `fit`, a route, a wire and a callout work on it. One colour a piece
+  (`--iso-color`). The numbers come from footprint-story 0.9 (`footprint-story/isometric`). The page carries its
+  stylesheet only when a deck has such a piece; a deck without one builds byte for byte as before.
+- **Ground.** `data-ground` on a piece (a floor has it by itself) says it lies under the picture: a camera and a blur
+  frame what stands on it, never the ground, so a view follows the pieces though the whole floor is shown.
+- **A callout stays beside a piece that stands off the slide.** A picture larger than the slide, shown by a camera, has
+  pieces past the slide's edge; a callout about one was held at the edge, far from its piece. On a piece inside the slide
+  nothing changes.
+- **`check` warns when a view stands far out** (`view-far`): further out than half size, the words on the picture show
+  that much smaller, and the warning says how small and what to do.
 
 ## 0.13.3 — one copy of footprint-story, shared with StoryReel
 
