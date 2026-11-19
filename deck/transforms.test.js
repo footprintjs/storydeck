@@ -1,5 +1,7 @@
 import {describe, it, expect} from 'vitest';
 import {wires, wireTags, icons, readIcon, applyTransforms} from './transforms.js';
+import {isoDrawn} from './iso.js';
+import {exitOutline} from './boxes.js';
 import {stripComments} from './html.js';
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
@@ -238,6 +240,91 @@ describe('a wire between pieces ("from to to")', () => {
     expect(() => wires(`${two}<i data-k="w" data-arrow="client to client"></i>`)).toThrow('data-arrow="client to client": a wire joins two pieces, not "client" to itself');
     expect(() => wires(`${box('a', 0, 0)}${box('b', 290, 0)}<i data-k="w" data-arrow="a to b"></i>`)).toThrow('data-arrow="a to b": "a" and "b" are too close for a wire between them (they touch or overlap) — move them apart, or give the wire numbers');
     expect(() => wires(`${box('a', 0, 0)}${box('b', 0, 0)}<i data-k="w" data-arrow="a to b"></i>`)).toThrow(/share a middle/);
+  });
+});
+
+describe('a wire to an isometric piece ends on what the piece draws, not on the box it is placed by', () => {
+  const canvas = [1920, 1080];
+  /** Each wire as drawn: where its line starts and where its head's tip is, in slide px. */
+  const drawn = (html) => [...html.matchAll(/<svg data-ends="([^"]*)"[^>]*style="left:([\d.-]+)px;top:([\d.-]+)px[^"]*"[^>]*><path d="M([\d.-]+) ([\d.-]+) Q[^"]*"\/><path class="head" d="M([\d.-]+) ([\d.-]+)L/g)]
+    .map((m) => ({ends: m[1], from: [+m[4] + +m[2], +m[5] + +m[3]], tip: [+m[6] + +m[2], +m[7] + +m[3]]}));
+  /** How far a point is from an outline's nearest side. */
+  const off = (points, [px, py]) => Math.min(...points.map(([ax, ay], i) => {
+    const [bx, by] = points[(i + 1) % points.length], t = Math.max(0, Math.min(1, ((px - ax) * (bx - ax) + (py - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2)));
+    return Math.hypot(px - ax - t * (bx - ax), py - ay - t * (by - ay));
+  }));
+  const blocks = '<i data-iso-grid="120 at 960 240"></i><div data-k="a" data-iso="block" data-at="0 0"></div><div data-k="b" data-iso="block" data-at="5 0" data-size="2 2 1.6"></div>';
+
+  it('runs from the outline of one block to the outline of the other, 6 px clear of each, along the line between their middles', () => {
+    const map = `${blocks}<i data-k="w" class="wire" data-arrow="a to b"></i>`, {shapes} = isoDrawn(map, {canvas});
+    const [w] = drawn(applyTransforms(map, {canvas})), a = shapes.get('a'), b = shapes.get('b');
+    expect(w.ends).toBe('a b');
+    const along = [b.middle[0] - a.middle[0], b.middle[1] - a.middle[1]], len = Math.hypot(...along), u = [along[0] / len, along[1] / len];
+    const start = exitOutline(a.outline, a.middle, u) + 6, end = len - exitOutline(b.outline, b.middle, [-u[0], -u[1]]) - 6;
+    expect(w.from[0]).toBeCloseTo(a.middle[0] + u[0] * start, 0);
+    expect(w.from[1]).toBeCloseTo(a.middle[1] + u[1] * start, 0);
+    expect(w.tip[0]).toBeCloseTo(a.middle[0] + u[0] * end, 0);
+    expect(w.tip[1]).toBeCloseTo(a.middle[1] + u[1] * end, 0);
+    expect(off(a.outline, w.from)).toBeLessThan(6.2);     // it starts beside the block itself…
+    expect(off(b.outline, w.tip)).toBeLessThan(6.2);      // …and its head touches the other, not the empty corner of a box
+    expect(off(a.outline, w.from)).toBeGreaterThan(3);
+  });
+
+  it('two blocks that stand clear of each other get their wire though their boxes meet — a box would have called them too close', () => {
+    // two tiles apart along the cols and one along the rows: the boxes they are placed by overlap on the slide, what they draw does not
+    const near = '<i data-iso-grid="120 at 960 240"></i><div data-k="a" data-iso="block" data-at="0 0"></div><div data-k="b" data-iso="block" data-at="4 1"></div><i data-k="w" class="wire" data-arrow="a to b"></i>';
+    const boxes = [...isoDrawn(near, {canvas}).html.matchAll(/data-k="([ab])"[^>]*style="left:([\d.-]+)px;top:([\d.-]+)px;width:([\d.-]+)px;height:([\d.-]+)px/g)].map((m) => m.slice(2).map(Number));
+    expect(boxes[1][0] < boxes[0][0] + boxes[0][2] && boxes[1][1] < boxes[0][1] + boxes[0][3]).toBe(true);   // the boxes do meet
+    const [w] = drawn(applyTransforms(near, {canvas}));
+    expect(Math.hypot(w.tip[0] - w.from[0], w.tip[1] - w.from[1])).toBeGreaterThan(12);   // a wire to see: no shorter than the least one drawn
+    // drawn by their boxes alone, as before, the same two are refused
+    expect(() => wires(isoDrawn(near, {canvas}).html)).toThrow('"a" and "b" are too close for a wire between them');
+    // blocks that do cover each other on the slide are still refused, naming the fix
+    const touching = near.replace('data-at="4 1"', 'data-at="2.2 0"');
+    expect(() => applyTransforms(touching, {canvas})).toThrow('data-arrow="a to b": "a" and "b" are too close for a wire between them (they touch or overlap) — move them apart, or give the wire numbers');
+  });
+
+  it('a wire between a block and a flat piece ends on the block\'s outline and the piece\'s box; two wires between two blocks keep a lane each', () => {
+    const map = `${blocks}<div data-k="note" class="chip" style="left:100px;top:700px;width:200px;height:80px">n</div><i data-k="w" class="wire" data-arrow="note to b"></i><i data-k="go" class="wire" data-arrow="a to b"></i><i data-k="back" class="wire" data-arrow="b to a"></i>`;
+    const {shapes} = isoDrawn(map, {canvas}), all = drawn(applyTransforms(map, {canvas})), b = shapes.get('b'), a = shapes.get('a');
+    const [note, go, back] = all;
+    expect(off(b.outline, note.tip)).toBeLessThan(6.2);
+    expect(off([[100, 700], [300, 700], [300, 780], [100, 780]], note.from)).toBeCloseTo(6, 0);   // the flat piece: its box, as before
+    expect(off(b.outline, go.tip)).toBeLessThan(7);
+    expect(off(a.outline, back.tip)).toBeLessThan(7);
+    expect(Math.hypot(go.from[0] - back.tip[0], go.from[1] - back.tip[1])).toBeGreaterThan(20);   // a lane each: the request does not lie on its answer
+  });
+
+  it('a map with no isometric piece draws its wires exactly as 0.16.0 did', () => {
+    const flat = '<div data-k="client" style="left:160px;top:420px;width:300px;height:210px"></div><div data-k="server" style="left:720px;top:420px;width:300px;height:210px"></div><i data-k="req" class="wire pkt" data-arrow="client to server" data-label="GET"></i><i data-k="res" data-arrow="server to client 30"></i>';
+    const out = applyTransforms(flat, {canvas, area: [0, 220, 1920, 1000]});
+    // the opening tags as 0.16.0 wrote them (built from that release's own source and compared whole, byte for byte, when this was written)
+    expect(out.match(/<svg data-ends="client server"[^>]*>/)[0]).toBe('<svg data-ends="client server" data-k="req" class="wire pkt" data-label="GET" style="left:446px;top:437px;width:288px;height:68px;--sd-angle:90deg" viewBox="0 0 288 68" aria-hidden="true">');
+    expect(out).toHaveLength(882);
+    expect(applyTransforms(flat, {canvas})).toBe(out);     // an area changes nothing for a map the build does not fit
+    expect(wires(flat, new Map())).toBe(wires(flat));
+  });
+
+  it('a name a block shares with another piece is one box round them all, as it always was: the block\'s own outline is not the whole of it', () => {
+    const shared = `${blocks}<div data-k="a tag" class="chip" style="left:100px;top:900px;width:120px;height:40px">t</div><i data-k="w" class="wire" data-arrow="a to b"></i>`;
+    const alone = `${blocks}<i data-k="w" class="wire" data-arrow="a to b"></i>`;
+    const [together] = drawn(applyTransforms(shared, {canvas})), [own] = drawn(applyTransforms(alone, {canvas}));
+    expect(together.from).not.toEqual(own.from);                                        // it starts from the box round the block and its tag…
+    const [boxOnly] = drawn(wires(isoDrawn(shared, {canvas}).html));
+    expect(together.from).toEqual(boxOnly.from);                                        // …that end is where a box-only wire starts
+    expect(off(isoDrawn(shared, {canvas}).shapes.get('b').outline, together.tip)).toBeLessThan(6.2);   // and its other end, a block alone, is on that block
+  });
+
+  it('three wires between two blocks, both ways, keep a lane each: side by side, none crossing, every tip on a block', () => {
+    const map = `${blocks}<i data-k="w1" class="wire" data-arrow="a to b"></i><i data-k="w2" class="wire" data-arrow="b to a"></i><i data-k="w3" class="wire" data-arrow="a to b"></i>`;
+    const {shapes} = isoDrawn(map, {canvas}), lanes = drawn(applyTransforms(map, {canvas})), a = shapes.get('a'), b = shapes.get('b');
+    const u = [b.middle[0] - a.middle[0], b.middle[1] - a.middle[1]], len = Math.hypot(...u), n = [-u[1] / len, u[0] / len];
+    const across = lanes.map((w) => (w.from[0] - a.middle[0]) * n[0] + (w.from[1] - a.middle[1]) * n[1]), tips = lanes.map((w) => (w.tip[0] - a.middle[0]) * n[0] + (w.tip[1] - a.middle[1]) * n[1]);
+    lanes.forEach((w, i) => expect(across[i]).toBeCloseTo(tips[i], 0));                 // each runs level with the line between the middles: none crosses another
+    const order = [...across].sort((x, y) => x - y);
+    expect(order[1] - order[0]).toBeGreaterThan(10);
+    expect(order[2] - order[1]).toBeCloseTo(order[1] - order[0], 0);                     // evenly apart
+    for (const [i, w] of lanes.entries()) expect(off(i === 1 ? a.outline : b.outline, w.tip)).toBeLessThan(7);   // the middle one runs back, to a
   });
 });
 

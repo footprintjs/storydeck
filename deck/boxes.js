@@ -5,11 +5,12 @@ import {readPieces} from '../focusHtml.js';
 /**
  * A finder of a piece's box in this HTML: (name, where) → {x, y, w, h}. A piece is found by its first data-k name and must
  * be placed (inline left, top, width and height); several pieces with that first name are one box around them. Throws,
- * starting with `where` (what asked) and naming the placed pieces there are, when there is none.
+ * starting with `where` (what asked) and naming the placed pieces there are, when there is none. `finder.alone(name)`
+ * says whether one placed piece alone has that first name.
  */
 export function boxFinder(html) {
   const placed = readPieces(html).pieces.filter((p) => p.box && p.box.w > 0 && p.box.h > 0);
-  return (name, where) => {
+  const find = (name, where) => {
     const boxes = placed.filter((p) => p.keys[0] === name).map((p) => p.box);
     if (!boxes.length) {
       const names = [...new Set(placed.map((p) => p.keys[0]))];
@@ -18,6 +19,24 @@ export function boxFinder(html) {
     const x0 = Math.min(...boxes.map((b) => b.x)), y0 = Math.min(...boxes.map((b) => b.y));
     return {x: x0, y: y0, w: Math.max(...boxes.map((b) => b.x + b.w)) - x0, h: Math.max(...boxes.map((b) => b.y + b.h)) - y0};
   };
+  /** Whether exactly one placed piece has this first name: only then is the piece's own shape the whole of what the name stands for. */
+  find.alone = (name) => placed.filter((p) => p.keys[0] === name).length === 1;
+  return find;
+}
+
+/**
+ * How far a ray from p along the unit vector u runs before it leaves an outline: `points` round a shape with no dent,
+ * [[x, y], …], p inside it. Infinity when it never does (a point outside, running away).
+ */
+export function exitOutline(points, [px, py], [ux, uy]) {
+  let least = Infinity;
+  points.forEach(([ax, ay], i) => {
+    const [bx, by] = points[(i + 1) % points.length], ex = bx - ax, ey = by - ay, cross = ux * ey - uy * ex;
+    if (Math.abs(cross) < 1e-12) return;   // the ray runs along this side: it leaves by another
+    const t = ((ax - px) * ey - (ay - py) * ex) / cross, along = ((ax - px) * uy - (ay - py) * ux) / cross;
+    if (t > 1e-9 && along >= -1e-9 && along <= 1 + 1e-9) least = Math.min(least, t);
+  });
+  return least;
 }
 
 /** How far a ray from p (inside the box) along the unit vector u runs before it leaves the box. */

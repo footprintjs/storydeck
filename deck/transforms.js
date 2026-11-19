@@ -27,9 +27,9 @@
 
 import {stripComments} from './html.js';
 import {readAttributes} from '../pieceRules.js';
-import {boxFinder, exit} from './boxes.js';
+import {boxFinder, exit, exitOutline} from './boxes.js';
 import {callouts} from './callouts.js';
-import {isoPieces} from './iso.js';
+import {isoDrawn} from './iso.js';
 
 const fixed = (v) => +v.toFixed(1);
 /** A wire written by the pieces it joins: "from to to [bend]". */
@@ -122,14 +122,28 @@ function replaceEach(html, found, draw) {
 /**
  * Each wire written between pieces as its numbers, "x1 y1 x2 y2 bend" (others: null). A piece is found as boxes.js ·
  * boxFinder finds it. Wires joining the same two pieces are spread across the line between their middles, LANE apart at
- * most and always inside both boxes, each keeping to its left (a request going right above its answer coming back,
- * whatever the pieces are called), in the order written; each then runs from the edge of one box to the edge of the
+ * most and always inside both pieces, each keeping to its left (a request going right above its answer coming back,
+ * whatever the pieces are called), in the order written; each then runs from the edge of one piece to the edge of the
  * other, GAP clear of both.
+ *
+ * An isometric piece (`shapes`: iso.js · isoDrawn) is not the box it is placed by: its edge is the outline of what it
+ * draws. So a wire to a block ends on the block, not in the empty corner of its box, and two blocks that stand clear
+ * of each other are never called too close because their boxes meet.
  */
-function wiresBetween(html, found) {
+function wiresBetween(html, found, shapes) {
   const read = found.map((f) => BETWEEN.exec(f.m[1]));
   if (!read.some(Boolean)) return read;
   const boxOf = boxFinder(html);
+  /** One end of a wire: its middle, how far a line may stand off that middle and still cross it, and where a ray leaves it. */
+  const endOf = (name, where) => {
+    // an isometric piece's own outline, when the name is that piece alone: a name several pieces share is one box round them all, as ever
+    const shape = boxOf.alone(name) ? shapes.get(name) : undefined;
+    if (shape) return {middle: shape.middle, across: (n) => Math.min(exitOutline(shape.outline, shape.middle, n), exitOutline(shape.outline, shape.middle, [-n[0], -n[1]])), exit: (p, u) => exitOutline(shape.outline, p, u)};
+    const box = boxOf(name, where);
+    // half the box measured across the line: a lane closer to the middle than this, less 8 px, crosses the box, so its
+    // ends are found on the box's edges (exit: from any point of such a line, as the line leaves the box)
+    return {middle: [box.x + box.w / 2, box.y + box.h / 2], across: (n) => (Math.abs(n[0]) * box.w + Math.abs(n[1]) * box.h) / 2, exit: (p, u) => exit(box, p, u)};
+  };
   // a pair's wires across its line, in its own direction (its names in order): those running that way first, on their
   // left of it, then those running back — on their own left
   const pairOf = (m) => [m[1], m[2]].sort().join('\u0000'), lanes = new Map();
@@ -143,18 +157,15 @@ function wiresBetween(html, found) {
     const spec = found[i].m[1];
     if (m[1] === m[2]) throw new Error(`data-arrow="${spec}": a wire joins two pieces, not "${m[1]}" to itself`);
     // in the pair's own direction (its names in order), so the wires both ways share one set of lanes
-    const [a, b] = [m[1], m[2]].sort(), A = boxOf(a, `data-arrow="${spec}"`), B = boxOf(b, `data-arrow="${spec}"`);
-    const ca = [A.x + A.w / 2, A.y + A.h / 2], cb = [B.x + B.w / 2, B.y + B.h / 2], len = Math.hypot(cb[0] - ca[0], cb[1] - ca[1]);
+    const [a, b] = [m[1], m[2]].sort(), A = endOf(a, `data-arrow="${spec}"`), B = endOf(b, `data-arrow="${spec}"`);
+    const ca = A.middle, cb = B.middle, len = Math.hypot(cb[0] - ca[0], cb[1] - ca[1]);
     if (len === 0) throw new Error(`data-arrow="${spec}": "${a}" and "${b}" share a middle — place them apart, or give the wire numbers`);
     const u = [(cb[0] - ca[0]) / len, (cb[1] - ca[1]) / len], n = [-u[1], u[0]];
-    // half the box measured across the line: a lane closer to the middle than this, less 8 px, crosses the box, so its
-    // ends are found on the box's edges (exit: from any point of such a line, as the line leaves the box)
-    const across = (box) => (Math.abs(n[0]) * box.w + Math.abs(n[1]) * box.h) / 2;
-    const lane = lanes.get(pairOf(m)), k = lane.indexOf(i), most = Math.max(0, Math.min(across(A), across(B)) - 8);
+    const lane = lanes.get(pairOf(m)), k = lane.indexOf(i), most = Math.max(0, Math.min(A.across(n), B.across(n)) - 8);
     const step = lane.length > 1 ? Math.min(LANE, (2 * most) / (lane.length - 1)) : 0, off = (k - (lane.length - 1) / 2) * step;
     const pa = [ca[0] + n[0] * off, ca[1] + n[1] * off], pb = [cb[0] + n[0] * off, cb[1] + n[1] * off];
-    const ta = exit(A, pa, u) + GAP, tb = exit(B, pb, [-u[0], -u[1]]) + GAP;
-    if (len - ta - tb < 12) throw new Error(`data-arrow="${spec}": "${a}" and "${b}" are too close for a wire between them (they touch or overlap) — move them apart, or give the wire numbers`);
+    const ta = A.exit(pa, u) + GAP, tb = B.exit(pb, [-u[0], -u[1]]) + GAP;
+    if (!(len - ta - tb >= 12)) throw new Error(`data-arrow="${spec}": "${a}" and "${b}" are too close for a wire between them (they touch or overlap) — move them apart, or give the wire numbers`);
     const start = [pa[0] + u[0] * ta, pa[1] + u[1] * ta], end = [pb[0] - u[0] * tb, pb[1] - u[1] * tb];
     const [from, to] = m[1] === a ? [start, end] : [end, start];
     return [...from, ...to, Number(m[3] ?? 0)].map(fixed).join(' ');
@@ -167,9 +178,12 @@ function wiresBetween(html, found) {
  */
 export const wireTags = (html) => emptyI(html, /\sdata-arrow="([^"<>]+)"/);
 
-/** Every <i data-arrow="…"></i> as its wire; one written between pieces runs between their boxes and carries data-ends. */
-export function wires(html) {
-  const found = wireTags(html), between = wiresBetween(html, found);
+/**
+ * Every <i data-arrow="…"></i> as its wire; one written between pieces runs between them and carries data-ends.
+ * `shapes`: what the isometric pieces draw (iso.js · isoDrawn) — a wire to one ends on its outline.
+ */
+export function wires(html, shapes = new Map()) {
+  const found = wireTags(html), between = wiresBetween(html, found, shapes);
   return replaceEach(html, found, ({before, m, after}, i) => {
     if (!between[i]) return wireSvg(before + after, m[1]);
     const [, from, to] = BETWEEN.exec(m[1]);
@@ -200,11 +214,17 @@ export function icons(html, set = {}) {
   });
 }
 
+/** What the wires written between pieces join, in the order written: [[from, to], …] by piece name. */
+export const wireLinks = (html) => wireTags(html).map(({m}) => wireEnds(m[1])).filter(Boolean);
+
 /**
  * The built-in helpers, in the order they run: icons first (a wire never holds one, a block's words may), then the
  * isometric pieces (so a callout may stand beside one and a wire reach it), then callouts (so a wire may reach one),
- * then wires. `canvas`, [w, h]: the slide a callout is kept on, and whose middle a floor starts from.
+ * then wires. `canvas`, [w, h]: the slide a callout is kept on, and whose middle a floor starts from. `area`, [x0, y0,
+ * x1, y1]: where a picture the build fits goes. What the wires join is read before anything is drawn: a map whose
+ * blocks have no place is placed from it (iso.js).
  */
-export function applyTransforms(html, {icons: set = {}, canvas = null} = {}) {
-  return wires(callouts(isoPieces(icons(html, set), {canvas}), {canvas}));
+export function applyTransforms(html, {icons: set = {}, canvas = null, area = null} = {}) {
+  const drawn = icons(html, set), iso = isoDrawn(drawn, {canvas, area, links: wireLinks(drawn)});
+  return wires(callouts(iso.html, {canvas}), iso.shapes);
 }

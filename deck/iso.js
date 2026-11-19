@@ -11,6 +11,23 @@
 // left), and a third number lifts it; data-size is "wide deep high" in tiles (a floor: "cols rows"). The numbers that
 // place it come from footprint-story/isometric, the grid a film can draw with too. Its words stand on its top face.
 //
+// NO PLACES TO TYPE. A map whose blocks have no data-at says only what is joined to what, with its wires ("you to
+// server"), and the build places them (footprint-story/isometric · arrange, across the frame): a joined block one
+// step to the right of what leads to it on the slide, the blocks led to from one place one below the other. A slide is
+// wider than it is tall, so the steps run across it; along the floor's own cols a chain is a long slant that leaves two
+// corners of the slide empty. Then nothing else needs a number: a block with no data-size is 2 2 1, a floor with none
+// is fitted round the blocks, and with no data-iso-grid the tile is chosen so the blocks fill the slide's area
+// (gridFor). The least a map is:
+//
+//   <div data-k="floor" data-iso="floor"></div>
+//   <div data-k="you" data-iso="block"><b>You</b></div>
+//   <div data-k="server" data-iso="block"><b>Server</b></div>
+//   <i data-k="w1" class="wire" data-arrow="you to server"></i>
+//
+// It is all or none: a map that places some of its blocks and not the others is refused, naming them — the build
+// does not guess where the unplaced go among the placed. data-iso-grid="fit" asks for the fitted grid on a map that
+// places its own blocks.
+//
 // WHY the build places it (and refuses a left/top/width/height of its own): where a block lands and how big it is on
 // the slide follow from the floor, and the order they are painted in (a nearer block over a further one) follows from
 // all of them together — written as a z-index, so the map's own order, which a click's numbering uses, never moves.
@@ -24,7 +41,7 @@
 // A piece is what it draws, not the box it is placed by. The box of a block seen from a corner has four empty corners,
 // and a nearer block's box lies over the block behind it: so on the slide shown only its faces and its words take the
 // pointer, and a ring round it (a highlight, explore's hover) follows its faces — isoRing, for whoever rings a piece.
-import {isometric} from 'footprint-story/isometric';
+import {arrange, gridFor, isometric, readThing} from 'footprint-story/isometric';
 import {attrRule, ownAttribute, pieceTags, tagsWith} from '../pieceRules.js';
 import {closeOf} from './callouts.js';
 
@@ -37,6 +54,20 @@ const GRID = new RegExp(`^\\s*${NUMBER}(?:\\s+${NUMBER})?\\s+at\\s+${NUMBER}\\s+
 const PLACED = ['left', 'top', 'width', 'height'];
 /** The most isometric pieces on one map (the grid orders that many). */
 export const MOST_ISO_PIECES = 256;
+/** A block or a cylinder that gives no data-size: 2 wide, 2 deep, 1 high. */
+export const USUAL_SIZE = Object.freeze([2, 2, 1]);
+/**
+ * A fitted grid's tile, in px: no wider than the first, and no narrower than the second — a block's words are drawn
+ * at one size whatever the tile, and under 96 px a block's top has no room for them. A picture too big for the slide
+ * at that tile runs past it, and a click's camera frames what the click shows (data-focus="fit"); the layout check
+ * names a lit piece that runs past the slide's edge.
+ */
+export const FITTED_TILE = Object.freeze({most: 160, least: 96});
+/** The px a fitted picture keeps clear of the area's edges, and the tiles of floor a fitted floor shows round the blocks. */
+const INSET = 40, MARGIN = 1;
+/** The most tiles a floor has along one side (the grid's own limit: footprint-story/isometric · floor). */
+export const MOST_FLOOR = 256;
+const FIT = 'fit';
 
 const fixed = (v) => +v.toFixed(1);
 const points = (list, x, y) => list.map((p) => `${fixed(p.x - x)},${fixed(p.y - y)}`).join(' ');
@@ -48,11 +79,12 @@ function numbersIn(text) {
 }
 
 /**
- * The map's grid and the map without the element that set it: the default is a tile 120 px wide, its far corner at the
- * slide's middle, 240 px down. The element is an empty <i> that carries data-iso-grid and nothing else: it is not a
- * piece, so taking it out moves no piece's number (a data-k on it would, and is refused). One pass over the tags.
+ * What the map says of its grid, and the map without the element that says it: {html, grid} when it is written in
+ * numbers, {html, fit: true} for data-iso-grid="fit", {html} alone when nothing is written (the build then decides:
+ * isoPieces). The element is an empty <i> that carries data-iso-grid and nothing else: it is not a piece, so taking it
+ * out moves no piece's number (a data-k on it would, and is refused). One pass over the tags.
  */
-function readGrid(html, canvas) {
+function readGrid(html) {
   const found = [];
   for (const t of tagsWith(html, MAYBE_GRID)) {
     const run = t.before + t.m[0] + t.after, own = ownAttribute(run, 'data-iso-grid');
@@ -63,22 +95,22 @@ function readGrid(html, canvas) {
     found.push({start: t.start, end: t.end + '</i>'.length, spec: own.value});
   }
   if (found.length > 1) throw new Error(`data-iso-grid: a map has one floor, and this one sets ${found.length} — keep one`);
-  if (!found.length) return {grid: isometric({tile: 120, origin: [(canvas?.[0] ?? 1920) / 2, 240]}), html};
-  const [{start, end, spec}] = found, m = GRID.exec(spec);
-  if (!m) throw new Error(`data-iso-grid="${spec}": the floor is a tile's width in px (and its height, for another angle), "at", and where its far corner stands, x y — "120 at 960 240", with "rise 70" after it to set a unit of height`);
+  if (!found.length) return {html};
+  const [{start, end, spec}] = found, map = html.slice(0, start) + html.slice(end);
+  if (spec.trim() === FIT) return {html: map, fit: true};
+  const m = GRID.exec(spec);
+  if (!m) throw new Error(`data-iso-grid="${spec}": the floor is a tile's width in px (and its height, for another angle), "at", and where its far corner stands, x y — "120 at 960 240", with "rise 70" after it to set a unit of height; or "fit", and the build chooses the tile that fills the slide`);
   const [w, h, x, y, rise] = m.slice(1).map((v) => (v === undefined ? undefined : Number(v)));
-  let grid;
   try {
-    grid = isometric({tile: h === undefined ? w : [w, h], origin: [x, y], ...(rise === undefined ? {} : {rise})});
+    return {html: map, grid: isometric({tile: h === undefined ? w : [w, h], origin: [x, y], ...(rise === undefined ? {} : {rise})})};
   } catch (e) {
     throw new Error(`data-iso-grid="${spec}": ${e.message.replace(/^isometric: /, '')}`, {cause: e});
   }
-  return {grid, html: html.slice(0, start) + html.slice(end)};
 }
 
 /**
  * Every isometric piece as written, in order, checked: [{start, open, close, end, tag, attrs, where, name, kind, at, size,
- * inner}]. Throws, naming the fix. A tag is one when a browser reads data-iso as its own attribute; the words inside
+ * inner}] — `at` null where no data-at is written, a floor's `size` null where no data-size is. Throws, naming the fix. A tag is one when a browser reads data-iso as its own attribute; the words inside
  * another attribute's value do not make it one.
  */
 function readIso(html) {
@@ -104,9 +136,9 @@ function readIso(html) {
       if (!a) return null;
       return (a.bare ? null : numbersIn(a.value)) ?? (() => { throw new Error(`${told}: ${attr}="${a.value}" — ${form}`); })();
     };
-    const size = read('data-size', kind === 'floor' ? 'a floor\'s size is "cols rows", whole numbers' : 'its size is "wide deep high", in tiles');
-    if (!size) throw new Error(`${told}: give it a data-size — ${kind === 'floor' ? '"cols rows" ("8 5")' : '"wide deep high" in tiles ("2 2 1.4")'}`);
-    const at = read('data-at', 'where it stands is "col row" on the floor, with a third number to lift it') ?? [0, 0];
+    // left out, a block's size is the usual one; a floor's size and anything's place are the build's to work out (place, below)
+    const size = read('data-size', kind === 'floor' ? 'a floor\'s size is "cols rows", whole numbers' : 'its size is "wide deep high", in tiles') ?? (kind === 'floor' ? null : [...USUAL_SIZE]);
+    const at = read('data-at', 'where it stands is "col row" on the floor, with a third number to lift it');
     const {at: close, end} = closeOf(html, tag, open, told), inner = html.slice(open, close);
     if (pieceTags(inner).length) throw new Error(`${told}: pieces do not nest, and this one holds a piece — place it beside it`);
     if (kind === 'floor' && inner.trim()) throw new Error(`${told}: a floor holds no words — put them in a piece that stands on it`);
@@ -118,7 +150,80 @@ function readIso(html) {
 /** The isometric pieces a map has: [{name, kind}] — nothing for a map without one. */
 export const isoIn = (html) => readIso(html).map(({name, kind}) => ({name, kind}));
 
-/** What the grid says of a piece, with the refusal naming the piece: {box, art, say}. */
+const quoted = (pieces) => pieces.map((p) => `"${p.name}"`).join(', ');
+
+/**
+ * Every piece given its place and its size, in tiles: `found` (readIso) with `at` and `size` filled in. Returns whether
+ * the build placed the blocks.
+ *
+ * The blocks (and cylinders): all placed by the map, or all placed here from `links` ([[from, to]], the map's wires) —
+ * never some of each. A floor with no data-size is fitted round them, a tile of floor showing on every side.
+ */
+function place(found, links) {
+  const solid = found.filter((p) => p.kind !== 'floor'), unplaced = solid.filter((p) => p.at === null);
+  if (unplaced.length && unplaced.length < solid.length) {
+    throw new Error(`${quoted(unplaced)} ${unplaced.length === 1 ? 'has' : 'have'} no data-at and ${quoted(solid.filter((p) => p.at !== null))} ${solid.length - unplaced.length === 1 ? 'has' : 'have'} one: the build places a map's blocks from its wires only when it places them all — take data-at off the others, or give every block one (a block with none stood at "0 0" before 0.17.0)`);
+  }
+  const placedHere = unplaced.length > 0;
+  if (placedHere) {
+    // a piece is known by the first name in its data-k: the wires say it, and the build places by it
+    const twice = solid.map((p) => p.name).find((name, i, all) => all.indexOf(name) !== i);
+    if (twice !== undefined) throw new Error(`the build places a map's blocks by the first name in their data-k, and two are called "${twice}" — give each a first name of its own, or give every block its data-at`);
+    // each block's size first, by the rule that draws it: a size that is none is refused naming the piece, as it always was
+    for (const p of solid) {
+      try { readThing({at: [0, 0], size: p.size}, `a ${p.kind}`); } catch (e) { throw new Error(`${p.where}: ${e.message.replace(/^isometric: /, '')}`, {cause: e}); }
+    }
+    let arranged;
+    try {
+      arranged = arrange(solid.map((p) => ({name: p.name, size: p.size})), links, {across: true});   // a slide is wider than it is tall
+    } catch (e) {
+      throw new Error(`the build cannot place this map's blocks: ${e.message.replace(/^isometric: /, '')} — or give every block its data-at`, {cause: e});
+    }
+    solid.forEach((p, i) => { p.at = [...arranged.things[i].at]; });
+  }
+  for (const floor of found.filter((p) => p.kind === 'floor')) {
+    if (floor.size !== null) { floor.at ??= [0, 0]; continue; }
+    if (floor.at !== null) throw new Error(`${floor.where}: a floor with a data-at needs its data-size too ("8 5") — or write neither, and the build fits the floor round the blocks`);
+    if (!solid.length) throw new Error(`${floor.where}: a floor with no data-size is fitted round the blocks that stand on it, and this map has none — give it a data-size ("8 5")`);
+    const reach = (axis, end) => (end ? Math.ceil(Math.max(...solid.map((p) => p.at[axis] + p.size[axis])) - 1e-9) : Math.floor(Math.min(...solid.map((p) => p.at[axis])) + 1e-9));
+    floor.at = [reach(0, false) - MARGIN, reach(1, false) - MARGIN];
+    floor.size = [reach(0, true) + MARGIN - floor.at[0], reach(1, true) + MARGIN - floor.at[1]];
+    // refused here, in the map's own terms: the author wrote no size, so the grid's "not [271,271]" would name numbers nobody typed
+    if (Math.max(...floor.size) > MOST_FLOOR) throw new Error(`${floor.where}: fitted round this map's blocks the floor would be ${floor.size[0]} by ${floor.size[1]} tiles, and a floor is at most ${MOST_FLOOR} a side — take the floor out, or give it a data-at and a data-size of its own (it is ground: it need not lie under every block)`);
+  }
+  return placedHere;
+}
+
+/**
+ * The grid of a map that writes none in numbers: fitted when the build placed the blocks or the map asks ("fit") — the
+ * tile that lets the blocks fill the slide's area, a little clear of its edges — and else the grid there has always
+ * been: a tile 120 px wide, its far corner at the slide's middle, 240 px down. A floor is not what the tile is chosen
+ * for: it is ground, and runs past the slide's edges as far as it likes.
+ */
+function gridOf(found, {fit, canvas, area}) {
+  const [w, h] = canvas ?? [1920, 1080];
+  if (!fit) return isometric({tile: 120, origin: [w / 2, 240]});
+  const things = found.filter((p) => p.kind !== 'floor').map((p) => ({at: p.at, size: p.size}));
+  if (!things.length) throw new Error('data-iso-grid="fit": the grid is fitted to the blocks, and this map has none — add a block, or write the grid in numbers ("120 at 960 240")');
+  const into = area ?? [0, 0, w, h];
+  if (!(Array.isArray(into) && into.length === 4 && into.every(Number.isFinite) && into[2] > into[0] && into[3] > into[1])) {
+    // each number as it is (NaN as NaN, where JSON would say null)
+    throw new Error(`a fitted picture goes into the slide's area, [x0, y0, x1, y1] in slide px with x1 past x0 and y1 past y0 (deck.json "area") — not ${Array.isArray(into) ? `[${into.map(String).join(', ')}]` : JSON.stringify(into)}`);
+  }
+  const [x0, y0, x1, y1] = into, inset = Math.min(INSET, (x1 - x0) / 4, (y1 - y0) / 4);   // a small area keeps half of itself
+  return gridFor(things, [x0 + inset, y0 + inset, x1 - inset, y1 - inset], FITTED_TILE);
+}
+
+/** A round thing's outline as points round it: the upper half of its top, then the lower half of its foot. */
+function roundOutline(top, bottom, steps = 12) {
+  const arc = (e, from) => Array.from({length: steps + 1}, (_, i) => { const a = from + (Math.PI * i) / steps; return {x: e.cx + e.rx * Math.cos(a), y: e.cy + e.ry * Math.sin(a)}; });
+  return [...arc(top, Math.PI), ...arc(bottom, 0)];
+}
+
+/**
+ * What the grid says of a piece, with the refusal naming the piece: {box, art, say} — and, for a block or a cylinder,
+ * {outline}: the points round what it draws on the slide.
+ */
 function shapeOf(p, grid) {
   try {
     if (p.kind === 'floor') {
@@ -131,10 +236,10 @@ function shapeOf(p, grid) {
     if (p.kind === 'cylinder') {
       const c = grid.cylinder(thing), {x, y} = c.box, t = c.top, b = c.bottom;
       const side = `M${fixed(t.cx - t.rx - x)} ${fixed(t.cy - y)}L${fixed(b.cx - b.rx - x)} ${fixed(b.cy - y)}A${fixed(b.rx)} ${fixed(b.ry)} 0 0 0 ${fixed(b.cx + b.rx - x)} ${fixed(b.cy - y)}L${fixed(t.cx + t.rx - x)} ${fixed(t.cy - y)}Z`;
-      return {box: c.box, art: `<path class="iso-side" d="${side}"/><ellipse class="iso-top" cx="${fixed(t.cx - x)}" cy="${fixed(t.cy - y)}" rx="${fixed(t.rx)}" ry="${fixed(t.ry)}"/>`, say: c.centre};
+      return {box: c.box, art: `<path class="iso-side" d="${side}"/><ellipse class="iso-top" cx="${fixed(t.cx - x)}" cy="${fixed(t.cy - y)}" rx="${fixed(t.rx)}" ry="${fixed(t.ry)}"/>`, say: c.centre, outline: roundOutline(t, b)};
     }
     const b = grid.block(thing), {x, y} = b.box;
-    return {box: b.box, art: `<polygon class="iso-left" points="${points(b.left, x, y)}"/><polygon class="iso-right" points="${points(b.right, x, y)}"/><polygon class="iso-top" points="${points(b.top, x, y)}"/>`, say: b.centre};
+    return {box: b.box, art: `<polygon class="iso-left" points="${points(b.left, x, y)}"/><polygon class="iso-right" points="${points(b.right, x, y)}"/><polygon class="iso-top" points="${points(b.top, x, y)}"/>`, say: b.centre, outline: b.outline};
   } catch (e) {
     throw new Error(`${p.where}: ${e.message.replace(/^isometric: /, '')}`, {cause: e});
   }
@@ -154,21 +259,47 @@ function draw(p, html, shape, level) {
   return `<${p.tag}${at}${ground} data-sd-iso="${p.kind}" style=${p.quote}${css}${p.quote}>${svg}${words}${html.slice(p.close, p.end)}`;
 }
 
-/** Every isometric piece in some HTML drawn on its floor; HTML without one (and without a floor set) comes back as it was. `canvas`: [w, h], the slide. */
-export function isoPieces(html, {canvas = null} = {}) {
-  if (!MAYBE.test(html) && !MAYBE_GRID.test(html)) return html;
-  const {grid, html: map} = readGrid(html, canvas), found = readIso(map);
-  if (!found.length) return map;
+/**
+ * Every isometric piece in some HTML drawn on its floor; HTML without one (and without a floor set) comes back as it
+ * was. `canvas`: [w, h], the slide; `area`: [x0, y0, x1, y1], where a fitted picture goes (the deck's area: below the
+ * headline, above the footer); `links`: [[from, to]] by piece name, what the map's wires join — what the build places
+ * the blocks from, when the map places none itself.
+ */
+export const isoPieces = (html, options) => isoDrawn(html, options).html;
+
+/**
+ * isoPieces, with what a helper that draws between pieces needs of an isometric one: {html, shapes} — `shapes` a Map
+ * from a block's or a cylinder's name to {outline: [[x, y], …], middle: [x, y]} in slide px: the points round what it
+ * draws, and the middle of that. A block is not the box it is placed by: a wire runs from the outline of one to the
+ * outline of the other (transforms.js), where a box would stop it short in the empty corner beside a face, and would
+ * call two blocks that stand clear of each other too close. A name two pieces share has no shape: it is found by its
+ * box, as before.
+ */
+export function isoDrawn(html, {canvas = null, area = null, links = []} = {}) {
+  const shapes = new Map();
+  if (!MAYBE.test(html) && !MAYBE_GRID.test(html)) return {html, shapes};
+  const {html: map, grid: written, fit = false} = readGrid(html), found = readIso(map);
+  if (!found.length) {
+    if (fit) throw new Error('data-iso-grid="fit": the grid is fitted to the blocks, and this map has none — add a block, or take the grid out');
+    return {html: map, shapes};
+  }
   if (found.length > MOST_ISO_PIECES) throw new Error(`a map holds at most ${MOST_ISO_PIECES} isometric pieces, and this one has ${found.length}`);
-  const shapes = found.map((p) => shapeOf(p, grid));
+  const placedHere = place(found, links);
+  const grid = written ?? gridOf(found, {fit: fit || placedHere, canvas, area});
+  const drawn = found.map((p) => shapeOf(p, grid));
   // the order they are painted in, the furthest first: a level each, above the floor and the wires (which share level 0)
   const solid = found.filter((p) => p.kind !== 'floor'), order = grid.backToFront(solid, (p) => ({at: p.at, size: p.size}));
   let out = '', from = 0;
   found.forEach((p, i) => {
-    out += map.slice(from, p.start) + draw(p, map, shapes[i], p.kind === 'floor' ? null : order.indexOf(p) + 1);
+    out += map.slice(from, p.start) + draw(p, map, drawn[i], p.kind === 'floor' ? null : order.indexOf(p) + 1);
     from = p.end;
   });
-  return out + map.slice(from);
+  const twice = new Set(solid.map((p) => p.name).filter((name, i, all) => all.indexOf(name) !== i));
+  for (const p of solid) {
+    const {outline, box} = drawn[found.indexOf(p)];
+    if (!twice.has(p.name)) shapes.set(p.name, {outline: outline.map(({x, y}) => [x, y]), middle: [box.x + box.w / 2, box.y + box.h / 2]});
+  }
+  return {html: out + map.slice(from), shapes};
 }
 
 const TONE = 'var(--iso-color, var(--sd-tone, #d9e4f3))';

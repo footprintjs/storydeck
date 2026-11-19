@@ -49,11 +49,11 @@ function refuseOwnNumbers(where, html) {
 }
 
 /** A map ready to plan on: its HTML with the helpers applied and its pieces read (`dev`: numbered for the dev page). */
-function prepareMap(name, html, icons, canvas, dev) {
+function prepareMap(name, html, icons, {canvas, area}, dev) {
   refuseOwnNumbers(`map "${name}"`, html);
   let drawn;
   try {
-    drawn = applyTransforms(stripComments(html), {icons, canvas});
+    drawn = applyTransforms(stripComments(html), {icons, canvas, area});
   } catch (e) {
     throw new Error(`map "${name}": ${e.message}`, {cause: e});
   }
@@ -78,7 +78,7 @@ function planClicks(parts, maps, {area, canvas, icons}) {
       refuseOwnNumbers(`"${part.label}"`, part.body);
       let inner;
       try {
-        inner = applyTransforms(part.body, {icons, canvas});
+        inner = applyTransforms(part.body, {icons, canvas, area});
       } catch (e) {
         throw new Error(`"${part.label}": ${e.message}`, {cause: e});
       }
@@ -145,7 +145,7 @@ function checkPost(post, labels) {
  */
 export function compileDeck(source, {dev = false} = {}) {
   const {config, parts, icons = {}} = source;
-  const maps = Object.fromEntries(Object.entries(source.maps ?? {}).map(([name, html]) => [name, prepareMap(name, html, icons, config.canvas, dev)]));
+  const maps = Object.fromEntries(Object.entries(source.maps ?? {}).map(([name, html]) => [name, prepareMap(name, html, icons, config, dev)]));
   for (const part of parts) if (part.map && !maps[part.map]) throw new Error(`"${part.label}" is told on map "${part.map}", which the deck does not have`);
   for (const part of parts) refuseEnglishWords(part.differs, config.lang, `"${part.label}"`);
   const opts = {area: [...config.area], canvas: config.canvas, icons, footer: config.footer};

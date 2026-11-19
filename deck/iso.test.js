@@ -1,7 +1,9 @@
 import {describe, it, expect} from 'vitest';
-import {isometric} from 'footprint-story/isometric';
-import {isoPieces, isoIn, isoRing, ISO_CSS, MOST_ISO_PIECES} from './iso.js';
-import {applyTransforms} from './transforms.js';
+import {readFileSync} from 'node:fs';
+import path from 'node:path';
+import {arrange, gridFor, isometric} from 'footprint-story/isometric';
+import {isoPieces, isoDrawn, isoIn, isoRing, ISO_CSS, MOST_ISO_PIECES, MOST_FLOOR, USUAL_SIZE, FITTED_TILE} from './iso.js';
+import {applyTransforms, wireLinks} from './transforms.js';
 import {compileDeck} from './compile.js';
 import {deckStyles} from './page.js';
 import {reviewClick} from './review.js';
@@ -46,11 +48,11 @@ describe('iso · blocks on a floor seen from a corner', () => {
     expect(tagOf(shown, 'f')).toContain(' data-ground="false" class="iso" data-sd-iso="floor"');   // its own word is kept, and no second one is added
     expect(readPieces(shown).pieces[0].ground).toBe(undefined);
     // a single-quoted style keeps its quote
-    expect(tagOf(isoPieces(`<div data-k="q" data-iso="block" data-size="1 1 1" style='--iso-color:"x"'></div>`, {canvas}), 'q')).toMatch(/style='left:900px;top:[\d.]+px;width:120px;height:[\d.]+px;z-index:1;--iso-color:"x"'>$/);
+    expect(tagOf(isoPieces(`<div data-k="q" data-iso="block" data-at="0 0" data-size="1 1 1" style='--iso-color:"x"'></div>`, {canvas}), 'q')).toMatch(/style='left:900px;top:[\d.]+px;width:120px;height:[\d.]+px;z-index:1;--iso-color:"x"'>$/);
   });
 
   it('found in review: the words data-iso in a text or in another attribute do not make a piece, a floor or a refusal', () => {
-    const piece = '<div data-k="a" data-iso="block" data-size="1 1 1"></div>';
+    const piece = '<div data-k="a" data-iso="block" data-at="0 0" data-size="1 1 1"></div>';
     const said = `<p>write &lt;i data-iso-grid="120 at 0 0"&gt; and data-iso="block"</p><div data-k="b" class="box" title="use data-iso-grid, or  data-iso=&quot;block&quot;" style="left:1px;top:2px;width:3px;height:4px">B</div>`;
     expect(isoPieces(said, {canvas})).toBe(said);                                 // no piece: byte for byte
     const out = isoPieces(said + piece, {canvas});
@@ -85,8 +87,8 @@ describe('iso · blocks on a floor seen from a corner', () => {
     expect(boxIn(own, 'a')).toMatchObject({x: 330, w: 96});
     const steep = isoPieces(`<i data-iso-grid="100 80 at 0 0 rise 50"></i><div data-k="a" data-iso="block" data-size="1 1 1"></div>`, {canvas});
     expect(boxIn(steep, 'a')).toEqual({x: -50, y: -50, w: 100, h: 130});   // 80 for the tile, 50 for its height
-    // the default: a tile 120 wide, its far corner at the slide's middle, 240 down — a slide of another size has another middle
-    expect(boxIn(isoPieces('<div data-k="a" data-iso="block" data-size="1 1 0"></div>', {canvas: [1000, 600]}), 'a')).toMatchObject({x: 440, y: 240});
+    // the default, for a map that places its blocks: a tile 120 wide, its far corner at the slide's middle, 240 down — a slide of another size has another middle
+    expect(boxIn(isoPieces('<div data-k="a" data-iso="block" data-at="0 0" data-size="1 1 0"></div>', {canvas: [1000, 600]}), 'a')).toMatchObject({x: 440, y: 240});
   });
 
   it('leaves HTML without an isometric piece as it was, byte for byte', () => {
@@ -100,8 +102,8 @@ describe('iso · blocks on a floor seen from a corner', () => {
     const bad = (html) => () => isoPieces(html, {canvas});
     expect(bad('<div data-k="a" data-iso="cube" data-size="1 1 1"></div>')).toThrow(/data-iso="cube": an isometric piece is a block, a cylinder or a floor/);
     expect(bad('<div data-iso="block" data-size="1 1 1"></div>')).toThrow(/an isometric piece is a piece, so a click can bring it in — give it a data-k name/);
-    expect(bad('<div data-k="a" data-iso="block"></div>')).toThrow(/"a" \(data-iso="block"\): give it a data-size — "wide deep high" in tiles \("2 2 1\.4"\)/);
-    expect(bad('<div data-k="f" data-iso="floor"></div>')).toThrow(/give it a data-size — "cols rows" \("8 5"\)/);
+    expect(bad('<div data-k="f" data-iso="floor"></div>')).toThrow(/"f" \(data-iso="floor"\): a floor with no data-size is fitted round the blocks that stand on it, and this map has none — give it a data-size \("8 5"\)/);
+    expect(bad('<div data-k="f" data-iso="floor" data-at="1 1"></div><div data-k="a" data-iso="block"></div>')).toThrow(/"f" \(data-iso="floor"\): a floor with a data-at needs its data-size too \("8 5"\) — or write neither, and the build fits the floor round the blocks/);
     expect(bad('<div data-k="a" data-iso="block" data-size="2 two 1"></div>')).toThrow(/data-size="2 two 1" — its size is "wide deep high", in tiles/);
     expect(bad('<div data-k="a" data-iso="block" data-size="2 2"></div>')).toThrow(/"a" \(data-iso="block"\): a block's size is \[wide, deep, high\], in tiles/);
     expect(bad('<div data-k="a" data-iso="block" data-at="1" data-size="1 1 1"></div>')).toThrow(/"a" \(data-iso="block"\): a block's at is \[col, row\] on the floor/);
@@ -121,7 +123,9 @@ describe('iso · blocks on a floor seen from a corner', () => {
     expect(bad('<div data-k="a" data-iso="block" data-size=1></div>')).toThrow(/data-size="1" — its size is "wide deep high", in tiles/);
     expect(bad('<div data-k="a" data-iso="block" data-size="1 1 1" title="oops></div>')).toThrow(/data-iso: a quote in its tag is never closed/);
     expect(bad('<i data-iso-grid="120 at 1 2"></i><i data-iso-grid="96 at 1 2"></i><div data-k="a" data-iso="block" data-size="1 1 1"></div>')).toThrow(/a map has one floor, and this one sets 2 — keep one/);
-    expect(bad('<i data-iso-grid="wide"></i><div data-k="a" data-iso="block" data-size="1 1 1"></div>')).toThrow(/data-iso-grid="wide": the floor is a tile's width in px/);
+    expect(bad('<i data-iso-grid="wide"></i><div data-k="a" data-iso="block" data-size="1 1 1"></div>')).toThrow(/data-iso-grid="wide": the floor is a tile's width in px .* or "fit", and the build chooses the tile that fills the slide/);
+    expect(bad('<i data-iso-grid="fit"></i>')).toThrow(/data-iso-grid="fit": the grid is fitted to the blocks, and this map has none — add a block, or take the grid out/);
+    expect(bad('<i data-iso-grid="fit"></i><div data-k="f" data-iso="floor" data-size="4 4"></div>')).toThrow(/data-iso-grid="fit": the grid is fitted to the blocks, and this map has none — add a block, or write the grid in numbers/);
     expect(bad('<i data-iso-grid="60 60 at 0 0"></i><div data-k="a" data-iso="block" data-size="1 1 1"></div>')).toThrow(/data-iso-grid="60 60 at 0 0": a tile is wider than it is tall/);
     expect(bad('<div data-iso-grid="120 at 1 2"></div><div data-k="a" data-iso="block" data-size="1 1 1"></div>')).toThrow(/the floor is set on an empty <i>/);
     expect(bad('<i data-iso-grid="120 at 1 2">x</i><div data-k="a" data-iso="block" data-size="1 1 1"></div>')).toThrow(/the floor is set on an empty <i>/);
@@ -222,5 +226,193 @@ describe('iso · in a deck', () => {
   it('a piece on the floor is moved in its file, not by a drag: the refusal says where', () => {
     const at = readPieces(isoPieces(MAP, {canvas})).pieces.findIndex((p) => p.keys[0] === 'server');
     expect(() => nudgePiece(MAP, {index: at, name: 'server'}, 10, 10)).toThrow(/"server" stands on the floor where its data-at says \("col row"\) — change its data-at in the file/);
+    // a block the build placed has no data-at to change: the message says what would place it, for every block of the map
+    // a floor is not a block: with a size of its own or fitted, it is moved by its own data-at and data-size
+    for (const floor of ['<div data-k="f" data-iso="floor" data-size="8 5"></div>', '<div data-k="f" data-iso="floor"></div>']) {
+      expect(() => nudgePiece(`${floor}<div data-k="a" data-iso="block" data-at="0 0"></div>`, {index: 0, name: 'f'}, 10, 10))
+        .toThrow('"f" is the floor: it lies where its data-at and data-size say, or round the blocks when it has neither — change them in the file');
+    }
+    const unplaced = '<div data-k="a" data-iso="block"></div><div data-k="b" data-iso="block"></div>';
+    expect(() => nudgePiece(unplaced, {index: 1, name: 'b'}, 10, 10)).toThrow('"b" was placed by the build, from the map\'s wires — to place the blocks yourself, give every block of the map a data-at ("col row") in the file');
+  });
+});
+
+describe('iso · no places to type: the build places the blocks from what is joined to what', () => {
+  const area = [0, 220, 1920, 1000];
+  /** The least a map is: no data-at, no data-size, no grid. */
+  const LEAST = `<div data-k="floor" data-iso="floor"></div>
+<div data-k="you" data-iso="block"><b>You</b></div>
+<i data-k="w1" class="wire" data-arrow="you to dns"></i>
+<div data-k="dns" data-iso="block"><b>DNS</b></div>
+<i data-k="w2" class="wire" data-arrow="you to server"></i>
+<div data-k="server" data-iso="block" data-size="2 2 1.6"><b>Server</b></div>
+<i data-k="w3" class="wire" data-arrow="server to db"></i>
+<div data-k="db" data-iso="cylinder"><b>Database</b></div>`;
+  const links = [['you', 'dns'], ['you', 'server'], ['server', 'db']];
+  const sizes = {you: USUAL_SIZE, dns: USUAL_SIZE, server: [2, 2, 1.6], db: USUAL_SIZE};
+  const round = (b) => Object.fromEntries(Object.entries(b).map(([k, v]) => [k, +v.toFixed(1)]));
+  /** What the kit says of this map, worked out here apart from iso.js: the places (across the frame), the floor round them, the grid that fits the blocks. */
+  function expected() {
+    const placed = arrange(Object.entries(sizes).map(([name, size]) => ({name, size: [...size]})), links, {across: true}).things;
+    const floor = {at: [-1, -1, 0], size: [Math.ceil(Math.max(...placed.map((t) => t.at[0] + t.size[0]))) + 2, Math.ceil(Math.max(...placed.map((t) => t.at[1] + t.size[1]))) + 2, 0]};
+    return {placed, floor, grid: gridFor(placed, [area[0] + 40, area[1] + 40, area[2] - 40, area[3] - 40], FITTED_TILE)};
+  }
+
+  it('reads what the wires join, in the order written', () => {
+    expect(wireLinks(LEAST)).toEqual(links);
+    expect(wireLinks('<i data-k="w" class="wire" data-arrow="1 2 3 4"></i><i data-k="v" class="wire" data-arrow="a to b 30"></i>')).toEqual([['a', 'b']]);   // a wire in numbers joins no pieces
+  });
+
+  it('places every block from the wires, fits the floor round them and the grid to the slide\'s area — no number typed', () => {
+    const drawn = isoPieces(LEAST, {canvas, area, links}), {placed, floor, grid} = expected();
+    for (const t of placed) expect(boxIn(drawn, t.name)).toEqual(round((t.name === 'db' ? grid.cylinder(t) : grid.block(t)).box));
+    expect(boxIn(drawn, 'floor')).toEqual(round(grid.floor({cols: floor.size[0], rows: floor.size[1], at: [-1, -1]}).box));   // a tile of floor on every side
+    // on the slide: you on the left; the two it asks one step to its right, one above its line and one below; the
+    // database one step on from the server, on the server's line (each by the middle of the tiles it stands on)
+    const mid = Object.fromEntries(placed.map((t) => { const p = grid.at(t.at[0] + t.size[0] / 2, t.at[1] + t.size[1] / 2); return [t.name, [p.x, p.y]]; }));
+    expect(mid.dns[0]).toBeCloseTo(mid.server[0], 6);
+    expect(mid.you[0]).toBeLessThan(mid.dns[0]);
+    expect(mid.dns[1]).toBeLessThan(mid.you[1]);
+    expect(mid.server[1]).toBeGreaterThan(mid.you[1]);
+    expect(mid.db[0]).toBeGreaterThan(mid.server[0]);
+    expect(mid.db[1]).toBeCloseTo(mid.server[1], 6);
+    // every block sits in the area, a little clear of its edges; the floor is ground, and may run past them
+    for (const name of ['you', 'dns', 'server', 'db']) {
+      const b = boxIn(drawn, name);
+      expect(b.x >= area[0] + 40 - 0.1 && b.y >= area[1] + 40 - 0.1 && b.x + b.w <= area[2] - 40 + 0.1 && b.y + b.h <= area[3] - 40 + 0.1, name).toBe(true);
+    }
+    expect(grid.tile[0]).toBeGreaterThanOrEqual(FITTED_TILE.least);
+  });
+
+  it('a block with no data-size is 2 wide, 2 deep and 1 high', () => {
+    expect(USUAL_SIZE).toEqual([2, 2, 1]);
+    const one = isoPieces('<i data-iso-grid="100 at 500 100"></i><div data-k="a" data-iso="block" data-at="0 0"></div>', {canvas});
+    expect(boxIn(one, 'a')).toEqual(round(isometric({tile: 100, origin: [500, 100]}).block({at: [0, 0], size: [2, 2, 1]}).box));
+  });
+
+  it('the same map through the whole helper chain: the wires run between the blocks the build placed', () => {
+    const out = applyTransforms(LEAST, {canvas, area});
+    expect(out).toBe(applyTransforms(LEAST, {canvas, area}));                   // the same again
+    expect(boxIn(out, 'server')).toEqual(boxIn(isoPieces(LEAST, {canvas, area, links}), 'server'));
+    for (const [name, ends] of [['w1', 'you dns'], ['w2', 'you server'], ['w3', 'server db']]) expect(tagOf(out, name)).toContain(`data-ends="${ends}"`);
+    expect(out).not.toMatch(/data-arrow|data-iso=|data-at=/);
+  });
+
+  it('a link to a piece that is no block is no rule, and blocks joined to nothing are placed too', () => {
+    const map = `<div data-k="a" data-iso="block"></div><div data-k="b" data-iso="block"></div><div data-k="note" class="chip" style="left:10px;top:10px;width:100px;height:40px">n</div>`;
+    const drawn = isoPieces(map, {canvas, area, links: [['a', 'note'], ['note', 'b']]});
+    const a = boxIn(drawn, 'a'), b = boxIn(drawn, 'b');
+    expect(b.x - a.x).toBeGreaterThan(a.w);             // side by side on the slide, clear of each other
+    expect(b.y).toBe(a.y);                              // on one level line
+    expect(boxIn(drawn, 'note')).toEqual({x: 10, y: 10, w: 100, h: 40});   // a piece that is no block stays where it was written
+  });
+
+  it('is all or none: a map that places some of its blocks and not the others is refused, naming them', () => {
+    const mixed = '<div data-k="a" data-iso="block" data-at="0 0"></div><div data-k="b" data-iso="block"></div><div data-k="c" data-iso="cylinder"></div>';
+    expect(() => isoPieces(mixed, {canvas})).toThrow('"b", "c" have no data-at and "a" has one: the build places a map\'s blocks from its wires only when it places them all — take data-at off the others, or give every block one (a block with none stood at "0 0" before 0.17.0)');
+    expect(() => isoPieces('<div data-k="a" data-iso="block" data-at="0 0"></div><div data-k="d" data-iso="block" data-at="3 0"></div><div data-k="b" data-iso="block"></div>', {canvas}))
+      .toThrow(/^"b" has no data-at and "a", "d" have one:/);
+    // a floor's place is its own matter: a floor that is placed beside blocks that are not is no mix
+    expect(() => isoPieces('<div data-k="f" data-iso="floor" data-at="-1 -1" data-size="9 9"></div><div data-k="a" data-iso="block"></div>', {canvas, area})).not.toThrow();
+  });
+
+  it('refuses two blocks with one name when it has to place them by name', () => {
+    const fix = 'the build places a map\'s blocks by the first name in their data-k, and two are called "a" — give each a first name of its own, or give every block its data-at';
+    expect(() => isoPieces('<div data-k="a" data-iso="block"></div><div data-k="a" data-iso="block"></div>', {canvas})).toThrow(fix);
+    expect(() => isoPieces('<div data-k="a x" data-iso="block"></div><div data-k="a y" data-iso="block"></div>', {canvas})).toThrow(fix);   // the first name is the name
+    // what the kit itself cannot place is said in its words, with the way out
+    expect(() => isoPieces('<div data-k="a" data-iso="block" data-size="70 2 1"></div>', {canvas}))
+      .toThrow(/^the build cannot place this map's blocks: "a"'s size is \[wide, deep, high\] with wide and deep above 0, high 0 or more, none over 64 — not \[70,2,1\] — or give every block its data-at$/);
+    // placed by the map, two of a name are drawn as they always were
+    expect(() => isoPieces('<div data-k="a" data-iso="block" data-at="0 0"></div><div data-k="a" data-iso="block" data-at="4 0"></div>', {canvas})).not.toThrow();
+  });
+
+  it('a floor with no data-size is fitted round the blocks, wherever the map placed them', () => {
+    const drawn = isoPieces('<i data-iso-grid="100 at 500 100"></i><div data-k="f" data-iso="floor"></div><div data-k="a" data-iso="block" data-at="2 3" data-size="1.5 1 1"></div><div data-k="b" data-iso="block" data-at="6.2 1" data-size="1 2.4 1"></div>', {canvas});
+    const grid = isometric({tile: 100, origin: [500, 100]});
+    expect(boxIn(drawn, 'f')).toEqual(round(grid.floor({cols: 8, rows: 5, at: [1, 0]}).box));   // cols 2..7.2 and rows 1..4, a whole tile clear on every side
+    // a floor the map sized keeps its size, and its place when none is written is 0 0, as before
+    expect(boxIn(isoPieces('<i data-iso-grid="100 at 500 100"></i><div data-k="f" data-iso="floor" data-size="3 2"></div><div data-k="a" data-iso="block" data-at="5 5"></div>', {canvas}), 'f'))
+      .toEqual(round(grid.floor({cols: 3, rows: 2}).box));
+  });
+
+  it('a floor fitted round a map too long for one is refused in the map\'s own terms, with the fix — never in numbers nobody typed', () => {
+    const far = `<div data-k="f" data-iso="floor"></div><div data-k="a" data-iso="block" data-at="0 0"></div><div data-k="b" data-iso="block" data-at="300 0"></div>`;
+    expect(() => isoPieces(far, {canvas})).toThrow('"f" (data-iso="floor"): fitted round this map\'s blocks the floor would be 304 by 4 tiles, and a floor is at most 256 a side — take the floor out, or give it a data-at and a data-size of its own (it is ground: it need not lie under every block)');
+    const many = Array.from({length: 90}, (_, i) => `<div data-k="b${i}" data-iso="block"></div>`).join(''), chain = Array.from({length: 89}, (_, i) => [`b${i}`, `b${i + 1}`]);
+    expect(() => isoPieces(`<div data-k="f" data-iso="floor"></div>${many}`, {canvas, area, links: chain})).toThrow(/fitted round this map's blocks the floor would be \d+ by \d+ tiles, and a floor is at most 256 a side/);
+    expect(() => isoPieces(many, {canvas, area, links: chain})).not.toThrow();   // the same blocks with no floor are placed
+    expect(() => isoPieces(`<div data-k="f" data-iso="floor" data-at="0 0" data-size="20 20"></div>${many}`, {canvas, area, links: chain})).not.toThrow();   // or with a floor the map sized
+    // the limit is the grid's own: a floor one tile over it is what the grid refuses
+    expect(() => isometric().floor({cols: MOST_FLOOR, rows: 1})).not.toThrow();
+    expect(() => isometric().floor({cols: MOST_FLOOR + 1, rows: 1})).toThrow(/whole numbers from 1 to 256/);
+  });
+
+  it('a fitted picture goes into the area given: a small one keeps half of itself clear, and one that is no area is refused by name', () => {
+    const blocks = '<div data-k="a" data-iso="block"></div>', one = [{at: [0, 0], size: [2, 2, 1]}];
+    const small = [100, 100, 220, 180];   // 120 by 80: 40 px each side would leave nothing, so a quarter each way
+    expect(boxIn(isoPieces(blocks, {canvas, area: small}), 'a')).toEqual(round(gridFor(one, [120, 120, 200, 160], FITTED_TILE).block(one[0]).box));
+    expect(boxIn(isoPieces(blocks, {canvas: [400, 300]}), 'a')).toEqual(round(gridFor(one, [40, 40, 360, 260], FITTED_TILE).block(one[0]).box));
+    for (const not of [[0, 0, 0, 100], [10, 0, 5, 100], [0, 0, NaN, 100], [0, 0, 100], 'wide']) {
+      expect(() => isoPieces(blocks, {canvas, area: not})).toThrow(/^a fitted picture goes into the slide's area, \[x0, y0, x1, y1\] in slide px with x1 past x0 and y1 past y0 \(deck\.json "area"\) — not /);
+    }
+    expect(() => isoPieces(blocks, {canvas, area: [NaN, 0, 10, 10]})).toThrow(/— not \[NaN, 0, 10, 10\]$/);   // each number as it is
+    expect(() => isoPieces(blocks, {canvas, area: 'wide'})).toThrow(/— not "wide"$/);
+  });
+
+  it('data-iso-grid="fit" fits the grid on a map that places its own blocks; a floor the map sized is ground, and is not what the tile is chosen for', () => {
+    const blocks = '<div data-k="a" data-iso="block" data-at="0 0"></div><div data-k="b" data-iso="block" data-at="5 0"></div>';
+    const fitted = isoPieces(`<i data-iso-grid="fit"></i>${blocks}`, {canvas, area}), usual = isoPieces(blocks, {canvas, area});
+    expect(fitted).not.toContain('data-iso-grid');
+    const things = [{at: [0, 0], size: [2, 2, 1]}, {at: [5, 0], size: [2, 2, 1]}], grid = gridFor(things, [40, 260, 1880, 960], FITTED_TILE);
+    expect(boxIn(fitted, 'a')).toEqual(round(grid.block(things[0]).box));
+    expect(boxIn(usual, 'a')).toEqual(round(isometric({tile: 120, origin: [960, 240]}).block(things[0]).box));   // without it: the grid there has always been
+    const wide = isoPieces(`<i data-iso-grid=" fit "></i><div data-k="f" data-iso="floor" data-at="-20 -20" data-size="60 60"></div>${blocks}`, {canvas, area});
+    expect(boxIn(wide, 'a')).toEqual(boxIn(fitted, 'a'));
+    // with no area given, the picture is fitted to the slide
+    const whole = gridFor(things, [40, 40, 1880, 1040], FITTED_TILE);
+    expect(boxIn(isoPieces(`<i data-iso-grid="fit"></i>${blocks}`, {canvas}), 'a')).toEqual(round(whole.block(things[0]).box));
+  });
+
+  it('a picture too big for the slide keeps a tile its words fit: it runs past the area, and a click\'s camera frames what the click shows', () => {
+    const many = Array.from({length: 14}, (_, i) => `<div data-k="b${i}" data-iso="block"></div>`).join('');
+    const chain = Array.from({length: 13}, (_, i) => [`b${i}`, `b${i + 1}`]);   // fourteen steps: 41 tiles across at a tile to a step
+    const drawn = isoPieces(many, {canvas, area, links: chain}), first = boxIn(drawn, 'b0'), last = boxIn(drawn, 'b13');
+    expect(first.w).toBe(FITTED_TILE.least * 2);        // a 2 × 2 block is two tiles wide on the slide: the least tile
+    expect(first.x < area[0] || last.x + last.w > area[2]).toBe(true);
+    expect(FITTED_TILE).toEqual({most: 160, least: 96});
+  });
+
+  it('hands each block\'s outline and its middle to whoever draws between pieces; a name two blocks share has none', () => {
+    const {html, shapes} = isoDrawn('<i data-iso-grid="100 at 500 100"></i><div data-k="a" data-iso="block" data-at="0 0"></div><div data-k="c" data-iso="cylinder" data-at="4 0"></div>', {canvas});
+    expect(html).toBe(isoPieces('<i data-iso-grid="100 at 500 100"></i><div data-k="a" data-iso="block" data-at="0 0"></div><div data-k="c" data-iso="cylinder" data-at="4 0"></div>', {canvas}));
+    const grid = isometric({tile: 100, origin: [500, 100]}), block = grid.block({at: [0, 0], size: [2, 2, 1]});
+    expect(shapes.get('a').outline).toEqual(block.outline.map(({x, y}) => [x, y]));
+    expect(shapes.get('a').middle).toEqual([block.box.x + block.box.w / 2, block.box.y + block.box.h / 2]);
+    const round_ = grid.cylinder({at: [4, 0], size: [2, 2, 1]}), points = shapes.get('c').outline;
+    expect(points).toHaveLength(26);
+    for (const [x, y] of points) expect(x >= round_.box.x - 1e-6 && x <= round_.box.x + round_.box.w + 1e-6 && y >= round_.box.y - 1e-6 && y <= round_.box.y + round_.box.h + 1e-6).toBe(true);
+    expect(Math.min(...points.map((p) => p[1]))).toBeCloseTo(round_.box.y, 6);                       // the top of its top
+    expect(Math.max(...points.map((p) => p[1]))).toBeCloseTo(round_.box.y + round_.box.h, 6);        // the foot of its foot
+    expect(isoDrawn('<div data-k="a" data-iso="block" data-at="0 0"></div><div data-k="a" data-iso="block" data-at="4 0"></div>', {canvas}).shapes.size).toBe(0);
+    expect(isoDrawn('<p>no piece</p>', {canvas})).toEqual({html: '<p>no piece</p>', shapes: new Map()});
+  });
+
+  it('the README\'s map with no number in it builds as written', () => {
+    const readme = readFileSync(path.join(process.cwd(), 'README.md'), 'utf8');   // the tests run from the package's own folder
+    const written = /no number to type:\n\n {2}```html\n([\s\S]*?)\n {2}```/.exec(readme)[1].split('\n').map((line) => line.trim()).join('\n');
+    expect(written).not.toMatch(/data-at|data-iso-grid|\d+px/);
+    expect(written.match(/data-iso="/g)).toHaveLength(5);
+    const out = applyTransforms(written, {canvas, area});
+    expect(isoIn(written).map((p) => p.name)).toEqual(['floor', 'you', 'dns', 'server', 'db']);
+    for (const name of ['you', 'dns', 'server', 'db']) expect(boxIn(out, name).w).toBeGreaterThan(0);
+    expect(out.match(/data-ends="/g)).toHaveLength(3);
+  });
+
+  it('a deck whose map types no places builds, and its clicks plan on the placed pieces', () => {
+    const compiled = compileDeck(sourceOf({clicks: '<section data-label="P" data-map="map"><step data-in="floor you dns w1" data-focus="fit"><h2>One</h2></step><step data-in="server w2 db w3" data-on="server db"><h2>Two</h2></step></section>', maps: {map: LEAST}}));
+    expect(compiled.clicks).toHaveLength(2);
+    expect(compiled.maps.map.pieces.map((p) => p.keys[0])).toEqual(['floor', 'you', 'w1', 'dns', 'w2', 'server', 'w3', 'db']);
+    expect(compiled.maps.map.pieces.every((p) => p.box && p.box.w > 0)).toBe(true);
   });
 });
