@@ -6,6 +6,7 @@
 // The build writes what each piece leads to (exploreTargets: pure); the page carries it as data (#deck-explore) and
 // exploreRuntime follows it. A piece no click is about leads nowhere and is not clickable.
 import {expandNames} from '../focus.js';
+import {isoRing} from './iso.js';
 
 /**
  * Where each piece leads, from the planned clicks: {slides: [the map each click is on, or null], targets: {map: {name:
@@ -28,9 +29,18 @@ export function exploreTargets(planned) {
 /** The data the page carries, safe inside its <script> tag. */
 export const exploreData = (explore) => `<script type="application/json" id="deck-explore">${JSON.stringify(explore).replace(/</g, '\\u003c')}</script>`;
 
-/** The look of a piece that leads somewhere and of the way back — in the page only when the deck explores. */
+const ACCENT = 'var(--sd-accent, var(--accent-ink, #0b6e99))', LEADS = 'deck-stage[data-explore] .sd-leads:hover';
+/**
+ * The look of a piece that leads somewhere and of the way back — in the page only when the deck explores. The ring on
+ * hover is round the piece's box only when the box is what the piece draws: a wire is marked along its line, and an
+ * isometric piece round its faces (a box round either is a rectangle over a picture that has none).
+ */
 export const EXPLORE_CSS = `:where(deck-stage[data-explore] .sd-leads) { cursor: pointer; }
-:where(deck-stage[data-explore] .sd-leads:hover) { outline: 3px solid var(--sd-accent, var(--accent-ink, #0b6e99)); outline-offset: 6px; }
+:where(${LEADS}) { outline: 3px solid ${ACCENT}; outline-offset: 6px; }
+:where(${LEADS}:is(svg.wire, [data-sd-iso])) { outline: none; }
+:where(${LEADS}:is(svg.wire)) { color: ${ACCENT}; }
+:where(${LEADS}:is(svg.wire) path:not(.head)) { stroke-width: 7; }
+${isoRing(LEADS, ACCENT)}
 :where(.explore-back) {
   position: fixed; left: 12px; top: 12px; z-index: 10; padding: 8px 14px; border-radius: 20px; cursor: pointer;
   border: 1.5px solid var(--line, #c9d0d9); background: var(--bg-elev, #f6f8fa); color: var(--fg, #14181f);

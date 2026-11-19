@@ -1,5 +1,6 @@
 import {describe, it, expect, afterEach} from 'vitest';
-import {exploreTargets, exploreData, exploreRuntime} from './explore.js';
+import {exploreTargets, exploreData, exploreRuntime, EXPLORE_CSS} from './explore.js';
+import {isoRing} from './iso.js';
 import {compileDeck} from './compile.js';
 import {deckPage} from './page.js';
 import {readConfig} from './config.js';
@@ -51,6 +52,18 @@ describe('the page', () => {
     expect(on).toContain('<script type="application/json" id="deck-explore">{"slides":');
     expect(on).toContain('exploreRuntime');
     expect(off).not.toMatch(/explore/);
+  });
+
+  it('rings a piece on hover where it is drawn: a box round a box, a wire along its line, an isometric piece round its faces', () => {
+    const rules = EXPLORE_CSS.split('\n'), leads = 'deck-stage[data-explore] .sd-leads:hover';
+    expect(rules[1]).toBe(`:where(${leads}) { outline: 3px solid var(--sd-accent, var(--accent-ink, #0b6e99)); outline-offset: 6px; }`);
+    // a box round a wire or a block seen from a corner is a rectangle over a picture that has none: off, after the rule that draws it
+    expect(rules[2]).toBe(`:where(${leads}:is(svg.wire, [data-sd-iso])) { outline: none; }`);
+    expect(rules[3]).toBe(`:where(${leads}:is(svg.wire)) { color: var(--sd-accent, var(--accent-ink, #0b6e99)); }`);
+    expect(rules[4]).toBe(`:where(${leads}:is(svg.wire) path:not(.head)) { stroke-width: 7; }`);
+    expect(EXPLORE_CSS).toContain(isoRing(leads, 'var(--sd-accent, var(--accent-ink, #0b6e99))'));
+    // every rule without weight, so a theme restyles the ring
+    for (const rule of EXPLORE_CSS.replace(/@media[^{]*\{/, '').split('}').map((r) => r.trim()).filter(Boolean)) expect(rule.startsWith(':where('), rule).toBe(true);
   });
 
   it('keeps the data inside its script tag', () => {

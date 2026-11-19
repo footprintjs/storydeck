@@ -591,7 +591,8 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
 - **Explore: click a piece, go to the click about it.** `"explore": true` in deck.json lets a viewer wander the
   deck: a click on a piece goes to the click that is about it (the first whose `data-on` names it, else the first that
   takes it in through a `name+`), and "Back to click N" (or Backspace) returns, as a browser's Back does. Pieces that
-  lead somewhere show a pointer and a ring on hover; on a touch screen a tap on one explores (tap beside the pieces to
+  lead somewhere show a pointer and a ring on hover, drawn where the piece is: round a box, along a wire's line, round
+  the faces of an isometric block. On a touch screen a tap on one explores (tap beside the pieces to
   step), and the keyboard keeps stepping in order. The order you wrote is
   untouched — explore is a way through the same clicks, for a deck left open on a screen or sent to someone.
 - **Read first, look last.** A reviewer — a person, or a model that pays for every screenshot — reads the deck as text:
@@ -649,8 +650,10 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   The floor is ground (see below), so the view follows the pieces. One colour a piece (`--iso-color`): its top is drawn
   lighter and its sides darker; `--iso-ink`, `--iso-line`, `--iso-grid` and `--iso-floor` are the other tokens, and
   class `ok`, `warn` or `bad` colours one. The numbers come from `footprint-story/isometric`, the grid a film can draw
-  with too. Not yet: a wire that runs along the floor (a wire goes straight from box to box), and moving a block by
-  dragging it in the dev page (change its `data-at`).
+  with too. A block is what it draws, not the box it is placed by: its faces and its words take the pointer (the
+  empty corners of its box do not, so a block behind is not covered by them), and a ring round it — a highlight
+  (`data-hot`) or explore's hover — follows its faces. Not yet: a wire that runs along the floor (a wire goes straight
+  from box to box), and moving a block by dragging it in the dev page (change its `data-at`).
   A deck to start from: [examples/a-request](examples/a-request) (blocks on a floor, a view that follows them, an order
   inside each click); a test builds and checks it.
 - **Ground: what lies under the picture.** `data-ground` on a piece (a floor has it by itself) says it lies under the

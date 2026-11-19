@@ -11,7 +11,7 @@
  * A piece with a loop (deck-stage: data-loop and its --loop) keeps it while it changes: the loop is the last animation
  * in the piece's list.
  *
- * Tokens (set them in your theme; each has a fallback): --sd-dim-opacity · --sd-hot · --sd-blur ·
+ * Tokens (set them in your theme; each has a fallback): --sd-dim-opacity · --sd-hot · --sd-hot-width · --sd-blur ·
  * --sd-veil · --sd-accent (falls back to storydeck's --yellow) · --sd-ease · --sd-move-time · --sd-glow (a path's
  * pulse, falls back to the accent).
  */
@@ -22,7 +22,7 @@
 .sd-dim.sd-keep { opacity: 1; filter: none; }
 .sd-gone { visibility: hidden; }
 .sd-twin-off { visibility: hidden; }   /* stepped aside for its lit twin (a dashed wire under a solid one) */
-.sd-hot { outline: 5px solid var(--sd-hot, #ef4444); outline-offset: 8px; }
+.sd-hot { outline: var(--sd-hot-width, 5px) solid var(--sd-hot, #ef4444); outline-offset: 8px; }   /* a piece that draws its own ring sets the width to 0 (deck/iso.js) */
 
 /* a mover's result: a piece moved and scaled around its centre (or its top-left corner), on top of
    whatever transform it has of its own; the stage, for a zoom, around the slide's corner */

@@ -1,12 +1,13 @@
 import {describe, it, expect} from 'vitest';
 import {isometric} from 'footprint-story/isometric';
-import {isoPieces, isoIn, ISO_CSS, MOST_ISO_PIECES} from './iso.js';
+import {isoPieces, isoIn, isoRing, ISO_CSS, MOST_ISO_PIECES} from './iso.js';
 import {applyTransforms} from './transforms.js';
 import {compileDeck} from './compile.js';
 import {deckStyles} from './page.js';
 import {reviewClick} from './review.js';
 import {nudgePiece} from './edit.js';
 import {readPieces} from '../focusHtml.js';
+import {pageAssets} from './assets.js';
 import {sourceOf} from './test/helpers.js';
 
 const canvas = [1920, 1080];
@@ -180,10 +181,34 @@ describe('iso · in a deck', () => {
     expect(why.y + why.h).toBeLessThan(db.y);
   });
 
+  /** Its style rules, without the comments, the keyframes and the media gate round the one that moves. */
+  const styleRules = (css) => css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/@keyframes[^{]*\{[^{}]*\{[^{}]*\}\s*\}/g, '').replace(/@media[^{]*\{/g, '')
+    .split('}').map((r) => r.trim()).filter(Boolean);
+
   it('every rule of its stylesheet has no weight and stays inside a slide, so a deck\'s own rule wins', () => {
-    const rules = ISO_CSS.replace(/\/\*[\s\S]*?\*\//g, '').split('}').map((r) => r.trim()).filter(Boolean);
-    expect(rules.length).toBeGreaterThan(8);
-    for (const rule of rules) expect(rule.startsWith(':where(section[data-label] '), rule).toBe(true);
+    const rules = styleRules(ISO_CSS);
+    expect(rules.length).toBeGreaterThan(12);
+    for (const rule of rules) expect(rule.startsWith(':where(section[data-label]'), rule).toBe(true);
+    // what plays is behind the motion gate, as every animation of a click is
+    expect(ISO_CSS).toMatch(/@media screen and \(prefers-reduced-motion: no-preference\) \{\n  :where\(section\[data-label\]\[data-deck-active\]:not\(\[data-sd-instant\]\):not\(\[data-deck-static\]\) \.sd-hot-in:is\([^)]*\) \.iso-art\) \{ animation: sdIsoRing /);
+  });
+
+  it('a piece is what it draws: its faces and its words take the pointer, never the corners of its box', () => {
+    expect(ISO_CSS).toContain(':where(section[data-label] [data-sd-iso]) { position: absolute; box-sizing: border-box; pointer-events: none; --sd-hot-width: 0px; }');
+    expect(ISO_CSS).toContain(':where(section[data-label] [data-sd-iso] :is(.iso-art > *, .iso-say)) { pointer-events: auto; }');
+    // the drawing itself stays out of the way: only what is painted inside it is hit
+    expect(ISO_CSS).toMatch(/:where\(section\[data-label\] \.iso-art\) \{[^}]*pointer-events: none;/);
+  });
+
+  it('a ring follows its faces: isoRing rings a block or a cylinder round what it paints, a floor along its edge', () => {
+    const ring = isoRing('deck-stage .picked', 'red', '3px');
+    expect(ring.split('\n')).toEqual([
+      ':where(deck-stage .picked:is([data-sd-iso="block"], [data-sd-iso="cylinder"]) .iso-art) { filter: drop-shadow(3px 0 0 red) drop-shadow(-3px 0 0 red) drop-shadow(0 3px 0 red) drop-shadow(0 -3px 0 red); }',
+      ':where(deck-stage .picked[data-sd-iso="floor"] .iso-ground) { stroke: red; stroke-width: 3px; }',
+    ]);
+    // its highlight (data-hot): the box's ring is off (focus.css reads the width), the faces are ringed in the same colour
+    expect(ISO_CSS).toContain(isoRing('section[data-label] .sd-hot', 'var(--sd-hot, #ef4444)', '5px'));
+    expect(pageAssets().css.join('\n')).toContain('.sd-hot { outline: var(--sd-hot-width, 5px) solid var(--sd-hot, #ef4444); outline-offset: 8px; }');
   });
 
   it('a piece on the floor is moved in its file, not by a drag: the refusal says where', () => {
