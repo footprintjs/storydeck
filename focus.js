@@ -154,7 +154,8 @@ export const FOCUS = Object.freeze({
   fit: Object.freeze({name: 'fit', kind: 'camera', keepsContext: true, place({subject, context, look, area, options}) {
     const share = num(options.share, .8), least = num(options.least, .25), most = num(options.most, 2.5);
     if (!(share > 0 && share <= 1)) throw new Error(`focus "fit": share is how much of the area the picture fills, above 0 and 1 at most (0.8) — not "${options.share}"`);
-    if (!(least > 0 && most >= least)) throw new Error(`focus "fit": least and most are how far out and how close the view may go, least above 0 and most no smaller (0.25 and 2.5) — not "${options.least ?? .25}" and "${options.most ?? 2.5}"`);
+    // 100× at most: a bound, so no option (an 'Infinity', a 1e308 from a file) can give the view a size no screen has
+    if (!(least > 0 && most >= least && most <= 100)) throw new Error(`focus "fit": least and most are how far out and how close the view may go, least above 0 and most no smaller, 100 at most (0.25 and 2.5) — not "${options.least ?? .25}" and "${options.most ?? 2.5}"`);
     const shown = union(look === 'hide' ? [subject] : [subject, context]);
     if (!shown) return {};
     return {stage: toCentre(shown, clamp(share * Math.min(area.w / Math.max(shown.w, 1), area.h / Math.max(shown.h, 1)), least, most), centre(area))};
