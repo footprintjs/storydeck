@@ -7,7 +7,9 @@
 //
 //   look     how the context looks     grey (greyed in place — the default) · hide · keep
 //   camera   where the view goes       zoom (the view closes in on the subject, where the mover leaves it — so a
-//                                      click can close in while its parts fly apart or step aside)
+//                                      click can close in while its parts fly apart or step aside) ·
+//                                      fit (the view frames everything shown, so it slides to a new piece and
+//                                      pulls back as the picture grows)
 //   mover    where things go           left · right · up · down (the context steps aside that way, smaller,
 //                                      and the subject grows into the room it leaves) ·
 //                                      place (named groups moved by the amounts you give — a layout you
@@ -140,6 +142,22 @@ export const FOCUS = Object.freeze({
     if (!subject) return {};
     const k = clamp(num(options.share, .7) * Math.min(area.w / Math.max(subject.w, 1), area.h / Math.max(subject.h, 1)), 1, num(options.most, 2.5));
     return {stage: toCentre(subject, k, centre(area))};
+  }}),
+  /**
+   * The view frames everything shown — what the click lights and the context round it, where the mover leaves them —
+   * so it slides to a piece that comes in and pulls back as the picture grows. It fills `share` (0.8) of the area,
+   * never closer than `most` (2.5×) and never further than `least` (0.25×). Under the look `hide` the context is not
+   * shown, so only what is lit is framed. WHY its own camera and not zoom with a wider subject: zoom never goes below
+   * 1× (it closes in, by its name), and a picture larger than the slide has to be seen from further away.
+   * keepsContext: it keeps the context in view, so it goes with left/right/up/down too.
+   */
+  fit: Object.freeze({name: 'fit', kind: 'camera', keepsContext: true, place({subject, context, look, area, options}) {
+    const share = num(options.share, .8), least = num(options.least, .25), most = num(options.most, 2.5);
+    if (!(share > 0 && share <= 1)) throw new Error(`focus "fit": share is how much of the area the picture fills, above 0 and 1 at most (0.8) — not "${options.share}"`);
+    if (!(least > 0 && most >= least)) throw new Error(`focus "fit": least and most are how far out and how close the view may go, least above 0 and most no smaller (0.25 and 2.5) — not "${options.least ?? .25}" and "${options.most ?? 2.5}"`);
+    const shown = union(look === 'hide' ? [subject] : [subject, context]);
+    if (!shown) return {};
+    return {stage: toCentre(shown, clamp(share * Math.min(area.w / Math.max(shown.w, 1), area.h / Math.max(shown.h, 1)), least, most), centre(area))};
   }}),
   left: aside('left'), right: aside('right'), up: aside('up'), down: aside('down'),
   /**
@@ -324,13 +342,13 @@ export function focusStep(prev, step, deck) {
   // The camera sees the click as the mover leaves it: every box moved by its group. Two things a camera never shares
   // a click with: a deck's own mover that moves the view itself (returns `stage`) — the view moves once — and a mover
   // that steps the context aside to keep it in view beside the subject, which a camera closing in would push off the
-  // slide.
+  // slide (a camera that keeps the context in view — `keepsContext`, as fit does — goes with it).
   if (chosen.camera && placed.stage) throw new Error(`a click moves the view once: "${chosen.mover.name}" moves it and so does "${chosen.camera.name}" — keep one`);
-  if (chosen.camera && chosen.mover?.s.withCamera === false) throw new Error(`"${chosen.camera.name}" closes in on the subject, and "${chosen.mover.name}" keeps the context in view beside it — together they push the context off the slide: keep one, and give the other a click of its own`);
+  if (chosen.camera && !chosen.camera.s.keepsContext && chosen.mover?.s.withCamera === false) throw new Error(`"${chosen.camera.name}" closes in on the subject, and "${chosen.mover.name}" keeps the context in view beside it — together they push the context off the slide: keep one, and give the other a click of its own`);
   const movedBox = i => { const g = groupOf(i), b = pieces[i].box; return g && b ? moveBox(g, b) : b; };
   // The whole subject moved as one group (a side mover): the group's own arithmetic, exactly as before; else piece by piece.
   const moved = subject && placed.subject && subjectIdx.every(i => groupOf(i) === placed.subject) ? moveBox(placed.subject, subject) : union(subjectIdx.map(movedBox));
-  const cameraSees = {subject: moved, context: union(contextIdx.map(movedBox)), area, view, canvas,
+  const cameraSees = {subject: moved, context: union(contextIdx.map(movedBox)), look, area, view, canvas,
     boxOf: l => union(all.filter(i => states[i] !== 'gone' && has(i, known(names([].concat(l)), 'focus group: '))).map(movedBox))};
   const viewMove = placed.stage ?? (chosen.camera ? chosen.camera.s.place({...cameraSees, options: chosen.camera.options})?.stage ?? null : null);
   const stage = viewMove ? {s: round(viewMove.s, 4), x: round(viewMove.o[0] * (1 - viewMove.s) + viewMove.t[0]), y: round(viewMove.o[1] * (1 - viewMove.s) + viewMove.t[1])} : null;

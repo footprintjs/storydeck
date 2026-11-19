@@ -1,6 +1,6 @@
 ---
 name: storydeck
-description: Build, focus, narrate and film talks and posts with StoryDeck — one source shown as a Read article, a Scroll story or a Watch deck; per-click focus on a diagram (grey, zoom, left/right, place, apart — the exploded view, blur, path); a tour that shows a deck's point while nobody is using it; narration from the speaker notes (a clip per click in a voice, cached by its words; notes, presenter and listen mode in the page; captions and chapters); a narrated video for YouTube; and a PowerPoint file (.pptx: a slide per click, its picture, notes and clip). A deck can be a folder (deck.json, clicks.html, maps, theme.css, icons/) that `storydeck` builds into one page, serves for editing with a reload on the same click, and reads back as text (outline, review a click, check). Use when creating or editing a StoryDeck post or deck, adding focus to a diagram slide, voicing a talk, rendering a talk as a video, or exporting it to PowerPoint.
+description: Build, focus, narrate and film talks and posts with StoryDeck — one source shown as a Read article, a Scroll story or a Watch deck; per-click focus on a diagram (grey, zoom, fit, left/right, place, apart — the exploded view, blur, path); a tour that shows a deck's point while nobody is using it; narration from the speaker notes (a clip per click in a voice, cached by its words; notes, presenter and listen mode in the page; captions and chapters); a narrated video for YouTube; and a PowerPoint file (.pptx: a slide per click, its picture, notes and clip). A deck can be a folder (deck.json, clicks.html, maps, theme.css, icons/) that `storydeck` builds into one page, serves for editing with a reload on the same click, and reads back as text (outline, review a click, check). Use when creating or editing a StoryDeck post or deck, adding focus to a diagram slide, voicing a talk, rendering a talk as a video, or exporting it to PowerPoint.
 ---
 
 # StoryDeck: one source, many lenses — and a deck that tells itself
@@ -106,7 +106,9 @@ const slides = looks.map(look => `<section class="${slideClass(look)}"><div clas
 
 Strategies, one of each kind at most: look `grey` (default) · `hide` · `keep`; camera `zoom` (it frames the subject
 where the mover leaves it, so `zoom apart` and `zoom place` work on one click; `zoom left` is refused — a side mover
-keeps the context in view, which closing in would push off the slide); mover `left` ·
+keeps the context in view, which closing in would push off the slide) · `fit` (it frames everything shown, lit and
+greyed, so the view slides to a new piece and pulls back as the picture grows: for a picture larger than the slide;
+`data-focus-share` 0.8, `-least` 0.25, `-most` 2.5; it goes with every mover); mover `left` ·
 `right` · `up` · `down` · `place` (named groups moved by amounts you art-direct) · `apart` (the exploded view:
 `data-focus-apart="lid: 0 -120 | core: 160 0"`, a spring per group `data-focus-stagger` ms apart, back together on a
 later click without it; a line carrying a group's name moves with it; `apart place` on one click is refused — give

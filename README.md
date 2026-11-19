@@ -101,6 +101,7 @@ decision every click makes again, so it is data on the click, and the library do
 |---|---|---|
 | look | `grey` (default) · `hide` · `keep` | how the context looks: greyed in place, hidden, or left as it is |
 | camera | `zoom` | the view closes in on the subject — where the click's mover leaves it (`share`, `most`): so a click can close in while its parts fly apart (`zoom apart`) or move (`zoom place`). With `left`/`right`/`up`/`down`, which keep the context in view beside the subject, it is refused |
+| camera | `fit` | the view frames everything shown, lit and greyed, where the click's mover leaves it: it slides to a piece that comes in and pulls back as the picture grows (`share` 0.8 of the area, never closer than `most` 2.5, never further than `least` 0.25). Under `hide` only what is lit is shown, so only that is framed. It keeps the context in view, so it goes with every mover |
 | mover | `left` · `right` · `up` · `down` | the context steps aside that way, smaller (`scale`), and the subject grows into the room it leaves (`grow`, `fill`, `gap`, `align`; `move: 'aside'` keeps the subject where it is) |
 | mover | `place` | named groups moved by the amounts you give (`groups: 'page floor: -90 -200 0.5 \| tl: 0 -230 1.1 @ 960 968'`): a layout you art-direct, still animated from wherever the last click left it |
 | mover | `apart` | the exploded view: named groups fly apart along the vectors you give (`apart: 'lid: 0 -120 \| core: 160 0 \| base: 0 120 1.1'`), one spring each, `stagger` ms apart (35), and come back together on a later click without it — the last one out is the first one back |
@@ -111,6 +112,19 @@ decision every click makes again, so it is data on the click, and the library do
 the right, framed. `'path grey'` lights a route in turn and greys the rest. Bring your own strategy of any kind
 (`strategies: { name: { kind, … } }`); what your own order's `route()` gives is checked like the built-in's — piece
 names, a `step` of 0–5 s, a text `line`, a `lineAt` of `'x y'` — and refused with the fix when it is not.
+
+**A picture larger than the slide.** A system drawn at a readable size is often wider than one slide. `zoom` closes in
+on what a click is about and never goes further out than the picture as drawn; `fit` shows all of it so far, so the
+audience keeps the whole while it grows:
+
+```html
+<step data-in="laptop" data-focus="fit"></step>                <!-- one piece: the view is close -->
+<step data-in="w1 dns" data-focus="fit"></step>                <!-- the view slides to take the dns in -->
+<step data-in="w2 server w3 db" data-focus="fit"></step>       <!-- and pulls back for the rest -->
+```
+
+Why a camera of its own: a subject named wider would still stop at 1×, and a picture four slides wide needs the view
+further out than that. The move is the same one a zoom makes, so a jump, a step back and reduced motion land at once.
 
 **A path, on a diagram of an app.** An architecture slide is a route more often than a picture: who calls whom.
 Write the click's `on` in the order a request travels it, wires included, and the path lights it that way:

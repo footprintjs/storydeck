@@ -125,3 +125,34 @@ describe('compileDeck', () => {
     expect(() => compileDeck(sourceOf({clicks, post: {sections: [{key: 's'}]}}))).not.toThrow();
   });
 });
+
+describe('compileDeck · a picture larger than the slide (fit)', () => {
+  // three boxes on a floor 5200 px wide: more than two slides and a half
+  const wide = `<div data-k="a" class="box" style="left:0px;top:400px;width:400px;height:200px">A</div>
+<i data-k="w1" class="wire pkt" data-arrow="a to b"></i>
+<div data-k="b" class="box" style="left:1800px;top:400px;width:400px;height:200px">B</div>
+<i data-k="w2" class="wire" data-arrow="b to c"></i>
+<div data-k="c" class="box" style="left:4800px;top:400px;width:400px;height:200px">C</div>`;
+  const clicks = `
+<section data-label="Wide" data-kicker="1 · Wide" data-map="map">
+  <step data-in="a" data-focus="fit"><h2>One piece</h2></step>
+  <step data-in="w1 b" data-focus="fit"><h2>The view slides to take B in</h2></step>
+  <step data-in="w2 c" data-focus="fit" data-focus-share="0.9"><h2>And pulls back for C</h2></step>
+</section>`;
+  const compiled = compileDeck(sourceOf({clicks, maps: {map: wide}}));
+  const scale = (k) => Number(/--sd-ts:([\d.]+)/.exec(compiled.slides[k].html)[1]);
+
+  it('each click frames all that is shown: close on one piece, further out than the picture as drawn for all three', () => {
+    expect(compiled.clicks.map((c) => c.look.strategies)).toEqual([['fit'], ['fit'], ['fit']]);
+    expect(scale(0)).toBe(2.5);                 // one box: held at `most`
+    expect(scale(1)).toBeLessThan(1);           // 2200 wide: further out than 1×
+    expect(scale(2)).toBeLessThan(scale(1));    // 5200 wide: further still
+    expect(scale(2)).toBeGreaterThanOrEqual(0.25);
+  });
+
+  it('writes the view\'s move into the slide, from where the last click left it', () => {
+    expect(compiled.slides[0].html).toMatch(/<div class="sd-stage" style="--sd-tx:-?[\d.]+px;--sd-ty:-?[\d.]+px;--sd-ts:2\.5">/);
+    expect(compiled.slides[1].html).toMatch(/<div class="sd-stage sd-move" style="[^"]*--sd-ts0:2\.5"/);
+    expect(compiled.slides[2].html).toContain(`--sd-ts0:${scale(1)}`);
+  });
+});

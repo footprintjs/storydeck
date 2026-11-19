@@ -49,6 +49,8 @@ export interface FocusContext {
   /** The lit pieces' box, and the greyed pieces' box (map px); null when there are none. */
   readonly subject: FocusBox | null;
   readonly context: FocusBox | null;
+  /** A camera only: how the context looks on this click. Under 'hide' it is not shown. */
+  readonly look?: 'grey' | 'hide' | 'keep';
   /** The area moved things may use, in map px. */
   readonly area: FocusBox;
   /** How the map sits on the slide (slide px = s · map px + [x, y]). */
@@ -79,9 +81,12 @@ export interface FocusSpring { readonly stagger: number }
  */
 export type FocusStrategy =
   | { readonly name?: string; readonly kind: 'look'; readonly look: 'grey' | 'hide' | 'keep' }
-  | { readonly name?: string; readonly kind: 'camera'; place(ctx: FocusContext): { stage?: FocusGroup } }
+  | { readonly name?: string; readonly kind: 'camera';
+      /** true: it keeps the context in view (fit), so it goes with a mover that needs that (left/right/up/down). */
+      readonly keepsContext?: boolean;
+      place(ctx: FocusContext): { stage?: FocusGroup } }
   | { readonly name?: string; readonly kind: 'mover';
-      /** false: it keeps the context in view beside the subject, so a click with a camera too is refused (left/right/up/down). */
+      /** false: it keeps the context in view beside the subject, so a click with a camera that closes in is refused (left/right/up/down). */
       readonly withCamera?: boolean;
       place(ctx: FocusContext): { stage?: FocusGroup; subject?: FocusGroup; context?: FocusGroup; groups?: { names: readonly string[]; g: FocusGroup | null }[]; spring?: FocusSpring } }
   | { readonly name?: string; readonly kind: 'overlay'; cover(ctx: { subjectOnSlide: FocusBox | null; canvas: { w: number; h: number }; options: Readonly<Record<string, unknown>> }): { rects: number[][]; label?: string; out?: number[][] } | null }
@@ -157,11 +162,13 @@ export interface FocusLook {
 export type FocusState = { readonly __focusState: true } & Record<string, unknown>;
 
 /**
- * The built-in strategies. `apart` (a mover) is the exploded view: its option `apart` — data-focus-apart — is
+ * The built-in strategies. `zoom` and `fit` are the cameras: zoom closes in on what the click is about; fit frames
+ * everything shown (options `share` 0.8, `least` 0.25, `most` 2.5), so the view slides to a new piece and pulls back
+ * as the picture grows. `apart` (a mover) is the exploded view: its option `apart` — data-focus-apart — is
  * 'names: dx dy [scale] | …' (slide px; each group scaled around its own centre), `stagger` the ms between two
  * groups (35); a later click without it brings the groups back together, the last one out first.
  */
-export const FOCUS: Readonly<Record<'grey' | 'hide' | 'keep' | 'zoom' | 'left' | 'right' | 'up' | 'down' | 'place' | 'apart' | 'path' | 'blur', FocusStrategy>>;
+export const FOCUS: Readonly<Record<'grey' | 'hide' | 'keep' | 'zoom' | 'fit' | 'left' | 'right' | 'up' | 'down' | 'place' | 'apart' | 'path' | 'blur', FocusStrategy>>;
 export function readFocus(spec: FocusSpec | undefined | null, shared?: Readonly<Record<string, unknown>>): { strategy: string; options: Record<string, unknown> }[];
 export function focusStep(prev: FocusState | null, click: FocusClick, deck: FocusDeck): { state: FocusState; look: FocusLook };
 /** Names as a click writes them, each `name+` read as that piece, the wires with it as an end, and the pieces at their other ends. */

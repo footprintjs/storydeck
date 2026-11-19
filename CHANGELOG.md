@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **A camera that keeps the whole picture in view: `fit`.** `data-focus="fit"` frames everything a click shows, lit and
+  greyed, so the view slides to a piece that comes in and pulls back as the picture grows. It is for a picture larger than
+  the slide: `zoom` closes in on what a click is about and never goes further out than the picture as drawn. It fills
+  `share` (0.8) of the area, never closer than `most` (2.5) and never further than `least` (0.25); under the look `hide`
+  only what is lit is framed. It goes with every mover, `left`/`right`/`up`/`down` too, because it keeps the context in
+  view. A deck's own camera says the same with `keepsContext: true`, and a camera is now told the click's `look`.
+  A deck that does not ask for `fit` builds byte for byte as before.
+
 ## 0.13.3 — one copy of footprint-story, shared with StoryReel
 
 - **StoryDeck now needs footprint-story `^0.7.0`** (it was `^0.6.0`), the same range as StoryReel 0.29. For a 0.x version the two
