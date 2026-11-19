@@ -140,9 +140,11 @@ function acrossStages(compiled) {
   for (const [map, {pieces}] of Object.entries(compiled.maps)) {
     if (!pieces.some((p) => p.stage)) continue;
     const click = compiled.clicks.find((c) => c.map === map) ?? null;
+    const called = new Map();   // the pieces of each name, found once
+    for (const p of pieces) for (const k of p.keys) called.set(k, [...(called.get(k) ?? []), p]);
     for (const p of pieces) {
       if (!p.ends) continue;
-      const theirs = [...new Set(p.ends.flatMap((name) => pieces.filter((o) => o !== p && o.keys.includes(name)).map((o) => o.stage ?? 'the main stage')))];
+      const theirs = [...new Set(p.ends.flatMap((name) => (called.get(name) ?? []).filter((o) => o !== p).map((o) => o.stage ?? 'the main stage')))];
       const own = p.stage ?? 'the main stage';
       if (theirs.length && theirs.some((s) => s !== own)) out.push(problem('warn', 'across-stages', click, `"${p.keys[0]}" stands on ${own === 'the main stage' ? own : `stage "${own}"`} and touches ${p.ends.map((e) => `"${e}"`).join(' and ')} on ${theirs.map((s) => (s === 'the main stage' ? s : `stage "${s}"`)).join(' and ')} — each stage has its own view, so it is left behind when one moves: stand them on one stage (data-stage)`));
     }

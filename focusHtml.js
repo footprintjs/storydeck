@@ -47,22 +47,46 @@ export function readPieces(html, {attr = 'data-k'} = {}) {
     const marked = /data-ground/i.test(at) ? ownAttribute(at, 'data-ground') : null, ground = !!marked && String(marked.value).trim().toLowerCase() !== 'false';
     // the stage it stands on, when it names one: one word, so it can be written into the page as it is
     const on = /data-stage/i.test(at) ? ownAttribute(at, 'data-stage') : null, stage = on ? String(on.value).trim() : '';
-    if (on && (on.bare || !/^[\w-]+$/.test(stage))) throw new Error(`data-stage${on.bare ? '' : `="${on.value}"`}: a stage is one name of letters, digits, - and _, in quotes (data-stage="panel")`);
+    if (on && (on.bare || !/^[\w-]+$/.test(stage))) throw new Error(`data-stage${on.bare ? '' : `="${on.value}"`}: a stage is written data-stage="panel" — one name of letters, digits, - and _, in lower case and with quotes`);
+    // a stage's piece is cut out of the map and drawn in its stage's element: a part of an <svg> drawing would stop being one there
+    if (stage && SVG_PARTS.has(tag.toLowerCase())) throw new Error(`data-stage="${stage}" on <${tag}>: a part of an <svg> drawing cannot stand on a stage by itself — put data-stage on the <svg> it is in`);
     pieces.push({keys: k.trim().split(/\s+/), box: x === null || y === null ? null : {x, y, w: w ?? 0, h: h ?? 0}, ...(twin ? {twin} : {}), ...(ends?.length ? {ends} : {}), ...(ground ? {ground: true} : {}), ...(stage ? {stage} : {})});
-    opens.push({lead: html.slice(from, start), tag: `<${tag}${before} ${attr}=${q}${k}${q} data-sd-i="${pieces.length - 1}"${after}`});
+    opens.push({lead: html.slice(from, start), tag: `<${tag}${before} ${attr}=${q}${k}${q} data-sd-i="${pieces.length - 1}"${after}`, name: tag, start, end, alone: VOID.has(tag.toLowerCase()) || /(^|\s)\/\s*$/.test(after)});
     from = end;
   }
+  if (pieces.some(p => p.stage)) refuseNested(html, pieces, opens);
   // A piece that names no stage and touches others (data-ends) stands where they do, when they all stand on one stage
   // of their own: a wire between two pieces of the panel is the panel's, a callout about one is too.
-  if (pieces.some(p => p.stage)) pieces.forEach((p, i) => {
+  // (the pieces of each name, found once: a map of thousands of wires costs its length, not its square)
+  const called = new Map();
+  if (pieces.some(p => p.stage)) pieces.forEach(p => p.keys.forEach(k => { if (!called.has(k)) called.set(k, []); called.get(k).push(p); }));
+  if (called.size) pieces.forEach((p, i) => {
     if (p.stage || !p.ends) return;
-    const theirs = p.ends.map(name => pieces.filter(o => o !== p && o.keys.includes(name)).map(o => o.stage ?? ''));
+    const theirs = p.ends.map(name => (called.get(name) ?? []).filter(o => o !== p).map(o => o.stage ?? ''));
     const names = new Set(theirs.flat());
     if (theirs.some(l => !l.length) || names.size !== 1 || names.has('')) return;
     p.stage = [...names][0];
     opens[i].tag += ` data-stage="${p.stage}"`;
   });
   return {html: `${opens.map(o => `${o.lead}${o.tag}>`).join('')}${html.slice(from)}`, pieces};
+}
+
+/** The parts of an <svg> drawing a map may name as pieces: none of them is an element of the page on its own. */
+const SVG_PARTS = new Set(['g', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path', 'text', 'tspan', 'use', 'image', 'defs', 'symbol', 'marker', 'mask', 'clippath', 'lineargradient', 'radialgradient', 'pattern', 'foreignobject']);
+const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
+
+/**
+ * On a map with stages, pieces must not be inside each other: a stage's piece is cut out whole and drawn in its
+ * stage's element, so a piece inside it would go along to a stage it does not stand on, and one it is inside would
+ * lose it. (Pieces never nest on any map; here it is checked, because here it would draw wrong without a word.)
+ */
+function refuseNested(html, pieces, opens) {
+  let last = null;
+  opens.forEach((o, i) => {
+    const end = o.alone ? o.end : closeOf(html, o.name, o.end, `piece "${pieces[i].keys[0]}"`).end;
+    if (last && o.start < last.end) throw new Error(`piece "${pieces[i].keys[0]}" is inside piece "${pieces[last.i].keys[0]}": on a map with stages, pieces stand beside each other, never inside — move it out, and give it the same data-stage if it belongs with it`);
+    if (!last || end > last.end) last = {end, i};
+  });
 }
 
 /**
@@ -124,15 +148,13 @@ export function drawFocus(html, look) {
   return out + html.slice(from);
 }
 
-const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
-
 /** One stage's element round its pieces: its view as CSS variables, where it came from when it moved, its turn when a route gives it one. */
 function stageElement(inner, {move, from, turn} = {}, name = null) {
   const vars = [], onRoute = !!(from && turn);
   if (move) vars.push(`--sd-tx:${move.x}px`, `--sd-ty:${move.y}px`, `--sd-ts:${move.s}`);
   if (from) vars.push(`--sd-tx0:${from.x}px`, `--sd-ty0:${from.y}px`, `--sd-ts0:${from.s}`);
   if (onRoute) vars.push(`--sd-stage-delay:${turn.at}s`, `--sd-stage-time:${turn.takes}s`);
-  return `<div class="sd-stage${from ? ' sd-move' : ''}${onRoute ? ' sd-stage-turn' : ''}${name === null ? '' : ' sd-stage-own'}"${name === null ? '' : ` data-sd-stage="${name}"`}${vars.length ? ` style="${vars.join(';')}"` : ''}>${inner}</div>`;
+  return `<div class="sd-stage${from ? ' sd-move' : ''}${onRoute ? ' sd-stage-turn' : ''}${name === null ? '' : ' sd-stage-own'}"${name === null ? '' : ` data-sd-stage="${esc(name)}"`}${vars.length ? ` style="${vars.join(';')}"` : ''}>${inner}</div>`;
 }
 
 /**
@@ -151,9 +173,10 @@ export function wrapStage(inner, look) {
   let main = '', from = 0;
   for (const t of tagsWith(inner, /data-stage/i)) {
     const run = t.before + t.m[0] + t.after, on = ownAttribute(run, 'data-stage');
-    // a drawn piece (drawFocus gives every piece the class "sd") on a stage this look has, outside any piece already taken
-    if (!on || on.bare || !names.has(on.value.trim()) || t.start < from || !ownAttribute(run, 'class')?.value?.split(/\s+/).includes('sd')) continue;
-    const end = VOID.has(t.tag.toLowerCase()) || /\/\s*$/.test(run) ? t.end : closeOf(inner, t.tag, t.end, `the piece on stage "${on.value.trim()}"`).end;
+    // a drawn piece (it has a data-k, and drawFocus gave it the class "sd") on a stage this look has, outside any piece already taken
+    if (!on || on.bare || !names.has(on.value.trim()) || t.start < from || !ownAttribute(run, 'data-k') || !ownAttribute(run, 'class')?.value?.split(/\s+/).includes('sd')) continue;
+    // (a tag that closes itself: drawFocus writes what it adds after the slash, so the slash stands alone inside the tag)
+    const end = VOID.has(t.tag.toLowerCase()) || /(^|\s)\/(\s|$)/.test(run) ? t.end : closeOf(inner, t.tag, t.end, `the piece on stage "${on.value.trim()}"`).end;
     main += inner.slice(from, t.start);
     held.set(on.value.trim(), held.get(on.value.trim()) + inner.slice(t.start, end));
     from = end;

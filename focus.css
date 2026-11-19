@@ -61,7 +61,8 @@
 @property --sd-stage-turn { syntax: '*'; inherits: false; }   /* the view's moment on a path, when the route gives it a turn; never inherited */
 /* When the view of this click has arrived: the one moment a deck's own animation waits on, so it never plays under a
    view still moving — animation-delay: var(--sd-arrive-at). 0s when no view moves, and on an arrival that plays nothing
-   (a jump, a step back, reduced motion, print): set only behind the motion gate, below. Inherited: read it anywhere on the slide. */
+   (a jump, a step back, reduced motion, print): set only behind the motion gate, below. Inherited: read it anywhere on the
+   slide. It takes the move time from --sd-move-time as the slide has it: set that token on the deck or the slide, not on a stage. */
 @property --sd-arrive-at { syntax: '<time>'; inherits: true; initial-value: 0s; }
 @keyframes sdNone {}
 @keyframes sdEnter { from { opacity: 0; scale: calc(var(--sd-s, 1) * .92); } }

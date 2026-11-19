@@ -101,6 +101,8 @@ export type FocusStrategy =
   | { readonly name?: string; readonly kind: 'camera';
       /** true: it keeps the context in view (fit), so it goes with a mover that needs that (left/right/up/down). */
       readonly keepsContext?: boolean;
+      /** true: with nothing to frame, the view stays where the last click left it (pan). Without it, the main stage's view goes back to the whole map. */
+      readonly holds?: boolean;
       place(ctx: FocusContext): { stage?: FocusGroup } }
   | { readonly name?: string; readonly kind: 'mover';
       /** false: it keeps the context in view beside the subject, so a click with a camera that closes in is refused (left/right/up/down). */

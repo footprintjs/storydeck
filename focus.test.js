@@ -1020,3 +1020,32 @@ describe('focus · the camera: pan moves the view and keeps its size', () => {
     expect(() => focusStep(null, { in: ['*'], on: ['a'], quiet: true, focus: 'pan left' }, d)).toThrow(/"pan" closes in on the subject, and "left" keeps the context in view/);
   });
 });
+
+describe('focus · a view with nothing to go to (found in review)', () => {
+  const pieces = [
+    { keys: ['m1'], box: { x: 0, y: 400, w: 400, h: 200 } }, { keys: ['m2'], box: { x: 900, y: 400, w: 400, h: 200 } },
+    { keys: ['q1'], box: { x: 1500, y: 100, w: 300, h: 80 }, stage: 'panel' },
+  ];
+  const d = { pieces, area: [0, 200, 1920, 1000] };
+
+  it('a pan with nothing lit on its stage leaves the view where it was; a zoom on the main stage still goes back, as always', () => {
+    const zoomed = { in: ['*'], on: ['m1'], quiet: true, focus: 'zoom' };
+    const pan = planFocus([zoomed, { on: ['q1'], focus: 'pan' }], d).looks;
+    expect(pan[1].stage).toEqual({ move: pan[0].stage.move, from: null });       // q1 is not on the main stage: nothing to go to, so it stays
+    const zoom = planFocus([zoomed, { on: ['q1'], focus: 'zoom' }], d).looks;
+    expect(zoom[1].stage).toEqual({ move: null, from: zoom[0].stage.move });      // the old law of zoom on the main stage
+  });
+
+  it('a stage of its own never goes back by itself: a camera on it with nothing to frame leaves it where it was', () => {
+    const { looks } = planFocus([{ in: ['*'] }, { on: ['q1'], focus: 'zoom', options: { stage: 'panel' } }, { out: ['q1'], on: ['m1'], focus: 'zoom', options: { stage: 'panel' } }], d);
+    expect(looks[2].stages[0]).toEqual({ name: 'panel', move: looks[1].stages[0].move, from: null });
+    // and with no earlier view there is nothing to keep: it stays as drawn
+    expect(planFocus([{ in: ['m1'], focus: 'zoom', options: { stage: 'panel' } }], d).looks[0].stages[0]).toEqual({ name: 'panel', move: null, from: null });
+  });
+
+  it('a deck\'s own strategy may have an option called stage: only a click of built-in strategies is told it has no camera', () => {
+    const mine = { kind: 'look', look: 'keep' };
+    expect(() => focusStep(null, { in: ['*'], focus: 'mine', options: { stage: 'anything' } }, { ...d, strategies: { mine } })).not.toThrow();
+    expect(() => focusStep(null, { in: ['*'], focus: 'keep', options: { stage: 'panel' } }, d)).toThrow(/this click has no camera/);
+  });
+});

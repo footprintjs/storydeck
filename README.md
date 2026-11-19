@@ -153,7 +153,9 @@ sees the pieces of its stage only, so `fit` on the map does not pull back to tak
 that names no stage stands on the stage of the pieces it touches, when they share one; `check` warns when it joins two
 stages (`across-stages`), since it would be left behind when one moves. Each stage's pieces are drawn together, in
 the order the map first names the stages, so a later stage is drawn over an earlier one. A piece on a stage is still
-a piece: it greys when a click is about something else, so name it in `data-on` to keep it lit.
+a piece: it greys when a click is about something else, so name it in `data-on` to keep it lit. On a map with stages
+a piece may not be inside another, and a stage is named on an element of the page, not on a part of an `<svg>` drawing
+(put it on the `<svg>`): a stage's piece is cut out whole and drawn in its stage, and both are refused with the fix.
 
 Why stages and not a "pinned" mark: a deck that could not say "this stays put" built a camera of its own out of a
 mover, and lost what a camera gives (pieces that come and go with the view, a turn on a route). A piece that stays put

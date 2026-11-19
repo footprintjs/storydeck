@@ -118,3 +118,12 @@ describe('readAttributes', () => {
     expect(readAttributes(' a="1"b="2"').map((a) => a.name)).toEqual(['a', 'b']);
   });
 });
+
+describe('closeOf · the end of an element', () => {
+  it('counts the tags of its kind inside it, and a tag that closes itself counts for nothing', async () => {
+    const { closeOf } = await import('./pieceRules.js');
+    const html = '<g id="a"><g/><g><g /></g></g><g id="b"></g>';
+    expect(closeOf(html, 'g', '<g id="a">'.length, 'a')).toEqual({ at: html.indexOf('</g><g id="b">'), end: html.indexOf('<g id="b">') });
+    expect(() => closeOf('<div><div>', 'div', 5, 'the box')).toThrow(/the box: its <div> is never closed/);
+  });
+});

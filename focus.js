@@ -177,8 +177,9 @@ export const FOCUS = Object.freeze({
    * camera has moved yet), the subject's middle on the area's middle. WHY: a run of clicks that each close in on their
    * own subject pumps the view in and out (a field deck: 27 of 62 moves changed scale by more than a quarter); a pan
    * holds one size for the run, so only the place changes. Choose the size once, with zoom or fit, then pan.
+   * holds: with nothing to go to (no piece of its stage is lit), the view stays where it is.
    */
-  pan: Object.freeze({name: 'pan', kind: 'camera', place({subject, area, was}) {
+  pan: Object.freeze({name: 'pan', kind: 'camera', holds: true, place({subject, area, was}) {
     return subject ? {stage: toCentre(subject, was?.s ?? 1, centre(area))} : {};
   }}),
   left: aside('left'), right: aside('right'), up: aside('up'), down: aside('down'),
@@ -404,7 +405,10 @@ export function focusStep(prev, step, deck) {
   // The camera sees the pieces of its stage only. A map with no stage of its own takes the lines below as before.
   const before = prev && !step.fresh ? prev : null;
   const stageNames = [...new Set(pieces.map(p => p.stage).filter(Boolean))], staged = stageNames.length > 0;
-  const named = chosen.camera?.options.stage ?? step.options?.stage, target = named === undefined || named === null || String(named).trim() === '' ? null : String(named).trim();
+  // (`stage` is the camera's option. With no camera it is a mistake only when every strategy of the click is a built-in
+  // one, none of which has such an option: a deck's own strategy may have a `stage` of its own.)
+  const builtIn = Object.values(chosen).every(c => FOCUS[c.name] && FOCUS[c.name].kind === c.s.kind && !strategies[c.name]);
+  const named = chosen.camera ? chosen.camera.options.stage : builtIn ? step.options?.stage : undefined, target = named === undefined || named === null || String(named).trim() === '' ? null : String(named).trim();
   if (target !== null && !chosen.camera) throw new Error(`focus stage: "${target}" names the stage a camera moves, and this click has no camera — add zoom or fit to data-focus, or take data-focus-stage out`);
   if (target !== null && !stageNames.includes(target)) throw new Error(`focus stage: no stage "${target}" (${staged ? `the stages are ${stageNames.join(', ')}` : 'every piece of this map stands on the main stage'}) — a piece says which stage it stands on with data-stage="name"`);
   const seenBy = l => (staged ? framed(l).filter(i => (pieces[i].stage ?? null) === target) : framed(l));
@@ -414,7 +418,11 @@ export function focusStep(prev, step, deck) {
     was: (target === null ? before?.stage : before?.stages?.[target]) ?? null,   // the view the last click left this stage at
     boxOf: l => union(all.filter(i => states[i] !== 'gone' && has(i, known(names([].concat(l)), 'focus group: '))).map(movedBox))};
   const viewMove = placed.stage ?? (chosen.camera ? chosen.camera.s.place({...cameraSees, options: chosen.camera.options})?.stage ?? null : null);
-  const framedView = viewMove ? {s: round(viewMove.s, 4), x: round(viewMove.o[0] * (1 - viewMove.s) + viewMove.t[0]), y: round(viewMove.o[1] * (1 - viewMove.s) + viewMove.t[1])} : null;
+  // A camera with nothing to frame gives no view. On the main stage that takes the view back to the whole map, as zoom
+  // always did; a camera that holds (pan), and any camera on a stage of its own, leaves the view where it was — a
+  // stage of its own never goes back by itself.
+  const framedView = viewMove ? {s: round(viewMove.s, 4), x: round(viewMove.o[0] * (1 - viewMove.s) + viewMove.t[0]), y: round(viewMove.o[1] * (1 - viewMove.s) + viewMove.t[1])}
+    : chosen.camera && !placed.stage && (target !== null || chosen.camera.s.holds) ? cameraSees.was : null;
   // Each stage keeps the view the last click left it, unless this click's camera is for it. One law is older than
   // stages and stays: on a click with no camera, the main stage goes back to the whole map.
   const stage = target === null ? framedView : before?.stage ?? null;

@@ -334,9 +334,10 @@ describe('focusHtml · stages of their own', () => {
   });
 
   it('refuses a stage that is not one plain name, and reads the tag\'s own attribute only', () => {
-    expect(() => readPieces(`<div data-k="a" data-stage="side panel" ${box(0)}></div>`)).toThrow(/data-stage="side panel": a stage is one name of letters, digits, - and _, in quotes \(data-stage="panel"\)/);
-    expect(() => readPieces(`<div data-k="a" data-stage=panel ${box(0)}></div>`)).toThrow(/data-stage: a stage is one name/);
-    expect(() => readPieces(`<div data-k="a" data-stage="" ${box(0)}></div>`)).toThrow(/a stage is one name/);
+    expect(() => readPieces(`<div data-k="a" data-stage="side panel" ${box(0)}></div>`)).toThrow(/data-stage="side panel": a stage is written data-stage="panel" — one name of letters, digits, - and _, in lower case and with quotes/);
+    expect(() => readPieces(`<div data-k="a" data-stage=panel ${box(0)}></div>`)).toThrow(/data-stage: a stage is written data-stage="panel"/);
+    expect(() => readPieces(`<div data-k="a" DATA-STAGE="panel" ${box(0)}></div>`)).toThrow(/in lower case and with quotes/);
+    expect(() => readPieces(`<div data-k="a" data-stage="" ${box(0)}></div>`)).toThrow(/one name of letters/);
     expect(readPieces(`<div data-k="a" title="see data-stage" ${box(0)}></div>`).pieces[0].stage).toBe(undefined);
   });
 
@@ -380,5 +381,53 @@ describe('focusHtml · stages of their own', () => {
     expect(css).toContain("@property --sd-arrive-at { syntax: '<time>'; inherits: true; initial-value: 0s; }");
     expect(css).toContain(':where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])):has(.sd-stage.sd-move) { --sd-arrive-at: var(--sd-view-at, var(--sd-move-time, 1s)); }');
     expect(css.split('@media screen and (prefers-reduced-motion: no-preference)')[0]).not.toMatch(/--sd-arrive-at\s*:/);   // never set outside the gate
+  });
+});
+
+describe('focusHtml · stages: what the review found', () => {
+  const box = (x) => `style="left:${x}px;top:0px;width:10px;height:10px"`;
+  const drawn = (map, clicks = [{ in: ['*'] }]) => { const { html, pieces } = readPieces(map); const look = planFocus(clicks, { pieces, area: [0, 0, 1920, 1080] }).looks.at(-1); return wrapStage(drawFocus(html, look), look); };
+  const panelOf = (out) => /data-sd-stage="p"[^>]*>(.*)<\/div>$/s.exec(out)[1];
+
+  it('a piece that holds a tag closing itself is cut at its own end, not at whatever closes next', () => {
+    // <g/> inside the staged svg once counted as an opening tag: the cut ran on to the next </svg>, taking the main piece with it
+    const out = drawn(`<svg data-k="q" data-stage="p" ${box(0)}><svg/><g><g/></g></svg><div data-k="m" ${box(20)}>M</div><svg data-k="tail" ${box(40)}></svg>`);
+    expect([...panelOf(out).matchAll(/data-k="(\w+)"/g)].map((m) => m[1])).toEqual(['q']);
+    expect(out.split('data-sd-stage="p"')[0]).toContain('data-k="m"');
+    expect(out.split('data-sd-stage="p"')[0]).toContain('data-k="tail"');
+  });
+
+  it('a piece that closes itself is taken whole: an image, and an svg written <svg … />', () => {
+    const out = drawn(`<svg data-k="q" data-stage="p" ${box(0)} /><img data-k="pic" data-stage="p" ${box(9)}><div data-k="m" ${box(20)}>M</div>`);
+    expect([...panelOf(out).matchAll(/data-k="(\w+)"/g)].map((m) => m[1])).toEqual(['q', 'pic']);
+    expect(out.split('data-sd-stage="p"')[0]).toContain('data-k="m"');
+  });
+
+  it('refuses a stage on a part of an svg drawing, and pieces inside each other on a map with stages', () => {
+    expect(() => readPieces(`<svg ${box(0)}><g data-k="q" data-stage="p"></g></svg>`)).toThrow(/data-stage="p" on <g>: a part of an <svg> drawing cannot stand on a stage by itself — put data-stage on the <svg> it is in/);
+    expect(() => readPieces(`<svg ${box(0)}><rect data-k="q" data-stage="p"/></svg>`)).toThrow(/on <rect>: a part of an <svg> drawing/);
+    const inside = /piece "in" is inside piece "out": on a map with stages, pieces stand beside each other, never inside/;
+    expect(() => readPieces(`<div data-k="out" ${box(0)}><b data-k="in" data-stage="p">x</b></div>`)).toThrow(inside);                      // a stage's piece inside a main one
+    expect(() => readPieces(`<div data-k="out" data-stage="p" ${box(0)}><b data-k="in">x</b></div>`)).toThrow(inside);                      // a main piece inside a stage's
+    expect(() => readPieces(`<div data-k="out" data-stage="p" ${box(0)}><i><b data-k="in" data-stage="p">x</b></i></div>`)).toThrow(inside);
+    expect(() => readPieces(`<div data-k="a" data-stage="p" ${box(0)}>never closed`)).toThrow(/piece "a": its <div> is never closed/);
+    // a map with no stage is read as it always was: nothing new is checked or refused
+    expect(readPieces(`<div data-k="out" ${box(0)}><b data-k="in">x</b></div>`).pieces.map((p) => p.keys[0])).toEqual(['out', 'in']);
+  });
+
+  it('only a piece goes to a stage, and a stage\'s name reaches the page escaped', () => {
+    const out = drawn(`<div data-k="q" data-stage="p" ${box(0)}>Q</div><div class="sd note" data-stage="p">not a piece</div><div data-k="m" ${box(20)}>M</div>`);
+    expect(panelOf(out)).not.toContain('not a piece');
+    expect(out.split('data-sd-stage="p"')[0]).toContain('not a piece');
+    // a program that plans with its own pieces may name a stage anything: it is written safely
+    const look = planFocus([{ in: ['*'] }], { pieces: [{ keys: ['a'], box: { x: 0, y: 0, w: 1, h: 1 }, stage: 'x"><b>' }] }).looks[0];
+    expect(wrapStage('', look)).toContain('data-sd-stage="x&quot;&gt;&lt;b&gt;"');
+  });
+
+  it('a map of thousands of wires on stages costs its length, not its square', () => {
+    const n = 4000, map = Array.from({ length: n }, (_, i) => `<div data-k="p${i}" data-stage="p" ${box(i)}></div><i data-k="w${i}" data-ends="p${i} p${(i + 1) % n}" ${box(i)}></i>`).join('');
+    const start = performance.now(), { pieces } = readPieces(map);
+    expect(performance.now() - start).toBeLessThan(400);                 // it took about 460 ms at this size when every wire looked at every piece
+    expect(pieces.filter((p) => p.stage === 'p').length).toBe(2 * n);
   });
 });
