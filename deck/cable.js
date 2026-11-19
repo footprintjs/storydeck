@@ -34,7 +34,6 @@ const SAMPLE = 6;   // px between the points asked: of a cable, whether a block 
 /** The most points a cable is walked in: a cable longer than a slide is asked more coarsely, never at greater cost. */
 export const WALK_MOST = 512;
 const CROSS_RUNS = 64;   // the straight runs a cable is taken as, when two are asked whether they cross
-const RELAYS = 2;        // how often the feet are shared out again after a cable was not kept
 
 const middle = ({at, size}) => [at[0] + size[0] / 2, at[1] + size[1] / 2];
 /** How far down the slide a piece stands: its middle's col and row together (a tile along either is as far down). */
@@ -167,15 +166,14 @@ export function cables(links, shapes, floor) {
     return {laid, kept: walks.map(Boolean)};
   };
   // first a trial from the middle of one foot to the middle of the other: a wire whose cable would pass under one of its own blocks takes no place on a foot
-  let can = ends.map((e) => (e && clear(e, lay(e, 0.5, 0.5)) ? e : null));
-  // Then the feet are shared out. A cable that fails at its place leaves that place empty, so the feet are shared out
-  // again among those kept, RELAYS times at most: after the last, a cable not kept leaves its gap (a deck is text
-  // someone wrote: laying must end)
-  for (let round = 0; ; round++) {
-    const {laid, kept} = share(can);
-    if (round === RELAYS || kept.every((stays, i) => stays === Boolean(can[i]))) return laid.map((cable, i) => (kept[i] ? cable : null));
-    can = can.map((e, i) => (kept[i] ? e : null));
-  }
+  const can = ends.map((e) => (e && clear(e, lay(e, 0.5, 0.5)) ? e : null));
+  const first = share(can), cablesOf = ({laid, kept}) => laid.map((cable, i) => (kept[i] ? cable : null));
+  if (first.kept.every((stays, i) => stays === Boolean(can[i]))) return cablesOf(first);
+  // A cable that fails at its place leaves that place empty. The feet are shared out once more among those kept, and
+  // that second laying is taken only if it keeps every one of them: a foot shared out evenly is not worth a cable
+  // (a cable that was clear at its old place may not be at its new one)
+  const again = share(can.map((e, i) => (first.kept[i] ? e : null)));
+  return cablesOf(again.kept.every((stays, i) => stays === first.kept[i]) ? again : first);
 }
 
 /** Where a label may stand along its cable: the middle first, then a twentieth further to each side by turns, a fifth to four fifths of the way. */

@@ -199,6 +199,20 @@ describe('cable · a wire along the floor between two isometric pieces', () => {
     for (const i of [2, 7, 8]) expect(hiddenBy(laid[i], shapes.get('n3')) + hiddenBy(laid[i], shapes.get('n0'))).toBe(0);   // laid again, and looked at again
   });
 
+  it('sharing a foot out again never costs a cable: where the second laying would lose one, the first is kept, gap and all', () => {
+    // seven blocks the build places, twelve wires. Laid once: eight cables, and four wires that get none. Laid again
+    // without those four, two of the eight would move to places where they are not clear — so the first laying stands
+    const names = Array.from({length: 7}, (_, i) => `n${i}`);
+    const links = [['n0', 'n1'], ['n1', 'n0'], ['n0', 'n2'], ['n0', 'n3'], ['n3', 'n0'], ['n1', 'n4'], ['n4', 'n1'], ['n0', 'n5'], ['n5', 'n0'], ['n0', 'n6'], ['n6', 'n0'], ['n3', 'n0']];
+    const {shapes, floor: placed} = isoDrawn(names.map((name) => `<div data-k="${name}" data-iso="block"></div>`).join(''), {canvas, links});
+    const laid = cables(links, shapes, placed);
+    expect(laid.filter(Boolean)).toHaveLength(8);
+    for (const [i, cable] of laid.entries()) if (cable) expect(hiddenBy(cable, shapes.get(links[i][0])) + hiddenBy(cable, shapes.get(links[i][1])), `${links[i]}`).toBe(0);
+    // a wire and its answer are still alike
+    const kind = (from, to) => links.map((l, i) => (l[0] === from && l[1] === to) || (l[0] === to && l[1] === from) ? Boolean(laid[i]) : null).filter((v) => v !== null);
+    for (const [from, to] of [['n0', 'n1'], ['n0', 'n3'], ['n1', 'n4'], ['n0', 'n5'], ['n0', 'n6']]) expect(new Set(kind(from, to)).size, `${from} and ${to}`).toBe(1);
+  });
+
   it('wherever two blocks stand: a cable kept lies clear of what both draw, a pair is kept together or not at all, and a pair kept does not cross (four distances, every 5° round)', () => {
     const seen = {kept: 0, none: 0, pairs: 0, apart: 0};
     for (const far of [3, 4, 6, 10]) {
