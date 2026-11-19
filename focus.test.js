@@ -664,10 +664,11 @@ describe('focus · the camera: fit frames everything shown', () => {
     expect(() => at({ least: 0 })).toThrow(/focus "fit": least and most are how far out and how close the view may go/);
     expect(() => at({ least: 3 })).toThrow(/not "3" and "2\.5"/);
     expect(() => at({ most: 'near' })).toThrow(/focus "fit": least and most/);
-    // found in review: an option no screen has must not reach the view as Infinity or NaN
-    for (const odd of [{ least: 'Infinity', most: 'Infinity' }, { least: '1e308', most: '1e308' }, { most: 'Infinity' }, { most: 101 }, { least: NaN }, { least: -1 }])
-      expect(() => at(odd), JSON.stringify(odd)).toThrow(/focus "fit": least and most are how far out and how close the view may go, least above 0 and most no smaller, 100 at most/);
-    for (const options of [{}, { share: 1 }, { least: 100, most: 100 }, { least: 0.001 }]) for (const v of Object.values(focusStep(null, { in: ['a', 'b'], focus: 'fit', options }, world).look.stage.move)) expect(Number.isFinite(v)).toBe(true);
+    // found in review: an option no screen has must not reach the view as Infinity, NaN or 0
+    for (const odd of [{ least: 'Infinity', most: 'Infinity' }, { least: '1e308', most: '1e308' }, { most: 'Infinity' }, { most: 101 }, { least: NaN }, { least: -1 }, { least: '1e-300', most: '1e-300' }, { least: 0.009 }])
+      expect(() => at(odd), JSON.stringify(odd)).toThrow(/focus "fit": least and most are how far out and how close the view may go, from 0\.01 to 100, most no smaller than least/);
+    for (const options of [{}, { share: 1 }, { least: 100, most: 100 }, { least: 0.01, most: 0.01 }]) for (const v of Object.values(focusStep(null, { in: ['a', 'b'], focus: 'fit', options }, world).look.stage.move)) { expect(Number.isFinite(v)).toBe(true); }
+    expect(at({ least: 0.01, most: 0.01 })).toBe(0.01);
   });
 
   it('nothing shown with a box: the view stays where it is', () => {

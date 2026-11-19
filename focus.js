@@ -146,7 +146,7 @@ export const FOCUS = Object.freeze({
   /**
    * The view frames everything shown — what the click lights and the context round it, where the mover leaves them —
    * so it slides to a piece that comes in and pulls back as the picture grows. It fills `share` (0.8) of the area,
-   * never closer than `most` (2.5×) and never further than `least` (0.25×). Under the look `hide` the context is not
+   * never closer than `most` (2.5×) and never further than `least` (0.25×); both from 0.01 to 100. Under the look `hide` the context is not
    * shown, so only what is lit is framed. WHY its own camera and not zoom with a wider subject: zoom never goes below
    * 1× (it closes in, by its name), and a picture larger than the slide has to be seen from further away.
    * keepsContext: it keeps the context in view, so it goes with left/right/up/down too.
@@ -154,8 +154,8 @@ export const FOCUS = Object.freeze({
   fit: Object.freeze({name: 'fit', kind: 'camera', keepsContext: true, place({subject, context, look, area, options}) {
     const share = num(options.share, .8), least = num(options.least, .25), most = num(options.most, 2.5);
     if (!(share > 0 && share <= 1)) throw new Error(`focus "fit": share is how much of the area the picture fills, above 0 and 1 at most (0.8) — not "${options.share}"`);
-    // 100× at most: a bound, so no option (an 'Infinity', a 1e308 from a file) can give the view a size no screen has
-    if (!(least > 0 && most >= least && most <= 100)) throw new Error(`focus "fit": least and most are how far out and how close the view may go, least above 0 and most no smaller, 100 at most (0.25 and 2.5) — not "${options.least ?? .25}" and "${options.most ?? 2.5}"`);
+    // 0.01× to 100×: bounds, so no option (an 'Infinity', a 1e-300 from a file) can give the view a size no screen has
+    if (!(least >= .01 && most >= least && most <= 100)) throw new Error(`focus "fit": least and most are how far out and how close the view may go, from 0.01 to 100, most no smaller than least (0.25 and 2.5) — not "${options.least ?? .25}" and "${options.most ?? 2.5}"`);
     const shown = union(look === 'hide' ? [subject] : [subject, context]);
     if (!shown) return {};
     return {stage: toCentre(shown, clamp(share * Math.min(area.w / Math.max(shown.w, 1), area.h / Math.max(shown.h, 1)), least, most), centre(area))};
