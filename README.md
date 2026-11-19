@@ -697,9 +697,23 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   class `ok`, `warn` or `bad` colours one. The numbers come from `footprint-story/isometric`, the grid a film can draw
   with too. A block is what it draws, not the box it is placed by: on the slide shown its faces and its words take the
   pointer (the empty corners of its box do not, so a block behind is not covered by them), a ring round it — a highlight
-  (`data-hot`) or explore's hover — follows its faces, and a wire to it ends on its outline. Not yet: a wire that runs
-  along the floor in the grid's own directions (a wire goes straight from one block to the other), and moving a block
-  by dragging it in the dev page (change its `data-at`).
+  (`data-hot`) or explore's hover — follows its faces.
+
+  A wire between two blocks is a cable on the floor. Of the two blocks, one stands to the right on the slide: the
+  cable joins the foot under the right face of the block on the left to the foot under the left face of the block on
+  the right, whichever of them it starts from. It leaves and arrives along the floor's tile lines, as one smooth
+  curve, so it reads as lying on the floor and its arrow's tip is always on a face the viewer sees. A request and its
+  answer use the same two feet and lie side by side; several cables at one foot share it out, in the order that keeps
+  them from crossing; a cylinder's feet are on its round base. A packet rides the curve. Its `data-label` stands on the
+  cable itself, on a plate of the ground's colour (`--bg`): at the cable's middle, or along it at the nearest place
+  where no block is over it, no label placed before it is under it and no other cable runs through it — and where
+  there is no such place, where the least of it is hidden.
+
+  A cable lies on the floor, so a block standing nearer the viewer is drawn over it: it does not go round blocks, and
+  one to a block two steps away may pass behind the block between. To keep a wire straight, give it a bend, `0` too:
+  `data-arrow="you to server 0"` runs from one block's outline to the other's, through the air. A wire from a block to
+  a flat piece, and one between blocks standing at different heights, are straight too, and end on the block's outline.
+  Not yet: moving a block by dragging it in the dev page (change its `data-at`).
   A deck to start from: [examples/a-request](examples/a-request) (blocks on a floor, a view that follows them, an order
   inside each click); a test builds and checks it.
 - **Ground: what lies under the picture.** `data-ground` on a piece (a floor has it by itself) says it lies under the
@@ -718,7 +732,7 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   list of names a click has, the groups a mover moves too (`data-focus-apart="gw+: 0 -200"`). A living system
   diagram needs three more things on a wire, each an attribute: `data-label="InvokeAgentRuntime"` writes its name at its
   middle, on its left (a request's above it, its answer's below; in the wire's colour, on an edge of the ground so it
-  reads over anything); class `halo` gives it a soft glow (`--wire-halo`); and `data-packets="2" data-speed="5"` keeps
+  reads over anything; a cable between two blocks carries it on the cable itself: see the isometric piece above); class `halo` gives it a soft glow (`--wire-halo`); and `data-packets="2" data-speed="5"` keeps
   packets running along it, evenly spaced, 5 s a run (`--packet`, `--packet-glow`). The packets are loops (see below):
   only on the slide shown, in step from click to click, and under reduced motion, in print or with motion off one rests
   at the wire's middle.

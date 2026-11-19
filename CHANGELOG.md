@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.18.0 — wires that lie on the floor
+
+- **A wire between two blocks is a cable on the floor.** It ran straight from one block's outline to the other's,
+  through the air over the floor. Now it leaves the foot of one block and arrives at the foot of the other, along the
+  floor's tile lines, as one smooth curve. Of two blocks, one stands to the right on the slide: the cable joins the
+  foot under the right face of the block on the left to the foot under the left face of the block on the right,
+  whichever of them it starts from. So every arrow's tip is on a face the viewer sees, and a request and its answer
+  lie side by side, one inside the other. Several cables at one foot share it out, in the order that keeps them from
+  crossing. A cylinder's feet are on its round base. A packet (`pkt`, `data-packets`) rides the curve itself.
+- **A cable's label stands on the cable.** `data-label` on a cable is written on the cable, on a plate of the
+  ground's colour (`--bg`), where a wire's label stands beside it. It takes the cable's middle, or the nearest place
+  along the cable where no block is drawn over it, no label placed before it is under it and no other cable runs
+  through it; where there is no such place, the one where the least of it is hidden. A packet passes under the plate.
+- **What changes in a deck you have (the picture, not the files).** Every wire written between two isometric pieces
+  with no bend is now drawn as a cable, and its label moves onto it. To keep one straight, give it a bend, `0` too:
+  `data-arrow="you to server 0"`. Drawn exactly as before: wires between flat pieces, wires by numbers, a wire from a
+  block to a flat piece, a wire with a bend, and a wire between blocks standing at different heights.
+- **What a cable does not do.** It lies on the floor, so a block standing nearer the viewer is drawn over it. It
+  does not go round blocks: a cable to a block two steps away may pass behind the block between, and a long label
+  beside a cable's twin may have the twin's line through it.
+- New files: `deck/cable.js` (the geometry: plain numbers in, plain numbers out) and `deck/REFERENCES.md` (whose
+  methods the folder uses).
+
 ## 0.17.0 — blocks nobody has to place
 
 - **An isometric map with no places typed.** Leave `data-at` off every block and say what is joined to what with the

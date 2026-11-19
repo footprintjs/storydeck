@@ -45,6 +45,12 @@
   transform: translate(calc(var(--cdx) * 2 * (1 - var(--sd-t)) * var(--sd-t) + var(--pdx) * var(--sd-t) * var(--sd-t)),
     calc(var(--cdy) * 2 * (1 - var(--sd-t)) * var(--sd-t) + var(--pdy) * var(--sd-t) * var(--sd-t)));
 }
+/* a cable (a wire along the floor between two blocks: deck/cable.js) is a curve with a handle at each end, so its
+   packets stand at B(t) = 3(1-t)²t·C₁ + 3(1-t)t²·C₂ + t³·E from its start (C₂: --c2x/--c2y) */
+:where(svg.wire[data-sd-cable] :is(.pkt, .run)) {
+  transform: translate(calc(var(--cdx) * 3 * (1 - var(--sd-t)) * (1 - var(--sd-t)) * var(--sd-t) + var(--c2x) * 3 * (1 - var(--sd-t)) * var(--sd-t) * var(--sd-t) + var(--pdx) * var(--sd-t) * var(--sd-t) * var(--sd-t)),
+    calc(var(--cdy) * 3 * (1 - var(--sd-t)) * (1 - var(--sd-t)) * var(--sd-t) + var(--c2y) * 3 * (1 - var(--sd-t)) * var(--sd-t) * var(--sd-t) + var(--pdy) * var(--sd-t) * var(--sd-t) * var(--sd-t)));
+}
 :where(svg.wire .pkt) { opacity: 0; fill: var(--sd-glow, currentColor); stroke: none; }
 @keyframes sdPkt { from { --sd-t: 0; } to { --sd-t: 1; } }
 @keyframes sdPktShow { 0%, 100% { opacity: 0; } 15%, 80% { opacity: 1; } }
@@ -79,6 +85,7 @@
   text-transform: uppercase; dominant-baseline: central; fill: currentColor;
   stroke: var(--bg, #ffffff); stroke-width: 6px; stroke-linejoin: round; paint-order: stroke;
 }
+:where(svg.wire rect.plate) { fill: var(--bg, #ffffff); stroke: none; }   /* a cable's label stands on the cable: the line stops at its plate, and a packet passes under it */
 :where(svg.wire.halo path) { filter: drop-shadow(0 0 6px var(--wire-halo, currentColor)); }   /* the line and its head, not the label */
 :where(svg.wire .run) {
   --sd-t: .5; fill: var(--packet, var(--sd-glow, currentColor)); stroke: none;
