@@ -110,7 +110,7 @@
     "test:cov": "vitest run --coverage"
   },
   "peerDependencies": {
-    "footprintjs": "^11.0.0 || ^12.0.0",
+    "footprintjs": "^11.0.0 || ^12.0.0 || ^13.0.0 || ^14.0.0",
     "react": ">=18",
     "react-dom": ">=18"
   },
@@ -120,7 +120,7 @@
     }
   },
   "dependencies": {
-    "footprint-story": "^0.7.0",
+    "footprint-story": "^0.9.0",
     "markdown-it": "^14.3.3"
   },
   "devDependencies": {
@@ -130,7 +130,8 @@
     "@vitejs/plugin-react": "^5.0.4",
     "@vitest/coverage-v8": "^4.1.9",
     "esbuild": "^0.28.2",
-    "footprintjs": "12.1.0",
+    "footprintjs": "14.0.0",
+    "foottrace": "2.1.0",
     "jsdom": "^29.1.1",
     "publint": "0.3.25",
     "react": "^19.0.0",

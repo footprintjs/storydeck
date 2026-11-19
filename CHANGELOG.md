@@ -31,6 +31,12 @@
 - **A callout stays beside a piece that stands off the slide.** A picture larger than the slide, shown by a camera, has
   pieces past the slide's edge; a callout about one was held at the edge, far from its piece. On a piece inside the slide
   nothing changes.
+- **StoryDeck now needs footprint-story `^0.9.0`** (it was `^0.7.0`), for the order and the grid above. For a 0.x version
+  the two ranges do not overlap, so an app that also uses StoryReel needs a StoryReel that asks for `^0.9.0` too, or it
+  installs two copies of the package they share. A voice you have already paid for is still found: a clip's key and its
+  files in `voice/cache` are the same.
+- **Works beside footprintjs 13 and 14.** The optional peer range is now `^11 || ^12 || ^13 || ^14`, and the PowerPoint
+  export is tested on 14.0.0 (which needs foottrace `^2.1.0` beside it).
 - **`check` warns when a view stands far out** (`view-far`): further out than half size, the words on the picture show
   that much smaller, and the warning says how small and what to do.
 
