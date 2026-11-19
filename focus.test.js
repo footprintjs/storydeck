@@ -148,13 +148,13 @@ describe('focus · strategies', () => {
 
   it('a click takes one strategy of each kind, from the built-ins or the deck\'s own', () => {
     expect(() => focusStep(null, { ...lit, focus: 'left right' }, deck)).toThrow(/one mover at most.*"left" and "right"/);
-    expect(() => focusStep(null, { ...lit, focus: 'spin' }, deck)).toThrow(/no focus strategy "spin" \(there are grey, hide, keep, zoom, left, right, up, down, place, apart, path, blur\)/);
+    expect(() => focusStep(null, { ...lit, focus: 'spin' }, deck)).toThrow(/no focus strategy "spin" \(there are grey, hide, keep, zoom, fit, left, right, up, down, place, apart, path, blur\)/);
     const tilt = { kind: 'mover', place: ({ subject }) => ({ subject: { o: [subject.x, subject.y], s: 2, t: [0, 0] } }) };
     const look = focusStep(null, { ...lit, focus: 'tilt' }, { ...deck, strategies: { tilt } }).look;
     expect(look.strategies).toEqual(['tilt']);
     expect(look.pieces[1].move.s).toBe(2);
     expect(() => focusStep(null, { ...lit, focus: 'odd' }, { ...deck, strategies: { odd: { kind: 'paint' } } })).toThrow(/a look, a camera, a mover, an overlay or an order/);
-    expect(Object.keys(FOCUS)).toEqual(['grey', 'hide', 'keep', 'zoom', 'left', 'right', 'up', 'down', 'place', 'apart', 'path', 'blur']);
+    expect(Object.keys(FOCUS)).toEqual(['grey', 'hide', 'keep', 'zoom', 'fit', 'left', 'right', 'up', 'down', 'place', 'apart', 'path', 'blur']);
   });
 });
 
@@ -611,5 +611,103 @@ describe('focus · a piece and what it touches (name+)', () => {
     expect(apart.look.apart.groups[0].names).toEqual(['browser', 'w1', 'gw']);
     const place = focusStep(null, { in: ['*'], quiet: true, fresh: true, focus: 'place', options: { groups: 'runtime+: 100 0 1' } }, { pieces: graph });
     expect(moved(place.look)).toEqual(['gw', 'runtime', 'db']);
+  });
+});
+
+describe('focus · the camera: fit frames everything shown', () => {
+  // a floor four slides wide: a picture larger than the slide, its pieces coming in from left to right
+  const wide = [
+    { keys: ['a'], box: { x: 0, y: 400, w: 400, h: 200 } },
+    { keys: ['b'], box: { x: 1600, y: 400, w: 400, h: 200 } },
+    { keys: ['c'], box: { x: 6000, y: 400, w: 400, h: 200 } },
+  ];
+  const world = { pieces: wide, area: [0, 200, 1920, 1000] };
+  const onSlide = (stage, [x, y]) => [stage.s * x + stage.x, stage.s * y + stage.y];
+
+  it('the view slides to a piece that comes in and pulls back as the picture grows', () => {
+    const { looks } = planFocus([{ in: ['a'], focus: 'fit' }, { in: ['b'], focus: 'fit' }, { in: ['c'], focus: 'fit' }], world);
+    const [one, two, three] = looks.map((l) => l.stage.move);
+    // one piece, 400 × 200: 0.8 · min(1920 / 400, 800 / 200) = 3.2, held at `most` (2.5); its centre on the area's centre
+    expect(one.s).toBe(2.5);
+    expect(onSlide(one, [200, 500])).toEqual([960, 600]);
+    // two pieces, 2000 wide: 0.8 · 1920 / 2000 = 0.768 — further out than 1, which zoom never goes
+    expect(two.s).toBeCloseTo(0.768, 4);
+    expect(onSlide(two, [1000, 500])[0]).toBeCloseTo(960, 1);
+    // all three, 6400 wide: 0.8 · 1920 / 6400 = 0.24, held at `least` (0.25)
+    expect(three.s).toBe(0.25);
+    expect(onSlide(three, [3200, 500])[0]).toBeCloseTo(960, 1);
+    // the view moved on each click, from where the last one left it
+    expect(looks[1].stage.from).toEqual(one);
+    expect(looks[2].stage.from).toEqual(two);
+    expect(looks.map((l) => l.strategies)).toEqual([['fit'], ['fit'], ['fit']]);
+  });
+
+  it('frames the lit and the greyed alike — and under the look hide, only what is lit', () => {
+    const grey = planFocus([{ in: ['a', 'b'] }, { on: ['b'], focus: 'fit' }], world).looks[1].stage.move;
+    expect(grey.s).toBeCloseTo(0.768, 4);                       // a (greyed) and b (lit): 2000 wide
+    const hidden = planFocus([{ in: ['a', 'b'] }, { on: ['b'], focus: 'fit hide' }], world).looks[1].stage.move;
+    expect(hidden.s).toBe(2.5);                                 // a is not shown: only b, 400 wide
+    expect(onSlide(hidden, [1800, 500])).toEqual([960, 600]);
+    // zoom, for the same click, closes in on what is lit whatever the look
+    expect(planFocus([{ in: ['a', 'b'] }, { on: ['b'], focus: 'zoom' }], world).looks[1].stage.move.s).toBeGreaterThan(1);
+  });
+
+  it('share, least and most are its options; each is refused with what to give', () => {
+    const at = (options) => focusStep(null, { in: ['a', 'b'], focus: 'fit', options }, world).look.stage.move.s;
+    expect(at({ share: 1 })).toBeCloseTo(0.96, 4);
+    expect(at({ share: '0.5' })).toBeCloseTo(0.48, 4);          // as a data-focus-share attribute gives it
+    expect(at({ least: 0.9 })).toBe(0.9);
+    expect(at({ most: 0.5 })).toBe(0.5);
+    expect(() => at({ share: 0 })).toThrow(/focus "fit": share is how much of the area the picture fills, above 0 and 1 at most \(0\.8\) — not "0"/);
+    expect(() => at({ share: 2 })).toThrow(/focus "fit": share/);
+    expect(() => at({ share: 'most' })).toThrow(/focus "fit": share/);
+    expect(() => at({ least: 0 })).toThrow(/focus "fit": least and most are how far out and how close the view may go/);
+    expect(() => at({ least: 3 })).toThrow(/not "3" and "2\.5"/);
+    expect(() => at({ most: 'near' })).toThrow(/focus "fit": least and most/);
+    // found in review: an option no screen has must not reach the view as Infinity, NaN or 0
+    for (const odd of [{ least: 'Infinity', most: 'Infinity' }, { least: '1e308', most: '1e308' }, { most: 'Infinity' }, { most: 101 }, { least: NaN }, { least: -1 }, { least: '1e-300', most: '1e-300' }, { least: 0.009 }])
+      expect(() => at(odd), JSON.stringify(odd)).toThrow(/focus "fit": least and most are how far out and how close the view may go, from 0\.01 to 100, most no smaller than least/);
+    for (const options of [{}, { share: 1 }, { least: 100, most: 100 }, { least: 0.01, most: 0.01 }]) for (const v of Object.values(focusStep(null, { in: ['a', 'b'], focus: 'fit', options }, world).look.stage.move)) { expect(Number.isFinite(v)).toBe(true); }
+    expect(at({ least: 0.01, most: 0.01 })).toBe(0.01);
+  });
+
+  it('nothing shown with a box: the view stays where it is', () => {
+    expect(focusStep(null, { in: ['note'], focus: 'fit' }, deck).look.stage).toBe(null);
+  });
+
+  it('it keeps the context in view, so it goes with a mover that steps the context aside — where zoom is refused', () => {
+    const look = focusStep(null, { in: ['a', 'b'], on: ['b'], quiet: true, focus: 'fit left' }, world).look;
+    expect(look.strategies).toEqual(['fit', 'left']);
+    // both groups, where the mover leaves them, are inside the area
+    const boxes = look.pieces.slice(0, 2).map((p, i) => { const b = wide[i].box, m = p.move ?? { dx: 0, dy: 0, s: 1 }, c = [b.x + b.w / 2 + m.dx, b.y + b.h / 2 + m.dy]; return { x: c[0] - b.w * m.s / 2, y: c[1] - b.h * m.s / 2, w: b.w * m.s, h: b.h * m.s }; });
+    for (const b of boxes) {
+      const [x0, y0] = onSlide(look.stage.move, [b.x, b.y]), [x1, y1] = onSlide(look.stage.move, [b.x + b.w, b.y + b.h]);
+      expect(x0).toBeGreaterThanOrEqual(0); expect(x1).toBeLessThanOrEqual(1920); expect(y0).toBeGreaterThanOrEqual(200); expect(y1).toBeLessThanOrEqual(1000);
+    }
+    expect(() => focusStep(null, { in: ['a', 'b'], on: ['b'], quiet: true, focus: 'zoom left' }, world)).toThrow(/"zoom" closes in on the subject/);
+    // a deck's own camera is held to the same rule: only one that says it keeps the context goes with such a mover
+    const mine = { kind: 'camera', place: () => ({}) };
+    expect(() => focusStep(null, { in: ['a', 'b'], focus: 'mine left' }, { ...world, strategies: { mine } })).toThrow(/"mine" closes in on the subject, and "left" keeps the context in view/);
+    expect(focusStep(null, { in: ['a', 'b'], focus: 'mine left' }, { ...world, strategies: { mine: { ...mine, keepsContext: true } } }).look.strategies).toEqual(['mine', 'left']);
+  });
+
+  it('with apart it frames the parts where they fly to; one camera a click', () => {
+    const open = planFocus([{ in: ['a', 'b'] }, { focus: 'fit apart', options: { apart: 'a: -1000 0 | b: 1000 0' } }], world).looks[1];
+    expect(open.strategies).toEqual(['fit', 'apart']);
+    expect(open.stage.move.s).toBeCloseTo(0.8 * 1920 / 4000, 4);   // 2000 wide, flown 1000 further out each way
+    expect(() => focusStep(null, { in: ['a'], focus: 'fit zoom' }, world)).toThrow(/a click takes one camera at most: "fit" and "zoom" are both cameras/);
+  });
+
+  it('property: whatever is shown ends inside the area, unless `least` holds the view closer', () => {
+    // a small deterministic sweep (no extra dependency): pieces spread over a wide floor, every subset shown
+    const floor = Array.from({ length: 5 }, (_, i) => ({ keys: [`p${i}`], box: { x: i * 700 - 900, y: (i % 3) * 300 - 100, w: 300 + i * 40, h: 150 + (i % 2) * 90 } }));
+    for (let mask = 1; mask < 32; mask += 1) {
+      const names = floor.filter((_, i) => mask & (1 << i)).map((p) => p.keys[0]);
+      const { stage } = focusStep(null, { in: names, focus: 'fit' }, { pieces: floor, area: [0, 200, 1920, 1000] }).look;
+      for (const p of floor.filter((q) => names.includes(q.keys[0]))) {
+        const [x0, y0] = onSlide(stage.move, [p.box.x, p.box.y]), [x1, y1] = onSlide(stage.move, [p.box.x + p.box.w, p.box.y + p.box.h]);
+        expect(x0).toBeGreaterThanOrEqual(-0.5); expect(x1).toBeLessThanOrEqual(1920.5); expect(y0).toBeGreaterThanOrEqual(199.5); expect(y1).toBeLessThanOrEqual(1000.5);
+      }
+    }
   });
 });

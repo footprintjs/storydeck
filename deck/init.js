@@ -45,7 +45,7 @@ const CLICKS = `<!--
     <step data-in="…" data-out="…" data-on="…" data-focus="…">
       data-in    pieces that come in (they stay)     data-out   pieces that leave
       data-on    what the click is about (the rest shown is greyed); data-quiet brings data-in pieces in greyed
-      data-focus how: zoom · path (lit piece after piece, in data-on's order) · left/right/up/down · blur · apart · place
+      data-focus how: zoom · fit (the view frames all that is shown) · path (lit piece after piece, in data-on's order) · left/right/up/down · blur · apart · place
       <h2>       the click's headline (about 12 words at most)
       <aside class="notes">  what the presenter says: N shows it, P opens the presenter window, L reads the deck aloud
 -->
