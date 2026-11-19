@@ -65,7 +65,8 @@ export interface DeckIcon { readonly viewBox: string; readonly body: string }
  * pieces (data-iso) are placed and drawn — by their own data-at, or, when no block has one, by the build from what the
  * wires join; callouts stand beside their pieces; and <i data-arrow="…"></i> becomes an SVG wire, by numbers ("x1 y1 x2
  * y2 [bend]") or between pieces ("from to to": class "pkt" adds a packet that rides it on a path click; between two
- * isometric pieces with no bend it is a cable along the floor, from the foot of one to the foot of the other). `canvas`: the
+ * isometric pieces with no bend it is a cable along the floor, from the foot of one to the foot of the other, where
+ * one can lie clear of both). `canvas`: the
  * slide, [w, h]; `area`: [x0, y0, x1, y1], where a picture the build fits goes (the deck's area).
  */
 export function applyTransforms(html: string, options?: { icons?: Readonly<Record<string, DeckIcon>>; canvas?: readonly [number, number] | null; area?: readonly [number, number, number, number] | null }): string;

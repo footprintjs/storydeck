@@ -55,8 +55,9 @@
 @keyframes sdPkt { from { --sd-t: 0; } to { --sd-t: 1; } }
 @keyframes sdPktShow { 0%, 100% { opacity: 0; } 15%, 80% { opacity: 1; } }
 /* a wire that comes in shows itself start to tip behind a sweeping soft edge (a mask: a theme's dashes stay), square to
-   its run (--sd-angle) — its curve's control point sits halfway along the run, so the curve shows in drawing order. It
-   is the piece's own animation (focus.css · --sd-a-more): at its turn on a path, after a new blur. */
+   its run (--sd-angle) — its curve's control point sits halfway along the run, so the curve shows in drawing order
+   (a cable's two handles do not: where it hooks round to its foot, a short stretch shows a little early). It is the
+   piece's own animation (focus.css · --sd-a-more): at its turn on a path, after a new blur. */
 @property --sd-reveal { syntax: '<percentage>'; inherits: false; initial-value: 100%; }
 @keyframes sdReveal { from { --sd-reveal: -12%; } }
 @media screen and (prefers-reduced-motion: no-preference) {
@@ -85,7 +86,7 @@
   text-transform: uppercase; dominant-baseline: central; fill: currentColor;
   stroke: var(--bg, #ffffff); stroke-width: 6px; stroke-linejoin: round; paint-order: stroke;
 }
-:where(svg.wire rect.plate) { fill: var(--bg, #ffffff); stroke: none; }   /* a cable's label stands on the cable: the line stops at its plate, and a packet passes under it */
+:where(svg.wire rect.plate) { fill: var(--wire-plate, var(--bg, #ffffff)); stroke: none; }   /* a cable's label stands on the cable: the line stops at its plate, and a packet passes under it. The plate is the slide's ground; on a tinted floor, --wire-plate */
 :where(svg.wire.halo path) { filter: drop-shadow(0 0 6px var(--wire-halo, currentColor)); }   /* the line and its head, not the label */
 :where(svg.wire .run) {
   --sd-t: .5; fill: var(--packet, var(--sd-glow, currentColor)); stroke: none;

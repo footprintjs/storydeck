@@ -17,12 +17,13 @@
 // that rides the curve itself on a path click (hidden at rest, so print, a jump and reduced motion show the plain
 // wire); a wire that comes in draws itself, start to tip.
 //
-// A wire written between two isometric pieces with no bend is a cable instead (cable.js): it lies on the floor, from
-// the foot of one block to the foot of the other, a curve with a handle at each end. It is the same wire in every
-// other way — its ends, its head, its packets, its options — but its label stands on it, not beside it. WHY: a line
-// through the air from one block's outline to another's reads as floating over a floor it has nothing to do with,
-// and beside the middle of a wire between blocks there is a block's face. A bend, 0 too ("a to b 0"), keeps a wire
-// between blocks the straight run it was.
+// A wire written between two isometric pieces with no bend is a cable instead, where one can lie (cable.js): it lies
+// on the floor, from the foot of one block to the foot of the other, a curve with a handle at each end. It is the
+// same wire in every other way — its ends, its head, its packets, its options — but its label stands on it, not
+// beside it. WHY: a line through the air from one block's outline to another's reads as floating over a floor it has
+// nothing to do with, and beside the middle of a wire between blocks there is a block's face. Where no cable can lie
+// (cable.js says: one block straight in front of the other, or a request and its answer that would cross), and with
+// a bend, 0 too ("a to b 0"), a wire between blocks is the straight run it was.
 //
 // A wire's options (deck.css draws them from the theme's tokens; a ">" or "<" in a value is written &gt; or &lt;, as a
 // tag ends at its first ">"):
@@ -38,7 +39,7 @@ import {readAttributes} from '../pieceRules.js';
 import {boxFinder, exit, exitOutline} from './boxes.js';
 import {callouts} from './callouts.js';
 import {isoDrawn} from './iso.js';
-import {cables, cableWalk, held, labelPlace, LABEL_LOOKS} from './cable.js';
+import {cables, cablePoint, cableWalk, held, labelPlace, LABEL_LOOKS} from './cable.js';
 
 const fixed = (v) => +v.toFixed(1);
 /** A wire written by the pieces it joins: "from to to [bend]". */
@@ -51,6 +52,10 @@ const GAP = 6;     // px between a wire's end and the box it leaves or reaches
 const MOST_PACKETS = 6;
 const SPEEDS = [0.5, 60];   // seconds a packet takes to run the wire
 const LABEL = {size: 18, char: 12, clear: 8};   // deck.css's label: its px size, a generous width per letter, px clear of the wire
+/** The letters a label shows: one written as an entity (&amp;) is one letter, not five. */
+const shown = (label) => label.replace(/&(?:#\d+|#x[\da-f]+|[a-z][a-z\d]*);/gi, '.').length;
+/** Where a cable's running packets may rest when they do not run: its middle first, then further to each side by turns. */
+const RESTS = [0.5, 0.35, 0.65, 0.25, 0.75, 0.15, 0.85];
 
 /** A wire's options, read as a browser reads its tag (the first of two with one name counts) and checked: {label, packets, speed}. */
 function wireOptions(attrs, spec) {
@@ -86,7 +91,7 @@ function wireSvg(attrs, spec, cable = null, place = null) {
   const tl = Math.hypot(x2 - kx, y2 - ky) || 1, ux = (x2 - kx) / tl, uy = (y2 - ky) / tl, hs = 18;
   // the label: beside the curve's middle, B(½), to the left of the way it runs there (its tangent is end − start), as
   // far off as half the label measures across the wire, and LABEL.clear more: above a level wire, beside a standing one
-  const half = o.label ? [(o.label.length * LABEL.char) / 2 + 4, LABEL.size / 2 + 4] : null;   // the box holds it, so a wire showing itself in shows it too
+  const half = o.label ? [(shown(o.label) * LABEL.char) / 2 + 4, LABEL.size / 2 + 4] : null;   // the box holds it, so a wire showing itself in shows it too
   let off = half ? (Math.abs(dy) / len) * half[0] + (Math.abs(dx) / len) * half[1] + LABEL.clear : 0;
   // a wire bent away from its label curves back towards it on either side of its middle — by 2·bend·u²/len² at u along
   // it, never past the line from end to end: the label stands clear of the curve under its whole width too
@@ -111,15 +116,20 @@ function wireSvg(attrs, spec, cable = null, place = null) {
   const pkt = /\bpkt\b/.test(at)
     ? `<rect class="pkt" x="${f(x1 - X - 8)}" y="${f(y1 - Y - 6)}" width="16" height="12" rx="3" style="${ride}"/>`
     : '';
+  // Where the packets do not run (reduced motion, print, motion off) one rests at the wire's middle (deck.css). A
+  // cable's label may stand there: then it rests at the nearest place along the cable that the plate is not over.
+  const drawn = cable && [cable[0], cable[1], cable[2], [ex, ey]];
+  const rest = drawn && half && o.packets ? RESTS.find((t) => { const [px, py] = cablePoint(drawn, t); return Math.abs(px - lx) > half[0] + 9 || Math.abs(py - ly) > half[1] + 9; }) ?? 0.5 : 0.5;
   // packets that keep running (deck.css · sdRun): loops on one clock, each its share of a run behind the one before
-  const runs = Array.from({length: o.packets}, (_, k) => `<circle class="run" data-loop cx="${f(x1 - X)}" cy="${f(y1 - Y)}" r="7" style="${ride};--loop:sdRun ${o.speed}s linear ${+((-k * o.speed) / o.packets).toFixed(3) + 0}s infinite"/>`).join('');
+  const runs = Array.from({length: o.packets}, (_, k) => `<circle class="run" data-loop cx="${f(x1 - X)}" cy="${f(y1 - Y)}" r="7" style="${ride};${rest === 0.5 ? '' : `--sd-t:${rest};`}--loop:sdRun ${o.speed}s linear ${+((-k * o.speed) / o.packets).toFixed(3) + 0}s infinite"/>`).join('');
   const label = o.label ? `<text class="label" x="${f(lx - X)}" y="${f(ly - Y)}" text-anchor="middle">${o.label}</text>` : '';
   // a label on its cable stands on a plate of the ground's colour: the line stops at it, never a dash between two
-  // words, and a packet passes under it, never across the words
+  // words, and a packet passes under it, never across the words. The head is drawn over the plate: where a label is
+  // longer than its cable has room for, the arrow's tip is still seen
   const plate = cable && half ? `<rect class="plate" x="${f(lx - X - half[0])}" y="${f(ly - Y - half[1])}" width="${f(2 * half[0])}" height="${f(2 * half[1])}" rx="6"/>` : '';
   // which way it runs, start to tip, as a CSS angle (0 up, 90 right): a wire coming in shows itself that way (deck.css · sdReveal)
   const angle = f((Math.atan2(dx, -dy) * 180) / Math.PI);
-  return `<svg${at}${cable ? ' data-sd-cable' : ''} style="left:${f(X)}px;top:${f(Y)}px;width:${f(W)}px;height:${f(H)}px;--sd-angle:${angle}deg" viewBox="0 0 ${f(W)} ${f(H)}" aria-hidden="true"><path d="${d}"/>${head}${pkt}${runs}${plate}${label}</svg>`;
+  return `<svg${at}${cable ? ' data-sd-cable' : ''} style="left:${f(X)}px;top:${f(Y)}px;width:${f(W)}px;height:${f(H)}px;--sd-angle:${angle}deg" viewBox="0 0 ${f(W)} ${f(H)}" aria-hidden="true"><path d="${d}"/>${cable ? '' : head}${pkt}${runs}${plate}${cable ? head : ''}${label}</svg>`;
 }
 
 /**
@@ -154,9 +164,9 @@ function replaceEach(html, found, draw) {
  * draws. So a wire to a block ends on the block, not in the empty corner of its box, and two blocks that stand clear
  * of each other are never called too close because their boxes meet.
  *
- * A wire written between two isometric pieces with no bend is a cable along the floor (cable.js): its entry here is
- * its four points, [start, handle, handle, end], where every other wire's is its numbers. A bend, 0 too ("a to b 0"),
- * keeps the wire a straight run from outline to outline.
+ * A wire written between two isometric pieces with no bend is a cable along the floor where cable.js lays one: its
+ * entry here is its four points, [start, handle, handle, end], where every other wire's is its numbers. Where it
+ * lays none, and with a bend, 0 too ("a to b 0"), the wire is a straight run from outline to outline.
  */
 function wiresBetween(html, found, shapes, floor) {
   const read = found.map((f) => BETWEEN.exec(f.m[1]));

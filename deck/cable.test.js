@@ -1,11 +1,18 @@
 import {describe, it, expect} from 'vitest';
-import {arrange, isometric} from 'footprint-story/isometric';
+import {isometric} from 'footprint-story/isometric';
+import {isoDrawn} from './iso.js';
 import {cables, cablePoint, cableWalk, held, labelPlace, HANDLE, LABEL_LOOKS, LABEL_PLACES, WALK_MOST} from './cable.js';
 
 const grid = isometric({tile: 120, origin: [960, 240]});
 const floor = (col, row, lift = 0) => { const p = grid.at(col, row, lift); return [p.x, p.y]; };
-const block = (at, size = [2, 2, 1], kind = 'block') => ({at: [at[0], at[1], at[2] ?? 0], size, kind});
-const shapesOf = (things) => new Map(Object.entries(things));
+const block = (at, size = [2, 2, 1], kind = 'block') => ({at, size, kind});
+const canvas = [1920, 1080];
+/** Pieces as the build draws them on that grid: the Map `cables` reads, each with the outline of what it draws. */
+const shapesOf = (things) => isoDrawn('<i data-iso-grid="120 at 960 240"></i>' + Object.entries(things).map(([name, t]) => `<div data-k="${name}" data-iso="${t.kind}" data-at="${t.at.join(' ')}" data-size="${t.size.join(' ')}"></div>`).join(''), {canvas}).shapes;
+/** Whether a slide point is inside an outline: asked here by its own count of the sides a ray crosses. */
+const within = (outline, [px, py]) => outline.reduce((odd, [xi, yi], i) => { const [xj, yj] = outline.at(i - 1); return (yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi ? !odd : odd; }, false);
+/** How many points of a cable, walked (6 px apart at most: a stretch shorter than that may slip between two), are under what a piece draws. */
+const hiddenBy = (cable, shape) => cableWalk(cable).filter((p) => within(shape.outline, p)).length;
 /** A slide point as the floor point under it, at a lift: [col, row]. */
 const tiles = ([x, y], lift = 0) => { const p = grid.tileAt(x, y + lift * grid.rise); return [p.col, p.row]; };
 const cols = [Math.cos(Math.atan2(30, 60)), Math.sin(Math.atan2(30, 60))], rows = [-cols[0], cols[1]];   // a tile along the cols is 60 right and 30 down; along the rows, 60 left and 30 down
@@ -48,9 +55,21 @@ describe('cable · a wire along the floor between two isometric pieces', () => {
     const [ux, uy] = along(start, h1), [vx, vy] = along(end, h2);
     expect([ux, uy]).toEqual([expect.closeTo(rows[0], 9), expect.closeTo(rows[1], 9)]);
     expect([vx, vy]).toEqual([expect.closeTo(cols[0], 9), expect.closeTo(cols[1], 9)]);
-    // a block straight above or below the other on the slide is taken as the one on the right: the first leaves by its right foot
-    const [[level]] = cables([['a', 'c']], shapesOf({a, c: block([3, 7])}), floor);
-    expect(touches(level, cols)[0]).toBeCloseTo(2, 6);
+  });
+
+  it('of two pieces one straight below the other, the upper is the one on the left — whichever the wire starts from', () => {
+    // two low plates far apart, one straight down the slide from the other: neither is further right
+    const plates = shapesOf({a: block([0, 0], [0.4, 0.4, 0.1]), c: block([8, 8], [0.4, 0.4, 0.1])});
+    const [down] = cables([['a', 'c']], plates, floor), [up] = cables([['c', 'a']], plates, floor);
+    expect(touches(down[0], cols).map((v) => +v.toFixed(6))).toEqual([0.4, 0.2]);    // out of a's right foot…
+    expect(touches(down[3], rows).map((v) => +v.toFixed(6))).toEqual([8.2, 8.4]);    // …into c's left foot
+    expect(touches(up[0], rows).map((v) => +v.toFixed(6))).toEqual([8.2, 8.4]);      // the answer: the same two feet
+    expect(touches(up[3], cols).map((v) => +v.toFixed(6))).toEqual([0.4, 0.2]);
+    // two as far right and as far down (one standing where the other does): by name, so still the same feet both ways
+    const twice = shapesOf({a: block([0, 0], [1, 1, 0.1]), b: block([0, 0], [1, 1, 0.1])});
+    const [ab] = cables([['a', 'b']], twice, floor), [ba] = cables([['b', 'a']], twice, floor);
+    expect(touches(ab[0], cols).map((v) => +v.toFixed(6))).toEqual(touches(ba[3], cols).map((v) => +v.toFixed(6)));
+    expect(touches(ab[3], rows).map((v) => +v.toFixed(6))).toEqual(touches(ba[0], rows).map((v) => +v.toFixed(6)));
   });
 
   it('a request and its answer lie side by side on the feet they share, one inside the other, and never cross', () => {
@@ -70,12 +89,12 @@ describe('cable · a wire along the floor between two isometric pieces', () => {
 
   it('a handle is a share of the run, never under a third of a tile nor over two tiles', () => {
     expect(HANDLE).toEqual({share: 0.45, least: 0.35, most: 2});
-    const reach = (b) => { const [[start, h1]] = cables([['a', 'b']], shapesOf({a: block([0, 0]), b: block(b)}), floor); return along(start, h1)[2]; };
-    expect(reach([1.6, -1.2])).toBeCloseTo(0.35 * 120, 6);     // two feet half a tile apart: the least (cable.js places nothing: it lays a cable between what it is given)
-    expect(reach([40, -40])).toBeCloseTo(2 * 120, 6);          // far apart: the most
+    const reach = (b, size) => { const [[start, h1]] = cables([['a', 'b']], shapesOf({a: block([0, 0], size), b: block(b, size)}), floor); return along(start, h1)[2]; };
+    expect(reach([1.2, -1.2], [1, 1, 1])).toBeCloseTo(0.35 * 120, 6);   // two small blocks corner to corner, their feet under a tile apart: the least
+    expect(reach([40, -40], [2, 2, 1])).toBeCloseTo(2 * 120, 6);        // far apart: the most
   });
 
-  it('cables at one foot share it out, leaving and arriving alike, in the order that keeps them apart: the one whose other end is furthest up the slide nearest the back', () => {
+  it('cables at one foot share it out, leaving and arriving alike: the one whose other end is furthest up the slide nearest the back', () => {
     const shapes = shapesOf({hub: block([4, 4]), up: block([8, -2]), level: block([10, 1]), down: block([13, 5]), src: block([-2, 10])});
     const links = [['hub', 'down'], ['hub', 'up'], ['hub', 'level'], ['src', 'hub'], ['up', 'hub']];
     const laid = cables(links, shapes, floor);
@@ -90,11 +109,17 @@ describe('cable · a wire along the floor between two isometric pieces', () => {
     expect(Math.hypot(twice[0][0][0] - twice[1][0][0], twice[0][0][1] - twice[1][0][1])).toBeGreaterThan(20);
     expect(Math.hypot(twice[0][3][0] - twice[1][3][0], twice[0][3][1] - twice[1][3][1])).toBeGreaterThan(20);
     expect(cross(twice[0], twice[1])).toBe(false);
+    // of two other ends as far up the slide, the nearer first: the cable to the further one passes in front of the nearer
+    const row = shapesOf({hub: block([0, 4]), near: block([5, 1]), far: block([9, -3])});
+    const fan = cables([['hub', 'far'], ['hub', 'near']], row, floor);
+    expect(touches(fan[1][0], cols)[1]).toBeCloseTo(4 + 2 / 3, 6);   // to "near": nearer the back, though written second
+    expect(touches(fan[0][0], cols)[1]).toBeCloseTo(4 + 4 / 3, 6);
+    expect(cross(fan[0], fan[1])).toBe(false);
   });
 
   it('a cylinder\'s feet are on its round base, not on the square of its tiles', () => {
-    const shapes = shapesOf({a: block([0, 4], [2, 2, 1], 'cylinder'), b: block([6, 0], [2, 2, 1], 'cylinder'), c: block([6, 4])});
-    const laid = cables([['a', 'b'], ['a', 'c'], ['c', 'b'], ['b', 'a']], shapes, floor);
+    const shapes = shapesOf({a: block([0, 4], [2, 2, 1], 'cylinder'), b: block([6, 0], [2, 2, 1], 'cylinder'), c: block([6, 4]), d: block([2, 9])});
+    const laid = cables([['a', 'b'], ['a', 'c'], ['d', 'b'], ['b', 'a']], shapes, floor);
     const fromCentre = (point, way, centre) => { const t = touches(point, way); return Math.hypot(t[0] - centre[0], t[1] - centre[1]); };
     expect(fromCentre(laid[0][0], cols, [1, 5])).toBeCloseTo(1, 6);   // a's cables leave off the middle of its side, and still from its rim
     expect(fromCentre(laid[1][0], cols, [1, 5])).toBeCloseTo(1, 6);
@@ -121,10 +146,59 @@ describe('cable · a wire along the floor between two isometric pieces', () => {
     expect(cables([], shapes, floor)).toEqual([]);
   });
 
-  it('for any map the build places: every cable joins the right foot of its block on the left to the left foot of its block on the right, sets off and comes in along the floor, and has a place of its own on each foot (300 seeded maps)', () => {
+  it('a block straight in front of another, behind it or against it gets no cable: the curve would run under one of the two', () => {
+    const none = (b, links = [['a', 'b']]) => cables(links, shapesOf({a: block([0, 0]), b: block(b)}), floor);
+    expect(none([5, 5])).toEqual([null]);              // straight down the slide: the cable would hook under b's corner
+    expect(none([5, 5], [['b', 'a']])).toEqual([null]);
+    expect(none([-5, -5])).toEqual([null]);            // straight up it: it would turn back under a
+    expect(none([2, 0])).toEqual([null]);              // against a's right face: its first stretch would be under b
+    expect(none([0, 2])).toEqual([null]);
+    expect(none([2.2, 0])).toEqual([null]);
+    // corner to corner, the feet face each other: a cable, however near
+    const [near] = none([2.2, -2.2]);
+    expect(near).toHaveLength(4);
+    // a cable kept is under neither block — and the check that says so does see a curve that ends inside one
+    const shapes = shapesOf({a: block([0, 0]), b: block([5, -3])}), [kept] = cables([['a', 'b']], shapes, floor);
+    expect(hiddenBy(kept, shapes.get('a')) + hiddenBy(kept, shapes.get('b'))).toBe(0);
+    expect(hiddenBy([kept[0], kept[1], kept[2], shapes.get('b').middle], shapes.get('b'))).toBeGreaterThan(0);
+  });
+
+  it('a request and its answer are cables together or not at all: where the two would cross, neither is', () => {
+    // b a little down the slide from a's right foot: a cable alone hooks round to b's left foot, and two side by side would cross
+    const shapes = shapesOf({a: block([0, 0]), b: block([6, 1])});
+    expect(cables([['a', 'b']], shapes, floor)[0]).toHaveLength(4);
+    expect(cables([['b', 'a']], shapes, floor)[0]).toHaveLength(4);
+    expect(cables([['a', 'b'], ['b', 'a']], shapes, floor)).toEqual([null, null]);
+    expect(cables([['a', 'b'], ['a', 'b']], shapes, floor)).toEqual([null, null]);
+    // and the others at those feet keep theirs
+    const more = shapesOf({a: block([0, 0]), b: block([6, 1]), c: block([5, -6])});
+    const laid = cables([['a', 'b'], ['b', 'a'], ['a', 'c']], more, floor);
+    expect(laid.slice(0, 2)).toEqual([null, null]);
+    expect(laid[2]).toHaveLength(4);
+  });
+
+  it('wherever two blocks stand: a cable kept lies clear of what both draw, a pair is kept together or not at all, and a pair kept does not cross (four distances, every 5° round)', () => {
+    const seen = {kept: 0, none: 0, pairs: 0, apart: 0};
+    for (const far of [3, 4, 6, 10]) {
+      for (let k = 0; k < 72; k++) {
+        const turn = (k * 5 * Math.PI) / 180, b = [+(far * Math.cos(turn)).toFixed(2), +(far * Math.sin(turn)).toFixed(2)];
+        if (Math.abs(b[0]) < 2 && Math.abs(b[1]) < 2) continue;   // one on the other
+        const shapes = shapesOf({a: block([0, 0]), b: block(b)}), where = `b at ${b}`;
+        const [alone] = cables([['a', 'b']], shapes, floor), [back] = cables([['b', 'a']], shapes, floor), [request, answer] = cables([['a', 'b'], ['b', 'a']], shapes, floor);
+        expect(Boolean(alone), where).toBe(Boolean(back));
+        expect(Boolean(request), where).toBe(Boolean(answer));
+        for (const cable of [alone, back, request, answer]) if (cable) expect(hiddenBy(cable, shapes.get('a')) + hiddenBy(cable, shapes.get('b')), where).toBe(0);
+        if (request) { expect(cross(request, answer), where).toBe(false); expect(Boolean(alone), where).toBe(true); }
+        seen.kept += Boolean(alone); seen.none += !alone; seen.pairs += Boolean(request); seen.apart += Boolean(alone) && !request;
+      }
+    }
+    expect(seen).toEqual({kept: 168, none: 120, pairs: 144, apart: 24});   // to the side: cables; in front, behind, against: none; a hooked pair: none
+  });
+
+  it('for any map the build places: nearly every wire gets its cable; each joins the right foot of its block on the left to the left foot of its block on the right, lies clear of both, and has a place of its own on each foot (300 seeded maps)', () => {
     let s = 20261119;
     const next = () => { s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-    const seen = {cables: 0, shared: 0, round: 0, back: 0};
+    const seen = {wires: 0, cables: 0, shared: 0, round: 0, back: 0, pairs: 0};
     const ways = {right: cols, left: rows};
     /** A foot's touch is on that foot: along its edge, on the piece's near half (its edge, or its round rim). */
     const onFoot = (at, piece, edge) => {
@@ -135,26 +209,42 @@ describe('cable · a wire along the floor between two isometric pieces', () => {
     for (let run = 0; run < 300; run++) {
       const n = 2 + Math.floor(next() * 7), names = Array.from({length: n}, (_, i) => `p${i}`);
       const kinds = names.map(() => (next() < 0.3 ? 'cylinder' : 'block')), wide = names.map((_, i) => (kinds[i] === 'cylinder' ? 2 : 1 + Math.floor(next() * 3)));
-      const things = names.map((name, i) => ({name, size: [wide[i], kinds[i] === 'cylinder' ? wide[i] : 1 + Math.floor(next() * 3), next() * 2]}));
+      const sizes = names.map((_, i) => [wide[i], kinds[i] === 'cylinder' ? wide[i] : 1 + Math.floor(next() * 3), +(0.2 + next() * 1.8).toFixed(2)]);
       const links = Array.from({length: Math.floor(next() * 10)}, () => [names[Math.floor(next() * n)], names[Math.floor(next() * n)]]);
-      const placed = arrange(things, links, {across: true}).things, shapes = new Map(placed.map((t, i) => [t.name, {at: [...t.at], size: [...t.size], kind: kinds[i]}]));
-      const laid = cables(links, shapes, floor), feet = new Map();
-      const right = (piece) => piece.at[0] + piece.size[0] / 2 - piece.at[1] - piece.size[1] / 2;   // how far right on the slide its middle stands
+      // the build's own placing: no data-at, so the blocks stand where the wires put them
+      const html = names.map((name, i) => `<div data-k="${name}" data-iso="${kinds[i]}" data-size="${sizes[i].join(' ')}"></div>`).join('');
+      const {shapes, floor: placed} = isoDrawn(html, {canvas, area: [60, 200, 1860, 1000], links: links.filter(([u, v]) => u !== v)});
+      const laid = cables(links, shapes, placed), feet = new Map();
+      const origin = placed(0, 0, 0), tile = placed(1, 0, 0)[0] - origin[0], rise = placed(1, 0, 0)[1] - origin[1];
+      const tilesOf = ([x, y]) => { const a = (x - origin[0]) / tile, b = (y - origin[1]) / rise; return [(a + b) / 2, (b - a) / 2]; };   // the floor point under a slide point
+      const right = (piece) => piece.at[0] + piece.size[0] / 2 - piece.at[1] - piece.size[1] / 2, down = (piece) => piece.at[0] + piece.size[0] / 2 + piece.at[1] + piece.size[1] / 2;
       laid.forEach((cable, i) => {
         if (links[i][0] === links[i][1]) { expect(cable).toBe(null); return; }
+        seen.wires += 1;
+        if (!cable) return;
         const [start, h1, h2, end] = cable, a = shapes.get(links[i][0]), b = shapes.get(links[i][1]);
         for (const p of [start, h1, h2, end]) expect(Number.isFinite(p[0]) && Number.isFinite(p[1])).toBe(true);
-        const [leaves, arrives] = right(b) >= right(a) ? ['right', 'left'] : ['left', 'right'];
+        const side = right(a) - right(b) || down(a) - down(b), [leaves, arrives] = side > 0 || (side === 0 && links[i][0] > links[i][1]) ? ['left', 'right'] : ['right', 'left'];
         const [ux, uy] = along(start, h1), [vx, vy] = along(end, h2);
         expect(Math.abs(ux - ways[leaves][0]) + Math.abs(uy - ways[leaves][1]) + Math.abs(vx - ways[arrives][0]) + Math.abs(vy - ways[arrives][1])).toBeLessThan(1e-6);
-        const out = touches(start, ways[leaves]), into = touches(end, ways[arrives]);
+        const out = tilesOf([start[0] - ways[leaves][0] * 6, start[1] - ways[leaves][1] * 6]), into = tilesOf([end[0] - ways[arrives][0] * 6, end[1] - ways[arrives][1] * 6]);
         onFoot(out, a, leaves); onFoot(into, b, arrives);
+        expect(hiddenBy(cable, a) + hiddenBy(cable, b), `${links[i]} of run ${run}`).toBe(0);
         for (const key of [`${links[i][0]} ${leaves} ${out.map((v) => v.toFixed(4))}`, `${links[i][1]} ${arrives} ${into.map((v) => v.toFixed(4))}`]) { expect(feet.has(key), `two cables at one place: ${key}`).toBe(false); feet.set(key, i); }
         seen.cables += 1; seen.round += a.kind === 'cylinder' || b.kind === 'cylinder'; seen.back += leaves === 'left';
       });
+      // cables between the same two blocks: kept together, and never across each other
+      for (let i = 0; i < links.length; i++) {
+        for (let j = i + 1; j < links.length; j++) {
+          if (links[i][0] === links[i][1] || [...links[i]].sort().join() !== [...links[j]].sort().join()) continue;
+          expect(Boolean(laid[i]), `${links[i]} and ${links[j]} of run ${run}`).toBe(Boolean(laid[j]));
+          if (laid[i]) { expect(cross(laid[i], laid[j])).toBe(false); seen.pairs += 1; }
+        }
+      }
       seen.shared += laid.filter(Boolean).length > new Set(links.filter(([u, v]) => u !== v).map(([u]) => u)).size;
     }
     for (const [kind, count] of Object.entries(seen)) expect(count, kind).toBeGreaterThan(40);   // every kind of case was really tried
+    expect(seen.cables / seen.wires).toBeGreaterThan(0.97);   // on a map the build places, the feet face each other
   });
 });
 
@@ -192,6 +282,16 @@ describe('cable · where its label stands', () => {
     // what a box says is far away is never looked at: an outline that would hide the label, held in a box that says it is elsewhere
     const lying = {...square(110, 190), left: 900, right: 990};
     expect(labelPlace(run, [30, 13], [lying])).toEqual([150, 0]);
+  });
+
+  it('off its own cable\'s two ends: its plate over the arrow\'s head would hide where the cable goes', () => {
+    const short = [[0, 0], [50, 0], [100, 0], [150, 0]];   // 150 px: the point t of the way along is at x = 150·t
+    expect(labelPlace(short, [30, 13], [])).toEqual([75, 0]);   // room at the middle: 45 to 105, off the head (134 on) and the start (to 8)
+    // a block over everything left of x 100: every place is partly hidden. At four fifths of the way the least is under
+    // the block, but the plate would be over the head; three quarters is no worse, and comes first
+    expect(labelPlace(short, [30, 13], [square(-100, 100)])).toEqual([112.5, 0]);
+    // on a cable with room to spare past both ends' zones, the ends change nothing
+    expect(labelPlace(run, [30, 13], [square(-100, 235)])).toEqual([240, 0]);
   });
 
   it('a cable walked: from its start to its end, never more than 6 px between two points', () => {

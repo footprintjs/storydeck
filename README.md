@@ -699,21 +699,27 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   pointer (the empty corners of its box do not, so a block behind is not covered by them), a ring round it — a highlight
   (`data-hot`) or explore's hover — follows its faces.
 
-  A wire between two blocks is a cable on the floor. Of the two blocks, one stands to the right on the slide: the
-  cable joins the foot under the right face of the block on the left to the foot under the left face of the block on
-  the right, whichever of them it starts from. It leaves and arrives along the floor's tile lines, as one smooth
-  curve, so it reads as lying on the floor and its arrow's tip is always on a face the viewer sees. A request and its
-  answer use the same two feet and lie side by side; several cables at one foot share it out, in the order that keeps
-  them from crossing; a cylinder's feet are on its round base. A packet rides the curve. Its `data-label` stands on the
-  cable itself, on a plate of the ground's colour (`--bg`): at the cable's middle, or along it at the nearest place
-  where no block is over it, no label placed before it is under it and no other cable runs through it — and where
-  there is no such place, where the least of it is hidden. (The search has a fixed amount of work for one map, enough
-  for some hundreds of labelled cables; a label after that takes its cable's middle.)
+  A wire between two blocks is a cable on the floor, where one can lie. Of the two blocks, one stands to the right
+  on the slide: the cable joins the foot under the right face of the block on the left to the foot under the left
+  face of the block on the right, whichever of them it starts from. It leaves and arrives along the floor's tile
+  lines, as one smooth curve, so it reads as lying on the floor and its arrow's tip is on a face the viewer sees. A
+  request and its answer use the same two feet and lie side by side; several cables at one foot share it out, the one
+  whose other end is furthest up the slide nearest the back, which keeps most of them from crossing; a cylinder's
+  feet are on its round base. A packet rides the curve. Its `data-label` stands on the cable itself, on a plate of
+  the slide's ground (`--bg`; on a tinted floor set `--wire-plate`): at the cable's middle, or along it at the
+  nearest place where no block is over it, no label placed before it is under it and no other cable runs through it
+  — and where there is no such place, where the least of it is hidden. Keep a cable's label short: one longer than
+  its cable covers it. (The search has a fixed amount of work for one map, enough for some hundreds of labelled
+  cables; a label after that takes its cable's middle.)
 
-  A cable lies on the floor, so a block standing nearer the viewer is drawn over it: it does not go round blocks, and
-  one to a block two steps away may pass behind the block between. To keep a wire straight, give it a bend, `0` too:
-  `data-arrow="you to server 0"` runs from one block's outline to the other's, through the air. A wire from a block to
-  a flat piece, and one between blocks standing at different heights, are straight too, and end on the block's outline.
+  Where a cable cannot lie, the wire is straight, as it was: from one block's outline to the other's, through the air,
+  its label beside it. That is when one block stands straight in front of the other or against it (the two feet do
+  not face each other, and a curve between them would run under one of the two blocks), and when a request and its
+  answer would cross as cables — the two are kept alike. A wire from a block to a flat piece, and one between blocks
+  standing at different heights, are straight too. To keep any wire straight, give it a bend, `0` too:
+  `data-arrow="you to server 0"`. A map the build places has its blocks side by side, so nearly all its wires are
+  cables. A cable lies on the floor, so a block standing nearer the viewer is drawn over it: it does not go round
+  other blocks, and one to a block two steps away may pass behind the block between.
   Not yet: moving a block by dragging it in the dev page (change its `data-at`).
   A deck to start from: [examples/a-request](examples/a-request) (blocks on a floor, a view that follows them, an order
   inside each click); a test builds and checks it.

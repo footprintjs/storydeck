@@ -2,26 +2,36 @@
 
 ## 0.18.0 — wires that lie on the floor
 
-- **A wire between two blocks is a cable on the floor.** It ran straight from one block's outline to the other's,
-  through the air over the floor. Now it leaves the foot of one block and arrives at the foot of the other, along the
-  floor's tile lines, as one smooth curve. Of two blocks, one stands to the right on the slide: the cable joins the
-  foot under the right face of the block on the left to the foot under the left face of the block on the right,
-  whichever of them it starts from. So every arrow's tip is on a face the viewer sees, and a request and its answer
-  lie side by side, one inside the other. Several cables at one foot share it out, in the order that keeps them from
-  crossing. A cylinder's feet are on its round base. A packet (`pkt`, `data-packets`) rides the curve itself.
+- **A wire between two blocks is a cable on the floor, where one can lie.** It ran straight from one block's
+  outline to the other's, through the air over the floor. Now it leaves the foot of one block and arrives at the foot
+  of the other, along the floor's tile lines, as one smooth curve. Of two blocks, one stands to the right on the
+  slide: the cable joins the foot under the right face of the block on the left to the foot under the left face of
+  the block on the right, whichever of them it starts from. So its arrow's tip is on a face the viewer sees, and a
+  request and its answer lie side by side, one inside the other. Several cables at one foot share it out, the one
+  whose other end is furthest up the slide nearest the back, which keeps most of them from crossing. A cylinder's
+  feet are on its round base. A packet (`pkt`, `data-packets`) rides the curve itself.
+- **Where a cable cannot lie, the wire stays straight.** Each cable is laid and then looked at. One that would pass
+  under what either of its own two blocks draws is not kept: that is a block standing straight in front of the other,
+  behind it, or against it. A request and its answer that would cross as cables are not kept either, and the two are
+  always drawn alike. Such a wire is drawn as 0.17.0 drew it. On a map the build places, nearly every wire is a cable.
 - **A cable's label stands on the cable.** `data-label` on a cable is written on the cable, on a plate of the
-  ground's colour (`--bg`), where a wire's label stands beside it. It takes the cable's middle, or the nearest place
-  along the cable where no block is drawn over it, no label placed before it is under it and no other cable runs
-  through it; where there is no such place, the one where the least of it is hidden. A packet passes under the plate.
-  The search has a fixed amount of work for one map (enough for some hundreds of labelled cables), so a map of
-  thousands still builds in about a second; a label past that takes its cable's middle.
-- **What changes in a deck you have (the picture, not the files).** Every wire written between two isometric pieces
-  with no bend is now drawn as a cable, and its label moves onto it. To keep one straight, give it a bend, `0` too:
-  `data-arrow="you to server 0"`. Drawn exactly as before: wires between flat pieces, wires by numbers, a wire from a
-  block to a flat piece, a wire with a bend, and a wire between blocks standing at different heights.
+  slide's ground (`--bg`; a new token, `--wire-plate`, for a tinted floor), where a wire's label stands beside it. It
+  takes the cable's middle, or the nearest place along the cable where no block is drawn over it, no label placed
+  before it is under it, no other cable runs through it and it is off the cable's own two ends; where there is no
+  such place, the one where the least of it is hidden. A packet passes under the plate, the arrow's head is drawn
+  over it, and where packets do not run (reduced motion, print) one rests beside the plate, not under it. The search
+  has a fixed amount of work for one map (enough for some hundreds of labelled cables), so a map of thousands still
+  builds in about a second; a label past that takes its cable's middle.
+- **What changes in a deck you have (the picture, not the files).** A wire written between two isometric pieces
+  with no bend is now a cable wherever one can lie, and its label moves onto it. To keep one straight, give it a
+  bend, `0` too: `data-arrow="you to server 0"`. Drawn exactly as before: wires between flat pieces, wires by numbers,
+  a wire from a block to a flat piece, a wire with a bend, and a wire between blocks standing at different heights —
+  with two small exceptions. A straight wire between two blocks that also have a cable between them no longer leaves
+  a lane free for it. And a label's width is measured by the letters it shows, so the box of a wire whose label
+  holds an entity (`&amp;`) is a little narrower.
 - **What a cable does not do.** It lies on the floor, so a block standing nearer the viewer is drawn over it. It
-  does not go round blocks: a cable to a block two steps away may pass behind the block between, and a long label
-  beside a cable's twin may have the twin's line through it.
+  does not go round other blocks: a cable to a block two steps away may pass behind the block between. A label
+  longer than its cable covers it, and a long label beside a cable's twin may have the twin's line through it.
 - New files: `deck/cable.js` (the geometry: plain numbers in, plain numbers out) and `deck/REFERENCES.md` (whose
   methods the folder uses).
 

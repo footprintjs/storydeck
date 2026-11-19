@@ -338,7 +338,7 @@ describe('a wire between two isometric pieces is a cable along the floor', () =>
   /** A cable as drawn: its four points in slide px (the last where the line stops, short of the tip), and its head's tip. */
   const laid = (html, name) => {
     const [, x, y] = /style="left:([\d.-]+)px;top:([\d.-]+)px/.exec(tag(html, name)), rest = html.slice(html.indexOf(tag(html, name)));
-    const n = /<path d="M([\d.-]+) ([\d.-]+) C([\d.-]+) ([\d.-]+) ([\d.-]+) ([\d.-]+) ([\d.-]+) ([\d.-]+)"\/><path class="head" d="M([\d.-]+) ([\d.-]+)L/.exec(rest).slice(1).map(Number);
+    const n = /<path d="M([\d.-]+) ([\d.-]+) C([\d.-]+) ([\d.-]+) ([\d.-]+) ([\d.-]+) ([\d.-]+) ([\d.-]+)"\/>(?:<(?:rect|circle)[^>]*\/>)*<path class="head" d="M([\d.-]+) ([\d.-]+)L/.exec(rest).slice(1).map(Number);
     const at = (i) => [n[i] + +x, n[i + 1] + +y];
     return {start: at(0), h1: at(2), h2: at(4), stop: at(6), tip: at(8)};
   };
@@ -365,15 +365,18 @@ describe('a wire between two isometric pieces is a cable along the floor', () =>
     const middle = cablePoint(cable, 0.5);
     expect(lx + x).toBeCloseTo(middle[0], 0);   // no block is over the cable's middle here: the label is on it
     expect(ly + y).toBeCloseTo(middle[1], 0);
-    // the plate: the label's own box (3 letters × 12 px and 4 px each side, 18 px and 4 px above and below), under the label and over the line
-    const [, px, py, pw, ph] = /<path class="head"[^>]*\/><rect class="plate" x="([\d.-]+)" y="([\d.-]+)" width="([\d.]+)" height="([\d.]+)" rx="6"\/><text class="label"/.exec(drawn).map(Number);
+    // the plate: the label's own box (3 letters × 12 px and 4 px each side, 18 px and 4 px above and below), over the line and
+    // under the label — and under the head, so the arrow's tip is seen even where a label is longer than its cable has room for
+    const [, px, py, pw, ph] = /<path d="[^"]*"\/><rect class="plate" x="([\d.-]+)" y="([\d.-]+)" width="([\d.]+)" height="([\d.]+)" rx="6"\/><path class="head"[^>]*\/><text class="label"/.exec(drawn).map(Number);
     expect([pw, ph]).toEqual([44, 26]);
     expect(px + pw / 2).toBeCloseTo(lx, 0);
     expect(py + ph / 2).toBeCloseTo(ly, 0);
-    expect(readFileSync(path.join(process.cwd(), 'deck.css'), 'utf8')).toContain(':where(svg.wire rect.plate) { fill: var(--bg, #ffffff); stroke: none; }');
+    expect(readFileSync(path.join(process.cwd(), 'deck.css'), 'utf8')).toContain(':where(svg.wire rect.plate) { fill: var(--wire-plate, var(--bg, #ffffff)); stroke: none; }');   // the slide's ground, or the deck's own token on a tinted floor
+    // a letter written as an entity is one letter of the plate's width, not five
+    expect(applyTransforms(`${blocks}<i data-k="w" class="wire" data-arrow="a to b" data-label="A &amp; B"></i>`, {canvas})).toMatch(/<rect class="plate" [^>]*width="68" height="26"/);
     // a cable's packets pass under its plate, never across its words
     const riding = applyTransforms(`${blocks}<i data-k="w" class="wire pkt" data-arrow="a to b" data-label="GET" data-packets="1"></i>`, {canvas});
-    expect(riding).toMatch(/<rect class="pkt"[^>]*\/><circle class="run"[^>]*\/><rect class="plate"[^>]*\/><text class="label"/);
+    expect(riding).toMatch(/<rect class="pkt"[^>]*\/><circle class="run"[^>]*\/><rect class="plate"[^>]*\/><path class="head"[^>]*\/><text class="label"/);
     // a wire that is no cable has no plate: its label stands beside it, as ever
     expect(applyTransforms(`${blocks}<i data-k="w" class="wire" data-arrow="a to b 0" data-label="GET"></i>`, {canvas})).not.toContain('plate');
   });
@@ -482,10 +485,39 @@ describe('a wire between two isometric pieces is a cable along the floor', () =>
     expect(tag(two, 's')).not.toBe(tag(alone, 's'));
   });
 
-  it('two blocks too close for a straight wire still get their cable: it runs from foot to foot, wherever the feet are', () => {
+  it('where the packets do not run, one rests clear of the label\'s plate: off the cable\'s middle when the label stands there', () => {
+    const packets = (label) => applyTransforms(`${blocks}<i data-k="w" class="wire" data-arrow="a to b"${label} data-packets="2"></i>`, {canvas});
+    // no label: the middle, as deck.css says for every wire (nothing written on the packet)
+    expect(packets('')).not.toContain('--sd-t');
+    // a label at the middle: the packets rest at the nearest place the plate is not over, both of them (one shows)
+    const labelled = packets(' data-label="GET"'), rests = [...labelled.matchAll(/<circle class="run"[^>]*style="[^"]*--pdy:[\d.-]+px;--sd-t:([\d.]+);--loop:/g)].map((m) => Number(m[1]));
+    expect(rests).toEqual([0.35, 0.35]);
+    const {shapes, floor} = isoDrawn(blocks, {canvas}), [cable] = cables([['a', 'b']], shapes, floor), middle = cablePoint(cable, 0.5), rest = cablePoint(cable, 0.35);
+    expect(Math.abs(rest[0] - middle[0])).toBeGreaterThan(22 + 9);   // clear of the plate, the packet's own 7 px and a little more
+    // a wire that is no cable keeps its label beside it: its packets rest at its middle, with nothing written
+    expect(applyTransforms(`${blocks}<i data-k="w" class="wire" data-arrow="a to b 0" data-label="GET" data-packets="2"></i>`, {canvas})).not.toContain('--sd-t');
+  });
+
+  it('a block straight in front of another, or against it, gets a straight wire as before: a cable there would run under one of them', () => {
+    const stack = '<i data-iso-grid="120 at 960 240"></i><div data-k="a" data-iso="block" data-at="0 0"></div><div data-k="b" data-iso="block" data-at="5 5"></div>';
+    const out = applyTransforms(`${stack}<i data-k="w" class="wire" data-arrow="a to b" data-label="GET"></i>`, {canvas});
+    expect(tag(out, 'w')).not.toContain('data-sd-cable');
+    expect(out).not.toContain('plate');   // its label beside it, as a straight wire's is
+    expect(out).toBe(applyTransforms(`${stack}<i data-k="w" class="wire" data-arrow="a to b 0" data-label="GET"></i>`, {canvas}).replace('a to b 0', 'a to b'));   // the very wire a bend of 0 asks for
+    // against each other: refused as ever, with the fix
     const close = '<i data-iso-grid="120 at 960 240"></i><div data-k="a" data-iso="block" data-at="0 0"></div><div data-k="b" data-iso="block" data-at="2.2 0"></div>';
-    expect(() => applyTransforms(`${close}<i data-k="w" class="wire" data-arrow="a to b 0"></i>`, {canvas})).toThrow(/too close for a wire between them/);
-    expect(applyTransforms(`${close}<i data-k="w" class="wire" data-arrow="a to b"></i>`, {canvas})).toContain('data-sd-cable');
+    expect(() => applyTransforms(`${close}<i data-k="w" class="wire" data-arrow="a to b"></i>`, {canvas})).toThrow('"a" and "b" are too close for a wire between them (they touch or overlap) — move them apart, or give the wire numbers');
+    // corner to corner the two feet face each other: a cable, however near
+    const corner = '<i data-iso-grid="120 at 960 240"></i><div data-k="a" data-iso="block" data-at="0 0"></div><div data-k="b" data-iso="block" data-at="2.2 -2.2"></div>';
+    expect(applyTransforms(`${corner}<i data-k="w" class="wire" data-arrow="a to b"></i>`, {canvas})).toContain('data-sd-cable');
+  });
+
+  it('a request and its answer that would cross as cables are both straight, in their lanes', () => {
+    const hook = '<i data-iso-grid="120 at 960 240"></i><div data-k="a" data-iso="block" data-at="0 0"></div><div data-k="b" data-iso="block" data-at="6 1"></div>';
+    expect(applyTransforms(`${hook}<i data-k="w" class="wire" data-arrow="a to b"></i>`, {canvas})).toContain('data-sd-cable');   // one alone hooks round to b's foot
+    const pair = applyTransforms(`${hook}<i data-k="w" class="wire" data-arrow="a to b"></i><i data-k="v" class="wire" data-arrow="b to a"></i>`, {canvas});
+    expect(pair).not.toContain('data-sd-cable');
+    expect(pair).toBe(applyTransforms(`${hook}<i data-k="w" class="wire" data-arrow="a to b 0"></i><i data-k="v" class="wire" data-arrow="b to a 0"></i>`, {canvas}).replace('a to b 0', 'a to b').replace('b to a 0', 'b to a'));
   });
 });
 
@@ -508,6 +540,9 @@ describe('a wire\'s options: data-label, data-packets, data-speed', () => {
     expect(w).toBeGreaterThanOrEqual((18 * 12) / 2 * 2);
     expect(h).toBeGreaterThan(40);
     expect(svg(' data-label="A &amp; B"')).toContain('>A &amp; B</text>');   // written as the deck wrote it
+    // and measured by the letters it shows: "&amp;" is one letter wide, so the box is the box of "A & B"
+    expect(at(svg(' data-label="A &amp; B"', '100 300 110 300'), /width:([\d.]+)px/)).toEqual(at(svg(' data-label="A + B"', '100 300 110 300'), /width:([\d.]+)px/));
+    expect(at(svg(' data-label="&#38;&#x26;&lt;"', '100 300 110 300'), /width:([\d.]+)px/)).toEqual(at(svg(' data-label="abc"', '100 300 110 300'), /width:([\d.]+)px/));
   });
 
   it('runs its packets as loops, evenly spaced on one clock: data-speed the seconds a run takes (3 by default)', () => {
