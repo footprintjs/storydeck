@@ -310,7 +310,9 @@ describe('a wire to an isometric piece ends on what the piece draws, not on the 
     const alone = `${blocks}<i data-k="w" class="wire" data-arrow="a to b"></i>`;
     const [together] = drawn(applyTransforms(shared, {canvas})), [own] = drawn(applyTransforms(alone, {canvas}));
     expect(together.from).not.toEqual(own.from);                                        // it starts from the box round the block and its tag…
-    expect(applyTransforms(shared, {canvas})).toBe(wires(isoDrawn(shared, {canvas}).html));   // …exactly as a box-only wire is drawn
+    const [boxOnly] = drawn(wires(isoDrawn(shared, {canvas}).html));
+    expect(together.from).toEqual(boxOnly.from);                                        // …that end is where a box-only wire starts
+    expect(off(isoDrawn(shared, {canvas}).shapes.get('b').outline, together.tip)).toBeLessThan(6.2);   // and its other end, a block alone, is on that block
   });
 
   it('three wires between two blocks, both ways, keep a lane each: side by side, none crossing, every tip on a block', () => {

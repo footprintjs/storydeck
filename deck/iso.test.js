@@ -227,6 +227,11 @@ describe('iso · in a deck', () => {
     const at = readPieces(isoPieces(MAP, {canvas})).pieces.findIndex((p) => p.keys[0] === 'server');
     expect(() => nudgePiece(MAP, {index: at, name: 'server'}, 10, 10)).toThrow(/"server" stands on the floor where its data-at says \("col row"\) — change its data-at in the file/);
     // a block the build placed has no data-at to change: the message says what would place it, for every block of the map
+    // a floor is not a block: with a size of its own or fitted, it is moved by its own data-at and data-size
+    for (const floor of ['<div data-k="f" data-iso="floor" data-size="8 5"></div>', '<div data-k="f" data-iso="floor"></div>']) {
+      expect(() => nudgePiece(`${floor}<div data-k="a" data-iso="block" data-at="0 0"></div>`, {index: 0, name: 'f'}, 10, 10))
+        .toThrow('"f" is the floor: it lies where its data-at and data-size say, or round the blocks when it has neither — change them in the file');
+    }
     const unplaced = '<div data-k="a" data-iso="block"></div><div data-k="b" data-iso="block"></div>';
     expect(() => nudgePiece(unplaced, {index: 1, name: 'b'}, 10, 10)).toThrow('"b" was placed by the build, from the map\'s wires — to place the blocks yourself, give every block of the map a data-at ("col row") in the file');
   });
@@ -351,6 +356,8 @@ describe('iso · no places to type: the build places the blocks from what is joi
     for (const not of [[0, 0, 0, 100], [10, 0, 5, 100], [0, 0, NaN, 100], [0, 0, 100], 'wide']) {
       expect(() => isoPieces(blocks, {canvas, area: not})).toThrow(/^a fitted picture goes into the slide's area, \[x0, y0, x1, y1\] in slide px with x1 past x0 and y1 past y0 \(deck\.json "area"\) — not /);
     }
+    expect(() => isoPieces(blocks, {canvas, area: [NaN, 0, 10, 10]})).toThrow(/— not \[NaN, 0, 10, 10\]$/);   // each number as it is
+    expect(() => isoPieces(blocks, {canvas, area: 'wide'})).toThrow(/— not "wide"$/);
   });
 
   it('data-iso-grid="fit" fits the grid on a map that places its own blocks; a floor the map sized is ground, and is not what the tile is chosen for', () => {

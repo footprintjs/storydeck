@@ -18,8 +18,9 @@
 - **A wire to a block ends on the block.** A wire between pieces ran from box to box, and the box a block is placed
   by has empty corners: the arrow stopped short of the block, and two blocks standing clear of each other were refused
   as "too close" because their boxes met. A wire to an isometric piece now runs to the outline of what it draws.
-  Wires in a deck that has isometric pieces move a little; wires between flat pieces are drawn exactly as before, and
-  so is a wire to a name that a block shares with another piece (one box round them all).
+  Wires in a deck that has isometric pieces move a little; wires between flat pieces are drawn exactly as before. A
+  name that a block shares with another piece still stands for one box round them all: that end of a wire is where it
+  was.
 - **It is all or none (breaking for one case).** A map that places some of its blocks and not the others is refused,
   naming them. Before, a block with no `data-at` stood at `0 0`: write `data-at="0 0"` on it to keep that. A map with
   one block and no `data-at`, and no `data-iso-grid`, now gets the fitted tile where it had a tile 120 px wide.

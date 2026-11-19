@@ -207,7 +207,8 @@ function gridOf(found, {fit, canvas, area}) {
   if (!things.length) throw new Error('data-iso-grid="fit": the grid is fitted to the blocks, and this map has none — add a block, or write the grid in numbers ("120 at 960 240")');
   const into = area ?? [0, 0, w, h];
   if (!(Array.isArray(into) && into.length === 4 && into.every(Number.isFinite) && into[2] > into[0] && into[3] > into[1])) {
-    throw new Error(`a fitted picture goes into the slide's area, [x0, y0, x1, y1] in slide px with x1 past x0 and y1 past y0 (deck.json "area") — not ${JSON.stringify(into)}`);
+    // each number as it is (NaN as NaN, where JSON would say null)
+    throw new Error(`a fitted picture goes into the slide's area, [x0, y0, x1, y1] in slide px with x1 past x0 and y1 past y0 (deck.json "area") — not ${Array.isArray(into) ? `[${into.map(String).join(', ')}]` : JSON.stringify(into)}`);
   }
   const [x0, y0, x1, y1] = into, inset = Math.min(INSET, (x1 - x0) / 4, (y1 - y0) / 4);   // a small area keeps half of itself
   return gridFor(things, [x0 + inset, y0 + inset, x1 - inset, y1 - inset], FITTED_TILE);

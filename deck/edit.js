@@ -108,7 +108,9 @@ function moveEdits(html, piece, dx, dy) {
   const left = placeOf(piece, 'left'), top = placeOf(piece, 'top');
   const about = attrValue(piece.before + piece.after, 'data-callout')?.value.trim().split(/\s+/)[0];
   if (about && (!left || !top)) throw new Error(`"${piece.name}" stands beside "${about}" and follows it — move "${about}", or give the callout a left and top of its own`);
-  if (attrValue(piece.before + piece.after, 'data-iso')) {
+  const iso = attrValue(piece.before + piece.after, 'data-iso')?.value.trim();
+  if (iso === 'floor') throw new Error(`"${piece.name}" is the floor: it lies where its data-at and data-size say, or round the blocks when it has neither — change them in the file`);
+  if (iso) {
     // a block with no data-at was placed by the build, with every other block of its map: one block alone cannot be given a place
     if (!attrValue(piece.before + piece.after, 'data-at')) throw new Error(`"${piece.name}" was placed by the build, from the map's wires — to place the blocks yourself, give every block of the map a data-at ("col row") in the file`);
     throw new Error(`"${piece.name}" stands on the floor where its data-at says ("col row") — change its data-at in the file`);
