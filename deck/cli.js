@@ -4,7 +4,7 @@ import {spawn} from 'node:child_process';
 import {initDeck} from './init.js';
 import {serveDeck} from './dev.js';
 import {serveMcp} from './mcp.js';
-import {outlineTool, reviewTool, checkTool, buildTool, feedbackTool, narrateTool, printable} from './tools.js';
+import {outlineTool, reviewTool, checkTool, buildTool, feedbackTool, narrateTool, logTool, countTool, printable} from './tools.js';
 import {packageVersion} from './assets.js';
 
 export const USAGE = `storydeck — make a deck: one picture, built click by click
@@ -17,15 +17,20 @@ export const USAGE = `storydeck — make a deck: one picture, built click by cli
   storydeck review [folder] --click <n|label> | --all
                                        one click as text: what it says, lights, greys and moves
   storydeck feedback [folder]          the notes a person left on clicks in the dev page (open ones)
-  storydeck check [folder] [--layout] [--strict]
-                                       what to fix, each with its click (--layout: a browser finds text that spills;
-                                       --strict: a warning fails too)
+  storydeck check [folder] [--layout] [--strict] [--all]
+                                       what to fix: the verdict first (clean, fix or broken), then each problem with
+                                       its click and its fix (--layout: a browser finds text that spills; --strict: a
+                                       warning fails too; --all: every problem, past the first 30)
   storydeck narrate [folder] [--kit <folder>] [--takes <folder>] [--only 1-3,7]
                                        what each click says, voiced or not; a voice kit voices what is missing, cached by
                                        its words (--takes: your own recordings, lined up by the kit)
-  storydeck build [folder] [--out <file>] [--voice]
-                                       one self-contained page (deck.json "out", index.html by default);
-                                       --voice carries the clips narrate made
+  storydeck build [folder] [--out <file>] [--voice] [--layout] [--all]
+                                       the same check, then one self-contained page (deck.json "out", index.html by
+                                       default): one reply says what to fix and what was written; --voice carries the
+                                       clips narrate made
+  storydeck log [folder] [--run <n>] [--all]
+                                       the deck's last checks and builds, kept with you: verdicts, rounds of fixing,
+                                       tool calls (--run: one run in full, with each stage's time and the run in words)
   storydeck mcp [folder] [--kit <folder>] [--takes <folder>]
                                        the read-first tools for an AI assistant (MCP over stdio); a voice named
                                        here lets its narrate tool voice, and only a voice named here
@@ -33,7 +38,7 @@ export const USAGE = `storydeck — make a deck: one picture, built click by cli
 The folder defaults to the current one. In the page: ← → Space step · T light/dark · N notes · P presenter · L listen.`;
 
 const BOOLEAN = new Set(['all', 'layout', 'strict', 'open', 'help', 'version', 'voice']);
-const VALUED = new Set(['out', 'port', 'click', 'kit', 'takes', 'only']);
+const VALUED = new Set(['out', 'port', 'click', 'kit', 'takes', 'only', 'run']);
 
 /** argv → {command, dir, flags}; an unknown flag is refused, naming the ones the command takes. */
 export function parseArgs(argv) {
@@ -93,6 +98,7 @@ export async function runCli(argv, {stdout = process.stdout, stderr = process.st
   const {command, dir, given, flags} = parsed;
   if (flags.version || command === '--version' || command === '-v') { out(packageVersion()); return 0; }
   if (!command || flags.help || command === 'help' || command === '--help') { out(USAGE); return command ? 0 : 1; }
+  countTool(dir, command, {home});   // each call of a read-first tool on a deck, for `log` (an unknown command counts nothing)
   try {
     switch (command) {
       case 'init': {
@@ -101,8 +107,14 @@ export async function runCli(argv, {stdout = process.stdout, stderr = process.st
         out(`✓ a starter deck in ${dir} (${r.files.length} files)\n  next: storydeck dev ${dir}`);
         return 0;
       }
-      case 'build':
-        out(buildTool(dir, {out: flags.out, voice: flags.voice}));
+      case 'build': {
+        const r = await buildTool(dir, {out: flags.out, voice: flags.voice, layout: flags.layout, all: flags.all, home});
+        if (r.verdict === 'broken') { err(r.text); return 1; }   // nothing was written
+        out(r.text);
+        return 0;
+      }
+      case 'log':
+        out(logTool(dir, {home, run: flags.run, all: flags.all}));
         return 0;
       case 'narrate':
         out(await narrateTool(dir, {kit: flags.kit, takes: flags.takes, only: flags.only}));
@@ -117,7 +129,7 @@ export async function runCli(argv, {stdout = process.stdout, stderr = process.st
         out(reviewTool(dir, {click: flags.click, all: flags.all}));
         return 0;
       case 'check': {
-        const r = await checkTool(dir, {layout: flags.layout, home});
+        const r = await checkTool(dir, {layout: flags.layout, all: flags.all, home});
         out(r.text);
         return r.errors || (flags.strict && r.warnings) ? 1 : 0;
       }

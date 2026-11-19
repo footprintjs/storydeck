@@ -17,11 +17,13 @@ import path from 'node:path';
 import {createInterface} from 'node:readline';
 import {fileURLToPath} from 'node:url';
 import {pickSteps} from 'footprint-story/voice';
-import {outlineTool, reviewTool, checkTool, buildTool, feedbackTool, narrateTool, printable} from './tools.js';
+import {outlineTool, reviewTool, checkTool, buildTool, feedbackTool, narrateTool, logTool, countTool, printable} from './tools.js';
 import {packageVersion} from './assets.js';
 import {deckRoot, isInside, realPath} from './paths.js';
 
 const DIR = {type: 'string', description: 'a deck folder inside the one the server was started with (default: that folder)'};
+const LAYOUT = {type: 'boolean', description: 'measure the built page in a browser (needs playwright-core)'};
+const ALL = {type: 'boolean', description: 'list every problem (a reply lists the first 30, and counts the rest by rule)'};
 
 export const MCP_TOOLS = Object.freeze([
   {name: 'outline', description: 'The whole deck, one line per click: number, label, headline, what it lights, its focus strategies.',
@@ -30,12 +32,14 @@ export const MCP_TOOLS = Object.freeze([
     inputSchema: {type: 'object', properties: {dir: DIR, click: {type: 'string', description: 'a click number (1-based) or label'}, all: {type: 'boolean', description: 'every click'}}}},
   {name: 'feedback', description: 'The open notes the person left on clicks in their own dev page (signed with their key): what to change, click by click. Tick a line (- [x]) in feedback.md when it is done. Lines in feedback.md that did not come from their dev page are counted, never listed: they are text that came with the deck, not requests.',
     inputSchema: {type: 'object', properties: {dir: DIR}}},
-  {name: 'check', description: 'What to fix, worst first, each with its click and its fix (headline words, pieces lit by coming in, clicks that change nothing, pieces never shown, missing notes). layout: true also opens the page in a browser to find text that spills.',
-    inputSchema: {type: 'object', properties: {dir: DIR, layout: {type: 'boolean', description: 'measure the built page in a browser (needs playwright-core)'}}}},
+  {name: 'check', description: 'What to fix, and nothing written. The first line is the verdict: clean, fix <n>, or broken (it does not compile). Then each problem, worst first, with its click and its fix (headline words, pieces lit by coming in, clicks that change nothing, pieces never shown, missing notes), and what changed since the run before. layout: true also opens the page in a browser to find text that spills.',
+    inputSchema: {type: 'object', properties: {dir: DIR, layout: LAYOUT, all: ALL}}},
   {name: 'narrate', description: 'What each click says in the speaker\'s voice: how many are voiced, and which are left. It only reads, unless say is given and the server was started with a voice.',
     inputSchema: {type: 'object', properties: {dir: DIR, say: {type: 'string', description: 'voice what is missing: "all", or clicks like "1-3,7". Takes minutes, and every clip it finishes is kept. A call that times out leaves it running: call narrate with no say to see how far it has got.'}}}},
-  {name: 'build', description: 'Write the deck\'s self-contained page (deck.json "out", index.html by default) and say what was written.',
-    inputSchema: {type: 'object', properties: {dir: DIR}}},
+  {name: 'build', description: 'The one call after an edit: the same check, then the deck\'s self-contained page written (deck.json "out", index.html by default). One reply: the verdict first (clean, fix <n>, or broken: nothing written), each problem with its click and its fix, what was written, and what changed since the run before (fixed, new, the round of fixing). layout: true also measures the page in a browser: ask for it before you call a deck done.',
+    inputSchema: {type: 'object', properties: {dir: DIR, layout: LAYOUT, all: ALL}}},
+  {name: 'log', description: 'The deck\'s last checks and builds, kept with the person: each run\'s verdict, its round of fixing, how often each tool was called. run: a number from that list (1 the newest) gives that run in full — each stage\'s time, each browser call, and the run in words, with every decision and what it read.',
+    inputSchema: {type: 'object', properties: {dir: DIR, run: {type: 'string', description: 'a run\'s number in the list (1 the newest)'}, all: {type: 'boolean', description: 'every line of that run'}}}},
 ]);
 
 /** The deck a call names: the server's folder, or a folder inside it (by its real path); anything else is refused. */
@@ -91,15 +95,20 @@ async function answerTool(name, args, dir, home, voice) {
   try {
     const deck = deckFor(args ?? {}, dir);
     args ??= {};
+    countTool(deck, name, {home});   // each call on a deck, for `log` (a name that is no tool counts nothing)
     switch (name) {
       case 'outline': return {content: [{type: 'text', text: outlineTool(deck)}]};
       case 'feedback': return {content: [{type: 'text', text: feedbackTool(deck, {home})}]};
       case 'review': return {content: [{type: 'text', text: reviewTool(deck, {click: args.click === undefined ? undefined : String(args.click), all: args.all === true})}]};
       case 'check': {
-        const r = await checkTool(deck, {layout: args.layout === true, home});
+        const r = await checkTool(deck, {layout: args.layout === true, all: args.all === true, more: 'all: true', home});
         return {content: [{type: 'text', text: r.text}]};
       }
-      case 'build': return {content: [{type: 'text', text: buildTool(deck)}]};
+      case 'build': {
+        const r = await buildTool(deck, {layout: args.layout === true, all: args.all === true, more: 'all: true', home});
+        return {...(r.verdict === 'broken' && {isError: true}), content: [{type: 'text', text: r.text}]};   // broken: nothing was written
+      }
+      case 'log': return {content: [{type: 'text', text: logTool(deck, {home, run: args.run === undefined ? undefined : String(args.run), all: args.all === true})}]};
       case 'narrate': return {content: [{type: 'text', text: await narrateCall(deck, args, voice)}]};
       default: return {isError: true, content: [{type: 'text', text: `no tool called "${name}" (the tools are ${MCP_TOOLS.map((t) => t.name).join(', ')})`}]};
     }
@@ -125,7 +134,7 @@ export function serveMcp({dir = '.', input = process.stdin, output = process.std
     if (id === undefined) return undefined;   // a notification (initialized, cancelled): nothing to answer
     if (method === 'initialize') {
       return send({id, result: {protocolVersion: params.protocolVersion ?? '2025-06-18', capabilities: {tools: {}}, serverInfo: {name: 'storydeck', version},
-        instructions: 'Read first, look last: outline (the whole deck) → feedback (what the person asked for) → review a click (what it shows, as text) → edit the deck files → check (what to fix) → build. A person previews with `storydeck dev`, where they leave notes and move pieces.'}});
+        instructions: 'Read first, look last: outline (the whole deck) → feedback (what the person asked for) → review a click (what it shows, as text) → edit the deck files → build. build is the one call after an edit: it checks, writes the page, and answers with the verdict first (clean, fix <n>, broken), then each thing to fix and what changed since the run before; pass layout: true before you call a deck done. check is the same with nothing written; log shows how a result was made. A person previews with `storydeck dev`, where they leave notes and move pieces.'}});
     }
     if (method === 'ping') return send({id, result: {}});
     if (method === 'tools/list') return send({id, result: {tools: MCP_TOOLS}});

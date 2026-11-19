@@ -347,7 +347,8 @@ export function measureSlide() {
     if (dx > 2 || dy > Math.max(2, size * 0.35)) out.push({ kind: 'spills', piece: pieceOf(el), text: textOf(el), dx: dx > 2 ? dx : 0, dy: dy > Math.max(2, size * 0.35) ? dy : 0 });
   }
   for (const el of slide.querySelectorAll('.sd-on, [data-chrome]')) {
-    if (!shown(el)) continue;
+    // ground (a floor) is what the pieces stand on: no view frames it, so it runs past the edge by design
+    if (!shown(el) || el.hasAttribute('data-ground')) continue;
     const r = el.getBoundingClientRect();
     const x0 = (r.left - box.left) / scale, y0 = (r.top - box.top) / scale, x1 = (r.right - box.left) / scale, y1 = (r.bottom - box.top) / scale;
     const dx = Math.max(0, -x0, x1 - W), dy = Math.max(0, -y0, y1 - H);

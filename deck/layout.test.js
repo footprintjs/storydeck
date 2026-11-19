@@ -1,5 +1,5 @@
 import {describe, it, expect, vi} from 'vitest';
-import {clickRuns, layoutProblems, layoutCheck, findChromium} from './layout.js';
+import {clickRuns, layoutProblems, layoutCheck, layoutFindings, findChromium} from './layout.js';
 import {deckStageDriver, measureSlide} from '../video.js';
 import {tempDir} from './test/helpers.js';
 
@@ -37,6 +37,26 @@ describe('layoutProblems · loops', () => {
       {level: 'error', rule: 'hidden-loop', click: 2, label: 'C2', message: '2 endless animations on a, b keep running while the slide is hidden (on clicks 2–3) — make each a loop (data-loop and its animation as --loop): a loop runs only on the slide shown'},
       {level: 'error', rule: 'hidden-loop', click: 6, label: 'C6', message: '1 endless animation on c keeps running while the slide is hidden — make it a loop (data-loop and its animation as --loop): a loop runs only on the slide shown'},
     ]);
+  });
+});
+
+describe('layoutFindings', () => {
+  const port = (found = () => []) => ({asked: [], async open(url) { this.asked.push(`open ${url}`); }, async measure(n) { this.asked.push(`measure ${n}`); return found(n); }, async close() { this.asked.push('close'); }});
+
+  it('measures every click in order, each finding with its click, and closes the port', async () => {
+    const p = port((n) => (n === 2 ? [{kind: 'spills', piece: 'a'}, {kind: 'outside', piece: 'b'}] : []));
+    expect(await layoutFindings(p, 'file:///d.html', 3)).toEqual([{n: 2, kind: 'spills', piece: 'a'}, {n: 2, kind: 'outside', piece: 'b'}]);
+    expect(p.asked).toEqual(['open file:///d.html', 'measure 1', 'measure 2', 'measure 3', 'close']);
+  });
+
+  it('makes each step through the caller\'s own call, by its name: a caller that records its calls records these', async () => {
+    const p = port(), made = [];
+    await layoutFindings(p, 'u', 2, async (target, step) => { made.push(target); return step(); });
+    expect(made).toEqual(['browser.open', 'browser.measure', 'browser.measure', 'browser.close']);
+    // a step that fails still closes the port, through the same door
+    const failing = [];
+    await expect(layoutFindings(port(), 'u', 2, async (target, step) => { failing.push(target); if (target === 'browser.measure') throw new Error('cut'); return step(); })).rejects.toThrow('cut');
+    expect(failing).toEqual(['browser.open', 'browser.measure', 'browser.close']);
   });
 });
 
@@ -141,6 +161,7 @@ describe('measureSlide (in the page)', () => {
         <div class="kicker" style="display:block;font-size:26px">1 · Kicker</div>
         <svg data-k="w"><text>svg text is drawn</text></svg>
         <div data-k="far" class="sd-on" style="display:block"></div>
+        <div data-k="floor" class="sd-on" data-ground style="display:block"></div>
         <p style="display:block;overflow-x:auto">scrolls</p></section>
       <section data-label="two"></section></deck-stage>`;
     const stage = document.querySelector('deck-stage');
@@ -156,6 +177,8 @@ describe('measureSlide (in the page)', () => {
     size(slide.querySelector('.kicker'), {sh: 28, ch: 26});   // 2 px of glyph over a tight line: not a spill
     const far = slide.querySelector('[data-k="far"]');
     far.getBoundingClientRect = () => ({left: 900, top: 100, right: 1000 * 1, bottom: 200});   // 2000 px in slide px: past 1920
+    // ground runs past every edge and is not a piece pushed off the slide: a view frames what stands on it
+    slide.querySelector('[data-k="floor"]').getBoundingClientRect = () => ({left: -400, top: -200, right: 2400, bottom: 1300});
     for (const el of slide.querySelectorAll('[data-k="net"], .kicker')) el.getBoundingClientRect = () => ({left: 10, top: 10, right: 50, bottom: 30});
     return stage;
   }

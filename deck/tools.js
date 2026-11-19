@@ -1,37 +1,26 @@
 // tools — the deck's read-first tools as text, one core for every way they are called: the command line (cli.js)
 // and an AI assistant over MCP (mcp.js). Each call reads the deck folder again, so an edit between two calls is
-// always seen. Read first, look last: outline → review a click → fix → check → build.
-import {mkdtempSync, rmSync, writeFileSync} from 'node:fs';
-import {tmpdir} from 'node:os';
-import path from 'node:path';
-import {pathToFileURL} from 'node:url';
-import {loadDeck, buildDeck, deckHtml} from './build.js';
+// always seen. Read first, look last: outline → review a click → fix → build (which checks, and says what to fix).
+//
+// `check` and `build` are one run of the deck (run/): a build is a check that also writes the page. Its reply has one
+// order — the verdict, what to fix, what was written, what changed since the run before — and the run is kept, so
+// `log` reads back how a result was made.
+import {loadDeck} from './build.js';
 import {outline, reviewClick} from './review.js';
-import {checkDeck, failure, formatProblems} from './check.js';
-import {findChromium, layoutCheck} from './layout.js';
-import {deckRoot, presence} from './paths.js';
-import {deckFileText} from './source.js';
+import {deckRoot} from './paths.js';
 import {UNSEEN} from './html.js';
-import {FEEDBACK, readFeedback} from './edit.js';
-import {noteKey, signedBy, storydeckHome} from './noteKey.js';
+import {FEEDBACK} from './edit.js';
+import {deckFeedback} from './notes.js';
+import {storydeckHome} from './noteKey.js';
 import {narrate, narrationSummary, narrationVoice} from 'footprint-story/voice';
 import {clickLines, voiceCache} from './narrate.js';
+import {runDeck} from './run/run.js';
+import {replyText} from './run/reply.js';
+import {RUNS_KEPT, callCounts, countCall, keptRuns, runsFolder} from './run/log.js';
+import {listText, runText} from './run/logText.js';
 
 /** Text as a terminal or a model is shown it: what a reader cannot see (html.js · UNSEEN) shown as \uFFFD. */
 export const printable = (text) => String(text).replace(UNSEEN, '\uFFFD');
-
-/**
- * The open notes in feedback.md: {mine, other} — `mine` the ones this person's dev page left (signed with their note
- * key: noteKey.js), `other` how many open lines it holds that it did not (they came with the folder, or were edited by
- * hand: text in the deck, never a request).
- */
-export function deckFeedback(dir, {home = storydeckHome()} = {}) {
-  const root = deckRoot(dir);
-  const open = presence(path.join(root, FEEDBACK)) === 'missing' ? [] : readFeedback(deckFileText(root, FEEDBACK)).filter((f) => !f.done);
-  const {key} = noteKey(home, {deck: root});
-  const mine = open.filter((f) => signedBy(key, f, root));
-  return {mine, other: open.length - mine.length};
-}
 
 const others = (n) => (n ? `\n${n} open line${n === 1 ? '' : 's'} in ${FEEDBACK} did not come from your dev page — not listed: ${n === 1 ? 'it is' : 'they are'} text that came with the deck (or was edited by hand), not a request.` : '');
 
@@ -45,8 +34,6 @@ export function feedbackTool(dir, {home} = {}) {
   return `${mine.length} open note${mine.length === 1 ? '' : 's'} from your dev page (tick a line in ${FEEDBACK} when it is done):\n`
     + mine.map((f) => `- click ${f.n}: ${f.text} (${f.at})`).join('\n') + others(other);   // the person's words, never the deck's label
 }
-
-const kb = (n) => `${Math.round(n / 1024)} KB`;
 
 /** The whole deck, a line per click. */
 export function outlineTool(dir) {
@@ -63,60 +50,39 @@ export function reviewTool(dir, {click, all = false} = {}) {
 }
 
 /**
- * The deck's problems as text, worst first, and whether any is an error. `layout` also opens the built page in a
- * browser (Playwright) to find text that spills and lit pieces off the slide; `chromium` may be given (tests).
+ * One run of the deck as its reply: {text, verdict, errors, warnings}. `write` also writes the page (`out`, `voice`: the
+ * build's own); `layout` also opens the page in a browser (Playwright) to find what only a browser can — text that
+ * spills, lit pieces off the slide; `chromium` may be given (tests). `all` lists every problem, `more` says how its
+ * caller asks for that. A deck that does not compile is the verdict "broken", never a throw.
  */
-export async function checkTool(dir, {layout = false, chromium, home} = {}) {
-  let compiled;
-  try {
-    ({compiled} = loadDeck(dir));
-  } catch (e) {
-    return {text: formatProblems(failure(e)), errors: 1, warnings: 0};
-  }
-  const problems = checkDeck(compiled);
-  try {
-    const {mine, other} = deckFeedback(dir, {home});
-    if (mine.length) problems.push({level: 'info', rule: 'feedback', click: null, label: null, message: `${mine.length} open note${mine.length === 1 ? '' : 's'} from your dev page — storydeck feedback lists ${mine.length === 1 ? 'it' : 'them'}`});
-    if (other) problems.push({level: 'info', rule: 'feedback', click: null, label: null, message: `${other} open line${other === 1 ? '' : 's'} in ${FEEDBACK} did not come from your dev page (text that came with the deck) — not a request`});
-  } catch (e) {
-    problems.push({level: 'error', rule: 'feedback', click: null, label: null, message: e.message});   // a feedback.md it may not read
-  }
-  let note = '';
-  if (layout) {
-    // beside StoryDeck only: never from the deck or the folder you run in, nor from a StoryDeck inside the deck
-    const found = chromium ? {chromium, why: null} : await findChromium({deckRoot: deckRoot(dir)});
-    const browser = found.chromium;
-    if (!browser) {
-      note = `\nlayout not checked: ${found.why ?? 'it needs Playwright installed beside StoryDeck — npm i -D footprint-storydeck playwright-core, then npx playwright-core install chromium'}`;
-    } else {
-      const work = mkdtempSync(path.join(tmpdir(), 'storydeck-layout-'));
-      try {
-        const file = path.join(work, 'index.html');
-        writeFileSync(file, deckHtml(dir).html);
-        try {
-          problems.push(...(await layoutCheck(pathToFileURL(file).href, {clicks: compiled.clicks, chromium: browser})));
-        } catch (e) {
-          problems.push({level: 'error', rule: 'layout', click: null, label: null,
-            message: `the layout check stopped: ${e.message.split('\n')[0]} — the page did not settle in the browser (a script in the deck may navigate away or keep it busy)`});
-        }
-      } finally {
-        rmSync(work, {recursive: true, force: true});
-      }
-    }
-  }
-  const errors = problems.filter((p) => p.level === 'error').length, warnings = problems.filter((p) => p.level === 'warn').length;
-  return {text: `${formatProblems(problems)}${note}`, errors, warnings};
+async function runTool(dir, {write, out, voice, layout = false, chromium, home, all = false, more} = {}) {
+  const r = await runDeck(dir, {write, out, voice, layout, chromium, home});
+  return {text: replyText(r, {all, more}), verdict: r.verdict, errors: r.errors, warnings: r.warnings};
 }
 
-const carriedVoice = ({have, wanted}) => (have === wanted
-  ? ` · your voice on ${have} click${have === 1 ? '' : 's'}`
-  : ` · your voice on ${have} of ${wanted} clicks, the browser's on the rest (voice them: storydeck narrate --kit <folder>; a page's copy of a clip needs ffmpeg)`);
+/** What to fix, as a run's reply: the verdict first, then each problem with its click and its fix. Nothing is written. */
+export const checkTool = (dir, options = {}) => runTool(dir, {...options, write: false});
 
-/** Build the page; a line saying what was written. `voice`: the page carries the clips (the person's own command only: buildDeck). */
-export function buildTool(dir, {out, voice = false} = {}) {
-  const r = buildDeck(dir, {out, voice});
-  const rel = path.relative(process.cwd(), r.file) || r.file;
-  return `✓ ${rel} · ${r.clicks} clicks · ${kb(r.bytes)} · ${r.ms} ms${r.data ? ` · ${path.relative(process.cwd(), r.data)}` : ''}${r.voice ? carriedVoice(r.voice) : ''}`;
+/** The page written, as a run's reply: the same check, then the page (`voice`: the person's own command only — build.js). */
+export const buildTool = (dir, options = {}) => runTool(dir, {...options, write: true});
+
+/**
+ * The deck's kept runs as text: the list, newest first — or one run in full (`run`: its number in that list, 1 the
+ * newest), with each stage's time, each tool's calls and the run in words (`all`: every line).
+ */
+export function logTool(dir, {home = storydeckHome(), run, all = false} = {}) {
+  const {dir: folder, why} = runsFolder(home, deckRoot(dir));
+  if (!folder) throw new Error(`this deck's runs are not kept: ${why}`);
+  const runs = keptRuns(folder);
+  if (run === undefined || run === null || run === '') return listText(runs, callCounts(folder), {kept: RUNS_KEPT});
+  const n = Number(run);
+  if (!Number.isInteger(n) || n < 1 || n > runs.length) throw new Error(runs.length ? `--run is a run's number in the list, 1 (the newest) to ${runs.length}, not ${run}` : 'no runs kept yet: storydeck check and storydeck build each leave one');
+  return runText(runs[n - 1], n, {all});
+}
+
+/** One more call of a tool on a deck, counted for `log` (run/log.js): never a reason for the tool to fail. */
+export function countTool(dir, tool, {home = storydeckHome()} = {}) {
+  try { countCall(home, deckRoot(dir), tool); } catch { /* no deck folder: nothing to count for */ }
 }
 
 /**

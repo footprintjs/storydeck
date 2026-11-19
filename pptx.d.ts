@@ -1,7 +1,7 @@
 /**
  * storydeck · pptx (pptx.js) — a deck as a PowerPoint file: one slide per click, its settled picture, its notes,
- * its clip. Node. The export is a footprintjs flowchart: every run leaves a record that explains it. footprintjs is an
- * optional peer dependency: `npm i footprintjs` beside StoryDeck to export.
+ * its clip. Node. The export is a footprintjs flowchart: every run leaves a record that explains it. footprintjs comes
+ * with StoryDeck, and is loaded when an export runs.
  */
 import type { VoiceProfile } from 'footprint-story/voice';
 import type { VideoClip, VideoDriver, VideoStep } from './video';
@@ -23,8 +23,8 @@ export interface PlannedSlide {
  * Exports the deck at `url` as a .pptx (`out` itself when it ends in .pptx, else `<name>.pptx` in the folder `out`).
  * Give `steps` (as renderVideo takes them) or `deck` (the clicks with their notes); `voice` finds a click's clip when
  * its step gives none. A clip, a picture or a package that is not usable is refused, naming the fix, and nothing is
- * written to `out`; the refusal's error carries the run's `narrative`. Without footprintjs installed, the export is
- * refused: "exportPptx needs footprintjs: npm i footprintjs".
+ * written to `out`; the refusal's error carries the run's `narrative`. A footprintjs that cannot be loaded (a broken
+ * install, a bundler that left it out) is refused: "exportPptx needs footprintjs: npm i footprintjs".
  */
 export function exportPptx(options: {
   url: string; out: string; driver: VideoDriver;

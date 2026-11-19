@@ -32,7 +32,7 @@ describe('serveMcp', () => {
     const byId = Object.fromEntries(out.map((m) => [m.id, m]));
     expect(byId[1].result).toMatchObject({protocolVersion: '2025-03-26', capabilities: {tools: {}}, serverInfo: {name: 'storydeck'}});
     expect(byId[1].result.instructions).toMatch(/^Read first, look last/);
-    expect(byId[2].result.tools.map((t) => t.name)).toEqual(['outline', 'review', 'feedback', 'check', 'narrate', 'build']);
+    expect(byId[2].result.tools.map((t) => t.name)).toEqual(['outline', 'review', 'feedback', 'check', 'narrate', 'build', 'log']);
     expect(byId[3].result.content[0].text).toContain('click 2 of 6');
     expect(byId[4].result).toEqual({});
   });
@@ -43,7 +43,7 @@ describe('serveMcp', () => {
     expect(out.filter((m) => m.error?.code === -32600)).toHaveLength(2);   // null and an array are not requests
     expect(out.find((m) => m.id === 8).result).toMatchObject({isError: true, content: [{text: expect.stringMatching(/^no tool called "undefined"/)}]});
     expect(out.find((m) => m.id === 5).error).toEqual({code: -32601, message: 'Method not found: resources/list'});
-    expect(out.find((m) => m.id === 6).result).toMatchObject({isError: true, content: [{text: 'no tool called "paint" (the tools are outline, review, feedback, check, narrate, build)'}]});
+    expect(out.find((m) => m.id === 6).result).toMatchObject({isError: true, content: [{text: 'no tool called "paint" (the tools are outline, review, feedback, check, narrate, build, log)'}]});
     expect(out.find((m) => m.id === 7).result.protocolVersion).toBe('2025-06-18');
   });
 });
@@ -55,13 +55,13 @@ describe('callTool', () => {
     expect((await callTool('outline', {dir: 'other'}, {dir})).content[0].text).toMatch(/^Other · 6 clicks/);
     expect((await callTool('outline', {dir: path.join(dir, 'other')}, {dir})).content[0].text).toMatch(/^Other · 6 clicks/);
     expect((await callTool('review', {all: true}, {dir})).content[0].text.match(/^click /gm)).toHaveLength(6);
-    expect((await callTool('check', {}, {dir})).content[0].text).toBe('no problems');
+    expect((await callTool('check', {}, {dir})).content[0].text).toBe('clean — nothing to fix');
     expect((await callTool('feedback', {}, {dir, home: tempDir()})).content[0].text).toBe('no open notes from your dev page');
     const esc = String.fromCharCode(27);
     const odd = tempDeck({...STARTER, 'clicks.html': STARTER['clicks.html'].replace('data-label="Title"', `data-label="Ti${esc}[2Jtle"`)});
     expect((await callTool('outline', {}, {dir: odd})).content[0].text).toContain('Ti\uFFFD[2Jtle');
     expect((await callTool('check', {layout: true}, {dir})).content[0].text).toContain('layout not checked');
-    expect((await callTool('build', {}, {dir})).content[0].text).toMatch(/^✓ .*index\.html · 6 clicks/);
+    expect((await callTool('build', {}, {dir})).content[0].text).toMatch(/^clean — nothing to fix\n✓ .*index\.html · 6 clicks/);
     expect(existsSync(path.join(dir, 'index.html'))).toBe(true);
   });
 
@@ -77,6 +77,22 @@ describe('callTool', () => {
     expect((await callTool('build', {dir: elsewhere}, {dir})).isError).toBe(true);
     expect(existsSync(path.join(elsewhere, 'index.html'))).toBe(false);
     expect((await callTool('outline', {dir: 'missing'}, {dir})).content[0].text).toMatch(/^no folder missing inside/);
+  });
+
+  it('build answers a deck that does not compile as an error — nothing was written — and log reads the runs back', async () => {
+    const home = tempDir(), dir = tempDeck({...STARTER, 'deck.json': '{"title":"T","oops":1}'});
+    const broken = await callTool('build', {}, {dir, home});
+    expect(broken).toMatchObject({isError: true, content: [{type: 'text', text: expect.stringMatching(/^broken — the deck does not compile, so no page was written\nerror deck · compile: deck\.json has "oops"/)}]});
+    expect(existsSync(path.join(dir, 'index.html'))).toBe(false);
+    expect((await callTool('check', {}, {dir, home})).isError).toBeUndefined();   // a check that finds something has still answered
+    const log = (await callTool('log', {}, {dir, home})).content[0].text.split('\n');
+    expect(log[0]).toBe('2 runs kept (the newest 30 are)');
+    expect(log[1]).toBe('tool calls: check 1, build 1, log 1');
+    expect(log[2]).toMatch(/check {2}broken — the deck does not compile · round 2 · 0 fixed, 0 new/);
+    expect((await callTool('log', {run: 1, all: true}, {dir, home})).content[0].text).toContain('[Condition]: It evaluated Rule 0 "The deck does not compile": compiled false eq false ✓, and chose broken.');
+    expect(await callTool('log', {run: 7}, {dir, home})).toMatchObject({isError: true, content: [{text: expect.stringMatching(/^--run is a run's number in the list, 1 \(the newest\) to 2/)}]});
+    expect((await callTool('paint', {}, {dir, home})).isError).toBe(true);
+    expect((await callTool('log', {}, {dir, home})).content[0].text).toContain('tool calls: check 1, build 1, log 4');   // a name that is no tool counted nothing
   });
 
   it('turns a refusal into an error result with the reason', async () => {

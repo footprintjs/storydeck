@@ -73,6 +73,26 @@ export function layoutProblems(found, clicks) {
   });
 }
 
+/** A call made as it is: what `layoutFindings` does with each step when no one records them. */
+const plainly = (_target, step) => step();
+
+/**
+ * Every click of an open page measured, in order, through the browser port: what it found, each with its click's
+ * number ({n, kind, …}). The port is closed whatever happens — a page that never comes up still closes its browser.
+ * `call(target, step)` makes each step (`browser.open`, `browser.measure`, `browser.close`): a caller that records its
+ * calls passes its own (run/measure.js), and the loop stays this one.
+ */
+export async function layoutFindings(port, url, count, call = plainly) {
+  const found = [];
+  try {
+    await call('browser.open', () => port.open(url));   // inside the try: a page that never comes up still closes its browser
+    for (let n = 1; n <= count; n++) for (const f of await call('browser.measure', () => port.measure(n))) found.push({n, ...f});
+  } finally {
+    await call('browser.close', () => port.close());
+  }
+  return found;
+}
+
 /**
  * Open a built page and measure every click. `driver` is the browser port, or pass `chromium` and the deck-stage driver
  * is made offline: the page loads nothing but itself, so a deck's own scripts cannot reach the network from your
@@ -80,12 +100,5 @@ export function layoutProblems(found, clicks) {
  */
 export async function layoutCheck(url, {clicks, driver, chromium}) {
   const port = driver ?? deckStageDriver({chromium, offline: true});   // the page is whole; it needs no network
-  const found = [];
-  try {
-    await port.open(url);   // inside the try: a page that never comes up still closes its browser
-    for (let n = 1; n <= clicks.length; n++) for (const f of await port.measure(n)) found.push({n, ...f});
-  } finally {
-    await port.close();
-  }
-  return layoutProblems(found, clicks);
+  return layoutProblems(await layoutFindings(port, url, clicks.length), clicks);
 }

@@ -9,6 +9,7 @@ export {compileDeck} from './compile.js';
 export {deckPage} from './page.js';
 export {pageAssets} from './assets.js';
 export {loadDeck, deckHtml, buildDeck} from './build.js';
+export {runDeck} from './run/run.js';
 export {outline, reviewClick} from './review.js';
 export {checkDeck, formatProblems} from './check.js';
 export {layoutCheck} from './layout.js';
