@@ -12,8 +12,10 @@
   feet are on its round base. A packet (`pkt`, `data-packets`) rides the curve itself.
 - **Where a cable cannot lie, the wire stays straight.** Each cable is laid and then looked at. One that would pass
   under what either of its own two blocks draws is not kept: that is a block standing straight in front of the other,
-  behind it, or against it. A request and its answer that would cross as cables are not kept either, and the two are
-  always drawn alike. Such a wire is drawn as 0.17.0 drew it. On a map the build places, nearly every wire is a cable.
+  behind it, or close beside it along a tile line (under about two tiles between them) — and, now and then, a cable
+  whose own place on a foot many cables share would put it under its block. A request and its answer that would cross
+  as cables are not kept either, and the two are always drawn alike. Such a wire is drawn as 0.17.0 drew it. On a map
+  the build places, nearly every wire is a cable.
 - **A cable's label stands on the cable.** `data-label` on a cable is written on the cable, on a plate of the
   slide's ground (`--bg`; a new token, `--wire-plate`, for a tinted floor), where a wire's label stands beside it. It
   takes the cable's middle, or the nearest place along the cable where no block is drawn over it, no label placed
@@ -21,7 +23,7 @@
   such place, the one where the least of it is hidden. A packet passes under the plate, the arrow's head is drawn
   over it, and where packets do not run (reduced motion, print) one rests beside the plate, not under it. The search
   has a fixed amount of work for one map (enough for some hundreds of labelled cables), so a map of thousands still
-  builds in about a second; a label past that takes its cable's middle.
+  builds in a second or two; a label past that takes its cable's middle.
 - **What changes in a deck you have (the picture, not the files).** A wire written between two isometric pieces
   with no bend is now a cable wherever one can lie, and its label moves onto it. To keep one straight, give it a
   bend, `0` too: `data-arrow="you to server 0"`. Drawn exactly as before: wires between flat pieces, wires by numbers,

@@ -713,9 +713,10 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   cables; a label after that takes its cable's middle.)
 
   Where a cable cannot lie, the wire is straight, as it was: from one block's outline to the other's, through the air,
-  its label beside it. That is when one block stands straight in front of the other or against it (the two feet do
-  not face each other, and a curve between them would run under one of the two blocks), and when a request and its
-  answer would cross as cables — the two are kept alike. A wire from a block to a flat piece, and one between blocks
+  its label beside it. That is when one block stands straight in front of the other, or close beside it along a tile
+  line with under about two tiles between them (the two feet do not face each other, and a curve between them would
+  run under one of the two blocks; so might a cable's own place on a foot many cables share), and when a request and
+  its answer would cross as cables — the two are kept alike. A wire from a block to a flat piece, and one between blocks
   standing at different heights, are straight too. To keep any wire straight, give it a bend, `0` too:
   `data-arrow="you to server 0"`. A map the build places has its blocks side by side, so nearly all its wires are
   cables. A cable lies on the floor, so a block standing nearer the viewer is drawn over it: it does not go round
@@ -740,7 +741,7 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   diagram needs three more things on a wire, each an attribute: `data-label="InvokeAgentRuntime"` writes its name at its
   middle, on its left (a request's above it, its answer's below; in the wire's colour, on an edge of the ground so it
   reads over anything; a cable between two blocks carries it on the cable itself: see the isometric piece above); class `halo` gives it a soft glow (`--wire-halo`); and `data-packets="2" data-speed="5"` keeps
-  packets running along it, evenly spaced, 5 s a run (`--packet`, `--packet-glow`). The packets are loops (see below):
+  packets running along it, evenly spaced, 5 s a run (`--packet`, `--packet-glow`; `--wire-plate` is the plate under a cable's label). The packets are loops (see below):
   only on the slide shown, in step from click to click, and under reduced motion, in print or with motion off one rests
   at the wire's middle.
   `<i class="ic" data-icon="server"></i>` is `icons/server.svg`. `deck.css` styles the chrome (kicker, headline, footer

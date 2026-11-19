@@ -11,8 +11,13 @@ const canvas = [1920, 1080];
 const shapesOf = (things) => isoDrawn('<i data-iso-grid="120 at 960 240"></i>' + Object.entries(things).map(([name, t]) => `<div data-k="${name}" data-iso="${t.kind}" data-at="${t.at.join(' ')}" data-size="${t.size.join(' ')}"></div>`).join(''), {canvas}).shapes;
 /** Whether a slide point is inside an outline: asked here by its own count of the sides a ray crosses. */
 const within = (outline, [px, py]) => outline.reduce((odd, [xi, yi], i) => { const [xj, yj] = outline.at(i - 1); return (yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi ? !odd : odd; }, false);
-/** How many points of a cable, walked (6 px apart at most: a stretch shorter than that may slip between two), are under what a piece draws. */
-const hiddenBy = (cable, shape) => cableWalk(cable).filter((p) => within(shape.outline, p)).length;
+/**
+ * How many points of a cable are well under what a piece draws: a thousand points along it (far finer than the code's
+ * own walk), each counted when it and the four points 1.5 px round it are all inside the outline — so a stretch that
+ * only grazes an edge between two points of the code's walk is not called hidden, and anything deeper is.
+ */
+const hiddenBy = (cable, shape) => Array.from({length: 1001}, (_, k) => cablePoint(cable, k / 1000))
+  .filter(([x, y]) => [[0, 0], [1.5, 0], [-1.5, 0], [0, 1.5], [0, -1.5]].every(([dx, dy]) => within(shape.outline, [x + dx, y + dy]))).length;
 /** A slide point as the floor point under it, at a lift: [col, row]. */
 const tiles = ([x, y], lift = 0) => { const p = grid.tileAt(x, y + lift * grid.rise); return [p.col, p.row]; };
 const cols = [Math.cos(Math.atan2(30, 60)), Math.sin(Math.atan2(30, 60))], rows = [-cols[0], cols[1]];   // a tile along the cols is 60 right and 30 down; along the rows, 60 left and 30 down
@@ -154,6 +159,11 @@ describe('cable · a wire along the floor between two isometric pieces', () => {
     expect(none([2, 0])).toEqual([null]);              // against a's right face: its first stretch would be under b
     expect(none([0, 2])).toEqual([null]);
     expect(none([2.2, 0])).toEqual([null]);
+    // beside it along a tile line with under about two tiles between: a's right foot faces b's back, and the cable would hook round under b
+    expect(none([4, 0])).toEqual([null]);
+    expect(none([0, 4])).toEqual([null]);
+    expect(none([5, 0])[0]).toHaveLength(4);           // three tiles between: room to hook round to b's left foot
+    expect(none([0, 5])[0]).toHaveLength(4);
     // corner to corner, the feet face each other: a cable, however near
     const [near] = none([2.2, -2.2]);
     expect(near).toHaveLength(4);
@@ -175,6 +185,18 @@ describe('cable · a wire along the floor between two isometric pieces', () => {
     const laid = cables([['a', 'b'], ['b', 'a'], ['a', 'c']], more, floor);
     expect(laid.slice(0, 2)).toEqual([null, null]);
     expect(laid[2]).toHaveLength(4);
+  });
+
+  it('a cable not kept leaves no gap on its foot: the foot is shared out again among those that stay', () => {
+    // n1 stands in front of n3 along the rows: the two wires from n1 to n3 pass the trial at the foot's middle, and at
+    // their own places on n3's crowded left foot they would run under a block — they are not kept
+    const shapes = shapesOf({n0: block([6, 15]), n1: block([12, 6]), n2: block([6, 0]), n3: block([12, 0]), n4: block([0, 3])});
+    const links = [['n0', 'n1'], ['n1', 'n0'], ['n3', 'n0'], ['n1', 'n3'], ['n2', 'n1'], ['n1', 'n2'], ['n1', 'n2'], ['n3', 'n0'], ['n0', 'n3'], ['n1', 'n3']];
+    const laid = cables(links, shapes, floor);
+    expect([laid[3], laid[9]]).toEqual([null, null]);
+    // the three that stay at n3's left foot (cols 12 to 14) stand at its quarters — not in the half the five left them
+    expect([touches(laid[2][0], rows)[0], touches(laid[7][0], rows)[0], touches(laid[8][3], rows)[0]].map((v) => +v.toFixed(6))).toEqual([12.5, 13, 13.5]);
+    for (const i of [2, 7, 8]) expect(hiddenBy(laid[i], shapes.get('n3')) + hiddenBy(laid[i], shapes.get('n0'))).toBe(0);   // laid again, and looked at again
   });
 
   it('wherever two blocks stand: a cable kept lies clear of what both draw, a pair is kept together or not at all, and a pair kept does not cross (four distances, every 5° round)', () => {

@@ -15,8 +15,9 @@
 // is furthest up the slide nearest the back. A cylinder's feet are on its round base.
 //
 // NOT EVERY WIRE IS A CABLE. The two feet face each other only when one block stands to the side of the other. When
-// one stands straight in front of the other, or they touch, a curve between those feet would run under one of its own
-// blocks; and a request and its answer between feet that the cable must hook round to reach would cross. So a cable
+// one stands straight in front of the other, or close beside it along a tile line (under about two tiles between
+// them: one's foot then faces the other's back), a curve between those feet would run under one of its own blocks;
+// and a request and its answer between feet that the cable must hook round to reach would cross. So a cable
 // is laid, then looked at: one that passes under what either of its own blocks draws is not kept, nor are two between
 // the same feet that cross. A wire with no cable is drawn straight, from outline to outline (transforms.js).
 //
@@ -33,6 +34,7 @@ const SAMPLE = 6;   // px between the points asked: of a cable, whether a block 
 /** The most points a cable is walked in: a cable longer than a slide is asked more coarsely, never at greater cost. */
 export const WALK_MOST = 512;
 const CROSS_RUNS = 64;   // the straight runs a cable is taken as, when two are asked whether they cross
+const RELAYS = 2;        // how often the feet are shared out again after a cable was not kept
 
 const middle = ({at, size}) => [at[0] + size[0] / 2, at[1] + size[1] / 2];
 /** How far down the slide a piece stands: its middle's col and row together (a tile along either is as far down). */
@@ -133,33 +135,47 @@ export function cables(links, shapes, floor) {
   const drawnOf = (piece) => drawn.get(piece) ?? drawn.set(piece, held(piece.outline ?? [])).get(piece);
   /** A cable's walk when it lies clear of what both its blocks draw, or null. */
   const clear = (e, cable) => { const walk = cableWalk(cable); return under(walk, drawnOf(e.from)) || under(walk, drawnOf(e.to)) ? null : walk; };
-  // first a trial from the middle of one foot to the middle of the other: a wire whose cable would pass under one of its own blocks takes no place on a foot
-  const can = ends.map((e) => (e && clear(e, lay(e, 0.5, 0.5)) ? e : null));
-  // each foot's cables, leaving and arriving alike, in the order that keeps them apart: the one whose other end is
-  // furthest up the slide first; of two as far up, the nearer; of two with one other end, the one written first (so
-  // a request and its answer nest)
-  const feet = new Map();
-  const take = (piece, edge, i, other) => { const at = feet.get(piece) ?? feet.set(piece, {right: [], left: []}).get(piece); at[edge].push({i, other}); };
-  can.forEach((e, i) => { if (e) { take(e.from, e.out, `out${i}`, e.to); take(e.to, e.in, `in${i}`, e.from); } });
-  const share = new Map();   // a cable's place along each of its feet: its turn among the foot's cables, evenly spaced
-  for (const [piece, edges] of feet) {
-    for (const list of [edges.right, edges.left]) {
-      const nearer = (c) => Math.abs(across(c.other) - across(piece));
-      list.map((c, k) => ({...c, k})).sort((a, b) => depth(a.other) - depth(b.other) || nearer(a) - nearer(b) || a.k - b.k).forEach((c, k) => share.set(c.i, (k + 1) / (list.length + 1)));
+  /**
+   * The cables of the wires in `can` (others: null): each foot shared out among them, each cable laid at its place and
+   * looked at. Gives {laid, kept}: the cables, and which of them may stay.
+   */
+  const share = (can) => {
+    // each foot's cables, leaving and arriving alike, in the order that keeps them apart: the one whose other end is
+    // furthest up the slide first; of two as far up, the nearer; of two with one other end, the one written first
+    // (so a request and its answer nest)
+    const feet = new Map();
+    const take = (piece, edge, i, other) => { const at = feet.get(piece) ?? feet.set(piece, {right: [], left: []}).get(piece); at[edge].push({i, other}); };
+    can.forEach((e, i) => { if (e) { take(e.from, e.out, `out${i}`, e.to); take(e.to, e.in, `in${i}`, e.from); } });
+    const place = new Map();   // a cable's place along each of its feet: its turn among the foot's cables, evenly spaced
+    for (const [piece, edges] of feet) {
+      for (const list of [edges.right, edges.left]) {
+        const nearer = (c) => Math.abs(across(c.other) - across(piece));
+        list.map((c, k) => ({...c, k})).sort((a, b) => depth(a.other) - depth(b.other) || nearer(a) - nearer(b) || a.k - b.k).forEach((c, k) => place.set(c.i, (k + 1) / (list.length + 1)));
+      }
     }
+    const laid = can.map((e, i) => e && lay(e, place.get(`out${i}`), place.get(`in${i}`)));
+    const walks = laid.map((cable, i) => cable && clear(can[i], cable));   // off its foot's middle a cable may meet its block where the trial did not
+    // cables between the same two feet are kept together or not at all: where one of them is not clear of its
+    // blocks, or two neighbours (in their order along the left block's foot) cross, none is kept — a request as a
+    // cable beside its answer as a straight wire would read as two different things
+    const twins = new Map();
+    can.forEach((e, i) => { if (e) twins.set(e.feet, [...(twins.get(e.feet) ?? []), i]); });
+    for (const group of twins.values()) {
+      const at = (i) => place.get(can[i].out === 'right' ? `out${i}` : `in${i}`), order = [...group].sort((a, b) => at(a) - at(b));
+      if (order.some((i, k) => !walks[i] || (k > 0 && cross(walks[order[k - 1]], walks[i])))) for (const i of group) walks[i] = null;
+    }
+    return {laid, kept: walks.map(Boolean)};
+  };
+  // first a trial from the middle of one foot to the middle of the other: a wire whose cable would pass under one of its own blocks takes no place on a foot
+  let can = ends.map((e) => (e && clear(e, lay(e, 0.5, 0.5)) ? e : null));
+  // Then the feet are shared out. A cable that fails at its place leaves that place empty, so the feet are shared out
+  // again among those kept, RELAYS times at most: after the last, a cable not kept leaves its gap (a deck is text
+  // someone wrote: laying must end)
+  for (let round = 0; ; round++) {
+    const {laid, kept} = share(can);
+    if (round === RELAYS || kept.every((stays, i) => stays === Boolean(can[i]))) return laid.map((cable, i) => (kept[i] ? cable : null));
+    can = can.map((e, i) => (kept[i] ? e : null));
   }
-  const laid = can.map((e, i) => e && lay(e, share.get(`out${i}`), share.get(`in${i}`)));
-  const walks = laid.map((cable, i) => cable && clear(can[i], cable));   // off its foot's middle a cable may meet its block where the trial did not
-  // cables between the same two feet are kept together or not at all: where one of them is not clear of its
-  // blocks, or two neighbours (in their order along the left block's foot) cross, none is kept — a request as a
-  // cable beside its answer as a straight wire would read as two different things
-  const twins = new Map();
-  can.forEach((e, i) => { if (e) twins.set(e.feet, [...(twins.get(e.feet) ?? []), i]); });
-  for (const group of twins.values()) {
-    const at = (i) => share.get(can[i].out === 'right' ? `out${i}` : `in${i}`), order = [...group].sort((a, b) => at(a) - at(b));
-    if (order.some((i, k) => !walks[i] || (k > 0 && cross(walks[order[k - 1]], walks[i])))) for (const i of group) walks[i] = null;
-  }
-  return laid.map((cable, i) => (walks[i] ? cable : null));
 }
 
 /** Where a label may stand along its cable: the middle first, then a twentieth further to each side by turns, a fifth to four fifths of the way. */
