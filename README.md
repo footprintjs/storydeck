@@ -408,7 +408,7 @@ loaded only when an export runs; the deck's browser runtime never loads it.
 ```js
 import { chromium } from 'playwright-core';
 import { deckStageDriver } from 'footprint-storydeck/video';
-import { exportPptx } from 'footprint-storydeck/pptx';   // and `npm i footprintjs`: an optional peer, needed to export
+import { exportPptx } from 'footprint-storydeck/pptx';   // and `npm i footprintjs` (14 or later): an optional peer, needed to export
 
 const done = await exportPptx({
   url: 'file:///…/deck.html', steps, out: 'out/my-talk.pptx',   // the steps the video takes; or `out` a folder → <name>.pptx

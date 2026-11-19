@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.14.1 — one engine: footprintjs 14
+
+- **The optional footprintjs peer is `^14.0.0`** (0.14.0 said `^11 || ^12 || ^13 || ^14`). StoryDeck's PowerPoint export is
+  tested on footprintjs 14 only, and StoryReel 0.30 and the rest of the family ask for 14, so the range now says what is
+  tested and an app keeps one engine. footprintjs 14 needs foottrace `^2.1.0` beside it. An app that exports with an
+  older engine stays on StoryDeck 0.14.0; an app that does not export to PowerPoint needs no engine and is not affected.
+- Nothing else in the published package changes.
+
 ## 0.14.0 — the isometric look, a view that follows, and an order inside a click
 
 - **A camera that keeps the whole picture in view: `fit`.** `data-focus="fit"` frames everything a click shows, lit and
