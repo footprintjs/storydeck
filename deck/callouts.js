@@ -12,7 +12,9 @@
 // has one. Every rule has no weight, so theme.css has the last word: set --callout-bg, --callout-fg, --callout-size,
 // --callout-radius or --callout-lag (how long after its piece it comes in), or write a rule for .callout, .callout-say
 // or .callout-tail. Class ok, warn or bad from the base look colours one.
-import {attrRule, attrValue, pieceTags, readAttributes, styleLength, tagsWith} from '../pieceRules.js';
+import {attrRule, attrValue, closeOf, pieceTags, readAttributes, styleLength, tagsWith} from '../pieceRules.js';
+
+export {closeOf};
 import {plainText} from './parse.js';
 import {boxFinder, exit} from './boxes.js';
 
@@ -31,25 +33,6 @@ const DOUBLE = /[\p{scx=Han}\p{scx=Hira}\p{scx=Kana}\p{scx=Hang}]/u;
 
 const fixed = (v) => +v.toFixed(1);
 const unitsOf = (word) => [...word].reduce((n, ch) => n + (DOUBLE.test(ch) ? 2 : 1), 0);
-
-/**
- * The element's end: where its own closing tag is, counting those of its kind inside it. Throws when it is never closed.
- * One pass: each tag's ">" is looked for once and the search goes on past it, so a file of unfinished tags costs no more
- * than its length.
- */
-export function closeOf(html, tag, from, where) {
-  const scan = new RegExp(`<(/?)${tag}\\b`, 'gi');
-  scan.lastIndex = from;
-  let depth = 1;
-  for (let m = scan.exec(html); m; m = scan.exec(html)) {
-    const gt = html.indexOf('>', m.index);
-    if (gt < 0) break;
-    depth += m[1] ? -1 : 1;
-    if (!depth) return {at: m.index, end: gt + 1};
-    scan.lastIndex = gt + 1;
-  }
-  throw new Error(`${where}: its <${tag}> is never closed — end it with </${tag}>`);
-}
 
 /** Every callout as written, in order, checked: [{start, open, close, end, tag, attrs, where, name, target, side, inner, text}]. Throws, naming the fix. */
 function readCallouts(html) {

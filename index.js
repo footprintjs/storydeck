@@ -16,7 +16,7 @@ export { useTheme } from './useTheme';
 export { assemblePost } from './content/loadPost';
 export { renderMarkdown, splitBodyByMarkers } from './content/markdown';
 export { FOCUS, readFocus, focusStep, planFocus } from './focus';
-export { readPieces, readStep, drawFocus, wrapStage, slideClass, focusOverlay, focusRuntime } from './focusHtml';
+export { readPieces, readStep, drawFocus, wrapStage, slideClass, slideStyle, focusOverlay, focusRuntime } from './focusHtml';
 export { idleTour, tourPlan, tourText } from './tour';
 export { narrationText, writtenText } from './narration';   // the rules beneath, captions and chapters: footprint-story
 export { notesData, notesRuntime, listenRuntime } from './narrationHtml';

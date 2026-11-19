@@ -29,6 +29,9 @@
 .sd-moved { translate: var(--sd-dx, 0px) var(--sd-dy, 0px); scale: var(--sd-s, 1); }
 .sd-origin-tl { transform-origin: 0 0; }
 .sd-stage { position: absolute; inset: 0; transform-origin: 0 0; translate: var(--sd-tx, 0px) var(--sd-ty, 0px); scale: var(--sd-ts, 1); }
+/* a stage of its own (data-stage on its pieces): its element lies over the main stage, so only its pieces take a click */
+.sd-stage-own { pointer-events: none; }
+:where(.sd-stage-own > *) { pointer-events: auto; }
 /* apart: a piece its group's spring moves is marked .sd-apart and has no CSS motion — focusRuntime plays the spring as
    Web Animations of the same translate/scale; at rest it is the plain style above (together: the piece as drawn) */
 
@@ -56,6 +59,11 @@
 @property --sd-a-loop { syntax: '*'; inherits: false; }   /* a piece's loop (deck-stage: data-loop and its --loop), kept while the piece changes */
 @property --sd-turn { syntax: '*'; inherits: false; }   /* a piece's moment on a path; never inherited, so 0 off the route */
 @property --sd-stage-turn { syntax: '*'; inherits: false; }   /* the view's moment on a path, when the route gives it a turn; never inherited */
+/* When the view of this click has arrived: the one moment a deck's own animation waits on, so it never plays under a
+   view still moving — animation-delay: var(--sd-arrive-at). 0s when no view moves, and on an arrival that plays nothing
+   (a jump, a step back, reduced motion, print): set only behind the motion gate, below. Inherited: read it anywhere on the
+   slide. It takes the move time from --sd-move-time as the slide has it: set that token on the deck or the slide, not on a stage. */
+@property --sd-arrive-at { syntax: '<time>'; inherits: true; initial-value: 0s; }
 @keyframes sdNone {}
 @keyframes sdEnter { from { opacity: 0; scale: calc(var(--sd-s, 1) * .92); } }
 @keyframes sdArrive { from { opacity: 0; } }
@@ -103,6 +111,9 @@
   /* the view with a turn on a path (`camera` in the route): it waits for its turn and takes the turn's time, both
      written by the plan (--sd-stage-delay, --sd-stage-time) so what comes after it starts when it has arrived; under a
      new blur it waits .4s more, as the whole path does. Until its turn it stays where the last click left it (both). */
+  /* a view that moves arrives after its move time; one with a turn on a route, when that turn is over (--sd-view-at, written by the plan) */
+  :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])):has(.sd-stage.sd-move) { --sd-arrive-at: var(--sd-view-at, var(--sd-move-time, 1s)); }
+  :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])).sd-focus-new:has(.sd-stage-turn.sd-move) { --sd-arrive-at: calc(var(--sd-view-at, 0s) + .4s); }
   .sd-stage-turn { --sd-stage-turn: var(--sd-stage-delay, 0s); }
   .sd-focus-new .sd-stage-turn { --sd-stage-turn: calc(var(--sd-stage-delay, 0s) + .4s); }
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-stage.sd-stage-turn.sd-move { animation: sdStage var(--sd-stage-time, 1s) var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) var(--sd-stage-turn, 0s) both; }

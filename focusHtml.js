@@ -12,7 +12,7 @@
 // path, at that twin's turn).
 // focus.css draws the classes; call focusRuntime() once in the page, so only a forward click animates.
 
-import {attrRule as ATTR, ownAttribute, pieceTags, styleLength, tagsWith} from './pieceRules.js';
+import {attrRule as ATTR, closeOf, ownAttribute, pieceTags, styleLength, tagsWith} from './pieceRules.js';
 
 /** An attribute's value in a run of attributes, single or double quoted, or null. */
 const attrOf = (at, name) => ATTR(name).exec(at)?.[2] ?? null;
@@ -27,13 +27,16 @@ const px = (style, prop) => styleLength(style, prop)?.value ?? null;
 
 /**
  * The pieces of a slide: every element carrying `attr` (data-k) — its names, its box when its inline style
- * places it, its twin, a wire's ends (data-ends: the pieces it joins), and whether it is ground (data-ground: it lies
- * under the picture, so no camera frames it). Returns {html, pieces}: the same HTML with each piece numbered (data-sd-i), and the
+ * places it, its twin, a wire's ends (data-ends: the pieces it joins), whether it is ground (data-ground: it lies
+ * under the picture, so no camera frames it), and the stage it stands on when not the main one (data-stage="panel": a
+ * stage has its own view, and a click's camera moves one of them). A piece that joins others or is about one (a wire, a
+ * callout: data-ends) and names no stage stands on theirs when they share one, so it moves with what it touches.
+ * Returns {html, pieces}: the same HTML with each piece numbered (data-sd-i), and the
  * pieces in order. Which tags are pieces is pieceRules.js · pieceTags, read in one pass.
  */
 export function readPieces(html, {attr = 'data-k'} = {}) {
-  const pieces = [];
-  let out = '', from = 0;
+  const pieces = [], opens = [];   // opens: each piece's opening tag as it will be written, and the text before it
+  let from = 0;
   for (const {start, end, tag, before, quote: q, value: k, after} of pieceTags(html, attr)) {
     const at = before + after, style = attrOf(at, 'style') ?? '';
     const attrPx = name => { const v = attrOf(at, name); return v !== null && /^[\d.]+$/.test(v) ? Number(v) : null; };
@@ -42,11 +45,48 @@ export function readPieces(html, {attr = 'data-k'} = {}) {
     // it lies under the picture (a floor, a backdrop): no camera frames it. Read as the tag's own attribute, so the
     // words "data-ground" inside a title are not it; data-ground="false" says it is part of the picture after all
     const marked = /data-ground/i.test(at) ? ownAttribute(at, 'data-ground') : null, ground = !!marked && String(marked.value).trim().toLowerCase() !== 'false';
-    pieces.push({keys: k.trim().split(/\s+/), box: x === null || y === null ? null : {x, y, w: w ?? 0, h: h ?? 0}, ...(twin ? {twin} : {}), ...(ends?.length ? {ends} : {}), ...(ground ? {ground: true} : {})});
-    out += `${html.slice(from, start)}<${tag}${before} ${attr}=${q}${k}${q} data-sd-i="${pieces.length - 1}"${after}>`;
+    // the stage it stands on, when it names one: one word, so it can be written into the page as it is
+    const on = /data-stage/i.test(at) ? ownAttribute(at, 'data-stage') : null, stage = on ? String(on.value).trim() : '';
+    if (on && (on.bare || !/^[\w-]+$/.test(stage))) throw new Error(`data-stage${on.bare ? '' : `="${on.value}"`}: a stage is written data-stage="panel" — one name of letters, digits, - and _, in lower case and with quotes`);
+    // a stage's piece is cut out of the map and drawn in its stage's element: a part of an <svg> drawing would stop being one there
+    if (stage && SVG_PARTS.has(tag.toLowerCase())) throw new Error(`data-stage="${stage}" on <${tag}>: a part of an <svg> drawing cannot stand on a stage by itself — put data-stage on the <svg> it is in`);
+    pieces.push({keys: k.trim().split(/\s+/), box: x === null || y === null ? null : {x, y, w: w ?? 0, h: h ?? 0}, ...(twin ? {twin} : {}), ...(ends?.length ? {ends} : {}), ...(ground ? {ground: true} : {}), ...(stage ? {stage} : {})});
+    opens.push({lead: html.slice(from, start), tag: `<${tag}${before} ${attr}=${q}${k}${q} data-sd-i="${pieces.length - 1}"${after}`, name: tag, start, end, alone: VOID.has(tag.toLowerCase()) || /(^|\s)\/\s*$/.test(after)});
     from = end;
   }
-  return {html: out + html.slice(from), pieces};
+  if (pieces.some(p => p.stage)) refuseNested(html, pieces, opens);
+  // A piece that names no stage and touches others (data-ends) stands where they do, when they all stand on one stage
+  // of their own: a wire between two pieces of the panel is the panel's, a callout about one is too.
+  // (the pieces of each name, found once: a map of thousands of wires costs its length, not its square)
+  const called = new Map();
+  if (pieces.some(p => p.stage)) pieces.forEach(p => p.keys.forEach(k => { if (!called.has(k)) called.set(k, []); called.get(k).push(p); }));
+  if (called.size) pieces.forEach((p, i) => {
+    if (p.stage || !p.ends) return;
+    const theirs = p.ends.map(name => (called.get(name) ?? []).filter(o => o !== p).map(o => o.stage ?? ''));
+    const names = new Set(theirs.flat());
+    if (theirs.some(l => !l.length) || names.size !== 1 || names.has('')) return;
+    p.stage = [...names][0];
+    opens[i].tag += ` data-stage="${p.stage}"`;
+  });
+  return {html: `${opens.map(o => `${o.lead}${o.tag}>`).join('')}${html.slice(from)}`, pieces};
+}
+
+/** The parts of an <svg> drawing a map may name as pieces: none of them is an element of the page on its own. */
+const SVG_PARTS = new Set(['g', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'path', 'text', 'tspan', 'use', 'image', 'defs', 'symbol', 'marker', 'mask', 'clippath', 'lineargradient', 'radialgradient', 'pattern', 'foreignobject']);
+const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
+
+/**
+ * On a map with stages, pieces must not be inside each other: a stage's piece is cut out whole and drawn in its
+ * stage's element, so a piece inside it would go along to a stage it does not stand on, and one it is inside would
+ * lose it. (Pieces never nest on any map; here it is checked, because here it would draw wrong without a word.)
+ */
+function refuseNested(html, pieces, opens) {
+  let last = null;
+  opens.forEach((o, i) => {
+    const end = o.alone ? o.end : closeOf(html, o.name, o.end, `piece "${pieces[i].keys[0]}"`).end;
+    if (last && o.start < last.end) throw new Error(`piece "${pieces[i].keys[0]}" is inside piece "${pieces[last.i].keys[0]}": on a map with stages, pieces stand beside each other, never inside — move it out, and give it the same data-stage if it belongs with it`);
+    if (!last || end > last.end) last = {end, i};
+  });
 }
 
 /**
@@ -108,23 +148,57 @@ export function drawFocus(html, look) {
   return out + html.slice(from);
 }
 
+/** One stage's element round its pieces: its view as CSS variables, where it came from when it moved, its turn when a route gives it one. */
+function stageElement(inner, {move, from, turn} = {}, name = null) {
+  const vars = [], onRoute = !!(from && turn);
+  if (move) vars.push(`--sd-tx:${move.x}px`, `--sd-ty:${move.y}px`, `--sd-ts:${move.s}`);
+  if (from) vars.push(`--sd-tx0:${from.x}px`, `--sd-ty0:${from.y}px`, `--sd-ts0:${from.s}`);
+  if (onRoute) vars.push(`--sd-stage-delay:${turn.at}s`, `--sd-stage-time:${turn.takes}s`);
+  return `<div class="sd-stage${from ? ' sd-move' : ''}${onRoute ? ' sd-stage-turn' : ''}${name === null ? '' : ' sd-stage-own'}"${name === null ? '' : ` data-sd-stage="${esc(name)}"`}${vars.length ? ` style="${vars.join(';')}"` : ''}>${inner}</div>`;
+}
+
 /**
  * The pieces' HTML inside the stage the view moves (a zoom, a fit); unchanged when nothing moves the view. Put it in
  * the map's own box. When the route gives the view a turn (`camera`), the move waits for it and takes the turn's time:
  * the plan writes both, so the pieces that come after start when the view has arrived, whatever the theme's move time.
+ *
+ * A map with stages of its own (look.stages; `inner` is what drawFocus gave): each stage's pieces are taken out of the map's flow and drawn together
+ * in that stage's element, after the main stage and in the order the map first names the stages — so a later stage is
+ * drawn over an earlier one, each with the levels of its own pieces. Every stage has an element then, moved or not, so
+ * a piece is in the same place in the page on every click.
  */
 export function wrapStage(inner, look) {
-  if (!look.stage) return inner;
-  const {move, from, turn} = look.stage, vars = [], onRoute = !!(from && turn);
-  if (move) vars.push(`--sd-tx:${move.x}px`, `--sd-ty:${move.y}px`, `--sd-ts:${move.s}`);
-  if (from) vars.push(`--sd-tx0:${from.x}px`, `--sd-ty0:${from.y}px`, `--sd-ts0:${from.s}`);
-  if (onRoute) vars.push(`--sd-stage-delay:${turn.at}s`, `--sd-stage-time:${turn.takes}s`);
-  return `<div class="sd-stage${from ? ' sd-move' : ''}${onRoute ? ' sd-stage-turn' : ''}"${vars.length ? ` style="${vars.join(';')}"` : ''}>${inner}</div>`;
+  if (!look.stages?.length) return look.stage ? stageElement(inner, look.stage) : inner;
+  const names = new Set(look.stages.map(st => st.name)), held = new Map(look.stages.map(st => [st.name, '']));
+  let main = '', from = 0;
+  for (const t of tagsWith(inner, /data-stage/i)) {
+    const run = t.before + t.m[0] + t.after, on = ownAttribute(run, 'data-stage');
+    // a drawn piece (it has a data-k, and drawFocus gave it the class "sd") on a stage this look has, outside any piece already taken
+    if (!on || on.bare || !names.has(on.value.trim()) || t.start < from || !ownAttribute(run, 'data-k') || !ownAttribute(run, 'class')?.value?.split(/\s+/).includes('sd')) continue;
+    // (a tag that closes itself: drawFocus writes what it adds after the slash, so the slash stands alone inside the tag)
+    const end = VOID.has(t.tag.toLowerCase()) || /(^|\s)\/(\s|$)/.test(run) ? t.end : closeOf(inner, t.tag, t.end, `the piece on stage "${on.value.trim()}"`).end;
+    main += inner.slice(from, t.start);
+    held.set(on.value.trim(), held.get(on.value.trim()) + inner.slice(t.start, end));
+    from = end;
+  }
+  main += inner.slice(from);
+  return stageElement(main, look.stage ?? {}) + look.stages.map(st => stageElement(held.get(st.name), st, st.name)).join('');
 }
 
 /** Classes for the slide around a click: sd-focus-new while its blur comes in (what the click adds waits for it). */
 export function slideClass(look) {
   return look.overlay?.phase === 'in-new' ? 'sd-focus-new' : '';
+}
+
+/**
+ * An inline style for the slide around a click, or '': when a route gives the moving view a turn, the moment that view
+ * has arrived (--sd-view-at: its turn's start and its time). focus.css makes --sd-arrive-at of it — the one token a
+ * deck's own animation waits on (`animation-delay: var(--sd-arrive-at)`): 0 when no view moves and on an arrival that
+ * plays nothing (a jump, a step back, reduced motion), the view's move time when one moves, this moment when it has a turn.
+ */
+export function slideStyle(look) {
+  const moving = [look.stage, ...(look.stages ?? [])].find(st => st?.from && st.turn);
+  return moving ? `--sd-view-at:${Math.round((moving.turn.at + moving.turn.takes) * 1000) / 1000}s` : '';
 }
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));

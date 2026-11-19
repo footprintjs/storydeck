@@ -67,6 +67,11 @@ function motionOf(look) {
   const st = look.stage;
   if (st?.move) out.push(`view at ${st.move.s}× (x ${st.move.x}, y ${st.move.y})${st.from ? ', moving' : ''}`);
   else if (st?.from) out.push('view back to the whole map');
+  // a stage of its own: said when its view is not as drawn, or moves on this click
+  for (const own of look.stages ?? []) {
+    if (own.move) out.push(`stage "${own.name}" at ${own.move.s}× (x ${own.move.x}, y ${own.move.y})${own.from ? ', moving' : ''}`);
+    else if (own.from) out.push(`stage "${own.name}" back to as drawn`);
+  }
   if (look.apart) out.push(`apart: ${look.apart.groups.map((g) => `${g.names.join(' ')} ${g.to === 1 ? (g.was === 1 ? 'stays out' : 'opens') : 'closes'}`).join(', ')}`);
   if (look.overlay) out.push(`blur ${look.overlay.phase === 'out' ? 'melts away' : look.overlay.label ? `with frame "${look.overlay.label}"` : 'around the subject'}`);
   return out;

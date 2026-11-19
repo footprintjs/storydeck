@@ -1,6 +1,6 @@
 ---
 name: storydeck
-description: Build, focus, narrate and film talks and posts with StoryDeck — one source shown as a Read article, a Scroll story or a Watch deck; per-click focus on a diagram (grey, zoom, fit, left/right, place, apart — the exploded view, blur, path); a tour that shows a deck's point while nobody is using it; narration from the speaker notes (a clip per click in a voice, cached by its words; notes, presenter and listen mode in the page; captions and chapters); a narrated video for YouTube; and a PowerPoint file (.pptx: a slide per click, its picture, notes and clip). A deck can be a folder (deck.json, clicks.html, maps, theme.css, icons/) that `storydeck` builds into one page, serves for editing with a reload on the same click, and reads back as text (outline, review a click, check). Use when creating or editing a StoryDeck post or deck, adding focus to a diagram slide, voicing a talk, rendering a talk as a video, or exporting it to PowerPoint.
+description: Build, focus, narrate and film talks and posts with StoryDeck — one source shown as a Read article, a Scroll story or a Watch deck; per-click focus on a diagram (grey, zoom, fit, pan, stages that stay put, left/right, place, apart — the exploded view, blur, path); a tour that shows a deck's point while nobody is using it; narration from the speaker notes (a clip per click in a voice, cached by its words; notes, presenter and listen mode in the page; captions and chapters); a narrated video for YouTube; and a PowerPoint file (.pptx: a slide per click, its picture, notes and clip). A deck can be a folder (deck.json, clicks.html, maps, theme.css, icons/) that `storydeck` builds into one page, serves for editing with a reload on the same click, and reads back as text (outline, review a click, check). Use when creating or editing a StoryDeck post or deck, adding focus to a diagram slide, voicing a talk, rendering a talk as a video, or exporting it to PowerPoint.
 ---
 
 # StoryDeck: one source, many lenses — and a deck that tells itself
@@ -119,6 +119,14 @@ whole path .4 s). A route is written as turns, the order inside the click:
 `data-focus-route="camera w1:1.2 dns (w2 server)"` — names alone one after another, `(a b)` together in one turn,
 `name:seconds` a turn that takes that long (a wire's packet rides it), and the word `camera` the view's move as a turn
 (1 s, or `camera:0.6`), so what follows waits until the view has arrived; `review` reads the route back as it plays).
+
+**Stages, a pan, and waiting for the view.** `data-stage="panel"` on a piece puts it on a stage of its own: it stays
+put while the map's view moves (a legend, a layer panel, an overview). Each stage has its own view; a click's camera moves
+the main stage, or the one `data-focus-stage="panel"` names, and the others stay where they were. Never build a camera out
+of `place` to keep something still: use a stage. `data-focus="pan"` moves the view to the subject at the size it had, so a
+run of clicks does not pump in and out (`zoom` or `fit` once, then `pan`). `--sd-arrive-at` is when the click's view has
+arrived (0 when none moves, 0 on a jump): a deck's own animation waits with `animation-delay: var(--sd-arrive-at)`. For
+one piece whose `data-k` has several names, CSS is `[data-k~="name"]`.
 
 **Blocks on a floor (isometric).** In `map.html`: `<div data-k="server" data-iso="block" data-at="7 4"
 data-size="2 2 1.6"><b>Server</b></div>` draws a block seen from a corner; also `data-iso="cylinder"` (round: the same

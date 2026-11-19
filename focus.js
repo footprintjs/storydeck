@@ -9,7 +9,10 @@
 //   camera   where the view goes       zoom (the view closes in on the subject, where the mover leaves it — so a
 //                                      click can close in while its parts fly apart or step aside) ·
 //                                      fit (the view frames everything shown, so it slides to a new piece and
-//                                      pulls back as the picture grows)
+//                                      pulls back as the picture grows) ·
+//                                      pan (the view moves to the subject and keeps the size it had).
+//                                      A map may have stages of its own (data-stage on a piece), each with its own
+//                                      view: a click's camera moves one of them (data-focus-stage), the rest stay
 //   mover    where things go           left · right · up · down (the context steps aside that way, smaller,
 //                                      and the subject grows into the room it leaves) ·
 //                                      place (named groups moved by the amounts you give — a layout you
@@ -168,6 +171,16 @@ export const FOCUS = Object.freeze({
     const shown = union(look === 'hide' ? [subject] : [subject, context]);
     if (!shown) return {};
     return {stage: toCentre(shown, clamp(share * Math.min(area.w / Math.max(shown.w, 1), area.h / Math.max(shown.h, 1)), least, most), centre(area))};
+  }}),
+  /**
+   * The view moves to the subject and keeps its size: the scale the last click left this stage at (1 on a stage no
+   * camera has moved yet), the subject's middle on the area's middle. WHY: a run of clicks that each close in on their
+   * own subject pumps the view in and out (a field deck: 27 of 62 moves changed scale by more than a quarter); a pan
+   * holds one size for the run, so only the place changes. Choose the size once, with zoom or fit, then pan.
+   * holds: with nothing to go to (no piece of its stage is lit), the view stays where it is.
+   */
+  pan: Object.freeze({name: 'pan', kind: 'camera', holds: true, place({subject, area, was}) {
+    return subject ? {stage: toCentre(subject, was?.s ?? 1, centre(area))} : {};
   }}),
   left: aside('left'), right: aside('right'), up: aside('up'), down: aside('down'),
   /**
@@ -384,21 +397,48 @@ export function focusStep(prev, step, deck) {
   // stands on it, never the ground itself — or a view that should follow the pieces would always show the whole floor.
   // A map without ground takes the lines below exactly as before.
   const grounded = pieces.some(p => p.ground), framed = l => (grounded ? l.filter(i => !pieces[i].ground) : l);
+  // Stages. A piece may stand on a stage of its own (`stage` on the piece: data-stage="panel"); every other piece
+  // stands on the main stage. Each stage has its own view, and a click's camera moves ONE of them: the main stage, or
+  // the one it names (`stage`, data-focus-stage). WHY: a panel beside a map has to stay put while the map's view
+  // moves, and a deck that could not say so built a camera of its own out of a mover, losing everything a camera
+  // gives (pieces that come and go with the view, a turn on a route). A stage no camera ever names simply stays put.
+  // The camera sees the pieces of its stage only. A map with no stage of its own takes the lines below as before.
+  const before = prev && !step.fresh ? prev : null;
+  const stageNames = [...new Set(pieces.map(p => p.stage).filter(Boolean))], staged = stageNames.length > 0;
+  // (`stage` is the camera's option. With no camera it is a mistake only when every strategy of the click is a built-in
+  // one, none of which has such an option: a deck's own strategy may have a `stage` of its own.)
+  const builtIn = Object.values(chosen).every(c => FOCUS[c.name] && FOCUS[c.name].kind === c.s.kind && !strategies[c.name]);
+  const named = chosen.camera ? chosen.camera.options.stage : builtIn ? step.options?.stage : undefined, target = named === undefined || named === null || String(named).trim() === '' ? null : String(named).trim();
+  if (target !== null && !chosen.camera) throw new Error(`focus stage: "${target}" names the stage a camera moves, and this click has no camera — add zoom or fit to data-focus, or take data-focus-stage out`);
+  if (target !== null && !stageNames.includes(target)) throw new Error(`focus stage: no stage "${target}" (${staged ? `the stages are ${stageNames.join(', ')}` : 'every piece of this map stands on the main stage'}) — a piece says which stage it stands on with data-stage="name"`);
+  const seenBy = l => (staged ? framed(l).filter(i => (pieces[i].stage ?? null) === target) : framed(l));
   // The whole subject moved as one group (a side mover): the group's own arithmetic, exactly as before; else piece by piece.
-  const moved = !grounded && subject && placed.subject && subjectIdx.every(i => groupOf(i) === placed.subject) ? moveBox(placed.subject, subject) : union(framed(subjectIdx).map(movedBox));
-  const cameraSees = {subject: moved, context: union(framed(contextIdx).map(movedBox)), look, area, view, canvas,
+  const moved = !grounded && !staged && subject && placed.subject && subjectIdx.every(i => groupOf(i) === placed.subject) ? moveBox(placed.subject, subject) : union(seenBy(subjectIdx).map(movedBox));
+  const cameraSees = {subject: moved, context: union(seenBy(contextIdx).map(movedBox)), look, area, view, canvas,
+    was: (target === null ? before?.stage : before?.stages?.[target]) ?? null,   // the view the last click left this stage at
     boxOf: l => union(all.filter(i => states[i] !== 'gone' && has(i, known(names([].concat(l)), 'focus group: '))).map(movedBox))};
   const viewMove = placed.stage ?? (chosen.camera ? chosen.camera.s.place({...cameraSees, options: chosen.camera.options})?.stage ?? null : null);
-  const stage = viewMove ? {s: round(viewMove.s, 4), x: round(viewMove.o[0] * (1 - viewMove.s) + viewMove.t[0]), y: round(viewMove.o[1] * (1 - viewMove.s) + viewMove.t[1])} : null;
-  // The overlay frames the subject where it ends up: moved by its group, then by the view.
-  const ends = moved && viewMove ? moveBox(viewMove, moved) : moved;
+  // A camera with nothing to frame gives no view. On the main stage that takes the view back to the whole map, as zoom
+  // always did; a camera that holds (pan), and any camera on a stage of its own, leaves the view where it was — a
+  // stage of its own never goes back by itself.
+  const framedView = viewMove ? {s: round(viewMove.s, 4), x: round(viewMove.o[0] * (1 - viewMove.s) + viewMove.t[0]), y: round(viewMove.o[1] * (1 - viewMove.s) + viewMove.t[1])}
+    : chosen.camera && !placed.stage && (target !== null || chosen.camera.s.holds) ? cameraSees.was : null;
+  // Each stage keeps the view the last click left it, unless this click's camera is for it. One law is older than
+  // stages and stays: on a click with no camera, the main stage goes back to the whole map.
+  const stage = target === null ? framedView : before?.stage ?? null;
+  const own = stageNames.map(name => ({name, view: name === target ? framedView : before?.stages?.[name] ?? null}));
+  // The overlay frames the subject where it ends up: moved by its group, then by the view (its own stage's view).
+  const viewOf = i => (pieces[i].stage ? own.find(o => o.name === pieces[i].stage).view : stage);
+  const shownAt = i => { const b = movedBox(i), v = viewOf(i); return b && v ? {x: b.x * v.s + v.x, y: b.y * v.s + v.y, w: b.w * v.s, h: b.h * v.s} : b; };
+  const ends = staged ? union(framed(subjectIdx).map(shownAt)) : moved && viewMove ? moveBox(viewMove, moved) : moved;
   const subjectOnSlide = ends ? {x: ends.x * view.s + view.x, y: ends.y * view.s + view.y, w: ends.w * view.s, h: ends.h * view.s} : null;
   const cover = chosen.overlay ? chosen.overlay.s.cover({subjectOnSlide, canvas, options: chosen.overlay.options}) : null;
   const looks = pieces.map((_, i) => states[i] === 'dim' ? look : null);
   // What changed since the last click: only that moves (see `out` below). Known here because the view's turn on a
-  // route is a turn only when the view moves.
-  const before = prev && !step.fresh ? prev : null;
+  // route is a turn only when a view moves: the main stage's, or the one the camera named.
   const stageMoved = !!before && !sameStage(before.stage, stage);
+  const ownMoved = own.map(o => !!before && !sameStage(before.stages?.[o.name] ?? null, o.view));
+  const viewMoved = stageMoved || ownMoved.some(Boolean);
   // An order: the subject turn after turn along a route. The LIT pieces of a turn's names take it together — a turn
   // with nothing lit takes none, so a greyed piece never waits or glows grey; a piece named twice keeps its first turn.
   // The word `camera` in a turn is the view's move (unless a piece is called that): it takes the turn when the view
@@ -410,12 +450,12 @@ export function focusStep(prev, step, deck) {
   for (const turn of order?.turns ?? []) {
     const camera = turn.names.includes(CAMERA) && !isPiece(CAMERA);
     if (camera && (cameras += turn.names.filter(x => x === CAMERA).length) > 1) throw new Error(`focus route: "${CAMERA}" is written more than once, and the view moves once on a click — keep one`);
-    if (camera && !chosen.camera && !placed.stage && !stageMoved) throw new Error(`focus route: "${CAMERA}" is the view's turn, and on this click the view does not move — add a camera (zoom, fit) to data-focus, or take "${CAMERA}" out of the route`);
+    if (camera && !chosen.camera && !placed.stage && !viewMoved) throw new Error(`focus route: "${CAMERA}" is the view's turn, and on this click the view does not move — add a camera (zoom, fit) to data-focus, or take "${CAMERA}" out of the route`);
     const named = known(turn.names.filter(x => !(camera && x === CAMERA)), 'focus route: ');
     const reached = all.filter(i => states[i] === 'on' && named.some(x => pieces[i].keys.includes(x)) && !turnOf.has(i));
-    if (!reached.length && !(camera && stageMoved)) continue;
+    if (!reached.length && !(camera && viewMoved)) continue;
     reached.forEach(i => turnOf.set(i, taken.length));
-    taken.push({names: turn.names, takes: turn.takes, camera: camera && stageMoved});
+    taken.push({names: turn.names, takes: turn.takes, camera: camera && viewMoved});
   }
   // When each turn starts: a turn takes its own seconds, the view's move its own second, any other the step. The turns
   // that take the step are counted, not summed, so the k-th of a plain route starts at exactly k × step, to the
@@ -484,10 +524,13 @@ export function focusStep(prev, step, deck) {
   const overlay = cover ? {rects: cover.rects, label: cover.label, phase: before?.cover ? 'in' : 'in-new', frameNew: !before?.cover || !sameCover(before.cover, cover)}
     : before?.cover ? {rects: before.cover.out ?? before.cover.rects, label: '', phase: 'out', frameNew: false} : null;
   return {
-    state: {vis, states, moves, stage, hot: hotNow, cover, looks,
+    state: {vis, states, moves, stage, ...(staged ? {stages: Object.fromEntries(own.map(o => [o.name, o.view]))} : {}), hot: hotNow, cover, looks,
       spring: springList.some(g => g.to === 1 || g.was === 1) ? {stagger: (spring ?? last).stagger, groups: springList.filter(g => g.to === 1 || g.was === 1).map(({key, names: l, to}) => ({key, names: l, to}))} : null,
       springOf: member, springEnd: end},
-    look: {pieces: out, stage: stage || stageMoved ? {move: stage, from: stageMoved ? before.stage ?? {s: 1, x: 0, y: 0} : null, ...(viewTurn ? {turn: viewTurn} : {})} : null, overlay,
+    look: {pieces: out, stage: stage || stageMoved ? {move: stage, from: stageMoved ? before.stage ?? {s: 1, x: 0, y: 0} : null, ...(viewTurn && (stageMoved || !staged) ? {turn: viewTurn} : {})} : null,
+      // the stages of their own, in the order the map first names them (a later one is drawn over an earlier): each with its view, and where it came from when it moved
+      ...(staged ? {stages: own.map((o, k) => ({name: o.name, move: o.view, from: ownMoved[k] ? before.stages?.[o.name] ?? {s: 1, x: 0, y: 0} : null, ...(viewTurn && ownMoved[k] && !stageMoved ? {turn: viewTurn} : {})}))} : {}),
+      overlay,
       path: turns ? {turns, step: order.step, done: starts[turns - 1], line: order.line, lineAt: order.lineAt} : null,
       apart: springList.length ? {stagger: (spring ?? last).stagger, groups: springList.map(({names: l, to, was}) => ({names: [...l], to, was}))} : null,
       strategies: Object.values(chosen).map(c => c.name), subject: subjectOnSlide},

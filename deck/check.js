@@ -11,6 +11,7 @@
 //   differs-unsaid a part names a phrase of its notes that says how it differs from the real thing, and they do not hold it
 //   callout-alone  a callout shown on a click that does not show the piece it points at: its tail points at nothing
 //   view-far       a click whose view stands further out than half size (a fit over a wide picture): its words are small
+//   across-stages  a wire or a callout that joins pieces standing on different stages: when one stage's view moves, it is left behind
 import {wordCount} from './parse.js';
 import {expandNames} from '../focus.js';
 import {LOOP_NAMES} from './loops.js';
@@ -128,9 +129,27 @@ const FAR_VIEW = 0.5;
 
 /** A map click whose view stands further out than half size: every word on the picture shows that much smaller. */
 function farView(c) {
-  const s = c.kind === 'map' ? c.look.stage?.move?.s : undefined;
-  if (!(s < FAR_VIEW)) return [];
-  return [problem('warn', 'view-far', c, `the view stands at ${s}× here, so words drawn 26 px tall show about ${Math.round(26 * s)} px tall — show less at once (take pieces out with data-out, or tell it in two parts), or stand the pieces closer together`)];
+  if (c.kind !== 'map') return [];
+  const views = [{what: 'the view', s: c.look.stage?.move?.s}, ...(c.look.stages ?? []).map((st) => ({what: `the view of stage "${st.name}"`, s: st.move?.s}))];
+  return views.filter((v) => v.s < FAR_VIEW).map((v) => problem('warn', 'view-far', c, `${v.what} stands at ${v.s}× here, so words drawn 26 px tall show about ${Math.round(26 * v.s)} px tall — show less at once (take pieces out with data-out, or tell it in two parts), or stand the pieces closer together`));
+}
+
+/** A piece that joins or is about others (a wire, a callout) and stands on another stage than one of them: each stage has its own view, so it is left behind when one moves. */
+function acrossStages(compiled) {
+  const out = [];
+  for (const [map, {pieces}] of Object.entries(compiled.maps)) {
+    if (!pieces.some((p) => p.stage)) continue;
+    const click = compiled.clicks.find((c) => c.map === map) ?? null;
+    const called = new Map();   // the pieces of each name, found once
+    for (const p of pieces) for (const k of p.keys) called.set(k, [...(called.get(k) ?? []), p]);
+    for (const p of pieces) {
+      if (!p.ends) continue;
+      const theirs = [...new Set(p.ends.flatMap((name) => (called.get(name) ?? []).filter((o) => o !== p).map((o) => o.stage ?? 'the main stage')))];
+      const own = p.stage ?? 'the main stage';
+      if (theirs.length && theirs.some((s) => s !== own)) out.push(problem('warn', 'across-stages', click, `"${p.keys[0]}" stands on ${own === 'the main stage' ? own : `stage "${own}"`} and touches ${p.ends.map((e) => `"${e}"`).join(' and ')} on ${theirs.map((s) => (s === 'the main stage' ? s : `stage "${s}"`)).join(' and ')} — each stage has its own view, so it is left behind when one moves: stand them on one stage (data-stage)`));
+    }
+  }
+  return out;
 }
 
 /** Every problem of a compiled deck: [{level: 'error' | 'warn' | 'info', rule, click, label, message}]. */
@@ -142,7 +161,7 @@ export function checkDeck(compiled) {
     out.push(...noChange(c, compiled.clicks[i - 1]));
     out.push(...farView(c));
   });
-  out.push(...neverShown(compiled), ...missingNotes(compiled), ...unstyledThemes(compiled), ...unsetLoops(compiled), ...unsaidDiffers(compiled), ...aloneCallouts(compiled));
+  out.push(...neverShown(compiled), ...missingNotes(compiled), ...unstyledThemes(compiled), ...unsetLoops(compiled), ...unsaidDiffers(compiled), ...aloneCallouts(compiled), ...acrossStages(compiled));
   return out;
 }
 
