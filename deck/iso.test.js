@@ -31,7 +31,7 @@ describe('iso · blocks on a floor seen from a corner', () => {
 
   it('draws a block as three faces, a cylinder as its side and its top, a floor as its tile lines, and keeps what the element had', () => {
     const server = drawn.slice(drawn.indexOf(tagOf(drawn, 'server')), drawn.indexOf('<div data-k="db"'));
-    expect(tagOf(drawn, 'server')).toMatch(/^<div data-k="server" data-at="3 1" data-size="2 2 1.4" class="iso ok" data-sd-iso="block" style="left:960px;top:257\.1px;width:240px;height:222\.9px;z-index:\d;--iso-color:#cfe1f7">$/);
+    expect(tagOf(drawn, 'server')).toBe('<div data-k="server" data-at="3 1" data-size="2 2 1.4" class="iso ok" data-sd-iso="block" style="left:960px;top:257.1px;width:240px;height:222.9px;z-index:2;--iso-color:#cfe1f7">');
     expect(server).toContain('<svg class="iso-art" viewBox="0 0 240 222.9" aria-hidden="true"><polygon class="iso-left" points="0,60 120,120 120,222.9 0,162.9"/><polygon class="iso-right" points="120,120 240,60 240,162.9 120,222.9"/><polygon class="iso-top" points="120,0 240,60 120,120 0,60"/></svg>');
     expect(server).toContain('<span class="iso-say" style="left:120px;top:60px"><b>Server</b><small>an API</small></span></div>');   // its words, on its top face
     expect(drawn).toMatch(/data-sd-iso="cylinder"[^>]*><svg class="iso-art"[^>]*><path class="iso-side" d="M0 33\.9L0 122\.1A67\.9 33\.9 0 0 0 135\.8 122\.1L135\.8 33\.9Z"\/><ellipse class="iso-top" cx="67\.9" cy="33\.9" rx="67\.9" ry="33\.9"\/><\/svg>/);
@@ -40,17 +40,42 @@ describe('iso · blocks on a floor seen from a corner', () => {
     expect(tagOf(drawn, 'floor')).not.toContain('z-index');
     expect(tagOf(drawn, 'floor')).toContain(' data-ground ');   // a floor is ground: no camera frames it
     expect(tagOf(drawn, 'server')).not.toContain('data-ground');
+    // a floor that says it is part of the picture keeps its own word, and is framed like any piece
+    const shown = isoPieces('<div data-k="f" data-iso="floor" data-size="2 2" data-ground="false"></div>', {canvas});
+    expect(tagOf(shown, 'f')).toContain(' data-ground="false" class="iso" data-sd-iso="floor"');   // its own word is kept, and no second one is added
+    expect(readPieces(shown).pieces[0].ground).toBe(undefined);
+    // a single-quoted style keeps its quote
+    expect(tagOf(isoPieces(`<div data-k="q" data-iso="block" data-size="1 1 1" style='--iso-color:"x"'></div>`, {canvas}), 'q')).toMatch(/style='left:900px;top:[\d.]+px;width:120px;height:[\d.]+px;z-index:1;--iso-color:"x"'>$/);
+  });
+
+  it('found in review: the words data-iso in a text or in another attribute do not make a piece, a floor or a refusal', () => {
+    const piece = '<div data-k="a" data-iso="block" data-size="1 1 1"></div>';
+    const said = `<p>write &lt;i data-iso-grid="120 at 0 0"&gt; and data-iso="block"</p><div data-k="b" class="box" title="use data-iso-grid, or  data-iso=&quot;block&quot;" style="left:1px;top:2px;width:3px;height:4px">B</div>`;
+    expect(isoPieces(said, {canvas})).toBe(said);                                 // no piece: byte for byte
+    const out = isoPieces(said + piece, {canvas});
+    expect(out.startsWith(said)).toBe(true);                                      // the text and the plain box are untouched
+    expect(isoIn(said + piece)).toEqual([{name: 'a', kind: 'block'}]);
+    expect(boxIn(out, 'a')).toMatchObject({x: 900, w: 120});                      // on the default floor: the mention set none
+    const titled = `<div data-k="t" title=' data-iso="block"' style="left:0px;top:0px">T</div>`;
+    expect(isoPieces(titled + piece, {canvas}).startsWith(titled)).toBe(true);
+  });
+
+  it('found in review: a tag repeating data-iso-grid thousands of times costs no more than its length', () => {
+    const long = `<i${' data-iso-grid=""'.repeat(12000)} x<div data-k="a" data-iso="block" data-size="1 1 1"></div>`, start = performance.now();
+    expect(() => isoPieces(long, {canvas})).toThrow(/data-iso-grid/);
+    expect(performance.now() - start).toBeLessThan(300);                          // it took about 2 s when the scan could back up
   });
 
   it('paints the nearer over the further by a level each, whatever order they are written in, and never moves the map\'s own order', () => {
-    const level = (html, name) => Number(/z-index:(\d+)/.exec(tagOf(html, name))[1]);
+    const level = (html, name) => Number(/z-index:(\d+)(?!\d)/.exec(tagOf(html, name))[1]);
     // a tall block in front of a low one, written first
     const map = `<div data-k="front" data-iso="block" data-at="2 2" data-size="1 1 3"></div><div data-k="back" data-iso="block" data-at="0 0" data-size="2 2 1"></div><div data-k="on" data-iso="block" data-at="0 0 1" data-size="1 1 1"></div>`;
     const out = isoPieces(map, {canvas});
     expect(level(out, 'back')).toBeLessThan(level(out, 'front'));
     expect(level(out, 'back')).toBeLessThan(level(out, 'on'));
     expect(readPieces(out).pieces.map((p) => p.keys[0])).toEqual(['front', 'back', 'on']);   // the order written: a click's numbering uses it
-    expect([level(out, 'front'), level(out, 'back'), level(out, 'on')].every((n) => n >= 1)).toBe(true);
+    expect([level(out, 'front'), level(out, 'back'), level(out, 'on')].sort()).toEqual([1, 2, 3]);   // one level each, from 1
+    expect(level(out, 'back')).toBe(1);
   });
 
   it('a floor of its own: data-iso-grid sets the tile and the far corner, and its element is taken out', () => {
@@ -88,11 +113,20 @@ describe('iso · blocks on a floor seen from a corner', () => {
     expect(bad('<div data-k="a" data-iso="block" data-size="1 1 1" style="color:red; Height: 4px"></div>')).toThrow(/its height comes from the floor/);
     expect(bad('<div data-k="a" data-iso="block" data-size="1 1 1"><b data-k="b">x</b></div>')).toThrow(/pieces do not nest, and this one holds a piece/);
     expect(bad('<div data-k="a" data-iso="block" data-size="1 1 1">')).toThrow(/its <div> is never closed/);
-    expect(bad('<div data-k="a" data-iso=block data-size="1 1 1"></div>')).toThrow(/an isometric piece is written data-iso="block" \(or cylinder, floor\), in lower case and with quotes/);
+    expect(bad('<div data-k="a" data-iso=block data-size="1 1 1"></div>')).toThrow(/an isometric piece is written data-iso="block" \(or cylinder, floor\), once, in lower case and with quotes/);
+    expect(bad('<div data-k="a" DATA-ISO="block" data-size="1 1 1"></div>')).toThrow(/once, in lower case and with quotes/);
+    expect(bad('<div data-k="a" data-iso="block" data-iso="floor" data-size="1 1 1"></div>')).toThrow(/once, in lower case and with quotes/);
+    expect(bad('<div data-k="a" data-iso="block" data-size="1 1 1" style="color:red" style="left:5px"></div>')).toThrow(/"a" \(data-iso="block"\): its style is written once, with quotes — a browser reads only the first of two/);
+    expect(bad('<div data-k="a" data-iso="block" data-size=1></div>')).toThrow(/data-size="1" — its size is "wide deep high", in tiles/);
+    expect(bad('<div data-k="a" data-iso="block" data-size="1 1 1" title="oops></div>')).toThrow(/data-iso: a quote in its tag is never closed/);
     expect(bad('<i data-iso-grid="120 at 1 2"></i><i data-iso-grid="96 at 1 2"></i><div data-k="a" data-iso="block" data-size="1 1 1"></div>')).toThrow(/a map has one floor, and this one sets 2 — keep one/);
     expect(bad('<i data-iso-grid="wide"></i><div data-k="a" data-iso="block" data-size="1 1 1"></div>')).toThrow(/data-iso-grid="wide": the floor is a tile's width in px/);
     expect(bad('<i data-iso-grid="60 60 at 0 0"></i><div data-k="a" data-iso="block" data-size="1 1 1"></div>')).toThrow(/data-iso-grid="60 60 at 0 0": a tile is wider than it is tall/);
     expect(bad('<div data-iso-grid="120 at 1 2"></div><div data-k="a" data-iso="block" data-size="1 1 1"></div>')).toThrow(/the floor is set on an empty <i>/);
+    expect(bad('<i data-iso-grid="120 at 1 2">x</i><div data-k="a" data-iso="block" data-size="1 1 1"></div>')).toThrow(/the floor is set on an empty <i>/);
+    expect(bad('<i DATA-ISO-GRID="120 at 1 2"></i><div data-k="a" data-iso="block" data-size="1 1 1"></div>')).toThrow(/the floor is set on an empty <i>, in lower case and with quotes/);
+    // found in review: a floor's <i> that is also a piece would be taken out with its data-k, and every later piece's number would move
+    expect(bad('<i data-k="g" data-iso-grid="120 at 1 2"></i><div data-k="a" data-iso="block" data-size="1 1 1"></div>')).toThrow(/the floor's <i> carries nothing else \(it is not a piece, and is taken out of the map\) — write <i data-iso-grid="120 at 960 240"><\/i> and put "data-k="g"" on a piece/);
     expect(bad(Array.from({length: MOST_ISO_PIECES + 1}, (_, i) => `<div data-k="p${i}" data-iso="block" data-at="${i} 0" data-size="1 1 1"></div>`).join(''))).toThrow(/a map holds at most 256 isometric pieces, and this one has 257/);
   });
 });

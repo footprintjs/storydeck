@@ -28,9 +28,9 @@
   stylesheet only when a deck has such a piece; a deck without one builds byte for byte as before.
 - **Ground.** `data-ground` on a piece (a floor has it by itself) says it lies under the picture: a camera and a blur
   frame what stands on it, never the ground, so a view follows the pieces though the whole floor is shown.
-- **A callout stays beside a piece that stands off the slide.** A picture larger than the slide, shown by a camera, has
-  pieces past the slide's edge; a callout about one was held at the edge, far from its piece. On a piece inside the slide
-  nothing changes.
+- **A callout stays beside a piece that stands wholly off the slide.** A picture larger than the slide, shown by a
+  camera, has pieces past the slide's edge; a callout about one was held at the edge, far from its piece. A piece on the
+  slide, or partly on it, keeps its bubble on the slide as before.
 - **StoryDeck now needs footprint-story `^0.9.0`** (it was `^0.7.0`), for the order and the grid above. For a 0.x version
   the two ranges do not overlap, so an app that also uses StoryReel needs a StoryReel that asks for `^0.9.0` too, or it
   installs two copies of the package they share. A voice you have already paid for is still found: a clip's key and its

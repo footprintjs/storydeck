@@ -870,3 +870,38 @@ describe('focus · ground: what lies under the picture is never framed', () => {
     expect(look.pieces.map((p) => p.state)).toEqual(['dim', 'on', 'dim']);
   });
 });
+
+describe('focus · a route of names alone is read as it always was (found in review)', () => {
+  const big = (n, name = (i) => `p${i}`) => ({ pieces: Array.from({ length: n }, (_, i) => ({ keys: [name(i)], box: { x: i * 10, y: 0, w: 5, h: 5 } })) });
+  const delays = (look) => look.pieces.map((p) => p.path);
+
+  it('a map may light more pieces than the written form\'s 256 turns: 300 names, by `on` or by `route`, each at k × step', () => {
+    const d = big(300), all = d.pieces.map((p) => p.keys[0]), want = all.map((_, k) => Math.round(k * 0.35 * 1000) / 1000);
+    expect(delays(planFocus([{ in: all, focus: 'path' }], d).looks[0])).toEqual(want);                                       // the order `in` gives
+    expect(delays(planFocus([{ in: ['*'], focus: { strategy: 'path', route: all.join(' ') } }], d).looks[0])).toEqual(want);  // the same order, written
+    expect(planFocus([{ in: ['*'], focus: { strategy: 'path', route: all } }], d).looks[0].path).toMatchObject({ turns: 300, done: want[299] });
+  });
+
+  it('a piece may be called anything it could be before: a long name, an emoji with its selector', () => {
+    const long = 'k'.repeat(200), heart = 'db❤️';
+    const d = { pieces: [{ keys: [long], box: { x: 0, y: 0, w: 5, h: 5 } }, { keys: [heart], box: { x: 10, y: 0, w: 5, h: 5 } }] };
+    expect(delays(planFocus([{ in: [long, heart], focus: 'path' }], d).looks[0])).toEqual([0, 0.35]);
+    expect(delays(planFocus([{ in: ['*'], focus: { strategy: 'path', route: `${heart} ${long}` } }], d).looks[0])).toEqual([0.35, 0]);
+    // a deck's own order strategy too: its names are the deck's
+    const mine = { kind: 'order', route: () => ({ names: [], turns: [{ names: [heart, long] }], step: 0.2 }) };
+    expect(delays(planFocus([{ in: ['*'], focus: 'mine' }], { ...d, strategies: { mine } }).looks[0])).toEqual([0, 0]);
+  });
+
+  it('a route that uses the written form is held to its bounds, and says so', () => {
+    const d = big(300), all = d.pieces.map((p) => p.keys[0]);
+    expect(() => planFocus([{ in: ['*'], focus: { strategy: 'path', route: `(${all[0]} ${all[1]}) ${all.slice(2).join(' ')}` } }], d)).toThrow(/focus "path": an order has at most 256 turns/);
+  });
+
+  it('the view moves once on a click: a second camera in a route is refused', () => {
+    const d = big(3);
+    const run = (route) => () => planFocus([{ in: ['p0'], focus: 'fit' }, { in: ['*'], focus: ['fit', { strategy: 'path', route }] }], d);
+    expect(run('camera p1 camera:3 p2')).toThrow(/focus route: "camera" is written more than once, and the view moves once on a click — keep one/);
+    expect(run('(camera camera) p1')).toThrow(/"camera" is written more than once/);
+    expect(run('camera p1 p2')).not.toThrow();
+  });
+});

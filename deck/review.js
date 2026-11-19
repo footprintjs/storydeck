@@ -47,16 +47,18 @@ function pieceGroups(click, pieces) {
  * a turn, and a turn's own seconds after it when the route gives them ("w1 (1.2 s)").
  */
 function routeOf(click, pieces) {
-  const turns = new Map(), at = (t) => { if (!turns.has(t)) turns.set(t, {names: [], takes: null}); return turns.get(t); };
+  // A turn is known by when it starts and what it takes of its own: two turns may start at the same moment (a turn of
+  // 0 s before another), and are still two. The view's turn is its own. Turns come out in the order they start, a turn
+  // with its own time before one without at the same moment (it is the one that took 0 s).
+  const turns = new Map(), at = (start, takes, own) => { const key = `${start}|${own}`; if (!turns.has(key)) turns.set(key, {start, names: [], takes, rank: turns.size}); return turns.get(key); };
   const view = click.look.stage?.turn;
-  if (view) { const t = at(view.at); t.names.push('the view'); t.takes = view.takes; }
+  if (view) at(view.at, view.takes, 'view').names.push('the view');
   click.look.pieces.forEach((p, i) => {
     if (p.path === null || p.path === undefined) return;
-    const t = at(p.path);
-    t.names.push(nameOf(pieces, i));
-    if (p.turnTime !== null && p.turnTime !== undefined) t.takes = p.turnTime;
+    const takes = p.turnTime ?? null;
+    at(p.path, takes, takes === null ? '' : `t${takes}`).names.push(nameOf(pieces, i));
   });
-  return [...turns.entries()].sort((a, b) => a[0] - b[0]).map(([, t]) => `${unique(t.names).join(' + ')}${t.takes === null ? '' : ` (${t.takes} s)`}`);
+  return [...turns.values()].sort((a, b) => a.start - b.start || (a.takes === null) - (b.takes === null) || a.rank - b.rank).map((t) => `${unique(t.names).join(' + ')}${t.takes === null ? '' : ` (${t.takes} s)`}`);
 }
 
 /** What moves the view or the parts on a map click, in words. */

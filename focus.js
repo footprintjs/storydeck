@@ -37,7 +37,7 @@
 // slide (p' = s·p + [x, y]; the identity unless the map is drawn scaled or shifted); `area` is the part
 // of the slide (slide pixels) where moved things may go — below a headline, above a footer.
 
-import {readTurns, turnTimes} from 'footprint-story/motion';
+import {readTurns} from 'footprint-story/motion';
 
 const KINDS = ['look', 'camera', 'mover', 'overlay', 'order'];
 /** On a route, the view's move: its turn. A piece really called this is itself (as `name+` is). */
@@ -201,8 +201,14 @@ export const FOCUS = Object.freeze({
   path: Object.freeze({name: 'path', kind: 'order', route({names, options, isName}) {
     const step = num(options.step, .35);
     if (!(step >= 0 && step <= 5)) throw new Error(`focus "path": step is the seconds between two pieces of the route (0–5), not "${options.step}"`);
-    const written = options.route === undefined || options.route === null ? [] : [].concat(options.route).map(x => (x && typeof x === 'object' ? x : String(x)));
-    const asked = readTurns(written, {where: 'focus "path"', isName}).map(t => ({names: t.names.filter(x => x !== '*'), takes: t.takes})).filter(t => t.names.length);
+    const given = options.route === undefined || options.route === null ? [] : [].concat(options.route);
+    // A route of names alone (no bracket, no colon, no turn handed over as data) is read exactly as it was before turns:
+    // split at spaces, one turn a name, any name and any number of them. Only a route that uses the written form goes
+    // through its reader, with its bounds (256 turns, a name of 128 characters, no character nobody can see).
+    const written = given.some(x => (x && typeof x === 'object') || /[():]/.test(String(x)));
+    const asked = (written ? readTurns(given.map(x => (x && typeof x === 'object' ? x : String(x))), {where: 'focus "path"', isName}).map(t => ({names: [...t.names], takes: t.takes}))
+      : given.flatMap(x => String(x).trim().split(/\s+/)).filter(Boolean).map(n => ({names: [n], takes: null})))
+      .map(t => ({names: t.names.filter(x => x !== '*'), takes: t.takes})).filter(t => t.names.length);
     const turns = asked.length ? asked : names.map(n => ({names: [n], takes: null}));
     if (!turns.length) throw new Error('focus "path": the route is empty — write the pieces in the order they light, in `on` or `route` (\'*\' names no order)');
     return {names: turns.flatMap(t => t.names), turns, step, line: options.line ?? '', lineAt: options.lineAt ?? null};
@@ -262,9 +268,15 @@ function readRoute(r, strategy) {
   if (line !== undefined && typeof line !== 'string') refuse(`a route's line is text that names it, or left out — not ${shown(line)}`);
   if (lineAt !== undefined && lineAt !== null && typeof lineAt !== 'string') refuse(`a route's lineAt is 'x y' in slide px, null, or left out — not ${shown(lineAt)}`);
   if (turns !== undefined && !Array.isArray(turns)) refuse(`a route's turns are a list of {names, takes?}, or left out — not ${shown(turns)}`);
-  // turns, when a route gives them, are the order (several names in one turn, a turn's own seconds); else each name is a turn
-  const order = turns ? readTurns(turns.map(t => (t && typeof t === 'object' && !Array.isArray(t) ? t : refuse(`a route's turn is {names, takes?} — not ${shown(t)}`))), {where: `focus "${strategy}"`}).map(t => ({names: [...t.names], takes: t.takes}))
-    : names.map(n => ({names: [n], takes: null}));
+  // turns, when a route gives them, are the order (several names in one turn, a turn's own seconds); else each name is
+  // a turn. A name is any text a piece may be called (the pieces are checked against it later): no bound of the written
+  // form applies here, so a deck's route is never refused for the length or the letters of its own names.
+  const order = turns ? turns.map(t => {
+    if (!t || typeof t !== 'object' || Array.isArray(t)) refuse(`a route's turn is {names, takes?} — not ${shown(t)}`);
+    if (!Array.isArray(t.names) || !t.names.length || t.names.some(n => typeof n !== 'string' || !n)) refuse(`a turn's names are a list of one name or more — not ${shown(t.names)}`);
+    if (t.takes !== undefined && t.takes !== null && !(typeof t.takes === 'number' && t.takes >= 0 && t.takes <= 60)) refuse(`a turn takes seconds, a number from 0 to 60, or nothing — not ${shown(t.takes)}`);
+    return {names: [...t.names], takes: t.takes ?? null};
+  }) : names.map(n => ({names: [n], takes: null}));
   return {turns: order, step, line: line ?? '', lineAt: lineAt?.trim() ? lineAt : null};   // (a blank lineAt, an empty data-focus-line-at, is none)
 }
 
@@ -394,8 +406,10 @@ export function focusStep(prev, step, deck) {
   const isPiece = x => pieces.some(p => p.keys.includes(x));
   const order = chosen.order ? readRoute(chosen.order.s.route({names: (on ?? ins).filter(x => x !== '*'), options: chosen.order.options, isName: isPiece}), chosen.order.name) : null;
   const turnOf = new Map(), taken = [];   // taken: the turns something takes, in order — {names, takes, camera}
+  let cameras = 0;
   for (const turn of order?.turns ?? []) {
     const camera = turn.names.includes(CAMERA) && !isPiece(CAMERA);
+    if (camera && (cameras += turn.names.filter(x => x === CAMERA).length) > 1) throw new Error(`focus route: "${CAMERA}" is written more than once, and the view moves once on a click — keep one`);
     if (camera && !chosen.camera && !placed.stage && !stageMoved) throw new Error(`focus route: "${CAMERA}" is the view's turn, and on this click the view does not move — add a camera (zoom, fit) to data-focus, or take "${CAMERA}" out of the route`);
     const named = known(turn.names.filter(x => !(camera && x === CAMERA)), 'focus route: ');
     const reached = all.filter(i => states[i] === 'on' && named.some(x => pieces[i].keys.includes(x)) && !turnOf.has(i));
@@ -403,13 +417,22 @@ export function focusStep(prev, step, deck) {
     reached.forEach(i => turnOf.set(i, taken.length));
     taken.push({names: turn.names, takes: turn.takes, camera: camera && stageMoved});
   }
-  // When each turn starts (footprint-story/motion · turnTimes): a turn takes its own seconds, the view's move its
-  // own second, any other the step — counted, not summed, so the tenth of a plain route starts at exactly 9 × step.
-  const timed = turnTimes(taken, {step: order?.step ?? 0, takes: t => (t.camera ? CAMERA_SECONDS : undefined), where: 'focus route'});
+  // When each turn starts: a turn takes its own seconds, the view's move its own second, any other the step. The turns
+  // that take the step are counted, not summed, so the k-th of a plain route starts at exactly k × step, to the
+  // millisecond, as it did before turns (the same law as footprint-story/motion · turnTimes, which bounds an order at
+  // 256 turns — a map may light more pieces than that, so the sum is done here).
+  const starts = [], lasts = [];
+  let steps = 0, spent = 0;
+  for (const t of taken) {
+    const own = t.takes ?? (t.camera ? CAMERA_SECONDS : null);
+    starts.push(round(steps * order.step + spent, 3));
+    lasts.push(own ?? order.step);
+    if (own === null) steps += 1; else spent += own;
+  }
   const turns = taken.length;
-  const delayOf = i => (turnOf.has(i) ? timed.turns[turnOf.get(i)].at : null);
+  const delayOf = i => (turnOf.has(i) ? starts[turnOf.get(i)] : null);
   const turnTimeOf = i => (turnOf.has(i) ? taken[turnOf.get(i)].takes : null);
-  const viewAt = taken.findIndex(t => t.camera), viewTurn = viewAt < 0 ? null : {at: timed.turns[viewAt].at, takes: timed.turns[viewAt].takes};
+  const viewAt = taken.findIndex(t => t.camera), viewTurn = viewAt < 0 ? null : {at: starts[viewAt], takes: lasts[viewAt]};
   // A piece stepping aside for a lit twin on the route stays until that twin's turn (the first of them to come), then
   // goes — so the wire never goes missing while its twin waits; a lit twin off the route lights at once, and so it goes.
   const twinTurn = i => (litTwins[i].length && litTwins[i].every(j => turnOf.has(j)) ? Math.min(...litTwins[i].map(delayOf)) : null);
@@ -465,7 +488,7 @@ export function focusStep(prev, step, deck) {
       spring: springList.some(g => g.to === 1 || g.was === 1) ? {stagger: (spring ?? last).stagger, groups: springList.filter(g => g.to === 1 || g.was === 1).map(({key, names: l, to}) => ({key, names: l, to}))} : null,
       springOf: member, springEnd: end},
     look: {pieces: out, stage: stage || stageMoved ? {move: stage, from: stageMoved ? before.stage ?? {s: 1, x: 0, y: 0} : null, ...(viewTurn ? {turn: viewTurn} : {})} : null, overlay,
-      path: turns ? {turns, step: order.step, done: timed.last, line: order.line, lineAt: order.lineAt} : null,
+      path: turns ? {turns, step: order.step, done: starts[turns - 1], line: order.line, lineAt: order.lineAt} : null,
       apart: springList.length ? {stagger: (spring ?? last).stagger, groups: springList.map(({names: l, to, was}) => ({names: [...l], to, was}))} : null,
       strategies: Object.values(chosen).map(c => c.name), subject: subjectOnSlide},
   };

@@ -12,7 +12,7 @@
 // path, at that twin's turn).
 // focus.css draws the classes; call focusRuntime() once in the page, so only a forward click animates.
 
-import {attrRule as ATTR, pieceTags, styleLength, tagsWith} from './pieceRules.js';
+import {attrRule as ATTR, ownAttribute, pieceTags, styleLength, tagsWith} from './pieceRules.js';
 
 /** An attribute's value in a run of attributes, single or double quoted, or null. */
 const attrOf = (at, name) => ATTR(name).exec(at)?.[2] ?? null;
@@ -39,7 +39,9 @@ export function readPieces(html, {attr = 'data-k'} = {}) {
     const attrPx = name => { const v = attrOf(at, name); return v !== null && /^[\d.]+$/.test(v) ? Number(v) : null; };
     const x = px(style, 'left'), y = px(style, 'top'), w = px(style, 'width') ?? attrPx('width'), h = px(style, 'height') ?? attrPx('height');
     const twin = attrOf(at, 'data-twin')?.trim().split(/\s+/), ends = attrOf(at, 'data-ends')?.trim().split(/\s+/).filter(Boolean);
-    const ground = /\sdata-ground(?![\w-])/.test(at);   // it lies under the picture (a floor, a backdrop): no camera frames it
+    // it lies under the picture (a floor, a backdrop): no camera frames it. Read as the tag's own attribute, so the
+    // words "data-ground" inside a title are not it; data-ground="false" says it is part of the picture after all
+    const marked = /data-ground/i.test(at) ? ownAttribute(at, 'data-ground') : null, ground = !!marked && String(marked.value).trim().toLowerCase() !== 'false';
     pieces.push({keys: k.trim().split(/\s+/), box: x === null || y === null ? null : {x, y, w: w ?? 0, h: h ?? 0}, ...(twin ? {twin} : {}), ...(ends?.length ? {ends} : {}), ...(ground ? {ground: true} : {})});
     out += `${html.slice(from, start)}<${tag}${before} ${attr}=${q}${k}${q} data-sd-i="${pieces.length - 1}"${after}>`;
     from = end;

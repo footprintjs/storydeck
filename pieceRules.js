@@ -75,3 +75,21 @@ export function readAttributes(text) {
   }
   return out;
 }
+
+/**
+ * A tag's own attribute `name` (lower case, letters and dashes), as a browser reads the tag — so a mention of the name
+ * inside another attribute's value is never taken for it — cut out of the run of attributes:
+ *   {value, quote, before, after, twice}   written name="value" or name='value' (twice: the tag carries it again)
+ *   {bare: true, value, twice}             there, but written another way (no quotes, no value, another case)
+ *   null                                   the tag has no such attribute
+ *   undefined                              a quote in the tag never closes: nothing in it can be trusted
+ */
+export function ownAttribute(run, name) {
+  const read = readAttributes(run);
+  if (!read) return undefined;
+  const found = read.filter((a) => a.name === name), a = found[0];
+  if (!a) return null;
+  const m = new RegExp(`^${name}=(["'])(.*?)\\1`).exec(run.slice(a.at));
+  if (!m) return {bare: true, value: a.value, twice: found.length > 1};
+  return {value: m[2], quote: m[1], before: run.slice(0, a.at).replace(/[\s/]$/, ''), after: run.slice(a.at + m[0].length), twice: found.length > 1};
+}

@@ -21,16 +21,15 @@
 // the last word: --iso-color (a piece's colour: its top is lighter, its sides darker), --iso-ink, --iso-line,
 // --iso-grid, --iso-floor. Class ok, warn or bad from the base look colours one.
 import {isometric} from 'footprint-story/isometric';
-import {attrRule, attrValue, pieceTags, readAttributes, styleLength, tagsWith} from '../pieceRules.js';
+import {attrRule, ownAttribute, pieceTags, tagsWith} from '../pieceRules.js';
 import {closeOf} from './callouts.js';
 
 const KINDS = ['block', 'cylinder', 'floor'];
-const ATTR = /\sdata-iso=(["'])(.*?)\1/;
-const LOOSE = /\sdata-iso(?![\w-])/i;
+/** A tag that may carry the attribute: a cheap look, in any case. Whether it does is ownAttribute's to say (a mention inside another value is not it). */
+const MAYBE = /data-iso(?![\w-])/i, MAYBE_GRID = /data-iso-grid(?![\w-])/i;
 const NUMBER = '(-?(?:\\d+(?:\\.\\d*)?|\\.\\d+))';
 /** The grid as written: "tile [tile-height] at x y [rise r]". */
 const GRID = new RegExp(`^\\s*${NUMBER}(?:\\s+${NUMBER})?\\s+at\\s+${NUMBER}\\s+${NUMBER}(?:\\s+rise\\s+${NUMBER})?\\s*$`);
-const GRID_TAG = /<i\b([^<>]*)\sdata-iso-grid="([^"<>]*)"([^<>]*)><\/i>/g;
 const PLACED = ['left', 'top', 'width', 'height'];
 /** The most isometric pieces on one map (the grid orders that many). */
 export const MOST_ISO_PIECES = 256;
@@ -44,13 +43,24 @@ function numbersIn(text) {
   return words.length && words.every((w) => new RegExp(`^${NUMBER}$`).test(w)) ? out : null;
 }
 
-/** The map's grid and the map without the element that set it: the default is a tile 120 px wide, its far corner at the slide's middle, 240 px down. */
+/**
+ * The map's grid and the map without the element that set it: the default is a tile 120 px wide, its far corner at the
+ * slide's middle, 240 px down. The element is an empty <i> that carries data-iso-grid and nothing else: it is not a
+ * piece, so taking it out moves no piece's number (a data-k on it would, and is refused). One pass over the tags.
+ */
 function readGrid(html, canvas) {
-  const found = [...html.matchAll(GRID_TAG)];
-  if (/\sdata-iso-grid/i.test(html.replace(GRID_TAG, ''))) throw new Error('data-iso-grid: the floor is set on an empty <i>, in lower case and with double quotes — <i data-iso-grid="120 at 960 240"></i>');
+  const found = [];
+  for (const t of tagsWith(html, MAYBE_GRID)) {
+    const run = t.before + t.m[0] + t.after, own = ownAttribute(run, 'data-iso-grid');
+    if (own === null) continue;   // the words inside another attribute's value: not a floor
+    const written = '<i data-iso-grid="120 at 960 240"></i>';
+    if (own === undefined || own.bare || own.twice || t.tag !== 'i' || !html.startsWith('</i>', t.end)) throw new Error(`data-iso-grid: the floor is set on an empty <i>, in lower case and with quotes — ${written}`);
+    if ((own.before + own.after).trim()) throw new Error(`data-iso-grid: the floor's <i> carries nothing else (it is not a piece, and is taken out of the map) — write ${written} and put "${(own.before + own.after).trim()}" on a piece`);
+    found.push({start: t.start, end: t.end + '</i>'.length, spec: own.value});
+  }
   if (found.length > 1) throw new Error(`data-iso-grid: a map has one floor, and this one sets ${found.length} — keep one`);
   if (!found.length) return {grid: isometric({tile: 120, origin: [(canvas?.[0] ?? 1920) / 2, 240]}), html};
-  const [tag, , spec] = found[0], m = GRID.exec(spec);
+  const [{start, end, spec}] = found, m = GRID.exec(spec);
   if (!m) throw new Error(`data-iso-grid="${spec}": the floor is a tile's width in px (and its height, for another angle), "at", and where its far corner stands, x y — "120 at 960 240", with "rise 70" after it to set a unit of height`);
   const [w, h, x, y, rise] = m.slice(1).map((v) => (v === undefined ? undefined : Number(v)));
   let grid;
@@ -59,29 +69,36 @@ function readGrid(html, canvas) {
   } catch (e) {
     throw new Error(`data-iso-grid="${spec}": ${e.message.replace(/^isometric: /, '')}`, {cause: e});
   }
-  return {grid, html: html.slice(0, found[0].index) + html.slice(found[0].index + tag.length)};
+  return {grid, html: html.slice(0, start) + html.slice(end)};
 }
 
-/** Every isometric piece as written, in order, checked: [{start, open, close, end, tag, attrs, where, name, kind, at, size, inner}]. Throws, naming the fix. */
+/**
+ * Every isometric piece as written, in order, checked: [{start, open, close, end, tag, attrs, where, name, kind, at, size,
+ * inner}]. Throws, naming the fix. A tag is one when a browser reads data-iso as its own attribute; the words inside
+ * another attribute's value do not make it one.
+ */
 function readIso(html) {
-  // written any other way a browser reads it as an attribute and this scan would not: refused, never silently a plain element
-  for (const {before, m, after} of tagsWith(html, LOOSE)) {
-    const run = before + m[0] + after, odd = readAttributes(run)?.find((a) => a.name === 'data-iso');
-    if (odd && !ATTR.test(run)) throw new Error('data-iso: an isometric piece is written data-iso="block" (or cylinder, floor), in lower case and with quotes');
-  }
-  return tagsWith(html, ATTR).map(({start, end: open, tag, before, m, after}) => {
-    const kind = m[2].trim(), where = `data-iso="${m[2]}"`, attrs = before + after;
+  const out = [];
+  for (const {start, end: open, tag, before, m, after} of tagsWith(html, MAYBE)) {
+    const run = before + m[0] + after, own = ownAttribute(run, 'data-iso');
+    if (own === null) continue;
+    if (own === undefined) throw new Error('data-iso: a quote in its tag is never closed — write a ">" or "<" inside a value as &gt; or &lt;');
+    // written any other way a browser reads it as the attribute and a reader of the file would not: refused, never silently a plain element
+    if (own.bare || own.twice) throw new Error('data-iso: an isometric piece is written data-iso="block" (or cylinder, floor), once, in lower case and with quotes');
+    const kind = own.value.trim(), where = `data-iso="${own.value}"`, attrs = own.before + own.after;
     if (!KINDS.includes(kind)) throw new Error(`${where}: an isometric piece is a ${KINDS.slice(0, -1).join(', a ')} or a ${KINDS.at(-1)}`);
-    if (!readAttributes(attrs)) throw new Error(`${where}: a quote in its tag is never closed — write a ">" or "<" inside a value as &gt; or &lt;`);
-    const name = attrRule('data-k').exec(attrs)?.[2].trim().split(/\s+/)[0];
+    const name = ownAttribute(attrs, 'data-k')?.value?.trim().split(/\s+/)[0];
     if (!name) throw new Error(`${where}: an isometric piece is a piece, so a click can bring it in — give it a data-k name`);
-    const told = `"${name}" (${where})`, style = attrValue(attrs, 'style')?.value ?? '';
-    const own = PLACED.find((prop) => new RegExp(`(?:^|;)\\s*${prop}\\s*:`, 'i').test(style));
-    if (own) throw new Error(`${told}: its ${own} comes from the floor — place it with data-at="col row" and size it with data-size, and take ${own} out of its style`);
+    const told = `"${name}" (${where})`, styled = ownAttribute(attrs, 'style');
+    // a browser keeps the first of two style attributes, and the build writes one: two would leave it where neither says
+    if (styled?.bare || styled?.twice) throw new Error(`${told}: its style is written once, with quotes — a browser reads only the first of two, and the build adds its place to it`);
+    const style = styled?.value ?? '';
+    const placed = PLACED.find((prop) => new RegExp(`(?:^|;)\\s*${prop}\\s*:`, 'i').test(style));
+    if (placed) throw new Error(`${told}: its ${placed} comes from the floor — place it with data-at="col row" and size it with data-size, and take ${placed} out of its style`);
     const read = (attr, form) => {
-      const v = attrValue(attrs, attr)?.value;
-      if (v === undefined) return null;
-      return numbersIn(v) ?? (() => { throw new Error(`${told}: ${attr}="${v}" — ${form}`); })();
+      const a = ownAttribute(attrs, attr);
+      if (!a) return null;
+      return (a.bare ? null : numbersIn(a.value)) ?? (() => { throw new Error(`${told}: ${attr}="${a.value}" — ${form}`); })();
     };
     const size = read('data-size', kind === 'floor' ? 'a floor\'s size is "cols rows", whole numbers' : 'its size is "wide deep high", in tiles');
     if (!size) throw new Error(`${told}: give it a data-size — ${kind === 'floor' ? '"cols rows" ("8 5")' : '"wide deep high" in tiles ("2 2 1.4")'}`);
@@ -89,8 +106,9 @@ function readIso(html) {
     const {at: close, end} = closeOf(html, tag, open, told), inner = html.slice(open, close);
     if (pieceTags(inner).length) throw new Error(`${told}: pieces do not nest, and this one holds a piece — place it beside it`);
     if (kind === 'floor' && inner.trim()) throw new Error(`${told}: a floor holds no words — put them in a piece that stands on it`);
-    return {start, open, close, end, tag, attrs, where: told, name, kind, at, size, inner};
-  });
+    out.push({start, open, close, end, tag, attrs, where: told, name, kind, at, size, inner, style, quote: styled?.quote ?? '"', styleCut: styled ? styled.before + styled.after : attrs});
+  }
+  return out;
 }
 
 /** The isometric pieces a map has: [{name, kind}] — nothing for a map without one. */
@@ -120,21 +138,21 @@ function shapeOf(p, grid) {
 
 /** One piece, drawn: its element placed and sized by the floor, its faces, and its words on its top face. */
 function draw(p, html, shape, level) {
-  const {box, art, say} = shape, style = attrValue(p.attrs, 'style')?.value ?? '', quote = attrRule('style').exec(p.attrs)?.[1] ?? '"';
+  const {box, art, say} = shape;
   const placed = [`left:${fixed(box.x)}px`, `top:${fixed(box.y)}px`, `width:${fixed(box.w)}px`, `height:${fixed(box.h)}px`, ...(level === null ? [] : [`z-index:${level}`])];
-  const css = [...placed, style.trim()].filter(Boolean).join(';');
-  let at = p.attrs.replace(attrRule('style'), '');
+  const css = [...placed, p.style.trim()].filter(Boolean).join(';');
+  let at = p.styleCut;   // its attributes without its style (and without data-iso): the one style written below is its only one
   at = attrRule('class').test(at) ? at.replace(attrRule('class'), (_, q, v) => ` class=${q}${/(^|\s)iso(\s|$)/.test(v) ? v : `iso ${v}`}${q}`) : `${at} class="iso"`;
   const svg = `<svg class="iso-art" viewBox="0 0 ${fixed(box.w)} ${fixed(box.h)}" aria-hidden="true">${art}</svg>`;
   const words = say && p.inner.trim() ? `<span class="iso-say" style="left:${fixed(say.x - box.x)}px;top:${fixed(say.y - box.y)}px">${p.inner}</span>` : '';
-  // a floor is ground: a camera frames what stands on it, never the floor itself (focus.js)
-  const ground = p.kind === 'floor' && !/\sdata-ground(?![\w-])/.test(at) ? ' data-ground' : '';
-  return `<${p.tag}${at}${ground} data-sd-iso="${p.kind}" style=${quote}${css}${quote}>${svg}${words}${html.slice(p.close, p.end)}`;
+  // a floor is ground: a camera frames what stands on it, never the floor itself (focus.js) — unless it says otherwise (data-ground="false")
+  const ground = p.kind === 'floor' && ownAttribute(at, 'data-ground') === null ? ' data-ground' : '';
+  return `<${p.tag}${at}${ground} data-sd-iso="${p.kind}" style=${p.quote}${css}${p.quote}>${svg}${words}${html.slice(p.close, p.end)}`;
 }
 
 /** Every isometric piece in some HTML drawn on its floor; HTML without one (and without a floor set) comes back as it was. `canvas`: [w, h], the slide. */
 export function isoPieces(html, {canvas = null} = {}) {
-  if (!ATTR.test(html) && !/\sdata-iso/i.test(html)) return html;
+  if (!MAYBE.test(html) && !MAYBE_GRID.test(html)) return html;
   const {grid, html: map} = readGrid(html, canvas), found = readIso(map);
   if (!found.length) return map;
   if (found.length > MOST_ISO_PIECES) throw new Error(`a map holds at most ${MOST_ISO_PIECES} isometric pieces, and this one has ${found.length}`);

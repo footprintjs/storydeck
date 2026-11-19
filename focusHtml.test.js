@@ -305,3 +305,11 @@ describe('focusHtml · ground', () => {
     expect('ground' in pieces[1]).toBe(false);
   });
 });
+
+describe('focusHtml · ground is the tag\'s own attribute', () => {
+  it('found in review: the words inside another attribute are not it, and data-ground="false" says it is part of the picture', () => {
+    const box = 'style="left:0px;top:0px;width:9px;height:9px"';
+    const { pieces } = readPieces(`<div data-k="a" title="x data-ground" ${box}></div><div data-k="b" data-ground="false" ${box}></div><div data-k="c" data-ground="FALSE " ${box}></div><div data-k="d" data-ground="" ${box}></div><div data-k="e" DATA-GROUND ${box}></div>`);
+    expect(pieces.map((p) => p.ground)).toEqual([undefined, undefined, undefined, true, true]);
+  });
+});

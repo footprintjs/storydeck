@@ -161,8 +161,11 @@ is itself, as a piece called `gw+` is. `review` reads the route back as it plays
 
 Why written in the route and not as more options: an order is one thing, and written once it reads the way it plays.
 The same written form is read by `footprint-story/motion` (`readTurns`), so a film says an order the same way. A route
-that cannot be read is refused while the deck builds, with what to write. Not yet a turn: a mover's glide and a blur
-(the blur still comes first), and a click does not start by itself after the one before.
+that cannot be read is refused while the deck builds, with what to write. A route of names alone is read exactly as
+it was before turns, whatever the names and however many; one that uses a bracket or a colon is held to the written
+form's bounds (256 turns, a name of 128 characters, no character nobody can see). `camera` is written once: the view
+moves once on a click. Not yet a turn: a mover's glide and a blur (the blur still comes first), and a click does not
+start by itself after the one before.
 
 **An exploded view, on a figure of parts.** A figure built of parts — an engine, a stack, a page and the layers
 under it — explains itself best when the parts come apart: the audience sees what it is made of, then sees it whole
@@ -599,7 +602,8 @@ npx footprint-storydeck build my-talk     # my-talk/index.html — one page, eve
   inside each click); a test builds and checks it.
 - **Ground: what lies under the picture.** `data-ground` on a piece (a floor has it by itself) says it lies under the
   picture: a camera and a blur frame what stands on it, never the ground. Without it a floor shown from the first click
-  would be all `fit` ever frames, and the view would never move.
+  would be all `fit` ever frames, and the view would never move. `data-ground="false"` on a floor says it is part of
+  the picture after all.
 - **The helpers a diagram needs.** `<i data-k="w1" class="wire pkt" data-arrow="client to server"></i>` is a wire (an
   SVG arrow) from the edge of one piece's box to the edge of the other's. It follows them: move a box (in the file, or
   by Alt-drag in the dev page) and its wires go with it. Two wires between the same pieces each take a lane, keeping to

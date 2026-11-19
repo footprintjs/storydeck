@@ -160,7 +160,7 @@ export interface FocusLook {
   readonly stage: { readonly move: { s: number; x: number; y: number } | null; readonly from: { s: number; x: number; y: number } | null; readonly turn?: { readonly at: number; readonly takes: number } } | null;
   /** The blur: 'in-new' when the last click had none, 'in' while it stays, 'out' as it melts away; frameNew when its frame moved or appeared. */
   readonly overlay: { readonly rects: readonly (readonly number[])[]; readonly label: string; readonly phase: 'in-new' | 'in' | 'out'; readonly frameNew: boolean } | null;
-  /** A path: how many turns (the view's too, when it has one), the seconds a turn takes when it does not say, when the last starts (done), and its line ('' for none) and where it goes (null: the area's bottom left); null when no lit piece took a turn. */
+  /** A path: how many turns (the view's too, when it has one), the seconds a turn takes when it does not say, when the last starts (done), and its line ('' for none) and where it goes (null: the area's bottom left); null when nothing took a turn — no lit piece, and not the view. */
   readonly path: { readonly turns: number; readonly step: number; readonly done: number; readonly line: string; readonly lineAt: string | null } | null;
   /**
    * apart: the groups that open on this click (to 1, in the order written), then those the last click opened that

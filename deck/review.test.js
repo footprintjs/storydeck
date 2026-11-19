@@ -101,3 +101,16 @@ describe('reviewClick · an order inside a click', () => {
     expect(r).toContain('view back to the whole map');
   });
 });
+
+describe('reviewClick · turns that start at the same moment (found in review)', () => {
+  const deck = (route) => compileDeck(sourceOf({clicks: `<section data-label="O" data-map="map">
+  <step data-in="a" data-focus="zoom"><h2>x</h2></step>
+  <step data-in="w1 b w2 c" data-focus="path" data-focus-route="${route}"><h2>y</h2></step></section>`, maps: {map: MAP}}));
+  const route = (r) => reviewClick(deck(r), 2).split('\n').find((l) => l.startsWith('focus'));
+
+  it('a turn of 0 s and the one after it are two turns, each with what is its own', () => {
+    expect(route('a:0 b c')).toBe('focus: path · route: a (0 s) → b → c, 0.35 s apart where a turn does not say');
+    expect(route('camera:0 a b')).toBe('focus: path · route: the view (0 s) → a → b, 0.35 s apart where a turn does not say');
+    expect(route('a b c')).toBe('focus: path · route: a → b → c, 0.35 s apart');
+  });
+});
