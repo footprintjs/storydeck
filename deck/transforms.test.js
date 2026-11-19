@@ -444,6 +444,17 @@ describe('a wire between two isometric pieces is a cable along the floor', () =>
     expect(tag(mixed, 'c')).toContain('data-sd-cable');
   });
 
+  it('a cable takes no lane: a straight wire between the same two blocks runs as it would alone', () => {
+    const path = (html, name) => /<path d="([^"]+)"/.exec(html.slice(html.indexOf(tag(html, name))))[1];
+    const alone = applyTransforms(`${blocks}<i data-k="s" class="wire" data-arrow="b to a 0"></i>`, {canvas});
+    const beside = applyTransforms(`${blocks}<i data-k="c" class="wire" data-arrow="a to b"></i><i data-k="s" class="wire" data-arrow="b to a 0"></i>`, {canvas});
+    expect(tag(beside, 's')).toBe(tag(alone, 's'));
+    expect(path(beside, 's')).toBe(path(alone, 's'));
+    // two straight ones still share their lanes, as ever
+    const two = applyTransforms(`${blocks}<i data-k="s" class="wire" data-arrow="b to a 0"></i><i data-k="t" class="wire" data-arrow="a to b 0"></i>`, {canvas});
+    expect(tag(two, 's')).not.toBe(tag(alone, 's'));
+  });
+
   it('two blocks too close for a straight wire still get their cable: it runs from foot to foot, wherever the feet are', () => {
     const close = '<i data-iso-grid="120 at 960 240"></i><div data-k="a" data-iso="block" data-at="0 0"></div><div data-k="b" data-iso="block" data-at="2.2 0"></div>';
     expect(() => applyTransforms(`${close}<i data-k="w" class="wire" data-arrow="a to b 0"></i>`, {canvas})).toThrow(/too close for a wire between them/);

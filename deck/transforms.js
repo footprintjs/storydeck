@@ -175,9 +175,9 @@ function wiresBetween(html, found, shapes, floor) {
     return {middle: [box.x + box.w / 2, box.y + box.h / 2], across: (n) => (Math.abs(n[0]) * box.w + Math.abs(n[1]) * box.h) / 2, exit: (p, u) => exit(box, p, u)};
   };
   // a pair's wires across its line, in its own direction (its names in order): those running that way first, on their
-  // left of it, then those running back — on their own left
+  // left of it, then those running back — on their own left. A cable is not on that line: it takes no lane.
   const pairOf = (m) => [m[1], m[2]].sort().join('\u0000'), lanes = new Map();
-  read.forEach((m, i) => { if (m) lanes.set(pairOf(m), [...(lanes.get(pairOf(m)) ?? []), i]); });
+  read.forEach((m, i) => { if (m && !laid[i]) lanes.set(pairOf(m), [...(lanes.get(pairOf(m)) ?? []), i]); });
   for (const [key, ids] of lanes) {
     const along = (i) => read[i][1] === key.split('\u0000')[0];
     lanes.set(key, [...ids.filter(along), ...ids.filter((i) => !along(i))]);
