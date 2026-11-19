@@ -142,11 +142,12 @@ width and depth) and `data-iso="floor" data-size="16 9"` (the tile lines; write 
 tiles (a third number lifts it), `data-size` "wide deep high". The build places, sizes and levels each one, so give it no
 left/top/width/height; `<i data-iso-grid="150 at 1500 150"></i>` sets the tile's width and the floor's far corner.
 Colour one with `style="--iso-color:#bcd6f3"`. It is a piece like any other: clicks, `fit`, routes, wires and callouts
-all work on it. A wire between two blocks is drawn as a cable on the floor, foot to foot, when the blocks stand side
-by side (a map the build places nearly always does), and a request and its answer lie side by side; its `data-label` is
-written on the cable, so keep it short. Between a block and one straight in front of it the wire is a straight line,
-as is any wire written `data-arrow="a to b 0"`. A cable does not go round other blocks: one that skips a block passes
-behind it. A floor is ground (`data-ground`): no camera frames it, so `fit` follows the pieces. `check` warns
+all work on it. A wire between two blocks is laid along the floor: along the tile lines, round any block in its way,
+from a foot that is seen to a foot that is seen; a request and its answer lie in two lanes. You write only what is
+joined to what. Its `data-label` is written on the cable, so keep it short. After an edit, read `check` or `build`:
+rule `wire-way` says in words when a wire passes behind a block (move that block, or the two it joins), lies on
+another for want of room (a foot holds three wires: widen the block), or is drawn straight and why. A wire written
+`data-arrow="a to b 0"` is a straight line. A floor is ground (`data-ground`): no camera frames it, so `fit` follows the pieces. `check` warns
 (`view-far`) when a view stands further out than half size, where words get small.
 
 **Narrate a deck in a voice.**

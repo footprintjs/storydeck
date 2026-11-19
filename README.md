@@ -699,28 +699,35 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   pointer (the empty corners of its box do not, so a block behind is not covered by them), a ring round it — a highlight
   (`data-hot`) or explore's hover — follows its faces.
 
-  A wire between two blocks is a cable on the floor, where one can lie. Of the two blocks, one stands to the right
-  on the slide: the cable joins the foot under the right face of the block on the left to the foot under the left
-  face of the block on the right, whichever of them it starts from. It leaves and arrives along the floor's tile
-  lines, as one smooth curve, so it reads as lying on the floor and its arrow's tip is on a face the viewer sees. A
-  request and its answer use the same two feet and lie side by side; several cables at one foot share it out, the one
-  whose other end is furthest up the slide nearest the back, which keeps most of them from crossing; a cylinder's
-  feet are on its round base. A packet rides the curve. Its `data-label` stands on the cable itself, on a plate of
-  the slide's ground (`--bg`; on a tinted floor set `--wire-plate`): at the cable's middle, or along it at the
-  nearest place where no block is over it, no label placed before it is under it and no other cable runs through it
-  — and where there is no such place, where the least of it is hidden. Keep a cable's label short: one longer than
-  its cable covers it. (The search has a fixed amount of work for one map, enough for some hundreds of labelled
-  cables; a label after that takes its cable's middle.)
+  A wire between two blocks is a cable on the floor. It leaves a block at one of the two feet a viewer sees (under
+  its right face, or under its left), runs along the floor's tile lines, turns in rounded corners, goes round a block
+  that stands in its way, and comes into the other block at a foot that is seen, so its arrow's tip is not behind a
+  block. It keeps off floor that a block hides when it can. A request and its answer lie in two lanes, half a tile
+  apart; a wire alone takes the middle of a foot, and a foot has room for three. A block straight in front of
+  another, behind it, or against it is reached the same way. A packet rides the line itself. The way is found by
+  `footprint-story/isometric` (`routes`), so a film lays the same wires the same way.
 
-  Where a cable cannot lie, the wire is straight, as it was: from one block's outline to the other's, through the air,
-  its label beside it. That is when one block stands straight in front of the other, or close beside it along a tile
-  line with under about two tiles between them (the two feet do not face each other, and a curve between them would
-  run under one of the two blocks; so might a cable's own place on a foot many cables share), and when a request and
-  its answer would cross as cables — the two are kept alike. A wire from a block to a flat piece, and one between blocks
-  standing at different heights, are straight too. To keep any wire straight, give it a bend, `0` too:
-  `data-arrow="you to server 0"`. A map the build places has its blocks side by side, so nearly all its wires are
-  cables. A cable lies on the floor, so a block standing nearer the viewer is drawn over it: it does not go round
-  other blocks, and one to a block two steps away may pass behind the block between.
+  Its `data-label` stands on the cable itself, on a plate of the slide's ground (`--bg`; on a tinted floor set
+  `--wire-plate`): at the cable's middle, or along it at the nearest place where no block is over it, no label placed
+  before it is under it and no other cable runs through it — and where there is no such place, where the least of it
+  is hidden. Keep a cable's label short: one longer than its cable covers it. (The search has a fixed amount of work
+  for one map, enough for some hundreds of labelled cables; a label after that takes its cable's middle.)
+
+  **The build says what it could not do, in words.** `storydeck check` (and `build`) tell you when a wire does not lie
+  well, with the fix, so nobody has to look at the picture to find out:
+
+  ```
+  warn  click 1 "Map · 1" · wire-way: "w3" (app to db) passes behind logs: that stretch of it is hidden — move it or
+        the two blocks so there is floor to see between, or draw the wire straight (data-arrow="app to db 0")
+  info  click 1 "Map · 1" · wire-way: "w5" (web to roof) is drawn straight, through the air, not along the floor:
+        the two stand at different heights
+  ```
+
+  It also warns when a wire lies on another for want of room at a foot. A wire is drawn straight, from one block's
+  outline to the other's with its label beside it, when it joins a block to a flat piece, when the two blocks stand at
+  different heights, when there is no way along the floor (walled in), and whenever you give it a bend, `0` too:
+  `data-arrow="you to server 0"`. Wires are laid in the order written, and an earlier one is never moved for a later
+  one: the fewest crossings there could be are not promised.
   Not yet: moving a block by dragging it in the dev page (change its `data-at`).
   A deck to start from: [examples/a-request](examples/a-request) (blocks on a floor, a view that follows them, an order
   inside each click); a test builds and checks it.

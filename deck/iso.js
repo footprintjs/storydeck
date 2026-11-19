@@ -272,8 +272,8 @@ export const isoPieces = (html, options) => isoDrawn(html, options).html;
  * a Map from a block's or a cylinder's name to {outline: [[x, y], …], middle: [x, y]} in slide px (the points round
  * what it draws, and the middle of that) and {kind, at: [col, row, lift], size} in tiles (where it stands);
  * `floor(col, row, lift)`: where a point of the floor is on the slide, [x, y] (absent when the map has no isometric
- * piece). A block is not the box it is placed by: a wire between two blocks is a cable along the floor, from the foot
- * of one to the foot of the other (cable.js), and a wire from a block to a flat piece ends on the block's outline
+ * piece). A block is not the box it is placed by: a wire between two blocks is a cable along the floor, from a foot
+ * of one to a foot of the other (cable.js), and a wire from a block to a flat piece ends on the block's outline
  * (transforms.js). A name two pieces share has no shape: it is found by its box, as before.
  */
 export function isoDrawn(html, {canvas = null, area = null, links = []} = {}) {

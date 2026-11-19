@@ -12,11 +12,13 @@
 //   callout-alone  a callout shown on a click that does not show the piece it points at: its tail points at nothing
 //   view-far       a click whose view stands further out than half size (a fit over a wide picture): its words are small
 //   across-stages  a wire or a callout that joins pieces standing on different stages: when one stage's view moves, it is left behind
+//   wire-way       a wire between two blocks that does not lie well on the floor: it passes behind a block, lies on another, or is drawn straight — and why
 import {wordCount} from './parse.js';
 import {expandNames} from '../focus.js';
 import {LOOP_NAMES} from './loops.js';
 import {saidInNotes} from './differs.js';
 import {showsPiece} from './callouts.js';
+import {readWay} from './cable.js';
 
 const names = (pieces, idx) => [...new Set(idx.map((i) => pieces[i].keys[0]))];
 const problem = (level, rule, click, message) => ({level, rule, click: click?.n ?? null, label: click?.label ?? null, message});
@@ -152,6 +154,20 @@ function acrossStages(compiled) {
   return out;
 }
 
+/**
+ * A wire between two blocks whose way the build could not lay well: what the build wrote on it (data-way), in words,
+ * with the fix. The picture need not be looked at to know that a wire is hidden behind a block.
+ */
+function wireWaysSaid(compiled) {
+  const out = [];
+  for (const [map, {ways = []}] of Object.entries(compiled.maps)) {
+    const click = compiled.clicks.find((c) => c.map === map) ?? null;
+    if (!click) continue;   // a map no part is told on is not part of this deck
+    for (const {name, from, to, way} of ways) for (const {level, message} of readWay(way, from, to)) out.push(problem(level, 'wire-way', click, `"${name}" (${from} to ${to}) ${message}`));
+  }
+  return out;
+}
+
 /** Every problem of a compiled deck: [{level: 'error' | 'warn' | 'info', rule, click, label, message}]. */
 export function checkDeck(compiled) {
   const out = [];
@@ -161,7 +177,7 @@ export function checkDeck(compiled) {
     out.push(...noChange(c, compiled.clicks[i - 1]));
     out.push(...farView(c));
   });
-  out.push(...neverShown(compiled), ...missingNotes(compiled), ...unstyledThemes(compiled), ...unsetLoops(compiled), ...unsaidDiffers(compiled), ...aloneCallouts(compiled), ...acrossStages(compiled));
+  out.push(...neverShown(compiled), ...missingNotes(compiled), ...unstyledThemes(compiled), ...unsetLoops(compiled), ...unsaidDiffers(compiled), ...aloneCallouts(compiled), ...acrossStages(compiled), ...wireWaysSaid(compiled));
   return out;
 }
 

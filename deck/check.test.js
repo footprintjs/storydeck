@@ -141,3 +141,41 @@ describe('checkDeck · across-stages, and a far view on a stage of its own', () 
     expect(found[0].message).toMatch(/^the view of stage "panel" stands at 0\.25× here/);
   });
 });
+
+describe('checkDeck · wire-way: what the build knows of a wire along the floor, said in words', () => {
+  const grid = '<i data-iso-grid="120 at 960 240"></i>';
+  const iso = (name, at, size = '2 2 1') => `<div data-k="${name}" data-iso="block" data-at="${at}" data-size="${size}"><b>${name}</b></div>`;
+  const deck = (map) => compileDeck(sourceOf({clicks: '<section data-label="S" data-map="map"><step data-in="*"><h2>All</h2></step></section>', maps: {map}}));
+  const ways = (map) => checkDeck(deck(map)).filter((p) => p.rule === 'wire-way');
+
+  it('says nothing of a wire that lies well', () => {
+    expect(ways(`${grid}${iso('a', '0 4')}${iso('b', '5 1')}<i data-k="w" class="wire" data-arrow="a to b"></i><i data-k="v" class="wire" data-arrow="b to a"></i>`)).toEqual([]);
+    expect(deck(`${grid}${iso('a', '0 4')}${iso('b', '5 1')}<i data-k="w" class="wire" data-arrow="a to b"></i>`).maps.map.ways).toBe(undefined);
+  });
+
+  it('warns that a wire passes behind a block, with the two ways out', () => {
+    const map = `${grid}${iso('a', '0 4')}${iso('b', '8 4')}${iso('wall', '4 5.5', '2 40 2')}<i data-k="w" class="wire" data-arrow="a to b"></i>`;
+    expect(deck(map).maps.map.ways).toEqual([{name: 'w', from: 'a', to: 'b', way: 'behind wall'}]);
+    expect(ways(map)).toEqual([{level: 'warn', rule: 'wire-way', click: 1, label: expect.any(String), message: '"w" (a to b) passes behind wall: that stretch of it is hidden — move it or the two blocks so there is floor to see between, or draw the wire straight (data-arrow="a to b 0")'}]);
+  });
+
+  it('says why a wire between two blocks is drawn straight: two heights is a note, no way is a warning', () => {
+    const lifted = ways(`${grid}${iso('a', '0 4')}${iso('up', '6 0 2')}<i data-k="w" class="wire" data-arrow="a to up"></i>`);
+    expect(lifted).toEqual([{level: 'info', rule: 'wire-way', click: 1, label: expect.any(String), message: '"w" (a to up) is drawn straight, through the air, not along the floor: the two stand at different heights'}]);
+    // a wire asked to be straight says nothing: it is what was written
+    expect(ways(`${grid}${iso('a', '0 4')}${iso('b', '5 1')}<i data-k="w" class="wire" data-arrow="a to b 0"></i>`)).toEqual([]);
+  });
+
+  it('warns when a wire lies on another for want of room at a foot', () => {
+    const wires = Array.from({length: 7}, (_, i) => `<i data-k="w${i}" class="wire" data-arrow="${i % 2 ? 'b to a' : 'a to b'}"></i>`).join('');
+    const said = ways(`${grid}${iso('a', '0 4')}${iso('b', '5 1')}${wires}`);
+    expect(said).toHaveLength(1);
+    expect(said[0].level).toBe('warn');
+    expect(said[0].message).toBe('"w6" (a to b) lies on another wire for want of room: a foot of a block has a place for three wires — make the block wider (data-size), or take a wire out');
+  });
+
+  it('a map no part is told on says nothing', () => {
+    const source = sourceOf({clicks: '<section data-label="S" data-map="map"><step data-in="*"><h2>All</h2></step></section>', maps: {map: `${grid}${iso('a', '0 4')}${iso('b', '5 1')}`, spare: `${grid}${iso('a', '0 4')}${iso('up', '6 0 2')}<i data-k="w" class="wire" data-arrow="a to up"></i>`}});
+    expect(checkDeck(compileDeck(source)).filter((p) => p.rule === 'wire-way')).toEqual([]);
+  });
+});
