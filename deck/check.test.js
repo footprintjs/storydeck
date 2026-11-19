@@ -168,9 +168,8 @@ describe('checkDeck · wire-way: what the build knows of a wire along the floor,
 
   it('warns when a wire lies on another for want of room at a foot', () => {
     const wires = Array.from({length: 7}, (_, i) => `<i data-k="w${i}" class="wire" data-arrow="${i % 2 ? 'b to a' : 'a to b'}"></i>`).join('');
-    const said = ways(`${grid}${iso('a', '0 4')}${iso('b', '5 1')}${wires}`);
+    const said = ways(`${grid}${iso('a', '0 4')}${iso('b', '5 1')}${wires}`).filter((p) => p.level === 'warn');   // seven wires at two blocks cross too: a note
     expect(said).toHaveLength(1);
-    expect(said[0].level).toBe('warn');
     expect(said[0].message).toBe('"w6" (a to b) lies on another wire for want of room: a foot of a block has a place for three wires — make the block wider (data-size), or take a wire out');
   });
 
