@@ -9,6 +9,16 @@
   only what is lit is framed. It goes with every mover, `left`/`right`/`up`/`down` too, because it keeps the context in
   view. A deck's own camera says the same with `keepsContext: true`, and a camera is now told the click's `look`.
   A deck that does not ask for `fit` builds byte for byte as before.
+- **An order you write inside a click.** A path's route (`data-focus-route`) is now written as turns:
+  `camera w1:1.2 dns (w2 server)`. Names alone come one after another, as a route always did. `(a b)` puts names in
+  one turn, so they come together. `name:seconds` gives a turn its own time before the next starts, and a wire's packet
+  rides that long. The word `camera` gives the view's move a turn: what comes after it waits until the view has arrived,
+  and the turn's time (1 s, or `camera:0.6`) is the move's time. On a click where the view stays, its turn takes none; a
+  piece really called `camera` is itself. `review` reads the route back as it plays. The written form is read by
+  footprint-story 0.9 (`readTurns`), which StoryDeck now needs, so a film can say an order the same way. A deck's own
+  order strategy may give `turns`, and is told `isName`. A route written before turns plays exactly as it did: each
+  turn starts at the same millisecond (a test pins it), and nothing new is written into its slides. `focus.css` gains
+  one rule, for a view with a turn.
 
 ## 0.13.3 — one copy of footprint-story, shared with StoryReel
 

@@ -55,6 +55,7 @@
 @property --sd-a-more { syntax: '*'; inherits: false; }   /* one more animation a stylesheet may give a piece, on the piece itself (deck.css: a wire showing itself in) */
 @property --sd-a-loop { syntax: '*'; inherits: false; }   /* a piece's loop (deck-stage: data-loop and its --loop), kept while the piece changes */
 @property --sd-turn { syntax: '*'; inherits: false; }   /* a piece's moment on a path; never inherited, so 0 off the route */
+@property --sd-stage-turn { syntax: '*'; inherits: false; }   /* the view's moment on a path, when the route gives it a turn; never inherited */
 @keyframes sdNone {}
 @keyframes sdEnter { from { opacity: 0; scale: calc(var(--sd-s, 1) * .92); } }
 @keyframes sdArrive { from { opacity: 0; } }
@@ -99,6 +100,12 @@
     animation: var(--sd-a-state, sdNone 0s), var(--sd-a-move, sdNone 0s), var(--sd-a-hot, sdNone 0s), var(--sd-a-path, sdNone 0s), var(--sd-a-more, sdNone 0s), var(--sd-a-loop, sdNone 0s); }
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-path-line { animation: sdArrive .5s ease var(--sd-turn) both; }
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-stage.sd-move { animation: sdStage var(--sd-move-time, 1s) var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) both; }
+  /* the view with a turn on a path (`camera` in the route): it waits for its turn and takes the turn's time, both
+     written by the plan (--sd-stage-delay, --sd-stage-time) so what comes after it starts when it has arrived; under a
+     new blur it waits .4s more, as the whole path does. Until its turn it stays where the last click left it (both). */
+  .sd-stage-turn { --sd-stage-turn: var(--sd-stage-delay, 0s); }
+  .sd-focus-new .sd-stage-turn { --sd-stage-turn: calc(var(--sd-stage-delay, 0s) + .4s); }
+  :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-stage.sd-stage-turn.sd-move { animation: sdStage var(--sd-stage-time, 1s) var(--sd-ease, cubic-bezier(.2, .7, .2, 1)) var(--sd-stage-turn, 0s) both; }
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-veil-in-new { animation: sdVeilIn .7s cubic-bezier(.4, 0, .2, 1) both; }
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-frame.sd-new { animation: sdArrive .5s ease .35s both; }
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) .sd-veil-out { animation: sdVeilOut .7s cubic-bezier(.4, 0, .2, 1) .15s both; }

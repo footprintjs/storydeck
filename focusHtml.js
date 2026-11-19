@@ -81,6 +81,7 @@ function pieceLook(p, look) {
   if (spring) cls.push('sd-apart');
   if (p.from) { if (!spring) cls.push('sd-move'); vars.push(`--sd-dx0:${p.from.dx}px`, `--sd-dy0:${p.from.dy}px`, `--sd-s0:${p.from.s}`); }
   if (onPath || twinTurn) vars.push(`--sd-path-delay:${onPath ? p.path : p.twinTurn}s`);   // its moment on the route: its turn, or its twin's
+  if (onPath && p.turnTime !== null && p.turnTime !== undefined) vars.push(`--sd-turn-time:${p.turnTime}s`);   // its turn's own seconds (`w1:1.2`): a wire's packet rides that long
   // The point it scales around, inline, so no stylesheet's transform-origin can move it off the planned place.
   const ref = p.move ?? p.from;
   if (ref) { if (ref.origin === 'top-left') cls.push('sd-origin-tl'); vars.push(`transform-origin:${ref.origin === 'top-left' ? '0 0' : '50% 50%'}`); }
@@ -103,13 +104,18 @@ export function drawFocus(html, look) {
   return out + html.slice(from);
 }
 
-/** The pieces' HTML inside the stage the view moves (a zoom); unchanged when nothing moves the view. Put it in the map's own box. */
+/**
+ * The pieces' HTML inside the stage the view moves (a zoom, a fit); unchanged when nothing moves the view. Put it in
+ * the map's own box. When the route gives the view a turn (`camera`), the move waits for it and takes the turn's time:
+ * the plan writes both, so the pieces that come after start when the view has arrived, whatever the theme's move time.
+ */
 export function wrapStage(inner, look) {
   if (!look.stage) return inner;
-  const {move, from} = look.stage, vars = [];
+  const {move, from, turn} = look.stage, vars = [], onRoute = !!(from && turn);
   if (move) vars.push(`--sd-tx:${move.x}px`, `--sd-ty:${move.y}px`, `--sd-ts:${move.s}`);
   if (from) vars.push(`--sd-tx0:${from.x}px`, `--sd-ty0:${from.y}px`, `--sd-ts0:${from.s}`);
-  return `<div class="sd-stage${from ? ' sd-move' : ''}"${vars.length ? ` style="${vars.join(';')}"` : ''}>${inner}</div>`;
+  if (onRoute) vars.push(`--sd-stage-delay:${turn.at}s`, `--sd-stage-time:${turn.takes}s`);
+  return `<div class="sd-stage${from ? ' sd-move' : ''}${onRoute ? ' sd-stage-turn' : ''}"${vars.length ? ` style="${vars.join(';')}"` : ''}>${inner}</div>`;
 }
 
 /** Classes for the slide around a click: sd-focus-new while its blur comes in (what the click adds waits for it). */

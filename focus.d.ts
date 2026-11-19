@@ -65,8 +65,15 @@ export interface FocusContext {
  * A route, as an order strategy gives it — checked, and refused (naming the strategy and the fix) when it is not this:
  * the names in turn (each one's LIT pieces take the next turn; a name with nothing lit takes none), the seconds between
  * two turns (0–5), and the line that names it, with where it goes ('x y', slide px). The strategy's object is only read.
+ *
+ * `turns`, when given, are the order instead of one turn a name: several names in one turn come together, and `takes`
+ * is that turn's own seconds (0–60) before the next starts. The name `camera` in a turn is the view's move, unless a
+ * piece is called that.
  */
-export interface FocusRoute { readonly names: readonly string[]; readonly step: number; readonly line?: string; readonly lineAt?: string | null }
+export interface FocusRoute {
+  readonly names: readonly string[]; readonly step: number; readonly line?: string; readonly lineAt?: string | null;
+  readonly turns?: readonly { readonly names: readonly string[]; readonly takes?: number | null }[];
+}
 
 /**
  * A mover's groups going by a spring each (apart), `stagger` ms apart (0–1000): out in the order the groups are given,
@@ -90,7 +97,9 @@ export type FocusStrategy =
       readonly withCamera?: boolean;
       place(ctx: FocusContext): { stage?: FocusGroup; subject?: FocusGroup; context?: FocusGroup; groups?: { names: readonly string[]; g: FocusGroup | null }[]; spring?: FocusSpring } }
   | { readonly name?: string; readonly kind: 'overlay'; cover(ctx: { subjectOnSlide: FocusBox | null; canvas: { w: number; h: number }; options: Readonly<Record<string, unknown>> }): { rects: number[][]; label?: string; out?: number[][] } | null }
-  | { readonly name?: string; readonly kind: 'order'; route(ctx: { names: readonly string[]; options: Readonly<Record<string, unknown>> }): FocusRoute };
+  | { readonly name?: string; readonly kind: 'order';
+      /** `isName(text)`: is this one of the deck's piece names, as written? (for reading a route's written form: footprint-story/motion · readTurns) */
+      route(ctx: { names: readonly string[]; options: Readonly<Record<string, unknown>>; isName: (text: string) => boolean }): FocusRoute };
 
 export interface FocusDeck {
   readonly pieces: readonly FocusPiece[];
@@ -130,6 +139,8 @@ export interface FocusPieceLook {
   readonly twinTurn: number | null;
   /** On a path: the seconds its turn waits (0 for the first); null when it takes no turn — not on the route, or not lit. */
   readonly path: number | null;
+  /** On a path, in a turn the route gives its own seconds (`w1:1.2`): those seconds — a wire's packet rides that long. Left out otherwise. */
+  readonly turnTime?: number;
   /**
    * It goes by its group's spring on this click (apart): the group's index in the look's `apart.groups` — the page's
    * focusRuntime moves it from `from` to `move`. Null for every other piece (one that enters, leaves, or is in no
@@ -140,11 +151,14 @@ export interface FocusPieceLook {
 
 export interface FocusLook {
   readonly pieces: readonly FocusPieceLook[];
-  /** The view's move (a zoom), and where it came from. */
-  readonly stage: { readonly move: { s: number; x: number; y: number } | null; readonly from: { s: number; x: number; y: number } | null } | null;
+  /**
+   * The view's move (a zoom, a fit), and where it came from. `turn`, when the route gives the view a turn (`camera`)
+   * and the view moves: the seconds it waits and the seconds the move takes. Left out otherwise.
+   */
+  readonly stage: { readonly move: { s: number; x: number; y: number } | null; readonly from: { s: number; x: number; y: number } | null; readonly turn?: { readonly at: number; readonly takes: number } } | null;
   /** The blur: 'in-new' when the last click had none, 'in' while it stays, 'out' as it melts away; frameNew when its frame moved or appeared. */
   readonly overlay: { readonly rects: readonly (readonly number[])[]; readonly label: string; readonly phase: 'in-new' | 'in' | 'out'; readonly frameNew: boolean } | null;
-  /** A path: how many turns, the seconds between two, when the last starts (done), and its line ('' for none) and where it goes (null: the area's bottom left); null when no lit piece took a turn. */
+  /** A path: how many turns (the view's too, when it has one), the seconds a turn takes when it does not say, when the last starts (done), and its line ('' for none) and where it goes (null: the area's bottom left); null when no lit piece took a turn. */
   readonly path: { readonly turns: number; readonly step: number; readonly done: number; readonly line: string; readonly lineAt: string | null } | null;
   /**
    * apart: the groups that open on this click (to 1, in the order written), then those the last click opened that

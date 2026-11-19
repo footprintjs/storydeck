@@ -115,7 +115,10 @@ later click without it; a line carrying a group's name moves with it; `apart pla
 each its own click); overlay `blur`; order `path` (the
 subject lit piece after piece along a route, a `line` naming it; write `on` — or `route` — in the order the pieces
 light: only lit pieces take a turn, a ring and a dashed twin keep their piece's turn, and a new blur delays the
-whole path .4 s).
+whole path .4 s). A route is written as turns, the order inside the click:
+`data-focus-route="camera w1:1.2 dns (w2 server)"` — names alone one after another, `(a b)` together in one turn,
+`name:seconds` a turn that takes that long (a wire's packet rides it), and the word `camera` the view's move as a turn
+(1 s, or `camera:0.6`), so what follows waits until the view has arrived; `review` reads the route back as it plays).
 
 **Narrate a deck in a voice.**
 
