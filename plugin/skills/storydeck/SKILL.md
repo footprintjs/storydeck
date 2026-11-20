@@ -161,7 +161,8 @@ round it and plug into its `data-ports`; the floor beside it is written in numbe
 block's name (its first `<b>`, inside no other element) is fitted to its top face: broken onto two lines, then made
 smaller; rule `name-fit` warns when it still does not fit. A top is as wide across its middle as the block's SHORTER
 side, so a long thin block holds a short name only: shorten the name, or give the block a bigger top (`data-size`). The picture and a fitted floor hold
-the wires too. A floor is ground (`data-ground`): no camera frames it, so `fit` follows the pieces. `check` warns
+the wires too. A floor is ground (`data-ground`): no camera frames it, so `fit` follows the pieces. A floor names its
+area with `data-label="Production account"` (and `data-icon`): flat along its front edge, clear of blocks, part of the floor. `check` warns
 (`view-far`) when a view stands further out than half size, where words get small.
 
 **Narrate a deck in a voice.**

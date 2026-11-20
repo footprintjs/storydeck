@@ -446,7 +446,8 @@ export function readIcon(name, svg) {
 
 /** Every <i … data-icon="name"></i> as that icon's SVG, keeping the element's other attributes. */
 export function icons(html, set = {}) {
-  return replaceEach(html, emptyI(html, /\sdata-icon="([\w-]+)"/), ({before, m, after}) => {
+  // an <i> that is an isometric piece keeps its data-icon: a floor's label draws it (iso.js)
+  return replaceEach(html, emptyI(html, /\sdata-icon="([\w-]+)"/).filter(({before, m, after}) => !ownAttribute(before + m[0] + after, 'data-iso')), ({before, m, after}) => {
     const icon = Object.hasOwn(set, m[1]) ? set[m[1]] : null;
     if (!icon) {
       const known = Object.keys(set);
@@ -515,6 +516,6 @@ export function transformed(html, {icons: set = {}, canvas = null, area = null} 
   const drawn = icons(html, set), found = wireTags(drawn);
   let routes = null;
   const lay = (solids) => { routes = layRoutes(floorLinks(drawn, found, solids), solids); return reachOf(routes); };
-  const iso = isoDrawn(drawn, {canvas, area, links: wireLinks(drawn), lay});
+  const iso = isoDrawn(drawn, {canvas, area, links: wireLinks(drawn), lay, icons: set});
   return {...wiresDrawn(callouts(iso.html, {canvas}), {...iso, routes}), tight: iso.tight ?? [], made: iso.made ?? null};
 }

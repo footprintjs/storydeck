@@ -13,7 +13,7 @@
 //   view-far       a click whose view stands further out than half size (a fit over a wide picture): its words are small
 //   across-stages  a wire or a callout that joins pieces standing on different stages: when one stage's view moves, it is left behind
 //   wire-way       a wire between two blocks that does not lie well on the floor: it passes behind a block, lies on another, doubles back on itself (a hairpin), or is drawn straight — and why
-//   name-fit       a block's name that does not fit its top face even on two lines at the least size
+//   name-fit       a block's name that does not fit its top face (or a floor's label its front edge) even on two lines at the least size
 import {wordCount} from './parse.js';
 import {expandNames} from '../focus.js';
 import {LOOP_NAMES} from './loops.js';
@@ -178,7 +178,11 @@ function namesTight(compiled) {
     const told = compiled.clicks.filter((c) => c.map === map);
     if (!told.length) continue;
     const shownAt = (name) => { const i = pieces.findIndex((p) => p.keys.includes(name)); return told.find((c) => i >= 0 && c.look.pieces[i]?.state !== 'gone') ?? told[0]; };
-    for (const {name, text} of tight) out.push(problem('warn', 'name-fit', shownAt(name), `"${name}": its name "${text}" does not fit its block's top, even on two lines at the least size — shorten it (and say the rest in a <small> line or the notes), or give the block a bigger top (data-size: a top is as wide across its middle as the block's shorter side)`));
+    for (const {name, text, on} of tight) {
+      if (on === 'floor-covered') out.push(problem('warn', 'name-fit', shownAt(name), `"${name}": its label "${text}" is covered: something stands on the floor's front edge all along it — move what stands there, or give the floor more room in front (data-size, data-at)`));
+      else if (on === 'floor') out.push(problem('warn', 'name-fit', shownAt(name), `"${name}": its label "${text}" does not fit along the floor's front edge, even on two lines at the least size — shorten it, or give the floor more cols (data-size)`));
+      else out.push(problem('warn', 'name-fit', shownAt(name), `"${name}": its name "${text}" does not fit its block's top, even on two lines at the least size — shorten it (and say the rest in a <small> line or the notes), or give the block a bigger top (data-size: a top is as wide across its middle as the block's shorter side)`));
+    }
   }
   return out;
 }

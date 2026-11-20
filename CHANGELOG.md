@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.26.0 — a floor with a name
+
+- **`data-label` on a floor** (and `data-icon`, an icon of the deck beside it) names the area it is: the words lie
+  flat on the floor along its front edge, part of the floor (they grey, light and hide with it), sized from the tile
+  (14 to 28 px), fitted to the edge as a block's name is fitted to its top, and moved along the edge clear of blocks
+  drawn over it. `check` (`name-fit`) says a label that does not fit or that is covered all along, with the fix. A
+  floor written as an empty `<i>` keeps its `data-icon` for its label. Refused with the fix: an empty or over-long
+  label, an icon without a label or one the deck does not have, `data-icon` on a block.
 ## 0.25.0 — how a wire's packets ride
 
 - **How a wire's packets ride**, each an attribute on the wire beside `data-packets` (and refused without it):

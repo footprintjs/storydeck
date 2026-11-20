@@ -697,6 +697,20 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   wrote it. It is a piece like any other: every click, `fit`,
   `zoom`, a route, a wire to it and a callout beside it work as they do on a box.
 
+  **A floor with a name.** A floor names the area it is (an account, a network, a team) with `data-label`, and an
+  icon of the deck beside it with `data-icon`:
+
+  ```html
+  <div data-k="prod" data-iso="floor" data-size="8 5" data-label="Production account" data-icon="account"></div>
+  ```
+
+  The words lie flat on the floor along its front edge (the near edge on the left), a little in from its far end, the
+  way a diagram heads a group box; they are part of the floor, so they grey, light and hide with it. Their size
+  follows the tile (14 to 28 px), so they are as readable as the floor at any zoom. They are fitted to the edge as a
+  block's name is to its top (two lines, then smaller), and they move along the edge, half a tile at a time, clear of
+  any block drawn over them. `check` (`name-fit`) says a label that still does not fit, or one that every place along
+  the edge has covered, with the fix.
+
   Why the build places it: where a block lands, how big it is and which block is painted over which all follow from
   the floor, so a left, top, width or height of its own is refused, with the fix. The nearer block is painted over the
   further by a level each; the map's own order never moves. Write the floor first: it and the wires share a level.

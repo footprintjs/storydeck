@@ -43,8 +43,9 @@
 // pointer, and a ring round it (a highlight, explore's hover) follows its faces — isoRing, for whoever rings a piece.
 import {arrange, gridFor, isometric, readThing, wordsToFit} from 'footprint-story/isometric';
 import {portsWritten} from './portsWritten.js';
+import {floorLabelPlace, MOST_LABEL} from './floorLabel.js';
 import {mayHoldFootprint, paintFootprints, readFootprints} from './footprint.js';
-import {decodeEntities} from './html.js';
+import {decodeEntities, esc} from './html.js';
 import {attrRule, ownAttribute, pieceTags, tagsWith} from '../pieceRules.js';
 import {closeOf} from './callouts.js';
 
@@ -146,7 +147,25 @@ function readIso(html) {
     const {at: close, end} = closeOf(html, tag, open, told), inner = html.slice(open, close);
     if (pieceTags(inner).length) throw new Error(`${told}: pieces do not nest, and this one holds a piece — place it beside it`);
     if (kind === 'floor' && inner.trim()) throw new Error(`${told}: a floor holds no words — put them in a piece that stands on it`);
-    out.push({start, open, close, end, tag, attrs, where: told, name, kind, at, size, ports, inner, style, quote: styled?.quote ?? '"', styleCut: styled ? styled.before + styled.after : attrs});
+    // a floor's label and its icon (floorLabel.js), read here and drawn by the build: taken off the element it writes
+    let styleCut = styled ? styled.before + styled.after : attrs, label = null, icon = null;
+    for (const attr of ['data-label', 'data-icon']) {
+      const a = ownAttribute(styleCut, attr);
+      if (!a) continue;
+      if (kind !== 'floor') { if (attr === 'data-label') continue; throw new Error(`${told}: data-icon on an isometric piece is the icon of a floor's label — put it on a floor with a data-label, or an <i data-icon> in the block's words`); }
+      if (a.bare || a.twice) throw new Error(`${told}: its ${attr} is written ${attr}="…", once, with quotes`);
+      const value = decodeEntities(a.value).trim();
+      if (attr === 'data-label') {
+        if (!value || value.length > MOST_LABEL) throw new Error(`${told}: a floor's label is a name of 1 to ${MOST_LABEL} letters — not ${value ? `${value.length} letters` : 'none'}`);
+        label = value;
+      } else {
+        if (!/^[\w-]+$/.test(value)) throw new Error(`${told}: data-icon names an icon of the deck (icons/<name>.svg) — not "${value.slice(0, 40)}"`);
+        icon = value;
+      }
+      styleCut = a.before + a.after;
+    }
+    if (icon && !label) throw new Error(`${told}: data-icon on a floor goes beside its label — give the floor a data-label too`);
+    out.push({start, open, close, end, tag, attrs, where: told, name, kind, at, size, ports, inner, style, quote: styled?.quote ?? '"', styleCut, label, icon});
   }
   return out;
 }
@@ -238,13 +257,14 @@ function roundOutline(top, bottom, steps = 12) {
  * What the grid says of a piece, with the refusal naming the piece: {box, art, say} — and, for a block or a cylinder,
  * {outline}: the points round what it draws on the slide, and {room}: how wide words so tall may be on its top.
  */
-function shapeOf(p, grid) {
+function shapeOf(p, grid, standing = []) {
   try {
     if (p.kind === 'floor') {
       if (p.size.length !== 2) throw new Error(`isometric: a floor's size is "cols rows" — not "${p.size.join(' ')}"`);
       const f = grid.floor({cols: p.size[0], rows: p.size[1], at: p.at.slice(0, 2)}), {x, y} = f.box;
       const lines = f.lines.map(([x1, y1, x2, y2]) => `M${fixed(x1 - x)} ${fixed(y1 - y)}L${fixed(x2 - x)} ${fixed(y2 - y)}`).join('');
-      return {box: f.box, art: `<polygon class="iso-ground" points="${points(f.outline, x, y)}"/><path class="iso-lines" d="${lines}"/>`, say: null};
+      const label = p.label ? floorLabelPlace({at: p.at, size: p.size}, grid, p.label, standing.map((q) => grid.block({at: q.at, size: q.size}).outline.map(({x: px, y: py}) => [px, py]))) : null;
+      return {box: f.box, art: `<polygon class="iso-ground" points="${points(f.outline, x, y)}"/><path class="iso-lines" d="${lines}"/>`, say: null, label};
     }
     const thing = {at: p.at, size: p.size};
     if (p.kind === 'cylinder') {
@@ -326,9 +346,20 @@ function draw(p, html, shape, level, tight) {
   const fitted = say && p.inner.trim() ? fitName(p.inner, shape.room) : null;
   if (fitted?.tight) tight.push({name: p.name, text: fitted.tight});
   const words = fitted ? `<span class="iso-say" style="left:${fixed(say.x - box.x)}px;top:${fixed(say.y - box.y)}px">${fitted.inner}</span>` : '';
+  const named = p.label ? floorLabelHtml(p, shape, box, tight) : '';
   // a floor is ground: a camera frames what stands on it, never the floor itself (focus.js) — unless it says otherwise (data-ground="false")
   const ground = p.kind === 'floor' && ownAttribute(at, 'data-ground') === null ? ' data-ground' : '';
-  return `<${p.tag}${at}${ground} data-sd-iso="${p.kind}" style=${p.quote}${css}${p.quote}>${svg}${words}${html.slice(p.close, p.end)}`;
+  return `<${p.tag}${at}${ground} data-sd-iso="${p.kind}" style=${p.quote}${css}${p.quote}>${svg}${words}${named}${html.slice(p.close, p.end)}`;
+}
+
+/** A floor's label (floorLabel.js) as drawn: flat on the floor, its icon first; a label too long for its edge is said (tight). */
+function floorLabelHtml(p, {label: place, iconSvg}, box, tight) {
+  const said = p.label.length > SHOWN ? `${p.label.slice(0, SHOWN)}…` : p.label;
+  if (!place.fits) tight.push({name: p.name, text: said, on: 'floor'});
+  if (place.covered) tight.push({name: p.name, text: said, on: 'floor-covered'});
+  const [a, b, c, d] = place.matrix.map((v) => +v.toFixed(4));
+  const style = `left:${fixed(place.x - box.x)}px;top:${fixed(place.y - box.y)}px;font-size:${place.size}px;transform:matrix(${a},${b},${c},${d},0,0) translateY(-100%)`;
+  return `<span class="iso-floor-label" style="${style}">${iconSvg ?? ''}${place.lines.map(esc).join('<br>')}</span>`;
 }
 
 /**
@@ -351,7 +382,7 @@ export const isoPieces = (html, options) => isoDrawn(html, options).html;
  * of one to a foot of the other (cable.js), and a wire from a block to a flat piece ends on the block's outline
  * (transforms.js). A name two pieces share has no shape: it is found by its box, as before.
  */
-export function isoDrawn(html, {canvas = null, area = null, links = [], lay = null} = {}) {
+export function isoDrawn(html, {canvas = null, area = null, links = [], lay = null, icons = {}} = {}) {
   const shapes = new Map(), solids = [], tight = [], levels = new Map();
   if (!MAYBE.test(html) && !MAYBE_GRID.test(html) && !mayHoldFootprint(html)) return {html, shapes, solids, tight};
   const {html: map, grid: written, fit = false} = readGrid(html), found = readIso(map), feet = readFootprints(map);
@@ -364,7 +395,13 @@ export function isoDrawn(html, {canvas = null, area = null, links = [], lay = nu
   if (found.length + feet.length > MOST_ISO_PIECES) throw new Error(`a map holds at most ${MOST_ISO_PIECES} isometric pieces${feet.length ? ' and footprints together' : ''}, and this one has ${found.length + feet.length}`);
   const {placedHere, reach} = place(found, links, lay, feet);
   const grid = written ?? gridOf(found, {fit: fit || placedHere, canvas, area, also: reach});
-  const drawn = found.map((p) => shapeOf(p, grid));
+  const drawn = found.map((p) => shapeOf(p, grid, [...found.filter((q) => q.kind !== 'floor'), ...feet]));
+  // a floor label's icon, from the deck's icons: one it does not have is refused, naming the ones it has
+  found.forEach((p, i) => {
+    if (!p.icon) return;
+    if (!Object.hasOwn(icons, p.icon)) { const known = Object.keys(icons); throw new Error(`${p.where}: no icon "${p.icon}" (${known.length ? `there are ${known.join(', ')}` : 'the deck has no icons'}) — add icons/${p.icon}.svg`); }
+    drawn[i].iconSvg = `<svg class="iso-floor-icon" viewBox="${icons[p.icon].viewBox}" aria-hidden="true">${icons[p.icon].body}</svg>`;
+  });
   // the order they are painted in, the furthest first: a level each, above the floor and the wires (which share level 0).
   // The levels are even (2, 4, …): the odd one above a block's is where a cable's lead into a port on its seen side stands
   // (transforms.js · leadSvg), over that block and under the next. A footprint's piece takes its place in that order too.
@@ -435,6 +472,13 @@ export const ISO_CSS = `/* isometric pieces: blocks on a floor seen from a corne
 }
 :where(section[data-label] .iso-say small) { font-size: 18px; font-weight: 500; color: color-mix(in srgb, ${INK} 68%, transparent); }
 :where(section[data-label] .iso-say svg.ic) { width: 40px; height: 40px; color: ${INK}; }
+/* a floor's label (floorLabel.js): flat on the floor along its front edge, a part of the floor that greys and lights with it */
+:where(section[data-label] .iso-floor-label) {
+  position: absolute; transform-origin: 0 0; white-space: nowrap; line-height: 1.15;
+  font-family: var(--sans, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif); font-weight: 700; letter-spacing: .02em;
+  color: var(--iso-label, color-mix(in srgb, var(--fg, #14181f) 72%, transparent));
+}
+:where(section[data-label] .iso-floor-icon) { width: 1.15em; height: 1.15em; vertical-align: -0.2em; margin-right: .35em; color: currentColor; }
 /* a callout is words about the picture: over every block, whose levels end at ${2 * MOST_ISO_PIECES} (a lead into a port at one more) */
 :where(section[data-label] [data-sd-callout]) { z-index: ${2 * MOST_ISO_PIECES + 2}; }
 /* its highlight (data-hot) rings what it draws; the box's own ring is off (--sd-hot-width: 0, read by focus.css) */
