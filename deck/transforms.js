@@ -65,8 +65,11 @@ export function wireEndsOf(spec, names) {
   };
   return {from: end(m[1]), to: end(m[2]), bend: m[3]};
 }
-/** The first names a map's pieces go by. */
-const pieceNames = (html) => new Set(readPieces(html).pieces.map((p) => p.keys[0]));
+/** The first names a map's pieces go by — every piece but a wire: a wire's own name is never the end of another. One reading, for every reader of a wire's ends. */
+function pieceNames(html) {
+  const tags = [...pieceTags(html)];
+  return new Set(readPieces(html).pieces.filter((p, i) => { const at = tags[i].before + tags[i].after; return !(/data-arrow/i.test(at) && ownAttribute(at, 'data-arrow')); }).map((p) => p.keys[0]));
+}
 /** A wire as the rest reads it: [spec, from, to, bend] by piece name (a port's piece), or null. */
 const endsRead = (spec, names) => { const e = wireEndsOf(spec, names); return e && [spec, e.from.name, e.to.name, e.bend]; };
 const LANE = 80;   // px between two wires joining the same pieces, at most (less when a box is too small to hold them)
@@ -355,13 +358,15 @@ function leadSvg(attrs, {points, radius, ends}, k, back, level) {
   if (!end?.seen || level === undefined) return '';
   const run = k ? [...points].reverse() : [...points];
   if (back) { const [tip, next] = run, far = Math.hypot(next[0] - tip[0], next[1] - tip[1]) || 1, by = Math.max(0, Math.min(back, far - 1)); run[0] = [tip[0] + (next[0] - tip[0]) * by / far, tip[1] + (next[1] - tip[1]) * by / far]; }
-  const way = rounded(run, radius), pieces = way.pieces.slice(0, 2 * (end.count - 2) + 1), f = fixed;
-  const marks = [way.start, ...pieces.flatMap((piece) => (piece.corner ? [piece.corner, piece.to] : [piece.to])), ...(back ? [points.at(k ? 0 : -1)] : [])];
+  // the lead runs to the end of its floor corner: the upper part of that corner can be behind the block's face too
+  const way = rounded(run, radius), pieces = way.pieces.slice(0, 2 * (end.count - 2) + 2), f = fixed;
+  const marks = [way.start, ...pieces.flatMap((piece) => (piece.corner ? [piece.corner, piece.to] : [piece.to])), ...(back ? [points.at(k ? -1 : 0)] : [])];
   const pad = 20, X = Math.min(...marks.map((p) => p[0])) - pad, Y = Math.min(...marks.map((p) => p[1])) - pad, W = Math.max(...marks.map((p) => p[0])) + pad - X, H = Math.max(...marks.map((p) => p[1])) + pad - Y;
   const d = `M${f(way.start[0] - X)} ${f(way.start[1] - Y)}${pieces.map((piece) => (piece.corner ? `Q${f(piece.corner[0] - X)} ${f(piece.corner[1] - Y)} ` : 'L') + `${f(piece.to[0] - X)} ${f(piece.to[1] - Y)}`).join('')}`;
   const tip = points.at(-1), before = points.at(-2), far = Math.hypot(tip[0] - before[0], tip[1] - before[1]) || 1;
   const head = back ? headAt([tip[0] - X, tip[1] - Y], [(tip[0] - before[0]) / far, (tip[1] - before[1]) / far]) : '';
-  return `<svg${classed(attrs)} data-sd-lead style="left:${f(X)}px;top:${f(Y)}px;width:${f(W)}px;height:${f(H)}px;z-index:${level + 1}" viewBox="0 0 ${f(W)} ${f(H)}" aria-hidden="true"><path d="${d}"/>${head}</svg>`;
+  // the cable's own piece (its name, its class, its ends), but not its id: an id is one element's
+  return `<svg${classed(attrs.replace(/\sid=("[^"]*"|'[^']*'|\S+)/gi, ''))} data-sd-lead="${k ? 'end' : 'start'}" style="left:${f(X)}px;top:${f(Y)}px;width:${f(W)}px;height:${f(H)}px;z-index:${level + 1}" viewBox="0 0 ${f(W)} ${f(H)}" aria-hidden="true"><path d="${d}"/>${head}</svg>`;
 }
 
 /** An icon file's drawing: {viewBox, body} from a whole <svg …>…</svg>. */
@@ -414,8 +419,7 @@ function floorLinks(html, found, solids) {
     const at = tags[i].before + tags[i].after, has = (name) => new RegExp(name, 'i').test(at) && ownAttribute(at, name);
     if (has('data-iso') || has('data-callout') || (piece.box && piece.box.w > 0 && piece.box.h > 0)) count.set(piece.keys[0], (count.get(piece.keys[0]) ?? 0) + 1);
   });
-  const alone = (name) => count.get(name) === 1 && solids.some((solid) => solid.name === name), names = new Set(count.keys());
-  for (const solid of solids) names.add(solid.name);
+  const alone = (name) => count.get(name) === 1 && solids.some((solid) => solid.name === name), names = pieceNames(html);
   return found.map(({m}) => {
     const ends = wireEndsOf(m[1], names);
     if (!ends) return null;

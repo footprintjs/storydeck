@@ -9,10 +9,12 @@
   point (named after the numbers at a corner, and a wrong one refused with the right one). A port on a side behind is
   allowed: its stretch runs behind its block, and `check` (rule `wire-way`) says so, as that, not as a block to move.
   A port that is no port of its block, a port on a piece that is no block, and a bend on a wire to a port are refused,
-  naming the fix. A name with a dot that some piece goes by is still that piece. Not yet: the top, cylinders.
+  naming the fix. A name with a dot that some piece (not a wire) goes by is still that piece. Not yet: the top, cylinders.
 - **The lead into a port on a seen side is drawn over its block.** The cable lies under every block; the stretch out
   of such a port and its riser stand in front of the block's face, so that stretch is drawn again just above its
-  block (it is the cable's own piece: shown, lit and hidden with it), and a head into that port with it.
+  block (it is the cable's own piece: shown, lit and hidden with it, without a ring of its own; the one at the far end
+  shows when the cable's sweep reaches it), and a head into that port with it. The dev page moves pieces on such a map
+  as on any: a lead is the build's own drawing, in no file.
 - **The paint levels of an isometric piece are even now** (2, 4, …, and a callout's 514): the odd level above a block
   is a lead's. Nothing looks different; a test that read a block's `z-index` reads twice the number.
 - The build's record of a cable (`maps[name].cables`) runs from port to port, risers included, and names its `ports`.

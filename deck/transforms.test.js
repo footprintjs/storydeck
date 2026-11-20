@@ -743,3 +743,39 @@ describe('a cable that plugs into a port (data-ports, "piece.port")', () => {
     expect(placed.cables[0].ports).toEqual(['p', null]);
   });
 });
+
+describe('a cable\'s lead into a port, after the second read', () => {
+  const canvas = [1920, 1080], grid = '<i data-iso-grid="120 at 960 150"></i>';
+  const map = `${grid}<div data-k="lap" data-iso="block" data-at="0 6" data-size="2 1.4 0.3" data-ports="rj45: 2 0.7 0.15"></div>`
+    + '<div data-k="sw" data-iso="block" data-at="6 6" data-size="4.7 2 0.4" data-ports="p1: 0.4 2 0.3 | hi: 2 2 0.38"></div>'
+    + '<div data-k="router" data-iso="block" data-at="12 2" data-size="2 2 0.8" data-ports="home: 0 1 0.4"></div>';
+  const wire = (k, spec, more = '') => `<i data-k="${k}" class="wire" data-arrow="${spec}"${more}></i>`;
+  const leadsOf = (html, k) => [...html.matchAll(new RegExp(`<svg[^>]*data-k="${k}"[^>]*data-sd-lead="(start|end)"[^>]*width:([\\d.]+)px[^>]*>(.*?)</svg>`, 'g'))].map(([, end, width, body]) => ({end, width: Number(width), body}));
+  it('a lead\'s box is its own few px, a head at its end too; it runs through its floor corner; it keeps no id', () => {
+    const html = transformed(`${map}${wire('w4', 'router.home to sw.p1', ' id="main"')}`, {canvas}).html;
+    const [end] = leadsOf(html, 'w4');
+    expect(end.end).toBe('end');
+    expect(end.width).toBeLessThan(150);
+    expect(end.body).toContain('class="head"');
+    expect((/d="([^"]+)"/.exec(end.body)[1].match(/Q/g) ?? []).length).toBe(2);   // out of the port and down, and on to the floor: both corners
+    expect(html.match(/id="main"/g)).toHaveLength(1);
+  });
+  it('one reading of a dotted name for every reader: a wire\'s own name is never an end; a piece of that name is that piece', () => {
+    const named = transformed(`${map}${wire('lap.rj45', 'lap.rj45 to sw.p1', ' data-head="none"')}`, {canvas});
+    expect(named.html).toMatch(/data-ends="lap sw"/);
+    expect(named.cables[0].ports).toEqual(['rj45', 'p1']);
+    expect(() => transformed(`${map}<span data-k="sw.b">words</span>${wire('w', 'lap.rj45 to sw.b')}`, {canvas})).toThrow(/no piece "sw\.b" with a box/);
+  });
+  it('a back port is said as that alone, not as a block to move', () => {
+    const made = transformed(`${map}${wire('w3', 'sw.hi to router.home')}`, {canvas});
+    expect(made.ways.find((w) => w.name === 'w3').way).toMatch(/^back router(;|$)/);
+    expect(made.ways.find((w) => w.name === 'w3').way).not.toMatch(/behind router/);
+  });
+  it('the dev page still moves pieces on a map with leads: a lead is the build\'s own, in no file', async () => {
+    const {editableMaps} = await import('./dev.js'), {compileDeck} = await import('./compile.js'), {sourceOf} = await import('./test/helpers.js');
+    const source = sourceOf({clicks: '<section data-label="S" data-map="map"><step data-in="*"><h2>All</h2></step></section>', maps: {map: `${map}${wire('w1', 'lap.rj45 to sw.p1', ' data-head="none"')}`}});
+    const compiled = compileDeck(source);
+    expect(compiled.maps.map.pieces.filter((p) => p.lead).length).toBe(2);
+    expect(editableMaps(source, compiled).map.why).toBeUndefined();
+  });
+});

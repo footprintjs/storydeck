@@ -58,9 +58,10 @@ const IGNORED = /(^|[\\/])(node_modules|\.[^\\/]*)([\\/]|$)/;   // dependencies 
  * are not the pieces of the map's source, in the same order (an icon file holding pieces of its own, a comment inside a
  * tag), so no piece number could be trusted to name the same one in both.
  */
-function editableMaps(source, compiled) {
+export function editableMaps(source, compiled) {
   return Object.fromEntries(Object.entries(compiled.maps).map(([name, {pieces}]) => {
-    const text = source.maps[name], names = pieces.map((p) => p.keys[0]);
+    // (a cable's lead into a port is the build's own drawing, in no file: not counted)
+    const text = source.maps[name], names = pieces.filter((p) => !p.lead).map((p) => p.keys[0]);
     const odd = mapAmbiguity(text);
     if (odd) return [name, {why: `a browser reads it differently from the build (${odd})`}];
     const same = sourcePieces(text).map((p) => p.name).join('\n') === names.join('\n');

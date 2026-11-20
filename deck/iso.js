@@ -161,7 +161,7 @@ function portsWritten(a, kind, size, told) {
   if (kind === 'floor') throw new Error(`${told}: a floor has no ports — give them to a block that stands on it`);
   const ports = a.value.split('|').filter((part) => part.trim()).map((part) => {
     const m = PORT.exec(part);
-    if (!m) throw new Error(`${told}: data-ports="${a.value}" — each port is "name: x y z", in the block's own tiles, with its side after it at a corner (right, left, back-left, back-right); they are parted by "|"`);
+    if (!m) throw new Error(`${told}: data-ports="${a.value.length > 80 ? `${a.value.slice(0, 79)}…` : a.value}" — each port is "name: x y z", in the block's own tiles, with its side after it at a corner (right, left, back-left, back-right); they are parted by "|"`);
     return {name: m[1], at: [Number(m[2]), Number(m[3]), Number(m[4])], ...(m[5] ? {face: m[5]} : {})};
   });
   try { return readPorts(ports, size, kind === 'cylinder', told).map(({name, at, face}) => ({name, at: [...at], face})); }

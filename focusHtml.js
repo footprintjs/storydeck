@@ -50,7 +50,9 @@ export function readPieces(html, {attr = 'data-k'} = {}) {
     if (on && (on.bare || !/^[\w-]+$/.test(stage))) throw new Error(`data-stage${on.bare ? '' : `="${on.value}"`}: a stage is written data-stage="panel" — one name of letters, digits, - and _, in lower case and with quotes`);
     // a stage's piece is cut out of the map and drawn in its stage's element: a part of an <svg> drawing would stop being one there
     if (stage && SVG_PARTS.has(tag.toLowerCase())) throw new Error(`data-stage="${stage}" on <${tag}>: a part of an <svg> drawing cannot stand on a stage by itself — put data-stage on the <svg> it is in`);
-    pieces.push({keys: k.trim().split(/\s+/), box: x === null || y === null ? null : {x, y, w: w ?? 0, h: h ?? 0}, ...(twin ? {twin} : {}), ...(ends?.length ? {ends} : {}), ...(ground ? {ground: true} : {}), ...(stage ? {stage} : {})});
+    // a cable's lead into a port (deck/transforms.js · leadSvg): the build's own, drawn again over a block; no file holds it
+    const lead = /data-sd-lead/i.test(at) && Boolean(ownAttribute(at, 'data-sd-lead'));
+    pieces.push({keys: k.trim().split(/\s+/), box: x === null || y === null ? null : {x, y, w: w ?? 0, h: h ?? 0}, ...(twin ? {twin} : {}), ...(ends?.length ? {ends} : {}), ...(ground ? {ground: true} : {}), ...(stage ? {stage} : {}), ...(lead ? {lead: true} : {})});
     opens.push({lead: html.slice(from, start), tag: `<${tag}${before} ${attr}=${q}${k}${q} data-sd-i="${pieces.length - 1}"${after}`, name: tag, start, end, alone: VOID.has(tag.toLowerCase()) || /(^|\s)\/\s*$/.test(after)});
     from = end;
   }
