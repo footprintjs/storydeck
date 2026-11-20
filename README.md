@@ -689,8 +689,9 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   "cols rows" for a `floor`. Its words stand flat on its top face, and its name (the `<b>`) is made to fit that face:
   as written when it fits on one line, else broken onto two lines, else smaller, down to 16 px. A name that still does
   not fit is drawn at 16 px and `check` says so (`name-fit`), with the two ways out: shorten it, or widen the block.
-  The fit is counted in letters, since a build has no browser; `build --layout` measures the page itself. A `<b>`
-  with a style or markup of its own is left as you wrote it. It is a piece like any other: every click, `fit`,
+  The fit is counted in letters, since a build has no browser; `build --layout` measures the page itself. Two words
+  joined by a no-break space (`&nbsp;`) stay on one line. A `<b>` with a style or markup of its own is left as you
+  wrote it. It is a piece like any other: every click, `fit`,
   `zoom`, a route, a wire to it and a callout beside it work as they do on a box.
 
   Why the build places it: where a block lands, how big it is and which block is painted over which all follow from

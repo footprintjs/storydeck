@@ -9,8 +9,8 @@
 - **A block's name fits its top face.** The name (the `<b>`) stays as written when it fits on one line; else it is
   broken onto two lines where they are most alike; else it is made smaller, down to 16 px. A name that still does not
   fit is drawn at 16 px, and a new rule, `name-fit`, warns with the two ways out (shorten it, or widen the block).
-  Counted in letters, since a build has no browser; `build --layout` measures the page. A `<b>` with a style or
-  markup of its own is left alone. Names that ran past their block in 0.19.0 are drawn differently now.
+  Counted in letters, since a build has no browser; `build --layout` measures the page. A no-break space (`&nbsp;`)
+  keeps two words on one line. A `<b>` with a style or markup of its own is left alone. Names that ran past their block in 0.19.0 are drawn differently now.
 - **`data-head="none"`** on any wire: a plain line that runs its whole length, with no arrow's head.
 - **The build's record of a map**, beside the page: `compileDeck(source).maps[name]` has `made` (who placed the
   blocks, the tile, whether the picture was fitted), `cables` (each cable's corners and its line's length in slide
