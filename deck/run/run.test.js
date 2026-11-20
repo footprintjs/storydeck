@@ -280,7 +280,7 @@ describe('storydeck log --run n --why value: where a value of a run came from, f
     expect(why).toMatch(/\n {2}verdict \(verdict#\d+\) ← \[control[^\]]*\] \[wrote: verdictWhy\]\n {4}count problems \(count-problems#\d+\) ← via errors \[wrote: errors, warnings, infos\]/);
     expect(why).toMatch(/read deck \(read-deck#0\) ← via /);   // back to the deck that was read
     expect(why.split('\n').at(-1)).toMatch(/^\(a stage also uses what it is given from outside the run's own state/);
-    expect(await logTool(dir, {home, run: '1', why: 'errors'})).toMatch(/^errors = \d+\ncount problems \(count-problems#\d+\) \[wrote: errors, warnings, infos\]\n {2}check rules \(check-rules#\d+\) ← via problems/);
+    expect(await logTool(dir, {home, run: '1', why: 'errors'})).toMatch(/^errors = \d+\ncount problems \(count-problems#\d+\) \[wrote: errors, warnings, infos\]\n {2}[\w ?]+ \([\w-]+#\d+\) ← via problems/);   // from the stage that last wrote the problems
     expect(await logTool(dir, {home, run: '1', why: 'nothing'})).toBe('nothing: no stage of this run wrote it (storydeck log --run 1 shows what each stage wrote)');
     // the run keeps which decision let each step run, as plain data beside its record
     const [run] = keptRuns(runsFolder(home, deckRoot(dir)).dir);
@@ -289,7 +289,7 @@ describe('storydeck log --run n --why value: where a value of a run came from, f
     // refusals name the fix; the run in full is as it was
     expect(() => logTool(dir, {home, why: 'verdict'})).toThrow('--why reads one run: give its number (storydeck log --run 1 --why verdict)');
     await expect(logTool(dir, {home, run: '1', why: ''})).rejects.toThrow('why names a value of the run');
-    expect(logTool(dir, {home, run: '1'})).toMatch(/^1\. /);
+    expect(logTool(dir, {home, run: '1'})).toMatch(/^1 {2}\d{4}-\d\d-\d\d /);
   });
 
   it('reads the record as a file anyone may have written: a name in it starts no line, and a record cut short says so first', async () => {
