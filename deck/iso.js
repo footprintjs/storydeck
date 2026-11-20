@@ -244,10 +244,10 @@ function shapeOf(p, grid) {
     if (p.kind === 'cylinder') {
       const c = grid.cylinder(thing), {x, y} = c.box, t = c.top, b = c.bottom;
       const side = `M${fixed(t.cx - t.rx - x)} ${fixed(t.cy - y)}L${fixed(b.cx - b.rx - x)} ${fixed(b.cy - y)}A${fixed(b.rx)} ${fixed(b.ry)} 0 0 0 ${fixed(b.cx + b.rx - x)} ${fixed(b.cy - y)}L${fixed(t.cx + t.rx - x)} ${fixed(t.cy - y)}Z`;
-      return {box: c.box, art: `<path class="iso-side" d="${side}"/><ellipse class="iso-top" cx="${fixed(t.cx - x)}" cy="${fixed(t.cy - y)}" rx="${fixed(t.rx)}" ry="${fixed(t.ry)}"/>`, say: c.centre, room: c.room, outline: roundOutline(t, b)};
+      return {box: c.box, art: `<path class="iso-side" d="${side}"/><ellipse class="iso-top" cx="${fixed(t.cx - x)}" cy="${fixed(t.cy - y)}" rx="${fixed(t.rx)}" ry="${fixed(t.ry)}"/>`, say: c.centre, room: (high) => grid.room({...thing, round: true}, high), outline: roundOutline(t, b)};
     }
     const b = grid.block(thing), {x, y} = b.box;
-    return {box: b.box, art: `<polygon class="iso-left" points="${points(b.left, x, y)}"/><polygon class="iso-right" points="${points(b.right, x, y)}"/><polygon class="iso-top" points="${points(b.top, x, y)}"/>`, say: b.centre, room: b.room, outline: b.outline};
+    return {box: b.box, art: `<polygon class="iso-left" points="${points(b.left, x, y)}"/><polygon class="iso-right" points="${points(b.right, x, y)}"/><polygon class="iso-top" points="${points(b.top, x, y)}"/>`, say: b.centre, room: (high) => grid.room(thing, high), outline: b.outline};
   } catch (e) {
     throw new Error(`${p.where}: ${e.message.replace(/^isometric: /, '')}`, {cause: e});
   }
