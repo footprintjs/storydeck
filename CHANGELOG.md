@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.26.0 — a floor with a name
+## 0.26.0 — named areas: a floor with a name, and groups
 
 - **`data-label` on a floor** (and `data-icon`, an icon of the deck beside it) names the area it is: the words lie
   flat on the floor along its front edge, part of the floor (they grey, light and hide with it), sized from the tile
@@ -8,6 +8,12 @@
   drawn over it. `check` (`name-fit`) says a label that does not fit or that is covered all along, with the fix. A
   floor written as an empty `<i>` keeps its `data-icon` for its label. Refused with the fix: an empty or over-long
   label, an icon without a label or one the deck does not have, `data-icon` on a block.
+- **`data-iso-group`** on blocks and on a floor: when the build places the blocks it places each group together (from
+  the wires inside it), then the groups (from the wires between them), left to right, each on its own floor fitted
+  round its blocks alone with a clear tile between floors; the fitted picture holds every group's floor. Placed by
+  hand, a group still fits its floor. A floor whose group has no block is refused, naming the fix.
+- **A labelled floor is not ground**: a view that frames it holds its words (`data-ground` still says otherwise).
+
 ## 0.25.0 — how a wire's packets ride
 
 - **How a wire's packets ride**, each an attribute on the wire beside `data-packets` (and refused without it):

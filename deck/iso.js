@@ -44,6 +44,7 @@
 import {arrange, gridFor, isometric, readThing, wordsToFit} from 'footprint-story/isometric';
 import {portsWritten} from './portsWritten.js';
 import {floorLabelPlace, MOST_LABEL} from './floorLabel.js';
+import {arrangeByGroup, groupWritten, GROUP_MARGIN} from './groups.js';
 import {mayHoldFootprint, paintFootprints, readFootprints} from './footprint.js';
 import {decodeEntities, esc} from './html.js';
 import {attrRule, ownAttribute, pieceTags, tagsWith} from '../pieceRules.js';
@@ -165,7 +166,7 @@ function readIso(html) {
       styleCut = a.before + a.after;
     }
     if (icon && !label) throw new Error(`${told}: data-icon on a floor goes beside its label — give the floor a data-label too`);
-    out.push({start, open, close, end, tag, attrs, where: told, name, kind, at, size, ports, inner, style, quote: styled?.quote ?? '"', styleCut, label, icon});
+    out.push({start, open, close, end, tag, attrs, where: told, name, kind, at, size, ports, inner, style, quote: styled?.quote ?? '"', styleCut, label, icon, group: groupWritten(attrs, told)});
   }
   return out;
 }
@@ -200,11 +201,12 @@ function place(found, links, lay, feet = []) {
     }
     let arranged;
     try {
-      arranged = arrange(solid.map((p) => ({name: p.name, size: p.size})), links, {across: true});   // a slide is wider than it is tall
+      // a slide is wider than it is tall; blocks in groups are placed group by group (groups.js)
+      arranged = solid.some((p) => p.group !== null) ? arrangeByGroup(solid, links, arrange) : arrange(solid.map((p) => ({name: p.name, size: p.size})), links, {across: true}).things.map((t) => t.at);
     } catch (e) {
       throw new Error(`the build cannot place this map's blocks: ${e.message.replace(/^isometric: /, '')} — or give every block its data-at`, {cause: e});
     }
-    solid.forEach((p, i) => { p.at = [...arranged.things[i].at]; });
+    solid.forEach((p, i) => { p.at = [...arranged[i]]; });
   }
   // every block as the rule that draws it reads it, before a wire is laid round it: a size or a place that is none is
   // refused here, naming the piece in the deck's words — not later, by whoever lays the wires, in words of its own
@@ -217,10 +219,14 @@ function place(found, links, lay, feet = []) {
     if (floor.size !== null) { floor.at ??= [0, 0]; continue; }
     if (floor.at !== null) throw new Error(`${floor.where}: a floor with a data-at needs its data-size too ("8 5") — or write neither, and the build fits the floor round the blocks`);
     if (!standing.length) throw new Error(`${floor.where}: a floor with no data-size is fitted round the blocks that stand on it, and this map has none — give it a data-size ("8 5")`);
-    // round the blocks, and round the wires laid between them (a wire that goes round a block reaches past it)
-    const far = (axis, end) => (end ? Math.ceil(Math.max(...standing.map((p) => p.at[axis] + p.size[axis]), ...reach.map((p) => p[axis])) - 1e-9) : Math.floor(Math.min(...standing.map((p) => p.at[axis]), ...reach.map((p) => p[axis])) + 1e-9));
-    floor.at = [far(0, false) - MARGIN, far(1, false) - MARGIN];
-    floor.size = [far(0, true) + MARGIN - floor.at[0], far(1, true) + MARGIN - floor.at[1]];
+    // a group's floor is fitted round its group's blocks alone (groups.js); any other round them all, and round the wires
+    // laid between them (a wire that goes round a block reaches past it)
+    const on = floor.group === null ? standing : standing.filter((p) => p.group === floor.group), reached = floor.group === null ? reach : [];
+    if (!on.length) throw new Error(`${floor.where}: its group "${floor.group}" has no block — give blocks data-iso-group="${floor.group}", or take the group off the floor`);
+    const margin = floor.group === null ? MARGIN : GROUP_MARGIN;
+    const far = (axis, end) => (end ? Math.ceil(Math.max(...on.map((p) => p.at[axis] + p.size[axis]), ...reached.map((p) => p[axis])) - 1e-9) : Math.floor(Math.min(...on.map((p) => p.at[axis]), ...reached.map((p) => p[axis])) + 1e-9));
+    floor.at = [far(0, false) - margin, far(1, false) - margin];
+    floor.size = [far(0, true) + margin - floor.at[0], far(1, true) + margin - floor.at[1]];
     // refused here, in the map's own terms: the author wrote no size, so the grid's "not [271,271]" would name numbers nobody typed
     if (Math.max(...floor.size) > MOST_FLOOR) throw new Error(`${floor.where}: fitted round this map's blocks the floor would be ${floor.size[0]} by ${floor.size[1]} tiles, and a floor is at most ${MOST_FLOOR} a side — take the floor out, or give it a data-at and a data-size of its own (it is ground: it need not lie under every block)`);
   }
@@ -347,8 +353,9 @@ function draw(p, html, shape, level, tight) {
   if (fitted?.tight) tight.push({name: p.name, text: fitted.tight});
   const words = fitted ? `<span class="iso-say" style="left:${fixed(say.x - box.x)}px;top:${fixed(say.y - box.y)}px">${fitted.inner}</span>` : '';
   const named = p.label ? floorLabelHtml(p, shape, box, tight) : '';
-  // a floor is ground: a camera frames what stands on it, never the floor itself (focus.js) — unless it says otherwise (data-ground="false")
-  const ground = p.kind === 'floor' && ownAttribute(at, 'data-ground') === null ? ' data-ground' : '';
+  // a floor is ground: a camera frames what stands on it, never the floor itself (focus.js) — unless it says otherwise
+  // (data-ground="false"), or it has a name (data-label): its words are there to be read, so a view that frames it holds them
+  const ground = p.kind === 'floor' && !p.label && ownAttribute(at, 'data-ground') === null ? ' data-ground' : '';
   return `<${p.tag}${at}${ground} data-sd-iso="${p.kind}" style=${p.quote}${css}${p.quote}>${svg}${words}${named}${html.slice(p.close, p.end)}`;
 }
 
@@ -394,7 +401,9 @@ export function isoDrawn(html, {canvas = null, area = null, links = [], lay = nu
   if (feet.length && fit) throw new Error(`${feet[0].where}: a footprint's piece stands where its own style puts it, so the floor is written in numbers beside it — data-iso-grid="120 at 960 240", not "fit"`);
   if (found.length + feet.length > MOST_ISO_PIECES) throw new Error(`a map holds at most ${MOST_ISO_PIECES} isometric pieces${feet.length ? ' and footprints together' : ''}, and this one has ${found.length + feet.length}`);
   const {placedHere, reach} = place(found, links, lay, feet);
-  const grid = written ?? gridOf(found, {fit: fit || placedHere, canvas, area, also: reach});
+  // a group's floor names an area, so the fitted picture holds all of it (any other floor is ground, and may run past the slide)
+  const areas = found.filter((p) => p.kind === 'floor' && p.group !== null).flatMap(({at: [c, r], size: [w, d]}) => [[c, r, 0], [c + w, r, 0], [c, r + d, 0], [c + w, r + d, 0]]);
+  const grid = written ?? gridOf(found, {fit: fit || placedHere, canvas, area, also: [...reach, ...areas]});
   const drawn = found.map((p) => shapeOf(p, grid, [...found.filter((q) => q.kind !== 'floor'), ...feet]));
   // a floor label's icon, from the deck's icons: one it does not have is refused, naming the ones it has
   found.forEach((p, i) => {

@@ -21,6 +21,8 @@ const SIZE = Object.freeze({per: 0.3, most: 28, least: 14});
 export const MOST_LABEL = 120;
 /** How wide a letter is for each px of its size — the common package's count (wordsToFit), a bold sans face. */
 const LETTER = 0.6;
+/** Tiles of floor kept clear past the counted end of the words. */
+const CLEARANCE = 0.25;
 
 /** Whether two convex outlines on the slide ([[x, y], …], each in order round it) overlap: no line parts them (SAT). */
 function overlap(a, b) {
@@ -54,7 +56,8 @@ export function floorLabelPlace({at: [col, row], size: [cols, rows]}, grid, text
   const fit = wordsToFit(text, () => room, {size, least: SIZE.least});
   const drawnSize = fit.size ?? size, lines = Math.max(1, fit.lines.length);
   // the words' strip of floor, in tiles: how long along the cols, how deep toward the far rows
-  const long = Math.max(...fit.lines.map((line) => line.length), 1) * LETTER * drawnSize / side, deep = lines * 1.15 * drawnSize / side;
+  // (a quarter tile more along it: the letters are counted, not measured, and the label's own spacing widens them)
+  const long = Math.max(...fit.lines.map((line) => line.length), 1) * LETTER * drawnSize / side + CLEARANCE, deep = lines * 1.15 * drawnSize / side;
   const near = row + rows - IN, far = near - deep;
   const strip = (from) => [[from, far], [from + long, far], [from + long, near], [from, near]].map(([c, r]) => { const p = grid.at(c, r); return [p.x, p.y]; });
   const clear = (from) => covers.every((outline) => !overlap(strip(from), outline));

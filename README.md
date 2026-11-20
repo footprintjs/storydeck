@@ -711,6 +711,21 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   any block drawn over them. `check` (`name-fit`) says a label that still does not fit, or one that every place along
   the edge has covered, with the fix.
 
+  **Groups.** Blocks that belong together name their group, and a floor with that group is fitted round them alone:
+
+  ```html
+  <div data-k="web" data-iso="block" data-iso-group="frontend"><b>Web</b></div>
+  <div data-k="api" data-iso="block" data-iso-group="backend"><b>API</b></div>
+  <div data-k="db" data-iso="cylinder" data-iso-group="backend"><b>Database</b></div>
+  <div data-k="g-frontend" data-iso="floor" data-iso-group="frontend" data-label="Frontend team"></div>
+  <div data-k="g-backend" data-iso="floor" data-iso-group="backend" data-label="Backend team"></div>
+  ```
+
+  When the build places the blocks, it places each group's blocks together from the wires inside it, then the groups
+  from the wires between them, the same way: the flow reads left to right, group by group, each on its own floor with
+  a clear tile between floors, and no number is typed. The fitted picture holds every group's floor. Placed by hand, a
+  group still fits its floor. A labelled floor is not ground: a view that frames it holds its words.
+
   Why the build places it: where a block lands, how big it is and which block is painted over which all follow from
   the floor, so a left, top, width or height of its own is refused, with the fix. The nearer block is painted over the
   further by a level each; the map's own order never moves. Write the floor first: it and the wires share a level.
