@@ -178,7 +178,7 @@ function namesTight(compiled) {
     const told = compiled.clicks.filter((c) => c.map === map);
     if (!told.length) continue;
     const shownAt = (name) => { const i = pieces.findIndex((p) => p.keys.includes(name)); return told.find((c) => i >= 0 && c.look.pieces[i]?.state !== 'gone') ?? told[0]; };
-    for (const {name, text} of tight) out.push(problem('warn', 'name-fit', shownAt(name), `"${name}": its name "${text}" does not fit its block, even on two lines at the least size — shorten it (and say the rest in a <small> line or the notes), or make the block wider (data-size)`));
+    for (const {name, text} of tight) out.push(problem('warn', 'name-fit', shownAt(name), `"${name}": its name "${text}" does not fit its block's top, even on two lines at the least size — shorten it (and say the rest in a <small> line or the notes), or give the block a bigger top (data-size: a top is as wide across its middle as the block's shorter side)`));
   }
   return out;
 }

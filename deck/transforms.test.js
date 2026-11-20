@@ -551,6 +551,22 @@ describe('a wire between two isometric pieces is a cable along the floor', () =>
     expect(wiresDrawn(iso.html, {...iso, routes: []}).html).toContain('data-sd-cable');                  // a list that is not this map's wires is not used
   });
 
+  it('a block is one piece alone by the pieces that have a box: a wire of its name, or words placed nowhere, leave it a cable\'s end', () => {
+    const wire = (k) => `<i data-k="${k}" class="wire" data-arrow="a to b"></i>`;
+    for (const map of [`${blocks}${wire('b')}`, `${blocks}<div data-k="b">a label placed nowhere</div>${wire('w')}`, `${blocks}<div data-k="b" style="left:10px;top:10px">no size</div>${wire('w')}`]) {
+      const made = transformed(map, {canvas});
+      expect(made.cables, map).toHaveLength(1);
+      expect(made.html, map).toContain('data-sd-cable');
+      // and the drawing agrees with the laying: the ways handed on are the ways it would lay itself
+      const iso = isoDrawn(map, {canvas});
+      expect(wiresDrawn(iso.html, iso).html, map).toBe(made.html);
+    }
+    // a second piece with a box shares the name: the name is a box round both, as ever, and the wire runs straight to it
+    const shared = transformed(`${blocks}<div data-k="b" class="chip" style="left:1500px;top:400px;width:50px;height:20px">b</div>${wire('w')}`, {canvas});
+    expect(shared.cables).toEqual([]);
+    expect(shared.html).not.toContain('data-sd-cable');
+  });
+
   it('a bend, 0 too, keeps the wire a straight run; so does an end that is no block', () => {
     const straight = applyTransforms(`${blocks}<i data-k="w" class="wire" data-arrow="a to b 0"></i><i data-k="v" class="wire" data-arrow="a to b 30"></i>`, {canvas});
     expect(straight).not.toContain('data-sd-cable');

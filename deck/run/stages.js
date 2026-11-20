@@ -40,12 +40,12 @@ export function checkRules(scope, run) {
 /**
  * How each isometric map was made, as the compile noted it — on the run's record, so the log can answer "who placed
  * these blocks" and "why is that wire straight" without the page being looked at: {map: {placed: 'build' | 'hand',
- * tile, cables, said: {wire: note}, tight: [names]}}. A deck with no such map writes nothing.
+ * tile, cables, said: [[wire, note], …], tight: [names]}}. A deck with no such map writes nothing.
  */
 export function mapsMade(scope, run) {
   const made = Object.entries(run.loaded.compiled.maps).filter(([, map]) => map.made).map(([name, map]) => [name, {
     placed: map.made.placed, tile: map.made.tile, cables: map.cables?.length ?? 0,
-    ...(map.ways?.length ? {said: Object.fromEntries(map.ways.map((w) => [w.name, w.way]))} : {}), ...(map.tight?.length ? {tight: map.tight.map((t) => t.name)} : {}),
+    ...(map.ways?.length ? {said: map.ways.map((w) => [w.name, w.way])} : {}), ...(map.tight?.length ? {tight: map.tight.map((t) => t.name)} : {}),
   }]);
   if (made.length) scope.maps = Object.fromEntries(made);
 }

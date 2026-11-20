@@ -230,7 +230,7 @@ function roundOutline(top, bottom, steps = 12) {
 
 /**
  * What the grid says of a piece, with the refusal naming the piece: {box, art, say} — and, for a block or a cylinder,
- * {outline}: the points round what it draws on the slide.
+ * {outline}: the points round what it draws on the slide, and {room}: how wide words so tall may be on its top.
  */
 function shapeOf(p, grid) {
   try {
@@ -244,10 +244,10 @@ function shapeOf(p, grid) {
     if (p.kind === 'cylinder') {
       const c = grid.cylinder(thing), {x, y} = c.box, t = c.top, b = c.bottom;
       const side = `M${fixed(t.cx - t.rx - x)} ${fixed(t.cy - y)}L${fixed(b.cx - b.rx - x)} ${fixed(b.cy - y)}A${fixed(b.rx)} ${fixed(b.ry)} 0 0 0 ${fixed(b.cx + b.rx - x)} ${fixed(b.cy - y)}L${fixed(t.cx + t.rx - x)} ${fixed(t.cy - y)}Z`;
-      return {box: c.box, art: `<path class="iso-side" d="${side}"/><ellipse class="iso-top" cx="${fixed(t.cx - x)}" cy="${fixed(t.cy - y)}" rx="${fixed(t.rx)}" ry="${fixed(t.ry)}"/>`, say: c.centre, outline: roundOutline(t, b)};
+      return {box: c.box, art: `<path class="iso-side" d="${side}"/><ellipse class="iso-top" cx="${fixed(t.cx - x)}" cy="${fixed(t.cy - y)}" rx="${fixed(t.rx)}" ry="${fixed(t.ry)}"/>`, say: c.centre, room: c.room, outline: roundOutline(t, b)};
     }
     const b = grid.block(thing), {x, y} = b.box;
-    return {box: b.box, art: `<polygon class="iso-left" points="${points(b.left, x, y)}"/><polygon class="iso-right" points="${points(b.right, x, y)}"/><polygon class="iso-top" points="${points(b.top, x, y)}"/>`, say: b.centre, outline: b.outline};
+    return {box: b.box, art: `<polygon class="iso-left" points="${points(b.left, x, y)}"/><polygon class="iso-right" points="${points(b.right, x, y)}"/><polygon class="iso-top" points="${points(b.top, x, y)}"/>`, say: b.centre, room: b.room, outline: b.outline};
   } catch (e) {
     throw new Error(`${p.where}: ${e.message.replace(/^isometric: /, '')}`, {cause: e});
   }
@@ -255,40 +255,67 @@ function shapeOf(p, grid) {
 
 /** A name's size in the page's own CSS (.iso-say): the size it is drawn at when it fits, and the least it is shrunk to. */
 const NAME = Object.freeze({size: 26, least: 16});
+/** How much of the top's room a name is given: a little clear of the edges. */
+const CLEAR = 0.9;
+/** What a name-fit note shows of a name: enough to find it. */
+const SHOWN = 80;
+/** Where a name may break — the common package's rule: a space, a tab, a line end. */
+const BREAK = /[ \t\n\r\f\v]+/, INSIDE = /[ \t\n\r\f\v]/g;
+/** A tag or a comment, a quoted value read whole (a "<b>" inside a title is not a tag). */
+const TAG = /<!--[\s\S]*?-->|<(\/?)([a-zA-Z][^\s/>]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/g;
+const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
 /**
- * A block's words with its name made to fit its top face: the name is the first <b> holding plain text and no style
- * of its own. It stays as written when it fits on one line; else it is broken onto two lines, then made smaller
- * (footprint-story/isometric · wordsToFit: the same rule a film uses). Gives {inner, tight}: `tight` the name and the
- * size it would need, when it does not fit even at the least size on two lines — the build says so (check ·
- * name-fit), it never hides a name. `wide`: the face's width on the slide, in px.
+ * A block's name in its words: the first <b> that is inside no other element — {from, to, text} when it holds plain
+ * text and has no attribute of its own, else null (a name with a style or markup of its own is the writer's: left as
+ * written; so is a <b> inside a <small>, and the words "<b>" inside an attribute's value).
+ */
+function nameOf(inner) {
+  let depth = 0;
+  for (const m of inner.matchAll(TAG)) {
+    if (m[2] === undefined) continue;   // a comment
+    const tag = m[2].toLowerCase();
+    if (m[1]) { depth = Math.max(0, depth - 1); continue; }
+    if (depth === 0 && tag === 'b') {
+      const after = m.index + m[0].length, close = m[3].trim() ? null : /^([^<]*)<\/b\s*>/i.exec(inner.slice(after));
+      return close && close[1].trim() ? {from: m.index, to: after + close[0].length, text: close[1]} : null;
+    }
+    if (!VOID.has(tag) && !/\/\s*$/.test(m[3])) depth += 1;
+  }
+  return null;
+}
+
+/**
+ * A block's words with its name made to fit its top face (nameOf). It stays as written when it fits on one line;
+ * else it is broken onto two lines, then made smaller (footprint-story/isometric · wordsToFit: the same rule a film
+ * uses). Gives {inner, tight}: `tight` the name, when it does not fit even at the least size on two lines — the
+ * build says so (check · name-fit), it never hides a name. `room`: how wide words so tall may be on the top, in px
+ * (the grid's: a block's top is a diamond, as wide across its middle as the block's shorter side is long).
  * WHY counted in letters: a build has no browser. `build --layout` measures the page itself.
  */
-const BREAK = /[ \t\n\r\f\v]+/, INSIDE = /[ \t\n\r\f\v]/g;
-function fitName(inner, wide) {
-  const found = /<b>([^<]*)<\/b>/.exec(inner);
-  if (!found || !found[1].trim()) return {inner, tight: null};
-  // broken where the kit breaks (a space, a tab, a line end): a no-break space, written or as an entity, keeps two words on one
-  // line. A space that comes out of an entity is inside a word here, so the fitted break falls between the words as written.
-  const raw = found[1].split(BREAK).filter(Boolean), shown = raw.map((word) => decodeEntities(word).replace(INSIDE, '\u00A0'));
-  const {lines, size, fits} = wordsToFit(shown.join(' '), [wide * 0.9, 2 * 1.15 * NAME.size + 1], NAME);
+function fitName(inner, room) {
+  const found = nameOf(inner);
+  if (!found) return {inner, tight: null};
+  // broken where the common package breaks: a no-break space, written or as an entity, keeps two words on one line. A space
+  // that comes out of an entity is inside a word here, so the fitted break falls between the words as written.
+  const raw = found.text.split(BREAK).filter(Boolean), shown = raw.map((word) => decodeEntities(word).replace(INSIDE, '\u00A0'));
+  const {lines, size, fits} = wordsToFit(shown.join(' '), (high) => CLEAR * room(high), NAME);
   if (lines.length === 1 && size === NAME.size) return {inner, tight: null};
   // the words as the deck wrote them (an entity stays an entity), broken where the fitted lines break
   const first = lines[0].split(' ').length, written = lines.length === 2 ? `${raw.slice(0, first).join(' ')}<br>${raw.slice(first).join(' ')}` : raw.join(' ');
-  const name = `<b${size === NAME.size ? '' : ` style="font-size:${size}px"`}>${written}</b>`;
-  return {inner: inner.slice(0, found.index) + name + inner.slice(found.index + found[0].length), tight: fits ? null : shown.join(' ')};
+  const name = `<b${size === NAME.size ? '' : ` style="font-size:${size}px"`}>${written}</b>`, said = shown.join(' ');
+  return {inner: inner.slice(0, found.from) + name + inner.slice(found.to), tight: fits ? null : said.length > SHOWN ? `${said.slice(0, SHOWN)}…` : said};
 }
 
 /** One piece, drawn: its element placed and sized by the floor, its faces, and its words on its top face. */
-function draw(p, html, shape, level, tile, tight) {
+function draw(p, html, shape, level, tight) {
   const {box, art, say} = shape;
   const placed = [`left:${fixed(box.x)}px`, `top:${fixed(box.y)}px`, `width:${fixed(box.w)}px`, `height:${fixed(box.h)}px`, ...(level === null ? [] : [`z-index:${level}`])];
   const css = [...placed, p.style.trim()].filter(Boolean).join(';');
   let at = p.styleCut;   // its attributes without its style (and without data-iso): the one style written below is its only one
   at = attrRule('class').test(at) ? at.replace(attrRule('class'), (_, q, v) => ` class=${q}${/(^|\s)iso(\s|$)/.test(v) ? v : `iso ${v}`}${q}`) : `${at} class="iso"`;
   const svg = `<svg class="iso-art" viewBox="0 0 ${fixed(box.w)} ${fixed(box.h)}" aria-hidden="true">${art}</svg>`;
-  // its name fitted to its top face: as wide as the face is on the slide, half a tile for each tile of its width and its depth
-  // (a round thing's top is narrower than the block on its tiles: its width over √2)
-  const fitted = say && p.inner.trim() ? fitName(p.inner, p.kind === 'cylinder' ? p.size[0] * tile / Math.SQRT2 : (p.size[0] + p.size[1]) * tile / 2) : null;
+  // its name fitted to its top face, by the room the grid says words have there
+  const fitted = say && p.inner.trim() ? fitName(p.inner, shape.room) : null;
   if (fitted?.tight) tight.push({name: p.name, text: fitted.tight});
   const words = fitted ? `<span class="iso-say" style="left:${fixed(say.x - box.x)}px;top:${fixed(say.y - box.y)}px">${fitted.inner}</span>` : '';
   // a floor is ground: a camera frames what stands on it, never the floor itself (focus.js) — unless it says otherwise (data-ground="false")
@@ -332,7 +359,7 @@ export function isoDrawn(html, {canvas = null, area = null, links = [], lay = nu
   const solid = found.filter((p) => p.kind !== 'floor'), order = grid.backToFront(solid, (p) => ({at: p.at, size: p.size}));
   let out = '', from = 0;
   found.forEach((p, i) => {
-    out += map.slice(from, p.start) + draw(p, map, drawn[i], p.kind === 'floor' ? null : order.indexOf(p) + 1, grid.tile[0], tight);
+    out += map.slice(from, p.start) + draw(p, map, drawn[i], p.kind === 'floor' ? null : order.indexOf(p) + 1, tight);
     from = p.end;
   });
   const twice = new Set(solid.map((p) => p.name).filter((name, i, all) => all.indexOf(name) !== i));

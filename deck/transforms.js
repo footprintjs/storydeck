@@ -36,7 +36,7 @@
 //                                     under reduced motion, in print and with motion off, where one rests at its middle
 
 import {stripComments} from './html.js';
-import {readAttributes} from '../pieceRules.js';
+import {ownAttribute, pieceTags, readAttributes} from '../pieceRules.js';
 import {readPieces} from '../focusHtml.js';
 import {boxFinder, exit, exitOutline} from './boxes.js';
 import {callouts} from './callouts.js';
@@ -360,8 +360,14 @@ export const applyTransforms = (html, options) => transformed(html, options).htm
  * `solids`: the map's blocks and cylinders as they stand; `html`: the map, for the names its other pieces have.
  */
 function floorLinks(html, found, solids) {
-  const count = new Map();
-  for (const piece of readPieces(html).pieces) count.set(piece.keys[0], (count.get(piece.keys[0]) ?? 0) + 1);
+  // a name is one block alone when one piece that has a box once the map is drawn has it (boxes.js · alone, asked before the
+  // drawing): an isometric piece, which the drawing gives its box, or a piece its own style places. A wire that shares a block's
+  // name, or words placed nowhere, have no box: the block is still alone.
+  const tags = [...pieceTags(html)], count = new Map();
+  readPieces(html).pieces.forEach((piece, i) => {
+    const at = tags[i].before + tags[i].after, iso = /data-iso/i.test(at) && ownAttribute(at, 'data-iso');
+    if (iso || (piece.box && piece.box.w > 0 && piece.box.h > 0)) count.set(piece.keys[0], (count.get(piece.keys[0]) ?? 0) + 1);
+  });
   const alone = (name) => count.get(name) === 1 && solids.some((solid) => solid.name === name);
   return found.map(({m}) => { const read = BETWEEN.exec(m[1]); return read && read[3] === undefined && alone(read[1]) && alone(read[2]) ? [read[1], read[2]] : null; });
 }

@@ -435,19 +435,36 @@ describe('iso · a block\'s name fits its top face', () => {
   });
 
   it('a longer name is broken onto two lines where they are most alike; a longer one still is made smaller', () => {
-    expect(say('<b>Load Balancer</b>')).toBe('<b>Load<br>Balancer</b>');                                   // a face 192 px wide: 13 letters at 26 px do not fit on one line
-    expect(say('<b>Authentication Service</b><small>OAuth</small>')).toBe('<b style="font-size:20px">Authentication<br>Service</b><small>OAuth</small>');
-    expect(say('<b>Load Balancer</b>', '4 2 1')).toBe('<b>Load Balancer</b>');                             // a wider block: one line
+    expect(say('<b>Load Balancer</b>')).toBe('<b style="font-size:25px">Load<br>Balancer</b>');          // a top 192 px across its middle: 13 letters at 26 px do not fit on one line, and the two lines stand where it is narrower
+    expect(say('<b>Authentication Service</b><small>OAuth</small>')).toBe('<b style="font-size:16px">Authentication<br>Service</b><small>OAuth</small>');
+    expect(say('<b>Load Balancer</b>', '4 4 1')).toBe('<b>Load Balancer</b>');                             // a bigger top: one line
+    expect(say('<b>Load Balancer</b>', '4 2 1')).toBe('<b style="font-size:25px">Load<br>Balancer</b>');   // a longer block has no wider top: a top is as wide as the SHORTER side
+    expect(say('<b>Authentication Service</b>', '8 1 0.2')).toBe('<b style="font-size:16px">Authentication<br>Service</b>');   // a long thin block: 96 px across, whatever its length
+    expect(tightOf('<b>Authentication Service</b>', '8 1 0.2')).toEqual([{name: 'a', text: 'Authentication Service'}]);
     expect(say('<b>R&amp;D Lab one</b>')).toBe('<b>R&amp;D Lab one</b>');                                  // an entity is one letter: eleven letters fit, where fifteen would not
-    expect(say('<b>R&amp;D Team Lab</b>')).toBe('<b>R&amp;D<br>Team Lab</b>');                             // and stays as written when the name is broken
+    expect(say('<b>R&amp;D Team Lab</b>')).toBe('<b style="font-size:25px">R&amp;D<br>Team Lab</b>');   // and stays as written when the name is broken
     expect(tightOf('<b>Authentication Service</b>')).toEqual([]);
+  });
+
+  it('the name is the first <b> inside no other element: words in a title, a <b> in a <small> and a styled name are left as written', () => {
+    const long = 'Supercalifragilistic expialidocious long';
+    for (const inner of [`<em title="<b>${long}</b>">x</em>`, `<small>x <b>${long}</b></small>`, `<b class="x">${long}</b><b>${long}</b>`, `<b> </b><b>${long}</b>`, `<!-- <b>${long}</b> -->words`, `<svg class="ic"><path d="M0 0"/><text><b>${long}</b></text></svg>`]) {
+      expect(say(inner), inner).toBe(inner);
+      expect(tightOf(inner), inner).toEqual([]);
+    }
+    // an element before it that is closed, a tag that closes itself and a void one do not hide it; capitals are a <b> too
+    expect(say('<svg class="ic"><path d="M0 0"/></svg><br><b>Load Balancer</b>')).toBe('<svg class="ic"><path d="M0 0"/></svg><br><b style="font-size:25px">Load<br>Balancer</b>');
+    expect(say('<B>Load Balancer</B>')).toBe('<b style="font-size:25px">Load<br>Balancer</b>');
+    // what the build is told of a name that does not fit is enough to find it, never a megabyte
+    const [{text}] = tightOf(`<b>${'Long'.repeat(5000)}</b>`);
+    expect(text).toBe(`${'Long'.repeat(20)}…`);
   });
 
   it('a no-break space keeps two words on one line, and a space written as an entity is inside its word', () => {
     expect(say('<b>Load\u00A0Balancer</b>')).toBe('<b style="font-size:22px">Load\u00A0Balancer</b>');     // smaller, never broken there
     expect(say('<b>Load&nbsp;Balancer</b>')).toBe('<b style="font-size:22px">Load&nbsp;Balancer</b>');
-    expect(say('<b>Big&#32;Data Platform Core</b>')).toBe('<b style="font-size:22px">Big&#32;Data<br>Platform Core</b>');   // the break is between words as written
-    expect(say('<b>  Load \n Balancer </b>')).toBe('<b>Load<br>Balancer</b>');
+    expect(say('<b>Big&#32;Data Platform Core</b>')).toBe('<b style="font-size:17px">Big&#32;Data<br>Platform Core</b>');   // the break is between words as written
+    expect(say('<b>  Load \n Balancer </b>')).toBe('<b style="font-size:25px">Load<br>Balancer</b>');
   });
 
   it('a name that cannot fit is drawn at the least size on two lines, and the build is told', () => {
@@ -476,7 +493,7 @@ describe('iso · a piece that cannot be drawn is refused in the deck\'s words, w
     const grid = '<i data-iso-grid="96 at 960 240"></i>';
     const say = (kind) => /<span class="iso-say"[^>]*>(.*?)<\/span>/.exec(isoPieces(`${grid}<div data-k="a" data-iso="${kind}" data-at="0 0"><b>Database 12</b></div>`, {canvas}))[1];
     expect(say('block')).toBe('<b>Database 12</b>');           // 11 letters fit a face 192 px wide
-    expect(say('cylinder')).toBe('<b style="font-size:25px">Database<br>12</b>');   // and not a top 136 px wide: two lines, a pixel smaller
+    expect(say('cylinder')).toBe('<b style="font-size:23px">Database<br>12</b>');   // and not a top 136 px wide: two lines, where a round top is narrower still
   });
 });
 
