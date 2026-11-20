@@ -535,6 +535,13 @@ describe('a wire between two isometric pieces is a cable along the floor', () =>
     const onFloor = ([px, py]) => ground.reduce((odd, [xi, yi], i) => { const [xj, yj] = ground.at(i - 1); return (yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi ? !odd : odd; }, false);
     for (const {name, points} of made.cables) for (const p of points) expect(onFloor(p), `${name} at ${p}`).toBe(true);
     expect(onFloor([ground[0][0], ground[0][1] - 50])).toBe(false);   // the check does see a point off the floor
+    // three wires round the front of a wall take three lanes: the third runs a tile and a half past every block, and the floor still lies under it
+    const lanes = `${grid}<div data-k="floor" data-iso="floor"></div><div data-k="a" data-iso="block" data-at="0 4"></div><div data-k="b" data-iso="block" data-at="8 4"></div><div data-k="wall" data-iso="block" data-at="4 -10" data-size="2 16 1"></div>` + [1, 2, 3].map((n) => `<i data-k="w${n}" class="wire" data-arrow="a to b"></i>`).join('');
+    const wide = transformed(lanes, {canvas}), [, lx, ly] = /data-k="floor"[^>]*style="left:([\d.-]+)px;top:([\d.-]+)px/.exec(wide.html).map(Number);
+    const under = /<polygon class="iso-ground" points="([^"]+)"/.exec(wide.html)[1].trim().split(/\s+/).map((pair) => pair.split(',').map(Number)).map(([x, y]) => [x + lx, y + ly]);
+    const onIt = ([px, py]) => under.reduce((odd, [xi, yi], i) => { const [xj, yj] = under.at(i - 1); return (yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi ? !odd : odd; }, false);
+    expect(wide.cables).toHaveLength(3);
+    for (const {name, points} of wide.cables) for (const p of points) expect(onIt(p), `${name} at ${p}`).toBe(true);
   });
 
   it('draws the wires as they were laid: the ways handed to it are the ways it draws, laid once', () => {
