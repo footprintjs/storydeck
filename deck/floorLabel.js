@@ -25,6 +25,8 @@ const LETTER = 0.6, CAPITAL = 0.7;
 export const ICON = 1.5;
 /** Tiles of floor kept clear past the counted end of the words. */
 const CLEARANCE = 0.25;
+/** Tiles all round the words that what is drawn over the floor must also keep off. */
+const MARGIN = 0.1;
 
 /** Whether two convex outlines on the slide ([[x, y], …], each in order round it) overlap: no line parts them (SAT). */
 function overlap(a, b) {
@@ -66,7 +68,9 @@ export function floorLabelPlace({at: [col, row], size: [cols, rows]}, grid, text
   const long = (Math.max(...fit.lines.map((line) => [...line].length), 1) * letter + (icon ? ICON : 0)) * drawnSize / side + CLEARANCE;
   const deep = lines * 1.15 * drawnSize / side, fits = fit.fits && deep + 2 * IN <= rows + 1e-9;
   const near = row + rows - IN, far = near - deep;
-  const strip = (from) => [[from, far], [from + long, far], [from + long, near], [from, near]].map(([c, r]) => { const p = grid.at(c, r); return [p.x, p.y]; });
+  // asked a little wider than the words (MARGIN all round): a cable is a line with width, and lies on the half-tile
+  // lanes the words' far edge can fall on
+  const strip = (from) => [[from - MARGIN, far - MARGIN], [from + long + MARGIN, far - MARGIN], [from + long + MARGIN, near + MARGIN], [from - MARGIN, near + MARGIN]].map(([c, r]) => { const p = grid.at(c, r); return [p.x, p.y]; });
   const clear = (from) => covers.every((outline) => !overlap(strip(from), outline));
   let from = col + ALONG;
   for (let at = col + ALONG; at + long <= col + cols - ALONG + 1e-9; at += 0.5) if (clear(at)) { from = at; break; }

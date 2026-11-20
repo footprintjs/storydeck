@@ -16,6 +16,8 @@
   group's floor, at a tile down to 64 px; `check` (`map-fit`, new) says when it still runs past the slide. A group's
   labelled floor is not ground. Placed by hand, a group still fits its floor. A floor whose group has no block is
   refused, naming the fix.
+- An attribute's value written over more than one line is read whole, as a browser reads it (before, such a value
+  was refused as unquoted). A floor's label wrapped onto two lines in the file is one line of words.
 
 ## 0.25.0 — how a wire's packets ride
 

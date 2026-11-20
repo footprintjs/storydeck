@@ -93,6 +93,38 @@ describe('floorLabel · counted honestly: an icon, capitals, the floor\'s depth,
   });
 });
 
+describe('floorLabel · what the map hands it to keep clear of', () => {
+  const g = '<i data-iso-grid="120 at 960 150"></i>';
+  const fl = '<div data-k="p" data-iso="floor" data-at="0 0" data-size="8 5" data-label="Home"></div>';
+  const col = (html) => { const m = /class="iso-floor-label" style="left:([\d.]+)px;top:([\d.]+)px/.exec(html); const f = /data-k="p"[^>]*style="left:([\d.-]+)px;top:([\d.-]+)px/.exec(html); return floor.tileAt(Number(f[1]) + Number(m[1]), Number(f[2]) + Number(m[2])).col; };
+
+  it('a flat footprint over the label\'s first place moves it on', () => {
+    const alone = transformed(`${g}${fl}`, {canvas}).html;
+    expect(col(alone)).toBeCloseTo(0.3, 6);
+    const foot = '<div data-k="mat" data-footprint="0 4 1 1" style="left:1px;top:1px;width:9px;height:9px"></div>';
+    expect(col(transformed(`${g}${fl}${foot}`, {canvas}).html)).toBeGreaterThan(0.31);
+  });
+
+  it('a cable laid along the floor\'s front edge moves it on: the blocks stay where they are, only the wire is added', () => {
+    const blocks = '<div data-k="a" data-iso="block" data-at="-3 4" data-size="1 1 0.3" data-ports="o: 1 0.5 0.1"></div><div data-k="b" data-iso="block" data-at="4 4" data-size="1 1 0.3" data-ports="i: 0 0.5 0.1"></div>';
+    const without = transformed(`${g}${fl}${blocks}`, {canvas}).html;
+    expect(col(without)).toBeCloseTo(0.3, 6);
+    const made = transformed(`${g}${fl}${blocks}<i data-k="w" class="wire" data-arrow="a.o to b.i"></i>`, {canvas});
+    expect(made.cables).toHaveLength(1);
+    expect(col(made.html)).toBeGreaterThan(5);   // past the cable and the block it plugs into
+    expect(made.tight).toEqual([]);
+    // laid the whole length of the edge, it leaves no clear place: said covered
+    const long = transformed(`${g}${fl}${blocks.replace('data-at="4 4"', 'data-at="9 4"')}<i data-k="w" class="wire" data-arrow="a.o to b.i"></i>`, {canvas});
+    expect(long.tight).toEqual([{name: 'p', text: 'Home', on: 'floor-covered'}]);
+  });
+
+  it('a label that does not fit is said as that, never also as covered', () => {
+    const wall = floor.block({at: [0, 0.5], size: [2, 2, 1]}).outline.map(({x, y}) => [x, y]);
+    const place = floorLabelPlace({at: [0, 0], size: [2, 2]}, floor, 'A name far too long for so small a floor', [wall]);
+    expect(place).toMatchObject({fits: false, covered: false});
+  });
+});
+
 describe('floorLabel · a labelled floor in a map (data-label, data-icon)', () => {
   const map = (more) => `${grid}<div data-k="prod" data-iso="floor" data-size="8 5"${more}></div><div data-k="a" data-iso="block" data-at="1 1"><b>A</b></div>`;
 
@@ -132,7 +164,13 @@ describe('floorLabel · a labelled floor in a map (data-label, data-icon)', () =
     expect(bad(' data-label=P')).toThrow('its data-label is written data-label="…", once, with quotes');
     // letters, not code units: 61 emoji are 61 letters; a control or a direction override is refused
     expect(() => transformed(map(` data-label="${'\u{1F600}'.repeat(61)}"`), {canvas})).not.toThrow();
-    for (const odd of ['&#x202E;evil', 'a&#0;b', '&#xD800;']) expect(bad(` data-label="${odd}"`), odd).toThrow('a floor\'s label is plain words — take out the control or direction character in it');
+    for (const odd of ['&#x202E;evil', 'a&#0;b', '&#xD800;', 'a&#x200F;b', 'a&#xFEFF;b', 'a&#x200B;b']) expect(bad(` data-label="${odd}"`), odd).toThrow('a floor\'s label is plain words — take out the control or direction character in it');
+    // a label wrapped onto two lines in the file is one line; a joiner inside an emoji stays
+    expect(labelOf(transformed(map(' data-label="Production\n\taccount"'), {canvas}).html)[2]).toBe('Production account');
+    expect(() => transformed(map(' data-label="Dev &#x1F468;&#x200D;&#x1F4BB;"'), {canvas})).not.toThrow();
+    // what check shows of a long label is cut by letters, never inside one
+    const tight = transformed(`${grid}<div data-k="p" data-iso="floor" data-size="2 2" data-label="${'\u{1F600}'.repeat(81)}"></div>`, {canvas}).tight;
+    expect(tight[0].text).toBe(`${'\u{1F600}'.repeat(80)}…`);
     expect(() => transformed(`${grid}<div data-k="b" data-iso="block" data-at="0 0" data-icon="acct"></div>`, {canvas, icons})).toThrow('"b" (data-iso="block"): data-icon on an isometric piece is the icon of a floor\'s label');
   });
 

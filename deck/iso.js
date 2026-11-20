@@ -157,12 +157,14 @@ function readIso(html) {
       if (!a) continue;
       if (kind !== 'floor') { if (attr === 'data-label') continue; throw new Error(`${told}: data-icon on an isometric piece is the icon of a floor's label — put it on a floor with a data-label, or an <i data-icon> in the block's words`); }
       if (a.bare || a.twice) throw new Error(`${told}: its ${attr} is written ${attr}="…", once, with quotes`);
-      const value = decodeEntities(a.value).trim();
+      // a label wrapped onto two lines in the file is one line of words: line ends and tabs are spaces
+      const value = decodeEntities(a.value).replace(/[\t\n\r]+/g, ' ').trim();
       if (attr === 'data-label') {
         const letters = [...value].length;
         if (!value || letters > MOST_LABEL) throw new Error(`${told}: a floor's label is a name of 1 to ${MOST_LABEL} letters — not ${value ? `${letters} letters` : 'none'}`);
-        // a control or a direction override would read differently in the page and in check's words: refused, not drawn
-        if (/[\p{Cc}\u202A-\u202E\u2066-\u2069]|[\uD800-\uDFFF]/u.test(value)) throw new Error(`${told}: a floor's label is plain words — take out the control or direction character in it`);
+        // a control, a direction mark or another character that draws nothing would read differently in the page and in
+        // check's words: refused, not drawn (a joiner inside an emoji stays)
+        if (/\p{Cc}|(?!\u200D)\p{Cf}|[\uD800-\uDFFF]/u.test(value)) throw new Error(`${told}: a floor's label is plain words — take out the control or direction character in it`);
         label = value;
       } else {
         if (!/^[\w-]+$/.test(value)) throw new Error(`${told}: data-icon names an icon of the deck (icons/<name>.svg) — not "${value.slice(0, 40)}"`);

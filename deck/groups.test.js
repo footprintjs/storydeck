@@ -111,6 +111,13 @@ describe('groups · blocks that belong together, each group on its floor (data-i
     expect(m).toBe(fitted);
   });
 
+  it('fits a group\'s floor round its blocks, never round a wire that goes out of it', () => {
+    const grid = '<i data-iso-grid="120 at 960 150"></i>';
+    const html = `${grid}<div data-k="f" data-iso="floor" data-iso-group="g"></div>${block('a', 'g', 'block', ' data-at="0 0"')}${block('b', null, 'block', ' data-at="0 8"')}${block('w', null, 'block', ' data-at="-2 4" data-size="6 1 1"')}${wire('x', 'a to b')}`;
+    const fitted = /data-k="f"[^>]*style="([^"]*)"/.exec(isoDrawn(html.replace('data-iso-group="g"></div>', 'data-at="-1 -1" data-size="4 4"></div>'), {canvas}).html)[1];
+    expect(/data-k="f"[^>]*style="([^"]*)"/.exec(transformed(html, {canvas}).html)[1]).toBe(fitted);
+  });
+
   it('refuses, naming the piece and the fix, a group it cannot keep', () => {
     expect(() => transformed(`${block('a', 'x')}<div data-k="f" data-iso="floor" data-iso-group="nobody"></div>`, {canvas})).toThrow('"f" (data-iso="floor"): its group "nobody" has no block — give blocks data-iso-group="nobody", or take the group off the floor');
     expect(() => groupWritten(' data-iso-group="a b"', '"x"')).toThrow('"x": a group\'s name is 1 to 60 letters, digits, "-" or "_" — not "a b"');
