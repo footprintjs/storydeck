@@ -395,7 +395,7 @@ describe('iso · no places to type: the build places the blocks from what is joi
     expect(Math.min(...points.map((p) => p[1]))).toBeCloseTo(round_.box.y, 6);                       // the top of its top
     expect(Math.max(...points.map((p) => p[1]))).toBeCloseTo(round_.box.y + round_.box.h, 6);        // the foot of its foot
     expect(isoDrawn('<div data-k="a" data-iso="block" data-at="0 0"></div><div data-k="a" data-iso="block" data-at="4 0"></div>', {canvas}).shapes.size).toBe(0);
-    expect(isoDrawn('<p>no piece</p>', {canvas})).toEqual({html: '<p>no piece</p>', shapes: new Map()});
+    expect(isoDrawn('<p>no piece</p>', {canvas})).toEqual({html: '<p>no piece</p>', shapes: new Map(), solids: []});
   });
 
   it('the README\'s map with no number in it builds as written', () => {

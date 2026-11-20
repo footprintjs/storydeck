@@ -45,18 +45,15 @@
   transform: translate(calc(var(--cdx) * 2 * (1 - var(--sd-t)) * var(--sd-t) + var(--pdx) * var(--sd-t) * var(--sd-t)),
     calc(var(--cdy) * 2 * (1 - var(--sd-t)) * var(--sd-t) + var(--pdy) * var(--sd-t) * var(--sd-t)));
 }
-/* a cable (a wire along the floor between two blocks: deck/cable.js) is a curve with a handle at each end, so its
-   packets stand at B(t) = 3(1-t)²t·C₁ + 3(1-t)t²·C₂ + t³·E from its start (C₂: --c2x/--c2y) */
-:where(svg.wire[data-sd-cable] :is(.pkt, .run)) {
-  transform: translate(calc(var(--cdx) * 3 * (1 - var(--sd-t)) * (1 - var(--sd-t)) * var(--sd-t) + var(--c2x) * 3 * (1 - var(--sd-t)) * var(--sd-t) * var(--sd-t) + var(--pdx) * var(--sd-t) * var(--sd-t) * var(--sd-t)),
-    calc(var(--cdy) * 3 * (1 - var(--sd-t)) * (1 - var(--sd-t)) * var(--sd-t) + var(--c2y) * 3 * (1 - var(--sd-t)) * var(--sd-t) * var(--sd-t) + var(--pdy) * var(--sd-t) * var(--sd-t) * var(--sd-t)));
-}
+/* a cable (a wire along the floor between two blocks: deck/cable.js) is straight runs and rounded corners, so its
+   packets ride its own line: each is drawn at the corner of the wire's box and carried along --sd-way, --sd-t of the way */
+:where(svg.wire[data-sd-cable] :is(.pkt, .run)) { transform: none; offset-path: var(--sd-way); offset-distance: calc(var(--sd-t) * 100%); offset-rotate: 0deg; }
 :where(svg.wire .pkt) { opacity: 0; fill: var(--sd-glow, currentColor); stroke: none; }
 @keyframes sdPkt { from { --sd-t: 0; } to { --sd-t: 1; } }
 @keyframes sdPktShow { 0%, 100% { opacity: 0; } 15%, 80% { opacity: 1; } }
 /* a wire that comes in shows itself start to tip behind a sweeping soft edge (a mask: a theme's dashes stay), square to
    its run (--sd-angle) — its curve's control point sits halfway along the run, so the curve shows in drawing order
-   (a cable's two handles do not: where it hooks round to its foot, a short stretch shows a little early). It is the
+   (a cable turns corners: a run that goes back against the way from start to tip shows a little early). It is the
    piece's own animation (focus.css · --sd-a-more): at its turn on a path, after a new blur. */
 @property --sd-reveal { syntax: '<percentage>'; inherits: false; initial-value: 100%; }
 @keyframes sdReveal { from { --sd-reveal: -12%; } }

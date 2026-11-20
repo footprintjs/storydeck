@@ -65,8 +65,8 @@ export interface DeckIcon { readonly viewBox: string; readonly body: string }
  * pieces (data-iso) are placed and drawn — by their own data-at, or, when no block has one, by the build from what the
  * wires join; callouts stand beside their pieces; and <i data-arrow="…"></i> becomes an SVG wire, by numbers ("x1 y1 x2
  * y2 [bend]") or between pieces ("from to to": class "pkt" adds a packet that rides it on a path click; between two
- * isometric pieces with no bend it is a cable along the floor, from the foot of one to the foot of the other, where
- * one can lie clear of both). `canvas`: the
+ * isometric pieces with no bend it is a cable along the floor: along the tile lines, round what stands in its way,
+ * from a foot that is seen to a foot that is seen). `canvas`: the
  * slide, [w, h]; `area`: [x0, y0, x1, y1], where a picture the build fits goes (the deck's area).
  */
 export function applyTransforms(html: string, options?: { icons?: Readonly<Record<string, DeckIcon>>; canvas?: readonly [number, number] | null; area?: readonly [number, number, number, number] | null }): string;
@@ -125,7 +125,7 @@ export interface CompiledDeck {
   readonly explore: { readonly slides: readonly (string | null)[]; readonly targets: Readonly<Record<string, Readonly<Record<string, number>>>> } | null;
   /** The parts' entrances as the page plays them: each distinct change sampled once (kinds), and its key per slide — or null when no part has one. */
   readonly transitions: { readonly kinds: Readonly<Record<string, unknown>>; readonly enter: readonly (string | null)[] } | null;
-  readonly maps: Readonly<Record<string, { readonly pieces: readonly FocusPiece[]; readonly callouts?: readonly DeckCallout[] }>>;
+  readonly maps: Readonly<Record<string, { readonly pieces: readonly FocusPiece[]; readonly callouts?: readonly DeckCallout[]; /** What the build knows of a wire's way along the floor, for check (rule wire-way): absent when every wire lies well. */ readonly ways?: readonly { readonly name: string; readonly from: string; readonly to: string; readonly way: string }[] }>>;
   /** Present when the deck has a callout: the page then carries a callout's stylesheet. */
   readonly callouts?: true;
 }

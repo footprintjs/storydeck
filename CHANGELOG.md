@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.19.0 — wires that find their way, and say so
+
+- **A wire between two blocks finds its way along the floor.** In 0.18.0 it was one curve between two fixed feet,
+  and where that curve could not lie (a block straight in front of another, close beside it, a request and its answer
+  that would cross) the wire stayed straight; a wire to a block two steps away ran behind the block between. Now the
+  way is found on the floor's own tile lines: it leaves a block at a foot a viewer sees, turns in rounded corners,
+  goes round a block that stands in its way, keeps off floor a block hides when it can, and comes into the other
+  block at a foot that is seen. A request and its answer lie in two lanes. A block straight in front of another,
+  behind it or against it is reached the same way. A wire has no way, and is drawn straight as before, when the two
+  blocks stand at different heights, a block's feet are closed in, the pair is walled apart, the map is too wide for
+  its smallest block, or the map is too big to lay every wire. You still write only what is joined to what.
+- **The build says what it could not do.** `check` and `build` have a new rule, `wire-way`. A warning: a wire
+  passes behind a block (which block, and the two ways out), lies on another for want of room at a foot, or is drawn
+  straight because there is no way along the floor or no place at a foot. A note: a wire is drawn straight because
+  the two blocks stand at different heights, the map is too big to lay every wire (a count of work, and 1,024 wires
+  at most) or too wide for its smallest block; it crosses three or more others; or it turns more than three times.
+  The build keeps what it knows beside the page, so nobody, person or model, has to look at the picture to find out,
+  and nothing a deck writes can pass for the build's word. **A deck that passed `check --strict` may now fail it**:
+  these warnings are new, about wires that were drawn the same way, or worse, before.
+- **One way for a deck and a film.** The way is `footprint-story/isometric`'s `routes`, and its rounded corners and
+  the place of a packet along it are `rounded` (0.11.0): a film lays the same wires and rides them the same.
+- **What changes in a deck you have (the picture, not the files).** Every cable is drawn anew: straight runs along
+  the tile lines with rounded corners, where 0.18.0 drew one long curve. Wires 0.18.0 left straight between two
+  blocks on one floor are cables now. A cable's packets ride its line by `offset-path` (every current browser).
+  Unchanged: wires between flat pieces, wires by numbers, a wire from a block to a flat piece, a wire with a bend
+  (`0` too), a wire between blocks at different heights, and where a cable's label stands (on it, on a plate).
+- **Not promised.** Wires are laid in the order written and an earlier one is never moved for a later one, so the
+  fewest crossings there could be are not promised. A foot has room for three wires; a fourth lies on another, and
+  `check` says so.
+- `footprint-story` 0.11.0 or later.
+
 ## 0.18.0 — wires that lie on the floor
 
 - **A wire between two blocks is a cable on the floor, where one can lie.** It ran straight from one block's

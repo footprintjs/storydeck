@@ -268,21 +268,23 @@ function draw(p, html, shape, level) {
 export const isoPieces = (html, options) => isoDrawn(html, options).html;
 
 /**
- * isoPieces, with what a helper that draws between pieces needs of an isometric one: {html, shapes, floor} — `shapes`
- * a Map from a block's or a cylinder's name to {outline: [[x, y], …], middle: [x, y]} in slide px (the points round
- * what it draws, and the middle of that) and {kind, at: [col, row, lift], size} in tiles (where it stands);
+ * isoPieces, with what a helper that draws between pieces needs of an isometric one: {html, shapes, solids, floor} —
+ * `shapes` a Map from a block's or a cylinder's name to {name, outline: [[x, y], …], middle: [x, y]} in slide px (the
+ * points round what it draws, and the middle of that) and {kind, at: [col, row, lift], size} in tiles (where it
+ * stands); `solids`: every block and cylinder so, those that share a name too (a wire cannot end at one of them, and
+ * still must not run under it);
  * `floor(col, row, lift)`: where a point of the floor is on the slide, [x, y] (absent when the map has no isometric
- * piece). A block is not the box it is placed by: a wire between two blocks is a cable along the floor, from the foot
- * of one to the foot of the other (cable.js), and a wire from a block to a flat piece ends on the block's outline
+ * piece). A block is not the box it is placed by: a wire between two blocks is a cable along the floor, from a foot
+ * of one to a foot of the other (cable.js), and a wire from a block to a flat piece ends on the block's outline
  * (transforms.js). A name two pieces share has no shape: it is found by its box, as before.
  */
 export function isoDrawn(html, {canvas = null, area = null, links = []} = {}) {
-  const shapes = new Map();
-  if (!MAYBE.test(html) && !MAYBE_GRID.test(html)) return {html, shapes};
+  const shapes = new Map(), solids = [];
+  if (!MAYBE.test(html) && !MAYBE_GRID.test(html)) return {html, shapes, solids};
   const {html: map, grid: written, fit = false} = readGrid(html), found = readIso(map);
   if (!found.length) {
     if (fit) throw new Error('data-iso-grid="fit": the grid is fitted to the blocks, and this map has none — add a block, or take the grid out');
-    return {html: map, shapes};
+    return {html: map, shapes, solids};
   }
   if (found.length > MOST_ISO_PIECES) throw new Error(`a map holds at most ${MOST_ISO_PIECES} isometric pieces, and this one has ${found.length}`);
   const placedHere = place(found, links);
@@ -298,11 +300,11 @@ export function isoDrawn(html, {canvas = null, area = null, links = []} = {}) {
   const twice = new Set(solid.map((p) => p.name).filter((name, i, all) => all.indexOf(name) !== i));
   for (const p of solid) {
     const {outline, box} = drawn[found.indexOf(p)];
-    if (!twice.has(p.name)) {
-      shapes.set(p.name, {outline: outline.map(({x, y}) => [x, y]), middle: [box.x + box.w / 2, box.y + box.h / 2], kind: p.kind, at: [p.at[0], p.at[1], p.at[2] ?? 0], size: [...p.size]});
-    }
+    const shape = {name: p.name, outline: outline.map(({x, y}) => [x, y]), middle: [box.x + box.w / 2, box.y + box.h / 2], kind: p.kind, at: [p.at[0], p.at[1], p.at[2] ?? 0], size: [...p.size]};
+    solids.push(shape);
+    if (!twice.has(p.name)) shapes.set(p.name, shape);
   }
-  return {html: out + map.slice(from), shapes, floor: (col, row, lift = 0) => { const point = grid.at(col, row, lift); return [point.x, point.y]; }};
+  return {html: out + map.slice(from), shapes, solids, floor: (col, row, lift = 0) => { const point = grid.at(col, row, lift); return [point.x, point.y]; }};
 }
 
 const TONE = 'var(--iso-color, var(--sd-tone, #d9e4f3))';
