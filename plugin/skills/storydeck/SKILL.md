@@ -147,7 +147,8 @@ all work on it. A wire between two blocks is laid along the floor: along the til
 from a foot that is seen to a foot that is seen; a request and its answer lie in two lanes. You write only what is
 joined to what. Its `data-label` is written on the cable, so keep it short. After an edit, read `check` or `build`:
 rule `wire-way` says in words when a wire passes behind a block (move that block, or the two it joins), lies on
-another for want of room (a foot holds three wires: widen the block), or is drawn straight and why. Those are
+another for want of room (a foot holds three wires: widen the block), doubles back on itself (a hairpin: a port
+that faces away — put it on the side that faces the way), or is drawn straight and why. Those are
 warnings, so `check --strict` fails on them; notes (crosses three or more, many turns, two heights, a map too big
 or too wide to lay every wire) do not. A wire written
 `data-arrow="a to b 0"` is a straight line; `data-head="none"` draws any wire as a plain line with no arrow's head. A block's

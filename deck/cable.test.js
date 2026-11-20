@@ -1,7 +1,8 @@
 import {describe, it, expect} from 'vitest';
 import {routes, rounded, MOST_ROUTES, NO_ROUTE} from 'footprint-story/isometric';
 import {isoDrawn} from './iso.js';
-import {cables, cablePoint, cableWalk, cableWay, held, labelPlace, readWay, wayNote, LABEL_LOOKS, LABEL_PLACES, WALK_MOST} from './cable.js';
+import {cables, cablePoint, cableWalk, cableWay, hairpins, held, labelPlace, readWay, wayNote, LABEL_LOOKS, LABEL_PLACES, WALK_MOST} from './cable.js';
+import {transformed} from './transforms.js';
 
 const canvas = [1920, 1080];
 const block = (at, size = [2, 2, 1], kind = 'block') => ({at, size, kind});
@@ -226,5 +227,66 @@ describe('cable · where its label stands', () => {
     expect(labelPlace(run, [30, 13], [square(110, 400)], [down(60)])).toEqual([75, 0]);   // a quarter of the way: tried before a fifth, and no more crossed
     // every place as much hidden: the nearest the middle that no line runs through
     expect(labelPlace(run, [30, 13], [square(-1000, 1000)], [down(150), down(140), down(160)])).toEqual([expect.closeTo(105, 9), 0]);
+  });
+});
+
+describe('cable · a cable that doubles back on itself (a hairpin)', () => {
+  // out of a port on the right side (+col), down the riser, then back the other way: the port faces away
+  const away = [[8, 7, 0.3], [8.25, 7, 0.3], [8.25, 7, 0], [8.5, 7, 0], [8.5, 5.5, 0], [2.5, 5.5, 0], [2.5, 6, 0]];
+
+  it('says where: leaving its first port, coming into its last, or a tight U-turn on the floor', () => {
+    expect(hairpins(away, ['p1', null])).toEqual(['start']);
+    // the same way read from its other end: the port is its last
+    expect(hairpins([...away].reverse(), [null, 'p1'])).toEqual(['end']);
+    expect(hairpins(away, ['p1', 'rj45'])).toEqual(['start']);
+    // a tight U on the floor, between a foot's step and the next: east, a quarter tile across, west
+    expect(hairpins([[0, -0.5, 0], [0, 0, 0], [4, 0, 0], [4, 0.25, 0], [0, 0.25, 0], [0, 4, 0], [0.5, 4, 0]], [])).toEqual(['middle']);
+  });
+
+  it('is no hairpin: a foot\'s lane change, a U round a block, a port that faces the way, a run back far from its port', () => {
+    // out of a foot half a tile, along, and half a tile back in to the other foot: the usual cable
+    expect(hairpins([[7, 8, 0], [7, 8.5, 0], [12, 8.5, 0], [12, 8, 0]], [null, null])).toEqual([]);
+    expect(hairpins(away, [null, null])).toEqual([]);   // asked at a port only
+    // a U-turn round something two tiles wide: a way round, not a hairpin
+    expect(hairpins([[0, -0.5, 0], [0, 0, 0], [4, 0, 0], [4, 2, 0], [0, 2, 0], [0, 4, 0], [0.5, 4, 0]], [])).toEqual([]);
+    // the port faces the way the cable goes
+    expect(hairpins([[2, 7, 0.3], [2.25, 7, 0.3], [2.25, 7, 0], [2.5, 7, 0], [6, 7, 0]], ['p', null])).toEqual([]);
+    // it runs a long way first, then turns back: far from its port
+    expect(hairpins([[0, 0, 0.3], [0.25, 0, 0.3], [0.25, 0, 0], [0.5, 0, 0], [0.5, 3, 0], [-4, 3, 0]], ['p', null])).toEqual([]);
+    expect(hairpins([], [])).toEqual([]);
+  });
+
+  it('reads no turn into a jog onto the floor\'s lines, and tells a port on the wrong side from a hook near a good one', () => {
+    // a jog of a few px (0.07 of a tile) back before the port: no U-turn
+    expect(hairpins([[2.64, 3, 0], [4.75, 3, 0], [4.75, 6.25, 0], [5, 6.25, 0], [5, 6.18, 0], [5.25, 6.18, 0], [5.25, 6.18, 0.3], [5.5, 6.18, 0.3]], [null, 'p'])).toEqual([]);
+    // a reversal of 0.047 of a tile right out of a port: none
+    expect(hairpins([[0, 0, 0.3], [0.25, 0, 0.3], [0.25, 0, 0], [0.203, 0, 0], [0.203, 3, 0], [5, 3, 0]], ['p', null])).toEqual([]);
+    // out of a port that faces the other end, a short hook back to reach a line of the floor: said as a hook, not a wrong side
+    const hook = [[0, 0, 0.3], [0.25, 0, 0.3], [0.25, 0, 0], [0.25, 0.5, 0], [-0.05, 0.5, 0], [-0.05, 1, 0], [6, 1, 0], [6, 0.5, 0]];
+    expect(hairpins(hook, ['p', null])).toEqual(['start-hook']);
+    expect(hairpins([...hook].reverse(), [null, 'p'])).toEqual(['end-hook']);
+    expect(readWay('hairpin start-hook', 'a', 'b')).toEqual([{level: 'info', message: 'makes a short loop near its port on a — moving the port along its side may straighten it'}]);
+    // a port at a right angle to the way to the other end is on the wrong side too: two ports side by side, both facing +row
+    expect(hairpins([[3.79, 3.5, 0.23], [3.79, 3.75, 0.23], [3.79, 3.75, 0], [3.79, 4, 0], [4.75, 4, 0], [4.75, 3.75, 0], [4.75, 3.75, 0.5], [4.75, 3.5, 0.5]], ['p', 'q'])).toEqual(['start', 'end']);
+    // a U whose arms are jogs is no U
+    expect(hairpins([[0, -0.5, 0], [0, 0, 0], [0.3, 0, 0], [0.3, 0.25, 0], [0, 0.25, 0], [0, 4, 0], [0.5, 4, 0]], [])).toEqual([]);
+  });
+
+  it('is written in the way note and read back by check as a warning, naming the end and the fix', () => {
+    const route = {from: 'sw', to: 'lap', points: [[0, 0], [1, 0]], path: away, ports: ['p1', null], feet: ['right', 'left'], bends: 2, behind: [], crosses: 0, shared: 0};
+    expect(wayNote(route)).toBe('hairpin start');
+    expect(readWay('hairpin start', 'sw', 'lap')).toEqual([{level: 'warn', message: 'doubles back on itself where it leaves sw: that port faces away from where the cable goes — put the port on the side of sw that faces the way the cable runs, or turn that block'}]);
+    expect(readWay('hairpin end', 'sw', 'lap')[0].message).toContain('where it leaves lap: ');
+    expect(readWay('hairpin middle', 'sw', 'lap')[0]).toMatchObject({level: 'warn', message: expect.stringContaining('a tight U-turn')});
+    for (const word of ['sideways', 'start-', 'start-hook-x']) expect(readWay(`hairpin ${word}`, 'sw', 'lap'), word).toEqual([]);   // a word of a newer build says nothing
+  });
+
+  it('is said of a cable the build lays out of a port that faces away', () => {
+    const grid = '<i data-iso-grid="120 at 960 150"></i>';
+    const html = `${grid}<div data-k="sw" data-iso="block" data-at="6 6" data-size="2 2 0.4" data-ports="p1: 2 1 0.3"></div><div data-k="lap" data-iso="block" data-at="0 6" data-size="2 1.4 0.3" data-ports="rj45: 2 0.7 0.15"></div>`;
+    const made = transformed(`${html}<i data-k="w1" class="wire" data-arrow="sw.p1 to lap.rj45"></i>`, {canvas: [1920, 1080]});
+    expect(made.ways).toEqual([{name: 'w1', from: 'sw', to: 'lap', way: expect.stringMatching(/^hairpin start(;|$)/)}]);
+    // the other way round, the far port is the one that faces away
+    expect(transformed(`${html}<i data-k="w1" class="wire" data-arrow="lap.rj45 to sw.p1"></i>`, {canvas: [1920, 1080]}).ways[0].way).toMatch(/^hairpin end(;|$)/);
   });
 });

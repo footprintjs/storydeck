@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.24.0 — a cable that doubles back is said
+
+- **`check` (rule `wire-way`) says when a cable doubles back on itself near a port, or in a tight U.** It warns when
+  a cable leaves a port one way and, within two tiles, runs back the other while the port faces away from the cable's
+  other end or sideways to it (the port is on the wrong side: put it on the side that faces the way, or turn the block), and when it
+  makes a tight U-turn on the floor (two stretches of half a tile or more, one each way, less than half a tile
+  apart). A port that faces sideways to the way counts as facing away. A short loop near a port that faces the other
+  end is a note (moving the port along its side may straighten it). Jogs under a tenth of a tile, a foot's step to change lanes and a wide U (more than two tiles
+  out before turning) are not said. The note is `hairpin start|end|start-hook|end-hook|middle` in `maps[name].ways`.
+  The build does not yet lay a way round a hairpin; it says so instead (`cable.js · hairpins`, on the kit's 3D path).
+  New warnings: `check --strict` fails on a deck whose ports face away.
+
 ## 0.23.0 — pictures that stand on the floor
 
 - **`data-footprint="col row wide deep [high]"`** on a piece you place yourself (a picture, an icon, a card): the
