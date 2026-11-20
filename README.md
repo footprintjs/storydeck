@@ -833,6 +833,19 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   (`data-iso-grid="120 at 960 240"`, not `fit`) and every block has its `data-at`; both are refused otherwise, with
   the fix. Ports on a piece that is neither a block nor a footprint are refused too: they would plug nothing in.
 
+  **Words a cable keeps off.** `data-keep-clear` on a piece placed by its own style (a device's name, a note) keeps
+  the cables the build lays off the floor under its box where there is another way: a cost to the router, never a
+  wall, so no cable is left without a way for words. Where there is none, the cable runs under them and `check` (rule
+  `wire-way`) says which cable runs under which piece (asked of the piece's own box and the cable's way on the floor),
+  with the fix. It works on a raised floor too (the floor under the box at the blocks' height). A piece no cable comes
+  near changes nothing, and it never changes how finely the floor is laid; a cable that goes round words may take the
+  lane another would have had, and a way round can pass behind a block (said, as ever). As for a footprint, the floor
+  beside it is written in numbers and every block has its `data-at`.
+
+  ```html
+  <div data-k="lap-name" class="name" data-keep-clear style="left:660px;top:420px;width:180px;height:36px">Laptop</div>
+  ```
+
   **The floor and the picture hold the wires too.** A wire that goes round a block reaches past the blocks. The wires
   are laid as soon as the blocks stand, before anything is fitted, so a fitted floor lies under every wire and the
   fitted picture keeps every wire on the slide.

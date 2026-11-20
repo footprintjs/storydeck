@@ -41,10 +41,11 @@
 // A piece is what it draws, not the box it is placed by. The box of a block seen from a corner has four empty corners,
 // and a nearer block's box lies over the block behind it: so on the slide shown only its faces and its words take the
 // pointer, and a ring round it (a highlight, explore's hover) follows its faces — isoRing, for whoever rings a piece.
-import {arrange, gridFor, isometric, readThing, wordsToFit} from 'footprint-story/isometric';
+import {arrange, gridFor, isometric, readThing, wordsToFit, MOST_KEEP} from 'footprint-story/isometric';
 import {portsWritten} from './portsWritten.js';
 import {floorLabelPlace, MOST_LABEL} from './floorLabel.js';
 import {arrangeByGroup, groupWritten, GROUP_MARGIN} from './groups.js';
+import {floorUnder, mayKeepClear, readKeepClear} from './keepClear.js';
 import {mayHoldFootprint, paintFootprints, readFootprints} from './footprint.js';
 import {decodeEntities, esc} from './html.js';
 import {attrRule, ownAttribute, pieceTags, tagsWith} from '../pieceRules.js';
@@ -190,13 +191,14 @@ const quoted = (pieces) => pieces.map((p) => `"${p.name}"`).join(', ');
  * The blocks (and cylinders): all placed by the map, or all placed here from `links` ([[from, to]], the map's wires) —
  * never some of each. A floor with no data-size is fitted round them, a tile of floor showing on every side.
  */
-function place(found, links, lay, feet = []) {
+function place(found, links, lay, feet = [], clear = [], fixedGrid = null) {
   const solid = found.filter((p) => p.kind !== 'floor'), unplaced = solid.filter((p) => p.at === null);
   if (unplaced.length && unplaced.length < solid.length) {
     throw new Error(`${quoted(unplaced)} ${unplaced.length === 1 ? 'has' : 'have'} no data-at and ${quoted(solid.filter((p) => p.at !== null))} ${solid.length - unplaced.length === 1 ? 'has' : 'have'} one: the build places a map's blocks from its wires only when it places them all — take data-at off the others, or give every block one (a block with none stood at "0 0" before 0.17.0)`);
   }
   const placedHere = unplaced.length > 0;
   // a footprint stands where its piece's style puts it: the build cannot place blocks round a picture it does not move
+  if (placedHere && clear.length) throw new Error(`${quoted(unplaced)} ${unplaced.length === 1 ? 'has' : 'have'} no data-at, and ${clear[0].where} keeps the floor under it clear where its own style puts it: the build places a map's blocks only when nothing on the floor is placed by hand — give every block its data-at`);
   if (placedHere && feet.length) throw new Error(`${quoted(unplaced)} ${unplaced.length === 1 ? 'has' : 'have'} no data-at, and ${feet[0].where} stands where its own style puts it: the build places a map's blocks only when nothing on the floor is placed by hand — give every block its data-at`);
   if (placedHere) {
     // a piece is known by the first name in its data-k: the wires say it, and the build places by it
@@ -221,7 +223,12 @@ function place(found, links, lay, feet = []) {
   for (const p of solid) shapeOf(p, unit);
   // the blocks stand: the wires are laid between them now, before anything is fitted, so the floor and the picture hold them too
   const standing = [...solid, ...feet];
-  const reach = lay ? lay(standing.map((p) => ({name: p.name, kind: p.kind, at: [p.at[0], p.at[1], p.at[2] ?? 0], size: [...p.size], ports: p.ports}))) : [];
+  // the floor kept clear at each height the blocks stand at: where a cable could run under the words
+  const lifts = [...new Set(standing.map((p) => p.at[2] ?? 0))], grid = clear.length ? fixedGrid() : null;
+  // (the kit knows each stretch by a number of ours, `name`; `piece` is the deck's name, any text a deck holds)
+  const budget = {left: MOST_KEEP, most: MOST_KEEP};
+  const keep = clear.flatMap(({name, box, where}, k) => lifts.flatMap((lift) => floorUnder(box, grid, lift, where, budget).map((stretch) => ({...stretch, name: String(k), piece: name}))));
+  const reach = lay ? lay(standing.map((p) => ({name: p.name, kind: p.kind, at: [p.at[0], p.at[1], p.at[2] ?? 0], size: [...p.size], ports: p.ports})), keep) : [];
   for (const floor of found.filter((p) => p.kind === 'floor')) {
     if (floor.size !== null) { floor.at ??= [0, 0]; continue; }
     if (floor.at !== null) throw new Error(`${floor.where}: a floor with a data-at needs its data-size too ("8 5") — or write neither, and the build fits the floor round the blocks`);
@@ -410,8 +417,11 @@ export function isoDrawn(html, {canvas = null, area = null, links = [], lay = nu
   }
   // a footprint's piece stands where its style puts it: a floor fitted to the slide would move under it
   if (feet.length && fit) throw new Error(`${feet[0].where}: a footprint's piece stands where its own style puts it, so the floor is written in numbers beside it — data-iso-grid="120 at 960 240", not "fit"`);
+  // floor kept clear under words placed by their own style (keepClear.js): known only on a floor that does not move
+  const clear = mayKeepClear(map) ? readKeepClear(map) : [];
+  if (clear.length && fit) throw new Error(`${clear[0].where}: the floor kept clear is the floor under the piece where its style puts it, so the floor is written in numbers beside it — data-iso-grid="120 at 960 240", not "fit"`);
   if (found.length + feet.length > MOST_ISO_PIECES) throw new Error(`a map holds at most ${MOST_ISO_PIECES} isometric pieces${feet.length ? ' and footprints together' : ''}, and this one has ${found.length + feet.length}`);
-  const {placedHere, reach} = place(found, links, lay, feet);
+  const {placedHere, reach} = place(found, links, lay, feet, clear, () => written ?? gridOf(found, {fit: false, canvas, area}));
   // a group's floor names an area, so the fitted picture holds all of it (any other floor is ground, and may run past the slide)
   const areas = found.filter((p) => p.kind === 'floor' && p.group !== null).flatMap(({at: [c, r], size: [w, d]}) => [[c, r, 0], [c + w, r, 0], [c, r + d, 0], [c + w, r + d, 0]]);
   const grouped = found.some((p) => p.group !== null && p.group !== undefined);
