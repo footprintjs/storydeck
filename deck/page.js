@@ -12,7 +12,7 @@ import {DIFFERS_CSS} from './differs.js';
 import {PACE_CSS} from './pace.js';
 import {CALLOUT_CSS} from './callouts.js';
 import {ISO_CSS} from './iso.js';
-import {RIDE_CSS} from './transforms.js';
+import {RIDE_CSS} from './rides.js';
 import {LENS_CSS, LENS_FIRST, lensHtml, lensRuntime} from './lenses.js';
 import {EXPLORE_CSS, exploreData, exploreRuntime} from './explore.js';
 import {TRANSITION_CSS, transitionData, transitionRuntime} from './transitions.js';

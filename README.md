@@ -777,12 +777,13 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   long as said) before the next run. `data-keep-size` keeps it the same size on the slide however near the camera
   comes, through the view's move too. `data-trail="3px var(--l1)"` draws a line of that width and colour behind it as
   it rides. `data-behind="fade"` fades it out over about three frames before a stretch a block hides (the build's
-  record: `unseen`) and back after it, on the same line. Each needs `data-packets`, and each works on a wire through
-  the air too, as `data-packets` does (nothing hides such a wire, so `data-behind` has nothing to fade there). A wrong
+  record: `unseen`), gone before its edge reaches the block, and back after it, on the same line. Each needs
+  `data-packets`, and each works on a wire through the air too, as `data-packets` does: its packets then ride its curve
+  by length, as a cable's ride its line (nothing hides such a wire, so `data-behind` has nothing to fade there). A wrong
   value is refused at build, naming the wire and the fix. Where loops do not run — reduced motion, print, motion off —
   the packet rests as it always did, at its cable's middle, or at its end with `data-rest="end"`; it keeps its size
   there too, and no trail is drawn. The numbers are one small module, `deck/ride.js` (plain numbers in and out), so a
-  film can ride the same packets the same way. A wire that asks for none of these is drawn exactly as before.
+  film can ride the same packets the same way; `deck/rides.js` turns them into the page's CSS. A wire that asks for none of these is drawn exactly as before.
 
   **A picture that stands on the floor.** A piece you place yourself (a drawing of a laptop, an icon, a card) stands
   on the floor by its footprint: the floor it takes, `col row wide deep` in tiles, with its height after it.

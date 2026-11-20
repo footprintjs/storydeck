@@ -37,14 +37,14 @@ describe('ride.js: the numbers of a packet\'s ride', () => {
     expect(speeds.at(-1)).toBeLessThan(30);   // into rest
   });
 
-  it('keeps every eased stop within half a px of the true ease, with more stops on a longer line, never past 32 an end', () => {
+  it('keeps every eased stop within 0.4 px of the true ease (a page rounds the rest of half a px), more stops on a longer line, never past 40 an end', () => {
     for (const length of [100, 1000, 5000]) {
       const ease = [0.2, 0.3], stops = rideProfile(ease, length), whole = 1 + ease[0] + ease[1];
       // the true place at a time, from rest: a·(t / ta)² in, 1 − b·((1 − t) / tb)² out
       const truth = (t) => (t < (2 * ease[0]) / whole ? ease[0] * (t / ((2 * ease[0]) / whole)) ** 2 : t > 1 - (2 * ease[1]) / whole ? 1 - ease[1] * ((1 - t) / ((2 * ease[1]) / whole)) ** 2 : null);
-      for (let k = 0; k <= 2000; k++) { const want = truth(k / 2000); if (want !== null) expect(Math.abs(at(stops, k / 2000) - want) * length).toBeLessThanOrEqual(0.5 + 1e-9); }
+      for (let k = 0; k <= 2000; k++) { const want = truth(k / 2000); if (want !== null) expect(Math.abs(at(stops, k / 2000) - want) * length).toBeLessThanOrEqual(0.4 + 1e-9); }
     }
-    expect(rideProfile([0.5, 0.5], 1e7).length).toBeLessThanOrEqual(1 + 32 + 32);
+    expect(rideProfile([0.5, 0.5], 1e7).length).toBeLessThanOrEqual(1 + 40 + 40);
     expect(rideProfile([0.5, 0.5], 10)).toEqual(expect.arrayContaining([[0.5, 0.5]]));   // all ease, no steady stretch: in to the middle and out
   });
 
@@ -83,5 +83,8 @@ describe('ride.js: the numbers of a packet\'s ride', () => {
     expect(hiddenRamps([[350, 900]], 400, 300)).toEqual([[(350 - 15) / 400, 0.875, 1, 1]]);
     expect(hiddenRamps([[50, 50]], 400, 300)).toEqual([]);
     expect(hiddenRamps([[0, 10]], 0, 300)).toEqual([]);
+    // with the packet's radius: gone when its front reaches the stretch, back once its back has left it
+    expect(hiddenRamps([[300, 360]], 600, 300, [0, 0], {radius: 7}).map((r) => r.map((v) => +(v * 600).toFixed(9)))).toEqual([[278, 293, 367, 382]]);
+    expect(hiddenRamps([[5, 40]], 400, 300, [0, 0], {radius: 7})).toEqual([[0, 0, 47 / 400, 62 / 400]]);   // too near the start to fade out: hidden from it
   });
 });

@@ -13,8 +13,15 @@
   the lead carries the packets too, so one resting at the port is seen there, over its block. Each works on a wire
   through the air too; a wrong value is refused at build, naming the wire and the fix. Under reduced motion, in print
   and with motion off a packet rests as before (at the end with `data-rest="end"`, at its kept size, no trail). The
-  numbers are one small module, `deck/ride.js` (plain numbers in and out, so a film can ride the same packets later);
-  the page carries their stylesheet only when a wire asks, so every page without them is byte for byte as before.
+  numbers are one small module, `deck/ride.js` (plain numbers in and out, so a film can ride the same packets later),
+  and `deck/rides.js` turns them into CSS; the page carries their stylesheet only when a wire asks, so every page
+  without them is byte for byte as before.
+- A wire through the air that asks how its packets ride carries them along its curve by length (offset-path, as a
+  cable's), so its eased ends, its px speed and its trail are shares of its length, not of its curve's parameter. A
+  packet that fades behind a block is gone before its edge reaches it (its radius more; over the zoom when it keeps
+  its size). On a lead's stretch only the lead's copy shows, never both, and a resting packet is drawn under the
+  lead's arrowhead. An error quotes at most 60 letters of a value; a trail's colour is at most 100 letters and three
+  brackets deep; a wire with no length is refused a px speed, with seconds as the fix.
 - Known: without a ride option, a packet riding into a port on a seen side still passes under its block for the last
   short stretch (a page without them stays byte for byte as it was).
 

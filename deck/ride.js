@@ -23,9 +23,9 @@
 // speed, and slows evenly to rest over the last `b` (a, b from 0 to 0.5). Evenly gathered speed covers a stretch in
 // twice the time the steady speed would, so the ride takes (1 + a + b) times as long as the line at its steady speed.
 
-/** Px a stop may stand off the true ease, at most: under a pixel, so no one sees the corners of the stops. */
-const TOLERANCE = 0.5;
-const MOST_STOPS = 32;   // stops for one eased end, at most: within TOLERANCE for half of any line up to 4096 px (a slide is 1920)
+/** Px a stop may stand off the true ease, at most: under half a pixel, so no one sees the corners of the stops. */
+const TOLERANCE = 0.4;   // 0.1 px left for a page to round the stops it writes (rides.js · easing): under half a px in all
+const MOST_STOPS = 40;   // stops for one eased end, at most: within TOLERANCE for half of any line up to 4096 px (a slide is 1920)
 const SHOW = {in: 0.12, out: 0.15};   // the share of a ride a packet takes to fade in at its start and out before its end (deck.css · sdRun)
 
 /** The ride's time, in seconds: a line `length` px long at `speed` px a second, its steady speed, with its ends eased [a, b]. */
@@ -77,15 +77,16 @@ export function showStops(share = 1, {end = false} = {}) {
  * backTo], …], shares of the line. `unseen`: the stretches, [[from, to], …] in px along the line (the build's record of a
  * cable); `length`: the line's px; `speed`: its steady px a second; `ease`: [a, b] (speedAt). Each fade takes `frames`
  * frames at `fps` — about three, the least a fade is seen as one and not as a jump — at the speed the packet has at
- * that edge, and never less than `least` px. It is gone by the edge and comes back from the far edge, so it never shows
- * cut by the block, and comes out on the same line it went in on. A stretch at the line's start has no fade out, one at
- * its end no fade back; a stretch with no length is no stretch.
+ * that edge, and never less than `least` px. It is gone by the time its front reaches the block — `radius` px (the
+ * packet's own) before the stretch — and comes back from as far past it, so it never shows cut by the block, and comes
+ * out on the same line it went in on. A stretch at the line's start has no fade out, one at its end no fade back; a
+ * stretch with no length is no stretch.
  */
-export function hiddenRamps(unseen, length, speed, ease = [0, 0], {frames = 3, fps = 60, least = 2} = {}) {
+export function hiddenRamps(unseen, length, speed, ease = [0, 0], {frames = 3, fps = 60, least = 2, radius = 0} = {}) {
   if (!(length > 0)) return [];
-  const fade = (at) => Math.max(least, (speed * speedAt(at / length, ease) * frames) / fps);
+  const fade = (at) => Math.max(least, (speed * speedAt(at / length, ease) * frames) / fps), share = (px) => Math.min(length, Math.max(0, px)) / length;
   return unseen
     .map(([lo, hi]) => [Math.max(0, lo), Math.min(length, hi)])
     .filter(([lo, hi]) => hi > lo)
-    .map(([lo, hi]) => [lo > 0 ? Math.max(0, lo - fade(lo)) / length : 0, lo / length, hi / length, hi < length ? Math.min(length, hi + fade(hi)) / length : 1]);
+    .map(([lo, hi]) => (lo > 0 ? [share(lo - radius - fade(lo)), share(lo - radius)] : [0, 0]).concat(hi < length ? [share(hi + radius), share(hi + radius + fade(hi))] : [1, 1]));
 }
