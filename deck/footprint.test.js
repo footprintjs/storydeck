@@ -114,6 +114,9 @@ describe('a piece that stands on the floor by its footprint (data-footprint)', (
       expect(bad(`${grid}<div data-k="g" data-footprint="0 0 2 2" style="left:1px;top:1px;width:300px;height:300px">${inner}</div>`), inner).toThrow('"g" (data-footprint="0 0 2 2"): pieces do not nest, and this one holds a block or a footprint — place it beside it');
     }
     expect(bad(`${grid}<div data-k="g" data-footprint="0 0 2 2" style="left:1px;top:1px;width:9px;height:9px"><b title="data-iso">words</b></div>`)).not.toThrow();
+    // <div/> is open to a browser: the block after it is inside it
+    expect(bad(`${grid}<div data-k="g" data-footprint="0 0 2 2" style="left:1px;top:1px;width:9px;height:9px"/><div data-k="x" data-iso="block" data-at="6 6"></div></div>`)).toThrow('pieces do not nest');
+    expect(bad(`${grid}${sw}<svg data-k="s" data-footprint="0 0 2 2" style="left:1px;top:1px;width:9px;height:9px"/><div data-k="x" data-iso="block" data-at="2 2"></div>`)).not.toThrow();
     // a wire or a callout does not stand on the floor
     expect(bad(`${grid}${sw}<i data-k="w" class="wire" data-arrow="f to sw" data-footprint="9 0 1 1" style="left:1px;top:1px;width:9px;height:9px"></i>`)).toThrow('"w" (data-footprint="9 0 1 1"): a wire does not stand on the floor — put data-footprint on the piece it is about');
     expect(bad(`${grid}${sw}<div data-k="c" data-callout="sw above" data-footprint="9 0 1 1" style="left:1px;top:1px;width:9px;height:9px">c</div>`)).toThrow('a callout does not stand on the floor');

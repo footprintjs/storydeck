@@ -71,7 +71,8 @@ export function readFootprints(html) {
     if (/(?:^|;)\s*z-index\s*:/i.test(styled.value)) throw new Error(`${told}: it is painted in the floor's order (a nearer piece over a further one) — take z-index out of its style`);
     const ports = portsWritten(ownAttribute(run, 'data-ports'), 'block', size, told);
     // pieces do not nest: a block or a footprint inside this one would be placed from its box, not from the floor
-    if (!EMPTY.has(tag.toLowerCase()) && !/\/\s*$/.test(run)) {
+    // a browser opens <div/> as <div>: only an element that holds nothing, or a self-closed <svg/> (foreign, closed by its slash), is skipped
+    if (!EMPTY.has(tag.toLowerCase()) && !(/^svg$/i.test(tag) && /\/\s*$/.test(run))) {
       const {at: close} = closeOf(html, tag, end, told), inner = html.slice(end, close);
       if (/data-(?:iso|footprint)(?![\w-])/i.test(inner) && tagsWith(inner, /data-(?:iso|footprint)(?![\w-])/i).some((t) => ownAttribute(t.before + t.m[0] + t.after, 'data-iso') || ownAttribute(t.before + t.m[0] + t.after, 'data-footprint'))) {
         throw new Error(`${told}: pieces do not nest, and this one holds a block or a footprint — place it beside it`);
