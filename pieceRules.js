@@ -89,7 +89,8 @@ export function ownAttribute(run, name) {
   if (!read) return undefined;
   const found = read.filter((a) => a.name === name), a = found[0];
   if (!a) return null;
-  const m = new RegExp(`^${name}=(["'])(.*?)\\1`).exec(run.slice(a.at));
+  // a value runs to its closing quote, over line ends too, as a browser reads it
+  const m = new RegExp(`^${name}=(["'])([\\s\\S]*?)\\1`).exec(run.slice(a.at));
   if (!m) return {bare: true, value: a.value, twice: found.length > 1};
   return {value: m[2], quote: m[1], before: run.slice(0, a.at).replace(/[\s/]$/, ''), after: run.slice(a.at + m[0].length), twice: found.length > 1};
 }

@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.26.0 — named areas: a floor with a name, and groups
+
+- **`data-label` on a floor** (and `data-icon`, an icon of the deck beside it) names the area it is: the words lie
+  flat on the floor along its front edge, part of the floor (they grey, light and hide with it), sized from the tile
+  (14 to 28 px), fitted to the edge as a block's name is fitted to its top (an icon and capitals take more room), and
+  moved along the edge clear of blocks, footprints and cables drawn over it. `check` (`name-fit`) says a label that
+  does not fit (or is deeper than its floor) or that is covered all along, with the fix. A labelled floor stays
+  ground unless it names a group. A floor written as an empty `<i>` keeps its `data-icon` for its label. Refused with
+  the fix: an empty label or one over 120 letters, a control, direction or other unseen character, an icon without a label or one
+  the deck does not have, `data-icon` on a block. The page carries the label's stylesheet only when a floor has one.
+- **`data-iso-group`** on blocks and on a floor: when the build places the blocks it places each group together (from
+  the wires inside it), then the groups (from the wires between them, with arrange's own gaps), left to right, each
+  on its own floor fitted round its blocks alone with a clear tile between floors. The fitted picture holds every
+  group's floor, at a tile down to 64 px; `check` (`map-fit`, new) says when it still runs past the slide. A group's
+  labelled floor is not ground. Placed by hand, a group still fits its floor. A floor whose group has no block is
+  refused, naming the fix.
+- An attribute's value written over more than one line is read whole, as a browser reads it (before, such a value
+  was refused as unquoted). A floor's label wrapped onto two lines in the file is one line of words.
+
 ## 0.25.0 — how a wire's packets ride
 
 - **How a wire's packets ride**, each an attribute on the wire beside `data-packets` (and refused without it):

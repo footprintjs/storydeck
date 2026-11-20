@@ -13,7 +13,8 @@
 //   view-far       a click whose view stands further out than half size (a fit over a wide picture): its words are small
 //   across-stages  a wire or a callout that joins pieces standing on different stages: when one stage's view moves, it is left behind
 //   wire-way       a wire between two blocks that does not lie well on the floor: it passes behind a block, lies on another, doubles back on itself (a hairpin), or is drawn straight — and why
-//   name-fit       a block's name that does not fit its top face even on two lines at the least size
+//   name-fit       a block's name that does not fit its top face (or a floor's label its front edge) even on two lines at the least size
+//   map-fit        a map of groups whose fitted picture runs past the slide even at the least tile
 import {wordCount} from './parse.js';
 import {expandNames} from '../focus.js';
 import {LOOP_NAMES} from './loops.js';
@@ -178,9 +179,22 @@ function namesTight(compiled) {
     const told = compiled.clicks.filter((c) => c.map === map);
     if (!told.length) continue;
     const shownAt = (name) => { const i = pieces.findIndex((p) => p.keys.includes(name)); return told.find((c) => i >= 0 && c.look.pieces[i]?.state !== 'gone') ?? told[0]; };
-    for (const {name, text} of tight) out.push(problem('warn', 'name-fit', shownAt(name), `"${name}": its name "${text}" does not fit its block's top, even on two lines at the least size — shorten it (and say the rest in a <small> line or the notes), or give the block a bigger top (data-size: a top is as wide across its middle as the block's shorter side)`));
+    for (const {name, text, on} of tight) {
+      if (on === 'floor-covered') out.push(problem('warn', 'name-fit', shownAt(name), `"${name}": its label "${text}" is covered: something stands on the floor's front edge all along it — move what stands there, or give the floor more room in front (data-size, data-at)`));
+      else if (on === 'floor') out.push(problem('warn', 'name-fit', shownAt(name), `"${name}": its label "${text}" does not fit along the floor's front edge, even on two lines at the least size — shorten it, or give the floor more cols (data-size)`));
+      else out.push(problem('warn', 'name-fit', shownAt(name), `"${name}": its name "${text}" does not fit its block's top, even on two lines at the least size — shorten it (and say the rest in a <small> line or the notes), or give the block a bigger top (data-size: a top is as wide across its middle as the block's shorter side)`));
+    }
   }
   return out;
+}
+
+/** A map of groups the build could not fit on the slide even at its least tile: said with how far it runs past, and the fix. */
+function mapsFit(compiled) {
+  return Object.entries(compiled.maps).flatMap(([map, {made}]) => {
+    const first = compiled.clicks.find((c) => c.map === map);
+    if (!first || !made?.outside) return [];
+    return [problem('warn', 'map-fit', first, `map "${map}": its groups need more room than the slide has — at the least tile the picture runs ${made.outside} px past the slide's area: tell it in two maps, or put fewer groups side by side`)];
+  });
 }
 
 /** Every problem of a compiled deck: [{level: 'error' | 'warn' | 'info', rule, click, label, message}]. */
@@ -192,7 +206,7 @@ export function checkDeck(compiled) {
     out.push(...noChange(c, compiled.clicks[i - 1]));
     out.push(...farView(c));
   });
-  out.push(...neverShown(compiled), ...missingNotes(compiled), ...unstyledThemes(compiled), ...unsetLoops(compiled), ...unsaidDiffers(compiled), ...aloneCallouts(compiled), ...acrossStages(compiled), ...wireWaysSaid(compiled), ...namesTight(compiled));
+  out.push(...neverShown(compiled), ...missingNotes(compiled), ...unstyledThemes(compiled), ...unsetLoops(compiled), ...unsaidDiffers(compiled), ...aloneCallouts(compiled), ...acrossStages(compiled), ...wireWaysSaid(compiled), ...namesTight(compiled), ...mapsFit(compiled));
   return out;
 }
 

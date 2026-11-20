@@ -697,6 +697,39 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   wrote it. It is a piece like any other: every click, `fit`,
   `zoom`, a route, a wire to it and a callout beside it work as they do on a box.
 
+  **A floor with a name.** A floor names the area it is (an account, a network, a team) with `data-label`, and an
+  icon of the deck beside it with `data-icon`:
+
+  ```html
+  <div data-k="prod" data-iso="floor" data-size="8 5" data-label="Production account" data-icon="account"></div>
+  ```
+
+  The words lie flat on the floor along its front edge (the near edge on the left), a little in from its far end, the
+  way a diagram heads a group box; they are part of the floor, so they grey, light and hide with it. Their size
+  follows the tile (14 to 28 px), so they are as readable as the floor at any zoom. They are fitted to the edge as a
+  block's name is to its top (two lines, then smaller; an icon and capitals take more room), and they move along the
+  edge, half a tile at a time, clear of any block or footprint drawn over them and of any cable laid across. `check`
+  (`name-fit`) says a label that still does not fit (or whose two lines are deeper than the floor), or one that every
+  place along the edge has covered, with the fix. A labelled floor is still ground (a view frames the pieces on it,
+  so a close view may leave its words out), unless it names a group.
+
+  **Groups.** Blocks that belong together name their group, and a floor with that group is fitted round them alone:
+
+  ```html
+  <div data-k="web" data-iso="block" data-iso-group="frontend"><b>Web</b></div>
+  <div data-k="api" data-iso="block" data-iso-group="backend"><b>API</b></div>
+  <div data-k="db" data-iso="cylinder" data-iso-group="backend"><b>Database</b></div>
+  <div data-k="g-frontend" data-iso="floor" data-iso-group="frontend" data-label="Frontend team"></div>
+  <div data-k="g-backend" data-iso="floor" data-iso-group="backend" data-label="Backend team"></div>
+  ```
+
+  When the build places the blocks, it places each group's blocks together from the wires inside it, then the groups
+  from the wires between them, the same way: the flow reads left to right, group by group, each on its own floor with
+  a clear tile between floors, and no number is typed. The fitted picture holds every group's floor, at a tile down to
+  64 px; when even that runs past the slide, `check` (`map-fit`) says how far, with the fix (two maps, or fewer
+  groups side by side). Placed by hand, a group still fits its floor. A group's labelled floor is not ground: a view
+  that frames it holds its words.
+
   Why the build places it: where a block lands, how big it is and which block is painted over which all follow from
   the floor, so a left, top, width or height of its own is refused, with the fix. The nearer block is painted over the
   further by a level each; the map's own order never moves. Write the floor first: it and the wires share a level.
