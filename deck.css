@@ -57,6 +57,10 @@
    piece's own animation (focus.css · --sd-a-more): at its turn on a path, after a new blur. */
 @property --sd-reveal { syntax: '<percentage>'; inherits: false; initial-value: 100%; }
 @keyframes sdReveal { from { --sd-reveal: -12%; } }
+/* a cable's lead into a port (transforms.js · leadSvg) is drawn again over its block: it has no ring of its own (the
+   cable's is the one), no sweep, and the one at the cable's far end shows when the cable's sweep reaches it */
+:where(svg.wire[data-sd-lead]) { --sd-hot-width: 0px; }
+@keyframes sdLeadWait { from, to { opacity: 0; } }
 @media screen and (prefers-reduced-motion: no-preference) {
   :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) :where(.sd-path) :where(.pkt) {
     animation: sdPkt var(--sd-turn-time, .6s) ease-in-out var(--sd-path-delay, 0s) both, sdPktShow var(--sd-turn-time, .6s) linear var(--sd-path-delay, 0s) both;   /* a turn with its own seconds (`w1:1.2`): the ride takes them */
@@ -67,8 +71,12 @@
   /* a highlighted wire keeps its ring, drawn outside its box where no mask paints: it just fades in */
   :where(svg.wire.sd-enter:not(.sd-hot, .sd-hot-in)) { --sd-a-more: sdReveal .6s cubic-bezier(.4, 0, .2, 1) var(--sd-delay, 0s) both; }
   :where(svg.wire.sd-path.sd-enter:not(.sd-hot, .sd-hot-in)) { --sd-a-more: sdReveal .6s cubic-bezier(.4, 0, .2, 1) var(--sd-turn, 0s) both; }
+  /* the far-end lead waits out most of the sweep: the cable's own seconds and wait, a part's pace included
+     — that rule leaves the far-end lead to this one */
+  :where(svg.wire[data-sd-lead="end"].sd-enter:not(.sd-hot, .sd-hot-in)) { --sd-a-more: sdLeadWait calc(var(--sd-arrive-time, .6s) * .8) linear calc(var(--sd-delay, 0s) + var(--sd-arrive-delay, 0s)) backwards; }
+  :where(svg.wire.sd-path[data-sd-lead="end"].sd-enter:not(.sd-hot, .sd-hot-in)) { --sd-a-more: sdLeadWait calc(var(--sd-arrive-time, .6s) * .8) linear calc(var(--sd-turn, 0s) + var(--sd-arrive-delay, 0s)) backwards; }
   :where(svg.wire.sd-twin-turn) { --sd-twin-lag: .3s; }   /* the wire it hands over to sweeps in: it leaves as the sweep nears the tip */
-  :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) :where(svg.wire.sd-enter:not(.sd-hot, .sd-hot-in)) {
+  :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) :where(svg.wire.sd-enter:not(.sd-hot, .sd-hot-in, [data-sd-lead])) {
     -webkit-mask-image: linear-gradient(var(--sd-angle, 90deg), #000 var(--sd-reveal), transparent calc(var(--sd-reveal) + 12%));
     mask-image: linear-gradient(var(--sd-angle, 90deg), #000 var(--sd-reveal), transparent calc(var(--sd-reveal) + 12%));
   }

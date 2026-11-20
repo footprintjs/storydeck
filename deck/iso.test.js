@@ -34,7 +34,7 @@ describe('iso · blocks on a floor seen from a corner', () => {
 
   it('draws a block as three faces, a cylinder as its side and its top, a floor as its tile lines, and keeps what the element had', () => {
     const server = drawn.slice(drawn.indexOf(tagOf(drawn, 'server')), drawn.indexOf('<div data-k="db"'));
-    expect(tagOf(drawn, 'server')).toBe('<div data-k="server" data-at="3 1" data-size="2 2 1.4" class="iso ok" data-sd-iso="block" style="left:960px;top:257.1px;width:240px;height:222.9px;z-index:2;--iso-color:#cfe1f7">');
+    expect(tagOf(drawn, 'server')).toBe('<div data-k="server" data-at="3 1" data-size="2 2 1.4" class="iso ok" data-sd-iso="block" style="left:960px;top:257.1px;width:240px;height:222.9px;z-index:4;--iso-color:#cfe1f7">');
     expect(server).toContain('<svg class="iso-art" viewBox="0 0 240 222.9" aria-hidden="true"><polygon class="iso-left" points="0,60 120,120 120,222.9 0,162.9"/><polygon class="iso-right" points="120,120 240,60 240,162.9 120,222.9"/><polygon class="iso-top" points="120,0 240,60 120,120 0,60"/></svg>');
     expect(server).toContain('<span class="iso-say" style="left:120px;top:60px"><b>Server</b><small>an API</small></span></div>');   // its words, on its top face
     expect(drawn).toMatch(/data-sd-iso="cylinder"[^>]*><svg class="iso-art"[^>]*><path class="iso-side" d="M0 33\.9L0 122\.1A67\.9 33\.9 0 0 0 135\.8 122\.1L135\.8 33\.9Z"\/><ellipse class="iso-top" cx="67\.9" cy="33\.9" rx="67\.9" ry="33\.9"\/><\/svg>/);
@@ -48,7 +48,7 @@ describe('iso · blocks on a floor seen from a corner', () => {
     expect(tagOf(shown, 'f')).toContain(' data-ground="false" class="iso" data-sd-iso="floor"');   // its own word is kept, and no second one is added
     expect(readPieces(shown).pieces[0].ground).toBe(undefined);
     // a single-quoted style keeps its quote
-    expect(tagOf(isoPieces(`<div data-k="q" data-iso="block" data-at="0 0" data-size="1 1 1" style='--iso-color:"x"'></div>`, {canvas}), 'q')).toMatch(/style='left:900px;top:[\d.]+px;width:120px;height:[\d.]+px;z-index:1;--iso-color:"x"'>$/);
+    expect(tagOf(isoPieces(`<div data-k="q" data-iso="block" data-at="0 0" data-size="1 1 1" style='--iso-color:"x"'></div>`, {canvas}), 'q')).toMatch(/style='left:900px;top:[\d.]+px;width:120px;height:[\d.]+px;z-index:2;--iso-color:"x"'>$/);
   });
 
   it('found in review: the words data-iso in a text or in another attribute do not make a piece, a floor or a refusal', () => {
@@ -77,8 +77,8 @@ describe('iso · blocks on a floor seen from a corner', () => {
     expect(level(out, 'back')).toBeLessThan(level(out, 'front'));
     expect(level(out, 'back')).toBeLessThan(level(out, 'on'));
     expect(readPieces(out).pieces.map((p) => p.keys[0])).toEqual(['front', 'back', 'on']);   // the order written: a click's numbering uses it
-    expect([level(out, 'front'), level(out, 'back'), level(out, 'on')].sort()).toEqual([1, 2, 3]);   // one level each, from 1
-    expect(level(out, 'back')).toBe(1);
+    expect([level(out, 'front'), level(out, 'back'), level(out, 'on')].sort()).toEqual([2, 4, 6]);   // one even level each, from 2: the odd one above a block's is a lead's
+    expect(level(out, 'back')).toBe(2);
   });
 
   it('a floor of its own: data-iso-grid sets the tile and the far corner, and its element is taken out', () => {
@@ -177,7 +177,7 @@ describe('iso · in a deck', () => {
   });
 
   it('a callout stands over every block, and beside a piece that stands off the slide', () => {
-    expect(ISO_CSS).toContain(':where(section[data-label] [data-sd-callout]) { z-index: 257; }');
+    expect(ISO_CSS).toContain(':where(section[data-label] [data-sd-callout]) { z-index: 514; }');   // over every block (levels 2 to 512) and every lead into a port (one above its block)
     // a floor far to the right of a 1920 slide: the bubble stays above its piece, not held at the slide's edge
     const far = applyTransforms('<i data-iso-grid="120 at 3000 240"></i><div data-k="db" data-iso="cylinder" data-at="4 0" data-size="2 2 1"></div><div data-k="why" data-callout="db above">It lives here</div>', {canvas});
     const db = boxIn(far, 'db'), why = boxIn(far, 'why');
@@ -500,3 +500,20 @@ describe('iso · a piece that cannot be drawn is refused in the deck\'s words, w
   });
 });
 
+
+describe('iso · ports on a block (data-ports)', () => {
+  const canvas = [1920, 1080];
+  const block = (ports, kind = 'block') => `<i data-iso-grid="96 at 960 240"></i><div data-k="sw" data-iso="${kind}" data-at="0 0" data-size="2 2 1" data-ports="${ports}"></div>`;
+  it('reads them as "name: x y z" parted by "|", the side read from the point; refuses a wrong one, naming the piece and the fix', () => {
+    const [sw] = isoDrawn(block('p1: 1 2 0.5 | up: 2 1 0.2 | c: 2 2 0.2 right'), {canvas}).solids;
+    expect(sw.ports).toEqual([{name: 'p1', at: [1, 2, 0.5], face: 'left'}, {name: 'up', at: [2, 1, 0.2], face: 'right'}, {name: 'c', at: [2, 2, 0.2], face: 'right'}]);
+    expect(() => isoDrawn(block('p1 1 2 0.5'), {canvas})).toThrow('"sw" (data-iso="block"): data-ports="p1 1 2 0.5" — each port is "name: x y z"');
+    expect(() => isoDrawn(block('p1: 1 2 0.5 front'), {canvas})).toThrow('data-ports="p1: 1 2 0.5 front" — each port is "name: x y z"');
+    expect(() => isoDrawn(block('p1: 1 2 0.5 right'), {canvas})).toThrow('"sw" (data-iso="block")\'s port "p1" is at [1,2,0.5], on the left side, not right: write face left, or move the point');
+    expect(() => isoDrawn(block('p1: 1 1 0.5'), {canvas})).toThrow('on no side of "sw" (data-iso="block")');
+    expect(() => isoDrawn(block('p1: 1 1 1 top'), {canvas})).toThrow('a port on the top is not routed yet');
+    expect(() => isoDrawn(block('p1: 1 2 0.5 | p1: 2 1 0.5'), {canvas})).toThrow('two ports named "p1"');
+    expect(() => isoDrawn(block('p1: 1 2 0.5', 'cylinder'), {canvas})).toThrow('is round, and a round thing has no ports yet');
+    expect(() => isoDrawn(`<i data-iso-grid="96 at 960 240"></i><div data-k="f" data-iso="floor" data-size="4 4" data-ports="p: 1 1 0"></div>`, {canvas})).toThrow('"f" (data-iso="floor"): a floor has no ports');
+  });
+});

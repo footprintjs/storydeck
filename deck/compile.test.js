@@ -1,5 +1,6 @@
 import {describe, it, expect} from 'vitest';
 import {compileDeck} from './compile.js';
+import {editableMaps} from './dev.js';
 import {sourceOf, MAP} from './test/helpers.js';
 
 const CLICKS = `
@@ -48,6 +49,23 @@ describe('compileDeck', () => {
     expect([...route1.matchAll(/data-k="(\w+)"[^>]*data-sd-at="(\d+)"/g)].map((m) => [m[1], m[2]])).toEqual([['a', '0'], ['w1', '1'], ['b', '2'], ['w2', '3'], ['c', '4']]);
     // the same page otherwise: the dev numbers are the only difference
     expect(route1.replace(/ data-sd-at="\d+"/g, '')).toBe(compileDeck(sourceOf({deck: {title: 'T'}, clicks: CLICKS})).slides[1].html);
+  });
+
+  it('numbers only the pieces the map file holds in the dev page: a lead into a port is the build\'s drawing and takes no number', () => {
+    const map = '<i data-iso-grid="120 at 960 150"></i><div data-k="a" data-iso="block" data-at="0 6" data-size="2 1.4 0.3" data-ports="p: 2 0.7 0.15"></div>'
+      + '<div data-k="b" data-iso="block" data-at="6 6" data-size="4.7 2 0.4" data-ports="p1: 0.4 2 0.3"></div>'
+      + '<i data-k="w1" class="wire" data-arrow="a.p to b.p1"></i><i data-k="w2" class="wire" data-arrow="b to a"></i><div data-k="c" style="left:40px;top:900px;width:200px;height:60px">c</div>';
+    const clicks = '<section data-label="Ports" data-map="map"><step data-in="a b w1 w2 c"><h2>Plugged</h2></step></section>';
+    const source = sourceOf({clicks, maps: {map}}), dev = compileDeck(source, {dev: true});
+    const html = dev.slides[0].html;
+    expect(html).toContain('data-sd-lead');
+    expect(html).not.toMatch(/<svg[^>]*data-sd-lead[^>]*data-sd-at|<svg[^>]*data-sd-at[^>]*data-sd-lead/);
+    const numbered = [...html.matchAll(/<\w+[^>]*?data-k="(\w+)"[^>]*?data-sd-at="(\d+)"/g)].map((m) => [m[1], Number(m[2])]);
+    // each number names, in the file's own order, the piece that carries it (dev.js · editableMaps moves by it)
+    const {names} = editableMaps(source, dev).map;
+    expect(names).toEqual(['a', 'b', 'w1', 'w2', 'c']);
+    for (const [k, n] of numbered) expect(names[n], k).toBe(k);
+    expect(new Set(numbered.map(([, n]) => n))).toEqual(new Set([0, 1, 2, 3, 4]));
   });
 
   it('draws the chrome on every slide: kicker, headline on a map, footer with the count — escaped', () => {

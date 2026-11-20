@@ -21,13 +21,19 @@ import {paceAttrs} from './pace.js';
 
 /**
  * In the dev page only: each piece keeps the number the build gave it (data-sd-at, beside the data-sd-i drawFocus
- * reads and drops), so a piece moved in the page is named as the build read it — never by a second reading.
+ * reads and drops), so a piece moved in the page is named as the build read it — never by a second reading. The number
+ * counts the pieces the map's FILE holds (dev.js · editableMaps reads them in that order): a cable's lead into a port is
+ * the build's own drawing, in no file, so it gets no number and the pieces after it are not shifted by it.
  */
-function numberForDev(html) {
+function numberForDev(html, pieces) {
+  const inFile = new Map();
+  pieces.forEach((p, i) => { if (!p.lead) inFile.set(i, inFile.size); });
   let out = '', from = 0;
   for (const {start, tag, before, m} of tagsWith(html, /\sdata-sd-i="(\d+)"/)) {
+    const n = inFile.get(Number(m[1]));
+    if (n === undefined) continue;
     const at = start + 1 + tag.length + before.length + m[0].length;
-    out += `${html.slice(from, at)} data-sd-at="${m[1]}"`;
+    out += `${html.slice(from, at)} data-sd-at="${n}"`;
     from = at;
   }
   return out + html.slice(from);
@@ -60,7 +66,7 @@ function prepareMap(name, html, icons, {canvas, area}, dev) {
   const {html: out, pieces} = readPieces(drawn);
   if (!pieces.length) throw new Error(`map "${name}" has no pieces — a piece is an element with data-k="name" and an inline left/top (width/height)`);
   // the loops the deck writes: its own text and its icons' (a wire's packets are its wire's, not loops of their own)
-  return {name, html: dev ? numberForDev(out) : out, pieces, loops: loopsIn(drawIcons(stripComments(html), icons), `map "${name}"`), callouts: calloutsIn(stripComments(html)), ways, cables, tight, made, iso: isoIn(stripComments(html)).length > 0, state: null};
+  return {name, html: dev ? numberForDev(out, pieces) : out, pieces, loops: loopsIn(drawIcons(stripComments(html), icons), `map "${name}"`), callouts: calloutsIn(stripComments(html)), ways, cables, tight, made, iso: isoIn(stripComments(html)).length > 0, state: null};
 }
 
 /** A map's loops a click shows: on a piece it does not keep out (gone), or on no piece. */

@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.22.0 — cables that plug into a port
+
+- **Ports.** A block names points on its sides where a cable plugs in — `data-ports="p1: 0.4 2 0.3 | up: 4.7 1 0.3"`,
+  in its own tiles (x along its width, y along its depth, z up from its base) — and a wire names one as `piece.port`:
+  `data-arrow="lap.rj45 to sw.p1"`. The cable leaves the port straight out of its side, drops to the floor, runs
+  along the tile lines and comes up into the other port: its line ends on the port itself. The side is read from the
+  point (named after the numbers at a corner, and a wrong one refused with the right one). A port on a side behind is
+  allowed: its stretch runs behind its block, and `check` (rule `wire-way`) says so, as that, not as a block to move.
+  A port that is no port of its block, a port on a piece that is no block, and a bend on a wire to a port are refused,
+  naming the fix. A name with a dot that some piece (not a wire) goes by is still that piece. Not yet: the top, cylinders.
+- **The lead into a port on a seen side is drawn over its block.** The cable lies under every block; the stretch out
+  of such a port and its riser stand in front of the block's face, so that stretch is drawn again just above its
+  block (it is the cable's own piece: shown, lit and hidden with it, without a ring of its own; the one at the far end
+  shows when the cable's sweep reaches it), and a head into that port with it. The dev page moves pieces on such a map
+  as on any: a lead is the build's own drawing, in no file.
+- **The paint levels of an isometric piece are even now** (2, 4, …, and a callout's 514): the odd level above a block
+  is a lead's. Nothing looks different; a test that read a block's `z-index` reads twice the number.
+- The build's record of a cable (`maps[name].cables`) runs from port to port, risers included, and names its `ports`.
+- `footprint-story` 0.15.0 or later. Known: a packet riding into a port on a seen side passes under its block for the
+  last short stretch (packet options are the next step).
+
 ## 0.21.0 — a run can say why
 
 - **`storydeck log --run <n> --why <value>`** (and the MCP tool `log` with `why`): where a value of a run came from,

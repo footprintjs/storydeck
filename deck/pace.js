@@ -71,6 +71,6 @@ export const PACE_CSS = `/* how a part's pieces arrive and leave (deck/pace.js) 
   :where([data-sd-pace]) .sd-path.sd-enter { --sd-a-state: var(--sd-arrive-with, sdEnter) ${TAKES} ${EASE} calc(var(--sd-turn) + ${WAITS}) both; }
   :where([data-sd-pace]) .sd-path.sd-arrive { --sd-a-state: sdArrive ${TAKES} ease calc(var(--sd-turn) + ${WAITS}) both; }
   :where([data-sd-pace]) .sd-twin-turn.sd-leave { --sd-a-state: sdLeave ${GOES} ease calc(var(--sd-turn) + var(--sd-twin-lag, 0s)) both; }
-  :where([data-sd-pace] svg.wire.sd-enter:not(.sd-hot, .sd-hot-in)) { --sd-a-more: sdReveal ${TAKES} cubic-bezier(.4, 0, .2, 1) calc(var(--sd-delay, 0s) + ${WAITS}) both; }
-  :where([data-sd-pace] svg.wire.sd-path.sd-enter:not(.sd-hot, .sd-hot-in)) { --sd-a-more: sdReveal ${TAKES} cubic-bezier(.4, 0, .2, 1) calc(var(--sd-turn, 0s) + ${WAITS}) both; }
+  :where([data-sd-pace] svg.wire.sd-enter:not(.sd-hot, .sd-hot-in, [data-sd-lead="end"])) { --sd-a-more: sdReveal ${TAKES} cubic-bezier(.4, 0, .2, 1) calc(var(--sd-delay, 0s) + ${WAITS}) both; }
+  :where([data-sd-pace] svg.wire.sd-path.sd-enter:not(.sd-hot, .sd-hot-in, [data-sd-lead="end"])) { --sd-a-more: sdReveal ${TAKES} cubic-bezier(.4, 0, .2, 1) calc(var(--sd-turn, 0s) + ${WAITS}) both; }
 }`;

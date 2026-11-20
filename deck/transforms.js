@@ -41,7 +41,7 @@ import {readPieces} from '../focusHtml.js';
 import {boxFinder, exit, exitOutline} from './boxes.js';
 import {callouts} from './callouts.js';
 import {isoDrawn} from './iso.js';
-import {NO_ROUTE} from 'footprint-story/isometric';
+import {NO_ROUTE, rounded} from 'footprint-story/isometric';
 import {cables, cablesOn, cableWalk, cableWay, held, labelPlace, layRoutes, reachOf, wayNote, LABEL_LOOKS} from './cable.js';
 
 const fixed = (v) => +v.toFixed(1);
@@ -49,6 +49,29 @@ const fixed = (v) => +v.toFixed(1);
 const BETWEEN = /^\s*(\S+)\s+to\s+(\S+)(?:\s+(-?\d+(?:\.\d+)?))?\s*$/;
 /** The pieces a wire's data-arrow joins, [from, to] — or null for a wire written in numbers. */
 export const wireEnds = (spec) => { const m = BETWEEN.exec(spec); return m ? [m[1], m[2]] : null; };
+
+/**
+ * A wire's two ends as written, each a piece's name or "piece.port" (a port of that piece): {from, to, bend}, each end
+ * {name, port}; null for a wire written by numbers. `names`: the first names the map's pieces go by. A name some piece
+ * goes by is that piece, dots and all: "lap.rj45" is a port only when no piece is called that.
+ */
+export function wireEndsOf(spec, names) {
+  const m = BETWEEN.exec(spec);
+  if (!m) return null;
+  const end = (token) => {
+    if (names.has(token)) return {name: token, port: null};
+    const dot = token.lastIndexOf('.');
+    return dot > 0 && dot < token.length - 1 && names.has(token.slice(0, dot)) ? {name: token.slice(0, dot), port: token.slice(dot + 1)} : {name: token, port: null};
+  };
+  return {from: end(m[1]), to: end(m[2]), bend: m[3]};
+}
+/** The first names a map's pieces go by — every piece but a wire: a wire's own name is never the end of another. One reading, for every reader of a wire's ends. */
+function pieceNames(html) {
+  const tags = [...pieceTags(html)];
+  return new Set(readPieces(html).pieces.filter((p, i) => { const at = tags[i].before + tags[i].after; return !(/data-arrow/i.test(at) && ownAttribute(at, 'data-arrow')); }).map((p) => p.keys[0]));
+}
+/** A wire as the rest reads it: [spec, from, to, bend] by piece name (a port's piece), or null. */
+const endsRead = (spec, names) => { const e = wireEndsOf(spec, names); return e && [spec, e.from.name, e.to.name, e.bend]; };
 const LANE = 80;   // px between two wires joining the same pieces, at most (less when a box is too small to hold them)
 const GAP = 6;     // px between a wire's end and the box it leaves or reaches
 
@@ -202,7 +225,7 @@ function replaceEach(html, found, draw) {
  * laid}: `laid` is what cable.js said of each wire it was asked about, a way or the reason there is none.
  */
 function wiresBetween(html, found, {shapes, floor, solids, routes}) {
-  const read = found.map((f) => BETWEEN.exec(f.m[1]));
+  const names = pieceNames(html), read = found.map((f) => endsRead(f.m[1], names));
   if (!read.some(Boolean)) return {between: read, laid: []};
   const boxOf = boxFinder(html);
   // the wires laid along the floor before the picture was fitted (transformed · lay), put on the slide — or, for a
@@ -293,16 +316,19 @@ export function wiresDrawn(html, {shapes = new Map(), floor = null, solids = [..
     taken.push(held([[x - wide, y - high], [x + wide, y - high], [x + wide, y + high], [x - wide, y + high]]));
     return [x, y];
   };
-  const said = [], record = [];
+  const said = [], record = [], names = pieceNames(html);
   const drawn = replaceEach(html, found, ({before, m, after}, i) => {
     if (!between[i]) return wireSvg(before + after, m[1]);
-    const [, from, to] = BETWEEN.exec(m[1]), laid = cabled[i], note = laid ? wayNote(laid.route) : '';
+    const [, from, to] = endsRead(m[1], names), laid = cabled[i], note = laid ? wayNote(laid.route) : '';
     // its first name, read as a browser reads its tag (the wire's own data-k, not those words inside another value)
     const name = laid ? readAttributes(before + after)?.find((a) => a.name === 'data-k')?.value.trim().split(/\s+/)[0] || `${from} to ${to}` : '';
     if (note) said.push({name, from, to, way: note});
     if (ways[i]) record.push(laidRecord(name, laid, ways[i]));
     const named = ` data-ends="${from} ${to}"${before}${after}`;
-    return ways[i] ? cableSvg(named, m[1], ways[i], laid.points, place) : wireSvg(named, between[i]);   // a cable's line, or its numbers
+    if (!ways[i]) return wireSvg(named, between[i]);   // its numbers
+    // a cable's line — and, at an end that plugs into a port on a seen side, its lead over that block (leadSvg)
+    const head = wireOptions(before + after, m[1]).head ? HEAD * 0.8 : 0;
+    return cableSvg(named, m[1], ways[i], laid.points, place) + [0, 1].map((k) => leadSvg(named, laid, k, k === 1 ? head : 0, shapes.get(k ? laid.route.to : laid.route.from)?.level)).join('');
   });
   return {html: drawn, ways: said, cables: record};
 }
@@ -313,10 +339,34 @@ export function wiresDrawn(html, {shapes = new Map(), floor = null, solids = [..
  * length (of its drawn line, px), unseen: [[from, to], …] (the stretches a block hides, px along it), behind, crosses,
  * shared, bends}.
  */
-function laidRecord(name, {points, tile, route}, way) {
+function laidRecord(name, {points, tile, route, lead = 0}, way) {
   const f = fixed;
-  return {name, from: route.from, to: route.to, points: points.map(([x, y]) => [f(x), f(y)]), length: f(way.length), unseen: route.unseen.map(([lo, hi]) => [f(lo * tile), f(hi * tile)]),
+  return {name, from: route.from, to: route.to, ...(route.ports?.some(Boolean) ? {ports: [...route.ports]} : {}), points: points.map(([x, y]) => [f(x), f(y)]), length: f(way.length), unseen: route.unseen.map(([lo, hi]) => [f(lead + lo * tile), f(lead + hi * tile)]),
     behind: [...route.behind], crosses: route.crosses, shared: f(route.shared * tile), bends: route.bends};
+}
+
+/**
+ * A cable's lead into a port on a seen side of its block — the stretch out of the port, the riser and down to where its
+ * corner on the floor begins — drawn again over that block: the cable lies under every block (they stand on the floor
+ * it runs on), so the port and its riser, in front of the block's face, would be covered by it. The lead stands at the
+ * odd level just above its block's (iso.js), so a block in front of it still covers it. It is the cable's own piece (its
+ * data-k, its class), so it is shown, lit and hidden with it. `k`: which end (0 the start, 1 the end); `back`: px the
+ * line stops short of the tip there, for its head; '' when that end has no lead.
+ */
+function leadSvg(attrs, {points, radius, ends}, k, back, level) {
+  const end = ends?.[k];
+  if (!end?.seen || level === undefined) return '';
+  const run = k ? [...points].reverse() : [...points];
+  if (back) { const [tip, next] = run, far = Math.hypot(next[0] - tip[0], next[1] - tip[1]) || 1, by = Math.max(0, Math.min(back, far - 1)); run[0] = [tip[0] + (next[0] - tip[0]) * by / far, tip[1] + (next[1] - tip[1]) * by / far]; }
+  // the lead runs to the end of its floor corner: the upper part of that corner can be behind the block's face too
+  const way = rounded(run, radius), pieces = way.pieces.slice(0, 2 * (end.count - 2) + 2), f = fixed;
+  const marks = [way.start, ...pieces.flatMap((piece) => (piece.corner ? [piece.corner, piece.to] : [piece.to])), ...(back ? [points.at(k ? -1 : 0)] : [])];
+  const pad = 20, X = Math.min(...marks.map((p) => p[0])) - pad, Y = Math.min(...marks.map((p) => p[1])) - pad, W = Math.max(...marks.map((p) => p[0])) + pad - X, H = Math.max(...marks.map((p) => p[1])) + pad - Y;
+  const d = `M${f(way.start[0] - X)} ${f(way.start[1] - Y)}${pieces.map((piece) => (piece.corner ? `Q${f(piece.corner[0] - X)} ${f(piece.corner[1] - Y)} ` : 'L') + `${f(piece.to[0] - X)} ${f(piece.to[1] - Y)}`).join('')}`;
+  const tip = points.at(-1), before = points.at(-2), far = Math.hypot(tip[0] - before[0], tip[1] - before[1]) || 1;
+  const head = back ? headAt([tip[0] - X, tip[1] - Y], [(tip[0] - before[0]) / far, (tip[1] - before[1]) / far]) : '';
+  // the cable's own piece (its name, its class, its ends), but not its id: an id is one element's
+  return `<svg${classed(attrs.replace(/\sid=("[^"]*"|'[^']*'|\S+)/gi, ''))} data-sd-lead="${k ? 'end' : 'start'}" style="left:${f(X)}px;top:${f(Y)}px;width:${f(W)}px;height:${f(H)}px;z-index:${level + 1}" viewBox="0 0 ${f(W)} ${f(H)}" aria-hidden="true"><path d="${d}"/>${head}</svg>`;
 }
 
 /** An icon file's drawing: {viewBox, body} from a whole <svg …>…</svg>. */
@@ -342,8 +392,8 @@ export function icons(html, set = {}) {
   });
 }
 
-/** What the wires written between pieces join, in the order written: [[from, to], …] by piece name. */
-export const wireLinks = (html) => wireTags(html).map(({m}) => wireEnds(m[1])).filter(Boolean);
+/** What the wires written between pieces join, in the order written: [[from, to], …] by piece name (a port's piece). */
+export const wireLinks = (html) => { const names = pieceNames(html); return wireTags(html).map(({m}) => wireEndsOf(m[1], names)).filter(Boolean).map((e) => [e.from.name, e.to.name]); };
 
 /**
  * The built-in helpers, in the order they run: icons first (a wire never holds one, a block's words may), then the
@@ -369,8 +419,20 @@ function floorLinks(html, found, solids) {
     const at = tags[i].before + tags[i].after, has = (name) => new RegExp(name, 'i').test(at) && ownAttribute(at, name);
     if (has('data-iso') || has('data-callout') || (piece.box && piece.box.w > 0 && piece.box.h > 0)) count.set(piece.keys[0], (count.get(piece.keys[0]) ?? 0) + 1);
   });
-  const alone = (name) => count.get(name) === 1 && solids.some((solid) => solid.name === name);
-  return found.map(({m}) => { const read = BETWEEN.exec(m[1]); return read && read[3] === undefined && alone(read[1]) && alone(read[2]) ? [read[1], read[2]] : null; });
+  const alone = (name) => count.get(name) === 1 && solids.some((solid) => solid.name === name), names = pieceNames(html);
+  return found.map(({m}) => {
+    const ends = wireEndsOf(m[1], names);
+    if (!ends) return null;
+    // a port is named on one block: one that has it, or the wire says which it has
+    for (const end of [ends.from, ends.to]) {
+      if (end.port === null) continue;
+      const solid = alone(end.name) ? solids.find((s) => s.name === end.name) : null;
+      if (!solid) throw new Error(`data-arrow="${m[1]}": "${end.name}.${end.port}" names a port, and a port is on one block — "${end.name}" is ${count.get(end.name) > 1 ? 'the name of more than one piece' : 'no block'}`);
+      if (!solid.ports?.some((p) => p.name === end.port)) throw new Error(`data-arrow="${m[1]}": "${end.name}" has no port "${end.port}" — ${solid.ports?.length ? `its ports are ${solid.ports.map((p) => p.name).join(', ')}` : 'it names none (data-ports="p1: x y z | …")'}`);
+      if (ends.bend !== undefined) throw new Error(`data-arrow="${m[1]}": a wire to a port runs along the floor, and a bend draws it straight — take the bend out`);
+    }
+    return ends.bend === undefined && alone(ends.from.name) && alone(ends.to.name) ? [ends.from, ends.to] : null;
+  });
 }
 
 /**
