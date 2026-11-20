@@ -147,7 +147,8 @@ from a foot that is seen to a foot that is seen; a request and its answer lie in
 joined to what. Its `data-label` is written on the cable, so keep it short. After an edit, read `check` or `build`:
 rule `wire-way` says in words when a wire passes behind a block (move that block, or the two it joins), lies on
 another for want of room (a foot holds three wires: widen the block), or is drawn straight and why. Those are
-warnings, so `check --strict` fails on them; notes (crosses three or more, many turns, two heights) do not. A wire written
+warnings, so `check --strict` fails on them; notes (crosses three or more, many turns, two heights, a map too big
+or too wide to lay every wire) do not. A wire written
 `data-arrow="a to b 0"` is a straight line. A floor is ground (`data-ground`): no camera frames it, so `fit` follows the pieces. `check` warns
 (`view-far`) when a view stands further out than half size, where words get small.
 

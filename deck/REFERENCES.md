@@ -9,5 +9,5 @@ A method taken from someone else is named here, with the file that uses it and f
 | A label takes the first of a fixed list of places that nothing is in the way of, the least bad when there is none | J. Christensen, J. Marks, S. Shieber, *An Empirical Study of Algorithms for Point-Feature Label Placement*, ACM Transactions on Graphics 14(3), 1995 (the greedy method over fixed candidate places) | `cable.js` · `labelPlace` | where a cable's label stands along it |
 | Placing blocks from what is joined to what (layers, ordering in a layer) | see `footprint-story`'s `src/isometric/REFERENCES.md` | `iso.js` (through `footprint-story/isometric` · `arrange`) | a map with no places typed |
 
-Our own: writing what the build knows of a wire's way on the wire (`data-sd-way`) so `check` can say it with its fix;
+Our own: keeping what the build knows of a wire's way beside the page so `check` can say it with its fix;
 the label's plate; a packet resting beside the plate; the count of looks a map's labels share.

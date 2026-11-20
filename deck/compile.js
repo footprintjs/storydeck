@@ -7,7 +7,7 @@
 // shows only the shared canvas underneath.
 import {focusStep} from '../focus.js';
 import {readPieces, readStep, drawFocus, wrapStage, slideClass, slideStyle, focusOverlay} from '../focusHtml.js';
-import {applyTransforms, icons as drawIcons, wireWays} from './transforms.js';
+import {applyTransforms, icons as drawIcons, transformed} from './transforms.js';
 import {calloutsIn} from './callouts.js';
 import {isoIn} from './iso.js';
 import {loopsIn} from './loops.js';
@@ -51,16 +51,16 @@ function refuseOwnNumbers(where, html) {
 /** A map ready to plan on: its HTML with the helpers applied and its pieces read (`dev`: numbered for the dev page). */
 function prepareMap(name, html, icons, {canvas, area}, dev) {
   refuseOwnNumbers(`map "${name}"`, html);
-  let drawn;
+  let drawn, ways;
   try {
-    drawn = applyTransforms(stripComments(html), {icons, canvas, area});
+    ({html: drawn, ways} = transformed(stripComments(html), {icons, canvas, area}));
   } catch (e) {
     throw new Error(`map "${name}": ${e.message}`, {cause: e});
   }
   const {html: out, pieces} = readPieces(drawn);
   if (!pieces.length) throw new Error(`map "${name}" has no pieces — a piece is an element with data-k="name" and an inline left/top (width/height)`);
   // the loops the deck writes: its own text and its icons' (a wire's packets are its wire's, not loops of their own)
-  return {name, html: dev ? numberForDev(out) : out, pieces, loops: loopsIn(drawIcons(stripComments(html), icons), `map "${name}"`), callouts: calloutsIn(stripComments(html)), ways: wireWays(drawn), iso: isoIn(stripComments(html)).length > 0, state: null};
+  return {name, html: dev ? numberForDev(out) : out, pieces, loops: loopsIn(drawIcons(stripComments(html), icons), `map "${name}"`), callouts: calloutsIn(stripComments(html)), ways, iso: isoIn(stripComments(html)).length > 0, state: null};
 }
 
 /** A map's loops a click shows: on a piece it does not keep out (gone), or on no piece. */
@@ -137,7 +137,7 @@ function checkPost(post, labels) {
 
 /**
  * The deck compiled: {config, slides: [{label, html, notes}], clicks: [{n, label, kind, loops, …}], loops (the named
- * loops its clicks show, for the page's CSS), maps: {name: {pieces, callouts?, ways?}} (ways: what the build wrote of a wire's way along the floor, for check), callouts?: true when it has any,
+ * loops its clicks show, for the page's CSS), maps: {name: {pieces, callouts?, ways?}} (ways: what the build knows of a wire's way along the floor, for check), callouts?: true when it has any,
  * iso?: true when it has an isometric piece}.
  * `dev` numbers each map's pieces in the slides (data-sd-at), for the dev page's edits.
  * A slide's notes are what notesData carries ({slide, step, steps, now, earlier}). Throws, naming the part and the

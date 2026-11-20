@@ -125,7 +125,7 @@ export interface CompiledDeck {
   readonly explore: { readonly slides: readonly (string | null)[]; readonly targets: Readonly<Record<string, Readonly<Record<string, number>>>> } | null;
   /** The parts' entrances as the page plays them: each distinct change sampled once (kinds), and its key per slide — or null when no part has one. */
   readonly transitions: { readonly kinds: Readonly<Record<string, unknown>>; readonly enter: readonly (string | null)[] } | null;
-  readonly maps: Readonly<Record<string, { readonly pieces: readonly FocusPiece[]; readonly callouts?: readonly DeckCallout[]; /** What the build wrote of a wire's way along the floor, for check (rule wire-way): absent when every wire lies well. */ readonly ways?: readonly { readonly name: string; readonly from: string; readonly to: string; readonly way: string }[] }>>;
+  readonly maps: Readonly<Record<string, { readonly pieces: readonly FocusPiece[]; readonly callouts?: readonly DeckCallout[]; /** What the build knows of a wire's way along the floor, for check (rule wire-way): absent when every wire lies well. */ readonly ways?: readonly { readonly name: string; readonly from: string; readonly to: string; readonly way: string }[] }>>;
   /** Present when the deck has a callout: the page then carries a callout's stylesheet. */
   readonly callouts?: true;
 }

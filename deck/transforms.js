@@ -24,7 +24,7 @@
 // over a floor it has nothing to do with, and beside the middle of a wire between blocks there is a block's face.
 // Where there is no way along the floor (cable.js gives the kit's reason: two heights, walled in), and with a bend,
 // 0 too ("a to b 0"), a wire between blocks is the straight run it was. What the build knows of a wire's way — it
-// passes behind a block, it lies on another, why it is straight — is written on the wire (data-sd-way) for `check`.
+// passes behind a block, it lies on another, why it is straight — is handed on beside the page (wiresDrawn) for `check`.
 //
 // A wire's options (deck.css draws them from the theme's tokens; a ">" or "<" in a value is written &gt; or &lt;, as a
 // tag ends at its first ">"):
@@ -35,11 +35,12 @@
 //                                     spaced (--packet, --packet-glow): loops (deck-stage.js USAGE (i)), so they stop
 //                                     under reduced motion, in print and with motion off, where one rests at its middle
 
-import {decodeEntities, esc, stripComments} from './html.js';
+import {stripComments} from './html.js';
 import {readAttributes} from '../pieceRules.js';
 import {boxFinder, exit, exitOutline} from './boxes.js';
 import {callouts} from './callouts.js';
 import {isoDrawn} from './iso.js';
+import {NO_ROUTE} from 'footprint-story/isometric';
 import {cables, cableWalk, cableWay, held, labelPlace, wayNote, LABEL_LOOKS} from './cable.js';
 
 const fixed = (v) => +v.toFixed(1);
@@ -236,8 +237,12 @@ function wiresBetween(html, found, {shapes, floor, solids}) {
     const pa = [ca[0] + n[0] * off, ca[1] + n[1] * off], pb = [cb[0] + n[0] * off, cb[1] + n[1] * off];
     const ta = A.exit(pa, u) + GAP, tb = B.exit(pb, [-u[0], -u[1]]) + GAP;
     // a wire the floor had no way for says so: "too close" alone would name the wrong cause
-    const why = laid[i]?.route.why ? `no way along the floor was laid for it (${laid[i].route.why}), and ` : '';
-    if (!(len - ta - tb >= 12)) throw new Error(`data-arrow="${spec}": ${why}"${a}" and "${b}" are too close for a ${why ? 'straight ' : ''}wire between them (they touch or overlap) — move them apart, or give the wire numbers`);
+    if (!(len - ta - tb >= 12)) {
+      const why = laid[i]?.route.why;
+      if (!why) throw new Error(`data-arrow="${spec}": "${a}" and "${b}" are too close for a wire between them (they touch or overlap) — move them apart, or give the wire numbers`);
+      const cure = why === NO_ROUTE.work ? 'take wires or blocks out of this map so that every wire is laid, or ' : '';
+      throw new Error(`data-arrow="${spec}": no way along the floor was laid for it (${why}), and "${a}" and "${b}" are too close for a straight wire between them — ${cure}move them apart, or give the wire numbers`);
+    }
     const start = [pa[0] + u[0] * ta, pa[1] + u[1] * ta], end = [pb[0] - u[0] * tb, pb[1] - u[1] * tb];
     const [from, to] = m[1] === a ? [start, end] : [end, start];
     return [...from, ...to, Number(m[3] ?? 0)].map(fixed).join(' ');
@@ -257,7 +262,15 @@ export const wireTags = (html) => emptyI(html, /\sdata-arrow="([^"<>]+)"/);
  * them is a cable along the floor, and a wire from one to a flat piece ends on its outline. `looks`: {left}, what the
  * map's cable labels may spend finding their places (cable.js · LABEL_LOOKS).
  */
-export function wires(html, {shapes = new Map(), floor = null, solids = [...shapes.values()]} = {}, looks = {left: LABEL_LOOKS}) {
+export const wires = (html, iso, looks) => wiresDrawn(html, iso, looks).html;
+
+/**
+ * `wires`, with what the build knows of each wire's way: {html, ways} — `ways`: [{name, from, to, way}] for every wire
+ * between two blocks there is something to say of (cable.js · wayNote: it passes behind a block, it lies on another,
+ * why it is straight), by the wire's first name and the two it joins. It is handed on beside the page, never written
+ * into it: what `check` says of a wire is then only ever the build's own word, never text a deck holds.
+ */
+export function wiresDrawn(html, {shapes = new Map(), floor = null, solids = [...shapes.values()]} = {}, looks = {left: LABEL_LOOKS}) {
   const found = wireTags(html), {between, laid: cabled} = wiresBetween(html, found, {shapes, floor, solids});
   // what a cable's label keeps clear of: what stands on the floor (a block is drawn over the floor's wires), each
   // label placed before it, and the other cables — so the labels of a request and its answer, lying side by side,
@@ -273,14 +286,16 @@ export function wires(html, {shapes = new Map(), floor = null, solids = [...shap
     taken.push(held([[x - wide, y - high], [x + wide, y - high], [x + wide, y + high], [x - wide, y + high]]));
     return [x, y];
   };
-  return replaceEach(html, found, ({before, m, after}, i) => {
-    if (!between[i]) return wireSvg((before + after).replace(OWN_WAY, ''), m[1]);
+  const said = [];
+  const drawn = replaceEach(html, found, ({before, m, after}, i) => {
+    if (!between[i]) return wireSvg(before + after, m[1]);
     const [, from, to] = BETWEEN.exec(m[1]), laid = cabled[i], note = laid ? wayNote(laid.route) : '';
-    // what the build knows of its way is written on it, first in its tag (cable.js · wayNote), for `check` to say; a
-    // data-sd-way of the deck's own writing is taken out: only the build says what the build did
-    const named = ` data-ends="${from} ${to}"${note ? ` data-sd-way="${esc(note)}"` : ''}${(before + after).replace(OWN_WAY, '')}`;
+    // its first name, read as a browser reads its tag (the wire's own data-k, not those words inside another value)
+    if (note) said.push({name: readAttributes(before + after)?.find((a) => a.name === 'data-k')?.value.trim().split(/\s+/)[0] || `${from} to ${to}`, from, to, way: note});
+    const named = ` data-ends="${from} ${to}"${before}${after}`;
     return ways[i] ? cableSvg(named, m[1], ways[i], laid.points, place) : wireSvg(named, between[i]);   // a cable's line, or its numbers
   });
+  return {html: drawn, ways: said};
 }
 
 /** An icon file's drawing: {viewBox, body} from a whole <svg …>…</svg>. */
@@ -316,23 +331,13 @@ export const wireLinks = (html) => wireTags(html).map(({m}) => wireEnds(m[1])).f
  * x1, y1]: where a picture the build fits goes. What the wires join is read before anything is drawn: a map whose
  * blocks have no place is placed from it (iso.js).
  */
-export function applyTransforms(html, {icons: set = {}, canvas = null, area = null} = {}) {
-  const drawn = icons(html, set), iso = isoDrawn(drawn, {canvas, area, links: wireLinks(drawn)});
-  return wires(callouts(iso.html, {canvas}), iso);
-}
+export const applyTransforms = (html, options) => transformed(html, options).html;
 
-/** A data-sd-way written in a deck's own source: taken out of a wire's tag, quoted either way or bare. */
-const OWN_WAY = /\sdata-sd-way(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'<>]*))?/gi;
 /**
- * What the build wrote of each wire's way (data-sd-way: cable.js · wayNote), read from a map's drawn HTML:
- * [{name, from, to, way}] — the wire's first name, the two it joins, and the note. Only a wire as the build writes
- * it is read, its ends and its note first in its tag: text of the deck's own is not the build's word.
+ * `applyTransforms`, with what the build knows of each wire's way: {html, ways} (wiresDrawn). The build compiles a map
+ * with this, and keeps `ways` for `check`.
  */
-export function wireWays(html) {
-  const out = [];
-  for (const tag of html.matchAll(/<svg data-ends="([^"<>]*)" data-sd-way="([^"<>]*)"([^<>]*)>/g)) {
-    const ends = tag[1].trim().split(/\s+/), name = /\sdata-k="([^"<>]*)"/.exec(tag[3])?.[1].trim().split(/\s+/)[0] ?? ends.join(' to ');
-    out.push({name, from: ends[0] ?? '', to: ends[1] ?? '', way: decodeEntities(tag[2])});
-  }
-  return out;
+export function transformed(html, {icons: set = {}, canvas = null, area = null} = {}) {
+  const drawn = icons(html, set), iso = isoDrawn(drawn, {canvas, area, links: wireLinks(drawn)});
+  return wiresDrawn(callouts(iso.html, {canvas}), iso);
 }

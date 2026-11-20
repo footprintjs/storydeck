@@ -155,7 +155,7 @@ function acrossStages(compiled) {
 }
 
 /**
- * A wire between two blocks whose way the build could not lay well: what the build wrote on it (data-sd-way), in words,
+ * A wire between two blocks whose way the build could not lay well: what the build noted of it (compile.js · ways), in words,
  * with the fix. The picture need not be looked at to know that a wire is hidden behind a block.
  */
 function wireWaysSaid(compiled) {

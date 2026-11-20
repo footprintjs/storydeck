@@ -61,9 +61,9 @@ export function cables(links, shapes, floor, solids = [...shapes.values()]) {
 }
 
 /**
- * What there is to say of a wire's way, as the build writes it on the wire (data-sd-way) — '' when it lies well. The
- * build knows why a wire is as it is; written on the wire, `check` can tell whoever writes the deck (a person, or a
- * model) in words, with the fix, where a picture would have to be looked at and guessed from.
+ * What there is to say of a wire's way, as the build notes it — '' when it lies well. The build knows why a wire is
+ * as it is; kept beside the page (compile.js · maps[name].ways), `check` can tell whoever writes the deck (a person,
+ * or a model) in words, with the fix, where a picture would have to be looked at and guessed from.
  *   "behind logs cache; crosses 2; shared; turns 5"    a cable: what it passes behind, how many it crosses, …
  *   "straight heights"                                 no cable: the key of the kit's reason (NO_ROUTE)
  * A name is written so that no letter of it can be read as part of the note (a name may hold a ";").
@@ -78,13 +78,13 @@ const STRAIGHT = {
   heights: ['info', 'the two stand at different heights'],
   foot: ['warn', 'one of the two has no free place at a foot that can be seen — move the blocks round it away, or make it wider (data-size)'],
   way: ['warn', 'there is no way along the floor between them — leave floor free round them'],
-  work: ['info', 'the map has more wires than are laid along the floor'],
+  work: ['info', 'the map is too big to lay every wire along the floor'],
   wide: ['info', 'the blocks stand too far apart for the smallest of them to lay wires between'],
   name: ['info', 'one of its names is no block here'],
   self: ['info', 'it joins a block to itself'],
 };
 /**
- * A data-sd-way note as what `check` says: [{level: 'warn' | 'info', message}], each with its fix. `from`, `to`: the
+ * A note of a wire's way as what `check` says: [{level: 'warn' | 'info', message}], each with its fix. `from`, `to`: the
  * names the wire joins. An unknown word in a note says nothing (a page written by a newer build).
  */
 export function readWay(note, from, to) {
