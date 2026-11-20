@@ -1,5 +1,5 @@
 import {describe, it, expect} from 'vitest';
-import {wires, wireTags, transformed, icons, readIcon, applyTransforms} from './transforms.js';
+import {wires, wiresDrawn, wireTags, transformed, icons, readIcon, applyTransforms} from './transforms.js';
 import {isoDrawn} from './iso.js';
 import {exitOutline} from './boxes.js';
 import {cables, cableWalk, cableWay, held, labelPlace} from './cable.js';
@@ -348,7 +348,7 @@ describe('a wire between two isometric pieces is a cable along the floor', () =>
     const map = `${blocks}<i data-k="w" class="wire req" data-arrow="a to b"></i>`, out = applyTransforms(map, {canvas});
     // out of a's right foot along the cols, one rounded turn, up the rows into b's left foot: the line stops where the head begins
     expect(svgOf(out, 'w')).toContain('<path d="M20 20L230.6 125.3Q254.6 137.3 278.6 125.3L356.4 86.4"/>');
-    expect(tag(out, 'w')).toMatch(/^<svg data-ends="a b" data-k="w" class="wire req" data-sd-cable style="left:[\d.-]+px;top:[\d.-]+px;width:[\d.]+px;height:[\d.]+px;--sd-angle:[\d.-]+deg;--sd-way:path\('M20 20L230\.6 125\.3Q254\.6 137\.3 278\.6 125\.3L356\.4 86\.4'\)" viewBox="0 0 [\d.]+ [\d.]+" aria-hidden="true">$/);
+    expect(tag(out, 'w')).toMatch(/^<svg data-ends="a b" data-k="w" class="wire req" data-sd-cable style="left:[\d.-]+px;top:[\d.-]+px;width:[\d.]+px;height:[\d.]+px;--sd-angle:[\d.-]+deg;--sd-way:path\('M20 20L230\.6 125\.3Q254\.6 137\.3 278\.6 125\.3L356\.4 86\.4'\);--sd-length:[\d.]+px" viewBox="0 0 [\d.]+ [\d.]+" aria-hidden="true">$/);
     // the same line as cable.js lays it, in the wire's own box
     const {way, tip} = lineOf(blocks, ['a', 'b']), [x, y] = cornerOf(out, 'w');
     expect(way.start[0] - x).toBeCloseTo(20, 1);
@@ -492,6 +492,84 @@ describe('a wire between two isometric pieces is a cable along the floor', () =>
     expect(() => applyTransforms(boxed, {canvas})).toThrow('data-arrow="a to b": no way along the floor was laid for it (no place at a foot that can be seen: closed in, or too narrow), and "a" and "b" are too close for a straight wire between them — move them apart, or give the wire numbers');
     // two blocks that touch, asked for a straight wire: the old words, as ever
     expect(() => applyTransforms(boxed.replace('a to b', 'a to b 0'), {canvas})).toThrow('"a" and "b" are too close for a wire between them (they touch or overlap) — move them apart, or give the wire numbers');
+  });
+
+  it('data-head="none": a plain line that runs its whole length, on a cable and on a straight wire', () => {
+    const cable = applyTransforms(`${blocks}<i data-k="w" class="wire" data-arrow="a to b" data-head="none"></i>`, {canvas}), {cable: laid} = lineOf(blocks, ['a', 'b']);
+    expect(svgOf(cable, 'w')).not.toContain('class="head"');
+    const whole = cableWay(laid, 0), [x, y] = cornerOf(cable, 'w'), [, ex, ey] = /L([\d.-]+) ([\d.-]+)"\/>/.exec(svgOf(cable, 'w')).map(Number);
+    expect([ex + x, ey + y]).toEqual([expect.closeTo(laid.points.at(-1)[0], 0), expect.closeTo(laid.points.at(-1)[1], 0)]);   // to the cable's own end, 6 px off the foot
+    expect(tag(cable, 'w')).toContain(`--sd-length:${+whole.length.toFixed(1)}px`);
+    const straight = wires('<i data-k="w" data-arrow="100 300 500 300" data-head="none"></i>');
+    expect(straight).toContain('<path d="M20 20 Q220 20 420 20"/>');   // all 400 px of it: no 14 px left for a head
+    expect(straight).not.toContain('class="head"');
+    expect(wires('<i data-k="w" data-arrow="100 300 500 300"></i>')).toContain('<path d="M20 20 Q220 20 405.6 20"/><path class="head"');
+    expect(() => wires('<i data-k="w" data-arrow="100 300 500 300" data-head="round"></i>')).toThrow('wire data-arrow="100 300 500 300": data-head="round" — a wire has its arrow\'s head, or data-head="none" for a plain line that runs its whole length');
+  });
+
+  it('carries its line\'s length for a deck\'s own CSS, and the build keeps a record of every cable laid', () => {
+    const map = `${blocks}<i data-k="w" class="wire" data-arrow="a to b"></i><i data-k="v" class="wire" data-arrow="b to a 0"></i>`, made = transformed(map, {canvas}), {way, cable} = lineOf(blocks, ['a', 'b']);
+    expect(tag(made.html, 'w')).toContain(`;--sd-length:${+way.length.toFixed(1)}px"`);
+    expect(tag(made.html, 'v')).not.toContain('--sd-length');   // a straight wire is its own short line
+    expect(made.cables).toEqual([{name: 'w', from: 'a', to: 'b', points: cable.points.map(([x, y]) => [+x.toFixed(1), +y.toFixed(1)]), length: +way.length.toFixed(1), unseen: [], behind: [], crosses: 0, shared: 0, bends: 1}]);
+    expect(made.made).toEqual({placed: 'hand', tile: 120, fitted: false});
+    expect(made.tight).toEqual([]);
+    // a stretch a block hides is in the record, in px along the cable
+    const walled = `${grid}<div data-k="a" data-iso="block" data-at="0 4"></div><div data-k="b" data-iso="block" data-at="8 4"></div><div data-k="wall" data-iso="block" data-at="4 5.5" data-size="2 40 2"></div><i data-k="w" class="wire" data-arrow="a to b"></i>`;
+    const [hidden] = transformed(walled, {canvas}).cables;
+    expect(hidden.behind).toEqual(['wall']);
+    expect(hidden.unseen.length).toBeGreaterThan(0);
+    for (const [from, to] of hidden.unseen) expect(from >= 0 && to > from && to <= hidden.length + 20).toBe(true);
+    expect(transformed('<p>no map</p>', {canvas})).toEqual({html: '<p>no map</p>', ways: [], cables: [], tight: [], made: null});
+  });
+
+  it('the picture and the floor are fitted to the wires as well as the blocks: a wire that goes round stays on the slide', () => {
+    // a ring: the wire back from the last block to the first runs round the front of the others
+    const ring = '<div data-k="floor" data-iso="floor"></div>' + ['a', 'b', 'c', 'd'].map((n) => `<div data-k="${n}" data-iso="block"></div>`).join('') + '<i data-k="w1" class="wire" data-arrow="a to b"></i><i data-k="w2" class="wire" data-arrow="b to c"></i><i data-k="w3" class="wire" data-arrow="c to d"></i><i data-k="back" class="wire" data-arrow="d to a"></i>';
+    const area = [60, 200, 1860, 1000], made = transformed(ring, {canvas, area});
+    expect(made.cables).toHaveLength(4);
+    for (const {name, points} of made.cables) for (const [x, y] of points) expect(x >= area[0] && x <= area[2] && y >= area[1] && y <= area[3], `${name} at ${[x, y]}`).toBe(true);
+    // and every corner of every wire is on the fitted floor: inside the four-sided ground the floor draws
+    const [, fx, fy] = /data-k="floor"[^>]*style="left:([\d.-]+)px;top:([\d.-]+)px/.exec(made.html).map(Number);
+    const ground = /<polygon class="iso-ground" points="([^"]+)"/.exec(made.html)[1].trim().split(/\s+/).map((pair) => pair.split(',').map(Number)).map(([x, y]) => [x + fx, y + fy]);
+    const onFloor = ([px, py]) => ground.reduce((odd, [xi, yi], i) => { const [xj, yj] = ground.at(i - 1); return (yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi ? !odd : odd; }, false);
+    for (const {name, points} of made.cables) for (const p of points) expect(onFloor(p), `${name} at ${p}`).toBe(true);
+    expect(onFloor([ground[0][0], ground[0][1] - 50])).toBe(false);   // the check does see a point off the floor
+    // three wires round the front of a wall take three lanes: the third runs a tile and a half past every block, and the floor still lies under it
+    const lanes = `${grid}<div data-k="floor" data-iso="floor"></div><div data-k="a" data-iso="block" data-at="0 4"></div><div data-k="b" data-iso="block" data-at="8 4"></div><div data-k="wall" data-iso="block" data-at="4 -10" data-size="2 16 1"></div>` + [1, 2, 3].map((n) => `<i data-k="w${n}" class="wire" data-arrow="a to b"></i>`).join('');
+    const wide = transformed(lanes, {canvas}), [, lx, ly] = /data-k="floor"[^>]*style="left:([\d.-]+)px;top:([\d.-]+)px/.exec(wide.html).map(Number);
+    const under = /<polygon class="iso-ground" points="([^"]+)"/.exec(wide.html)[1].trim().split(/\s+/).map((pair) => pair.split(',').map(Number)).map(([x, y]) => [x + lx, y + ly]);
+    const onIt = ([px, py]) => under.reduce((odd, [xi, yi], i) => { const [xj, yj] = under.at(i - 1); return (yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi ? !odd : odd; }, false);
+    expect(wide.cables).toHaveLength(3);
+    for (const {name, points} of wide.cables) for (const p of points) expect(onIt(p), `${name} at ${p}`).toBe(true);
+  });
+
+  it('draws the wires as they were laid: the ways handed to it are the ways it draws, laid once', () => {
+    const map = `${blocks}<i data-k="w" class="wire" data-arrow="a to b"></i>`, iso = isoDrawn(map, {canvas});
+    expect(wiresDrawn(iso.html, {...iso, routes: [null]}).html).not.toContain('data-sd-cable');          // told the wire was not laid: it draws the straight wire
+    expect(wiresDrawn(iso.html, iso).html).toContain('data-sd-cable');                                   // told nothing: it lays the wire itself
+    expect(wiresDrawn(iso.html, {...iso, routes: []}).html).toContain('data-sd-cable');                  // a list that is not this map's wires is not used
+  });
+
+  it('a block is one piece alone by the pieces that have a box: a wire of its name, or words placed nowhere, leave it a cable\'s end', () => {
+    const wire = (k) => `<i data-k="${k}" class="wire" data-arrow="a to b"></i>`;
+    for (const map of [`${blocks}${wire('b')}`, `${blocks}<div data-k="b">a label placed nowhere</div>${wire('w')}`, `${blocks}<div data-k="b" style="left:10px;top:10px">no size</div>${wire('w')}`]) {
+      const made = transformed(map, {canvas});
+      expect(made.cables, map).toHaveLength(1);
+      expect(made.html, map).toContain('data-sd-cable');
+      // and the drawing agrees with the laying: the ways handed on are the ways it would lay itself
+      const iso = isoDrawn(map, {canvas});
+      expect(wiresDrawn(iso.html, iso).html, map).toBe(made.html);
+    }
+    // a callout is placed before the wires are drawn, so one that shares a block's name is a second piece with a box: laying and
+    // drawing agree that the name is no block alone (no cable is laid for it, and none is drawn)
+    const noted = transformed(`${blocks}<div data-k="c" data-iso="block" data-at="9 4"></div><div data-k="b" data-callout="c right">a note</div>${wire('w')}`, {canvas});
+    expect(noted.cables).toEqual([]);
+    expect(noted.html).not.toContain('data-sd-cable');
+    // a second piece with a box shares the name: the name is a box round both, as ever, and the wire runs straight to it
+    const shared = transformed(`${blocks}<div data-k="b" class="chip" style="left:1500px;top:400px;width:50px;height:20px">b</div>${wire('w')}`, {canvas});
+    expect(shared.cables).toEqual([]);
+    expect(shared.html).not.toContain('data-sd-cable');
   });
 
   it('a bend, 0 too, keeps the wire a straight run; so does an end that is no block', () => {

@@ -44,7 +44,9 @@ compiles --> check_rules
 check_rules["check rules"]
 compiles --> broken
 broken["broken"]
-compiles --> read_notes
+compiles --> maps_made
+maps_made["maps made"]
+maps_made --> read_notes
 read_notes["read notes"]
 read_notes --> measure_asked
 measure_asked["measure asked?"]
@@ -90,7 +92,7 @@ stopped["stopped"]
 | Module | Its one job |
 |---|---|
 | `chart.js` | the run's wiring, as data: which stage follows which, and where the adapter is mounted |
-| `stages.js` | what each stage does: read and compile once, check the rules, read the notes, write the page, count, give the verdict |
+| `stages.js` | what each stage does: read and compile once, check the rules, put on the record how each isometric map was made (`maps made`: who placed its blocks, the tile, its cables, what the build could not do — so the log answers "why is that wire straight" without the page being looked at), read the notes, write the page, count, give the verdict |
 | `measure.js` | the browser, as an adapter: find one, open the page offline, measure every click, say what it found or why it could not |
 | `engine.js` | the one module that calls footprintjs: builds a chart from wiring, runs it with the recorders, hands back what they hold |
 | `run.js` | `runDeck`: build the chart, run it, keep the run, hand back what a reply is made of |

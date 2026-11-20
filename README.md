@@ -686,7 +686,14 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
 
   `data-at` is "col row" (col runs down and to the right of the slide, row down and to the left; a third number lifts
   the piece), `data-size` is "wide deep high" for a `block` or a `cylinder` (round: the same width and depth) and
-  "cols rows" for a `floor`. Its words stand flat on its top face. It is a piece like any other: every click, `fit`,
+  "cols rows" for a `floor`. Its words stand flat on its top face, and its name (its first `<b>`, inside no other
+  element) is made to fit that face: as written when it fits on one line, else broken onto two lines, else smaller,
+  down to 16 px. A name that still does not fit is drawn at 16 px and `check` says so (`name-fit`), with the two ways
+  out: shorten it, or give the block a bigger top. A top is a diamond, as wide across its middle as the block's
+  shorter side is long: a block 8 by 1 has room for a short name only, however long it is.
+  The fit is counted in letters, since a build has no browser; `build --layout` measures the page itself. Two words
+  joined by a no-break space (`&nbsp;`) stay on one line. A `<b>` with a style or markup of its own is left as you
+  wrote it. It is a piece like any other: every click, `fit`,
   `zoom`, a route, a wire to it and a callout beside it work as they do on a box.
 
   Why the build places it: where a block lands, how big it is and which block is painted over which all follow from
@@ -729,7 +736,21 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   outline to the other's with its label beside it, when it joins a block to a flat piece, when the two blocks stand at
   different heights, when there is no way along the floor (walled in), and whenever you give it a bend, `0` too:
   `data-arrow="you to server 0"`. Wires are laid in the order written, and an earlier one is never moved for a later
-  one: the fewest crossings there could be are not promised.
+  one: the fewest crossings there could be are not promised. `data-head="none"` on any wire draws a plain line that
+  runs its whole length, with no arrow's head.
+
+  **The floor and the picture hold the wires too.** A wire that goes round a block reaches past the blocks. The wires
+  are laid as soon as the blocks stand, before anything is fitted, so a fitted floor lies under every wire and the
+  fitted picture keeps every wire on the slide.
+
+  **The build's record of a map.** What the build knows of a map it keeps beside the page, never in it:
+  `compileDeck(source).maps[name]` has `made` (who placed the blocks, `build` or `hand`; the tile; whether the picture
+  was fitted), `cables` (each cable's corners and its line's length in slide px, the stretches a block hides, what it
+  passes behind, crosses and shares), `ways` (what `check` says of a wire) and `tight` (names that do not fit, each
+  by its first 80 characters). The run's log has it too (stage `maps made`, `storydeck log --run 1`). And each cable
+  carries its line's length in the page as `--sd-length`, so a deck's own CSS can time a thing to a cable without
+  measuring:
+  `animation-duration: calc(var(--sd-length) / 300px * 1s)`.
   Not yet: moving a block by dragging it in the dev page (change its `data-at`).
   A deck to start from: [examples/a-request](examples/a-request) (blocks on a floor, a view that follows them, an order
   inside each click); a test builds and checks it.

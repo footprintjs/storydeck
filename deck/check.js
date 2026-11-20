@@ -13,6 +13,7 @@
 //   view-far       a click whose view stands further out than half size (a fit over a wide picture): its words are small
 //   across-stages  a wire or a callout that joins pieces standing on different stages: when one stage's view moves, it is left behind
 //   wire-way       a wire between two blocks that does not lie well on the floor: it passes behind a block, lies on another, or is drawn straight — and why
+//   name-fit       a block's name that does not fit its top face even on two lines at the least size
 import {wordCount} from './parse.js';
 import {expandNames} from '../focus.js';
 import {LOOP_NAMES} from './loops.js';
@@ -170,6 +171,18 @@ function wireWaysSaid(compiled) {
   return out;
 }
 
+/** A block's name that does not fit its top face: broken onto two lines and shrunk to the least size, it still runs past the edges. */
+function namesTight(compiled) {
+  const out = [];
+  for (const [map, {tight = [], pieces}] of Object.entries(compiled.maps)) {
+    const told = compiled.clicks.filter((c) => c.map === map);
+    if (!told.length) continue;
+    const shownAt = (name) => { const i = pieces.findIndex((p) => p.keys.includes(name)); return told.find((c) => i >= 0 && c.look.pieces[i]?.state !== 'gone') ?? told[0]; };
+    for (const {name, text} of tight) out.push(problem('warn', 'name-fit', shownAt(name), `"${name}": its name "${text}" does not fit its block's top, even on two lines at the least size — shorten it (and say the rest in a <small> line or the notes), or give the block a bigger top (data-size: a top is as wide across its middle as the block's shorter side)`));
+  }
+  return out;
+}
+
 /** Every problem of a compiled deck: [{level: 'error' | 'warn' | 'info', rule, click, label, message}]. */
 export function checkDeck(compiled) {
   const out = [];
@@ -179,7 +192,7 @@ export function checkDeck(compiled) {
     out.push(...noChange(c, compiled.clicks[i - 1]));
     out.push(...farView(c));
   });
-  out.push(...neverShown(compiled), ...missingNotes(compiled), ...unstyledThemes(compiled), ...unsetLoops(compiled), ...unsaidDiffers(compiled), ...aloneCallouts(compiled), ...acrossStages(compiled), ...wireWaysSaid(compiled));
+  out.push(...neverShown(compiled), ...missingNotes(compiled), ...unstyledThemes(compiled), ...unsetLoops(compiled), ...unsaidDiffers(compiled), ...aloneCallouts(compiled), ...acrossStages(compiled), ...wireWaysSaid(compiled), ...namesTight(compiled));
   return out;
 }
 

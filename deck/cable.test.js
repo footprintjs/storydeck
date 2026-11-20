@@ -43,7 +43,7 @@ describe('cable · a wire between two isometric pieces, on the slide', () => {
     const {shapes, floor} = drawn({a: block([0, 4]), b: block([5, 1]), up: block([0, 9, 2])});
     const laid = cables([null, ['a', 'elsewhere'], ['nobody', 'b'], ['a', 'a'], ['a', 'up'], ['a', 'b']], shapes, floor);
     expect(laid.slice(0, 3)).toEqual([null, null, null]);   // no wire; an end that is no isometric piece
-    expect(laid[3]).toEqual({points: null, radius: 0, route: {from: 'a', to: 'a', points: null, why: NO_ROUTE.self}});
+    expect(laid[3]).toEqual({points: null, radius: 0, tile: expect.any(Number), route: {from: 'a', to: 'a', points: null, why: NO_ROUTE.self}});
     expect(laid[4].points).toBe(null);
     expect(laid[4].route.why).toBe(NO_ROUTE.heights);
     expect(laid[5].points).toHaveLength(3);
@@ -61,7 +61,7 @@ describe('cable · a wire between two isometric pieces, on the slide', () => {
     const {shapes, floor} = drawn({a: block([0, 4]), b: block([5, 1])});
     const laid = cables(Array.from({length: MOST_ROUTES + 2}, () => ['a', 'b']), shapes, floor);
     expect(laid.slice(0, MOST_ROUTES).every((cable) => cable.points)).toBe(true);
-    expect(laid.slice(MOST_ROUTES)).toEqual(Array.from({length: 2}, () => ({points: null, radius: 0, route: {from: 'a', to: 'b', points: null, why: NO_ROUTE.work}})));   // and says why
+    expect(laid.slice(MOST_ROUTES)).toEqual(Array.from({length: 2}, () => ({points: null, radius: 0, tile: expect.any(Number), route: {from: 'a', to: 'b', points: null, why: NO_ROUTE.work}})));   // and says why
   });
 
   it('its line: the way with the last run pulled back for the arrow\'s head, corners rounded; a point of it; walked', () => {
