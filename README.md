@@ -756,8 +756,33 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   sides behind); at a corner, name it after the numbers (`right`, `left`, `back-left`, `back-right`), and a wrong one is
   refused with the right one. The lead into a port on a side you see is drawn over its block, so the block does not
   cover it; a port on a side behind is allowed, its stretch runs behind its block, and `check` says so. A name with a
-  dot that some piece goes by is still that piece. Not yet: a port on the top or on a cylinder, and a packet that
-  rides into a port on a side you see passes under its block for the last short stretch (packet options come next).
+  dot that some piece goes by is still that piece. Not yet: a port on the top or on a cylinder. A packet riding into a
+  port on a side you see passes under its block for the last short stretch, unless the wire asks how its packets ride
+  (below): then the lead carries them too, over its block.
+
+  **How a cable's packets ride.** `data-packets` runs packets along a wire at one steady speed; five more options, each
+  an attribute on the wire, say how they ride:
+
+  ```html
+  <i data-k="w1" class="wire" data-arrow="lap.rj45 to sw.p1" data-head="none" data-packets="1"
+     data-speed="260px" data-ride="ease-ends 0.15 0.2" data-rest="end" data-keep-size
+     data-trail="3px var(--l1)" data-behind="fade"></i>
+  ```
+
+  `data-speed="260px"` is px a second: the build knows the cable's length, so a run takes that length over the speed
+  and no deck measures a path (a bare number is still the seconds a run takes). `data-ride="ease-ends 0.15 0.2"` eases
+  out of the start over the first 15% of the length, keeps one steady speed, and eases into the end over the last
+  20% (one number eases both; with a px speed, that speed is the steady one, so the run takes 1.35 times as long).
+  `data-rest="end"` keeps the packet at the end of the cable when it arrives, at the port, for 1 s (`"end 3s"`: as
+  long as said) before the next run. `data-keep-size` keeps it the same size on the slide however near the camera
+  comes, through the view's move too. `data-trail="3px var(--l1)"` draws a line of that width and colour behind it as
+  it rides. `data-behind="fade"` fades it out over about three frames before a stretch a block hides (the build's
+  record: `unseen`) and back after it, on the same line. Each needs `data-packets`, and each works on a wire through
+  the air too, as `data-packets` does (nothing hides such a wire, so `data-behind` has nothing to fade there). A wrong
+  value is refused at build, naming the wire and the fix. Where loops do not run — reduced motion, print, motion off —
+  the packet rests as it always did, at its cable's middle, or at its end with `data-rest="end"`; it keeps its size
+  there too, and no trail is drawn. The numbers are one small module, `deck/ride.js` (plain numbers in and out), so a
+  film can ride the same packets the same way. A wire that asks for none of these is drawn exactly as before.
 
   **A picture that stands on the floor.** A piece you place yourself (a drawing of a laptop, an icon, a card) stands
   on the floor by its footprint: the floor it takes, `col row wide deep` in tiles, with its height after it.
@@ -808,7 +833,8 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   reads over anything; a cable between two blocks carries it on the cable itself: see the isometric piece above); class `halo` gives it a soft glow (`--wire-halo`); and `data-packets="2" data-speed="5"` keeps
   packets running along it, evenly spaced, 5 s a run (`--packet`, `--packet-glow`; `--wire-plate` is the plate under a cable's label). The packets are loops (see below):
   only on the slide shown, in step from click to click, and under reduced motion, in print or with motion off one rests
-  at the wire's middle.
+  at the wire's middle. How they ride — eased ends, a rest at the end, a kept size, a trail, a fade behind a block, a
+  speed in px a second — is said on the wire too (see the cable's packets above).
   `<i class="ic" data-icon="server"></i>` is `icons/server.svg`. `deck.css` styles the chrome (kicker, headline, footer
   and count), wires, packets, icons and the theme toggle from the token contract, every rule `:where()`, so your
   theme wins.
