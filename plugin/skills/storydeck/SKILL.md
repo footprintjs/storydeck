@@ -149,7 +149,10 @@ rule `wire-way` says in words when a wire passes behind a block (move that block
 another for want of room (a foot holds three wires: widen the block), or is drawn straight and why. Those are
 warnings, so `check --strict` fails on them; notes (crosses three or more, many turns, two heights, a map too big
 or too wide to lay every wire) do not. A wire written
-`data-arrow="a to b 0"` is a straight line. A floor is ground (`data-ground`): no camera frames it, so `fit` follows the pieces. `check` warns
+`data-arrow="a to b 0"` is a straight line; `data-head="none"` draws any wire as a plain line with no arrow's head. A
+block's name (its `<b>`) is fitted to its top face: broken onto two lines, then made smaller; rule `name-fit` warns
+when it still does not fit (shorten it, or widen the block with `data-size`). The picture and a fitted floor hold
+the wires too. A floor is ground (`data-ground`): no camera frames it, so `fit` follows the pieces. `check` warns
 (`view-far`) when a view stands further out than half size, where words get small.
 
 **Narrate a deck in a voice.**

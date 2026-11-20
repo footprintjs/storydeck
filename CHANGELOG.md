@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.20.0 — a picture that holds its wires, names that fit, and the build's record of a map
+
+- **The floor and the picture hold the wires too.** A wire that goes round a block reaches past the blocks, and a
+  fitted picture cut it off at the slide's edge. The wires are now laid as soon as the blocks stand, before anything
+  is fitted: a fitted floor lies under every wire, and the fitted picture keeps every wire on the slide. A map the
+  build places, or one with `data-iso-grid="fit"`, may stand a little differently on the slide than in 0.19.0.
+- **A block's name fits its top face.** The name (the `<b>`) stays as written when it fits on one line; else it is
+  broken onto two lines where they are most alike; else it is made smaller, down to 16 px. A name that still does not
+  fit is drawn at 16 px, and a new rule, `name-fit`, warns with the two ways out (shorten it, or widen the block).
+  Counted in letters, since a build has no browser; `build --layout` measures the page. A `<b>` with a style or
+  markup of its own is left alone. Names that ran past their block in 0.19.0 are drawn differently now.
+- **`data-head="none"`** on any wire: a plain line that runs its whole length, with no arrow's head.
+- **The build's record of a map**, beside the page: `compileDeck(source).maps[name]` has `made` (who placed the
+  blocks, the tile, whether the picture was fitted), `cables` (each cable's corners and its line's length in slide
+  px, the stretches a block hides, what it passes behind, crosses and shares) and `tight`. The run's log has a new
+  stage, `maps made`, with the same facts. Each cable carries its line's length in the page as `--sd-length`, so a
+  deck's own CSS can time a thing to a cable without measuring.
+- **A map is made in one order, each step one function**: icons, blocks placed, wires laid in tiles, floor and
+  picture fitted, pieces drawn, callouts, wires drawn. A wire's way is found once.
+- `footprint-story` 0.12.0 or later (`gridFor` · `also`, `wordsToFit`, `unseen` on a route).
+
 ## 0.19.0 — wires that find their way, and say so
 
 - **A wire between two blocks finds its way along the floor.** In 0.18.0 it was one curve between two fixed feet,
