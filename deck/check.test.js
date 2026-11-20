@@ -184,3 +184,13 @@ describe('checkDeck · wire-way: what the build knows of a wire along the floor,
     expect(checkDeck(compileDeck(source)).filter((p) => p.rule === 'wire-way')).toEqual([]);
   });
 });
+
+describe('checkDeck · name-fit: a name that does not fit its block', () => {
+  const deck = (map) => compileDeck(sourceOf({clicks: '<section data-label="S" data-map="map"><step data-in="*"><h2>All</h2></step></section>', maps: {map}}));
+  it('warns, naming the block and the two ways out; says nothing of a name that fits, broken or shrunk', () => {
+    const grid = '<i data-iso-grid="96 at 960 240"></i>', block = (name, text) => `<div data-k="${name}" data-iso="block" data-at="${name === 'a' ? '0 0' : '6 0'}"><b>${text}</b></div>`;
+    const found = checkDeck(deck(`${grid}${block('a', 'Supercalifragilisticexpialidocious')}${block('b', 'Authentication Service')}`)).filter((p) => p.rule === 'name-fit');
+    expect(found).toEqual([{level: 'warn', rule: 'name-fit', click: 1, label: expect.any(String), message: '"a": its name "Supercalifragilisticexpialidocious" does not fit its block, even on two lines at the least size — shorten it (and say the rest in a <small> line or the notes), or make the block wider (data-size)'}]);
+  });
+});
+

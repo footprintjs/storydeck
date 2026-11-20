@@ -24,40 +24,65 @@ const SAMPLE = 6;   // px between the points asked: of a cable, whether it is un
 export const WALK_MOST = 512;
 
 /**
- * The cables of a map. `links`: one entry a wire, [from, to] by piece name, or null for a wire that is no cable;
- * `shapes`: a Map from a name to its one piece, {at: [col, row, lift], size: [wide, deep, high], kind}; `floor(col,
- * row, lift)`: where a floor point is on the slide, [x, y]; `solids`: every block and cylinder of the map, each {name,
- * at, size, kind} — those that share a name too: a wire cannot end at one of them, and must still go round it.
- * Gives, in the same order, null for a wire that was not asked, and else {points, radius, route}: `route` what the
- * kit says of it (its feet, its bends, what it passes behind — or `why` it has none), `points` its way on the slide
- * from 6 px off one foot to 6 px off the other ([[x, y], …], null when it has none), `radius` its corners' rounding.
+ * The wires of a map, laid along the floor: tiles in, tiles out — nothing of a slide yet. `links`: one entry a wire,
+ * [from, to] by piece name, or null for a wire that is not laid; `solids`: every block and cylinder of the map, each
+ * {name, at: [col, row, lift], size: [wide, deep, high], kind} — those that share a name too: a wire cannot end at one
+ * of them, and must still go round it. Gives, in the same order, null for a wire that was not asked (or an end that
+ * is not the one piece of its name), and else {route, lift}: `route` what the kit says of it (its points in tiles,
+ * its feet, its bends, what it passes behind — or `why` it has none), `lift` the height of the floor it lies on.
  *
  * The kit knows each piece by a number of ours, not by its name: two pieces may share a name, and a name may be any
  * text a deck holds (the kit keeps names to 200 characters, and would refuse the whole map for one).
  */
-export function cables(links, shapes, floor, solids = [...shapes.values()]) {
-  const idOf = new Map(solids.map((piece, i) => [piece, String(i)]));
-  const asked = links.map((link, i) => (link && idOf.has(shapes.get(link[0])) && idOf.has(shapes.get(link[1])) ? i : -1)).filter((i) => i >= 0);
+export function layRoutes(links, solids) {
+  const idOf = new Map(), twice = new Set();
+  solids.forEach(({name}, i) => { if (idOf.has(name)) twice.add(name); else idOf.set(name, String(i)); });
+  for (const name of twice) idOf.delete(name);
+  const asked = links.map((link, i) => (link && idOf.has(link[0]) && idOf.has(link[1]) ? i : -1)).filter((i) => i >= 0);
   const laid = links.map(() => null);
   if (!asked.length) return laid;
   const things = solids.map(({at, size, kind}, i) => ({name: String(i), at, size, round: kind === 'cylinder'}));
   const first = asked.slice(0, MOST_ROUTES);   // the kit lays so many
-  const found = routes(things, first.map((i) => links[i].map((name) => idOf.get(shapes.get(name)))));
+  const found = routes(things, first.map((i) => links[i].map((name) => idOf.get(name))));
+  const liftOf = (name) => solids[Number(idOf.get(name))].at[2] ?? 0;
+  // the kit's words, with the deck's names back in them
+  first.forEach((i, k) => { laid[i] = {route: {...found[k], from: links[i][0], to: links[i][1], ...(found[k].behind && {behind: found[k].behind.map((id) => solids[Number(id)].name)})}, lift: liftOf(links[i][0])}; });
+  // a wire past what the kit lays stays the straight wire it was, and says why
+  for (const i of asked.slice(MOST_ROUTES)) laid[i] = {route: {from: links[i][0], to: links[i][1], points: null, why: NO_ROUTE.work}, lift: liftOf(links[i][0])};
+  return laid;
+}
+
+/** The floor points laid routes reach, [[col, row, lift], …]: what the floor and the picture are fitted to beside the blocks. */
+export const reachOf = (laid) => laid.flatMap((entry) => (entry?.route.points ? entry.route.points.map(([col, row]) => [col, row, entry.lift]) : []));
+
+/**
+ * Laid routes (layRoutes) put on the slide. `floor(col, row, lift)`: where a floor point is on the slide, [x, y].
+ * Gives, in the same order, null for a wire that was not laid, and else {points, radius, tile, route}: `points` its
+ * way on the slide from 6 px off one foot to 6 px off the other ([[x, y], …], null when it has none), `radius` its
+ * corners' rounding in px, `tile` a tile along the floor in px, `route` as it was laid.
+ */
+export function cablesOn(laid, floor) {
   const origin = floor(0, 0, 0), tile = Math.hypot(floor(1, 0, 0)[0] - origin[0], floor(1, 0, 0)[1] - origin[1]);   // a tile along the floor, in slide px
-  first.forEach((i, k) => {
-    // the kit's words, with the deck's names back in them
-    const route = {...found[k], from: links[i][0], to: links[i][1], ...(found[k].behind && {behind: found[k].behind.map((id) => solids[Number(id)].name)})};
-    if (!route.points) { laid[i] = {points: null, radius: 0, route}; return; }
-    const lift = shapes.get(route.from).at[2], points = route.points.map(([col, row]) => floor(col, row, lift));
+  return laid.map((entry) => {
+    if (!entry) return null;
+    const {route, lift} = entry;
+    if (!route.points) return {points: null, radius: 0, tile, route};
+    const points = route.points.map(([col, row]) => floor(col, row, lift));
     // each end 6 px off its foot, along its own run
     const off = (p, towards) => { const far = Math.hypot(towards[0] - p[0], towards[1] - p[1]) || 1, by = Math.min(CLEAR, far / 2); return [p[0] + (towards[0] - p[0]) * by / far, p[1] + (towards[1] - p[1]) * by / far]; };
     points[0] = off(points[0], points[1]);
     points[points.length - 1] = off(points.at(-1), points.at(-2));
-    laid[i] = {points, radius: CORNER * tile, route};
+    return {points, radius: CORNER * tile, tile, route};
   });
-  // a wire past what the kit lays stays the straight wire it was, and says why
-  for (const i of asked.slice(MOST_ROUTES)) laid[i] = {points: null, radius: 0, route: {from: links[i][0], to: links[i][1], points: null, why: NO_ROUTE.work}};
-  return laid;
+}
+
+/**
+ * The cables of a map, laid and put on the slide in one call (layRoutes, cablesOn). `shapes`: a Map from a name to its
+ * one piece — a wire ends only at such a piece; `solids`: every block and cylinder (all of `shapes` when not given).
+ */
+export function cables(links, shapes, floor, solids = [...shapes.values()]) {
+  const named = solids.map((piece) => ({...piece, name: piece.name ?? [...shapes].find(([, shape]) => shape === piece)?.[0] ?? ''}));
+  return cablesOn(layRoutes(links.map((link) => (link && shapes.has(link[0]) && shapes.has(link[1]) ? link : null)), named), floor);
 }
 
 /**

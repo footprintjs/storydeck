@@ -44,7 +44,9 @@ compiles --> check_rules
 check_rules["check rules"]
 compiles --> broken
 broken["broken"]
-compiles --> read_notes
+compiles --> maps_made
+maps_made["maps made"]
+maps_made --> read_notes
 read_notes["read notes"]
 read_notes --> measure_asked
 measure_asked["measure asked?"]

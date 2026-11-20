@@ -46,7 +46,7 @@ describe('runDeck: one run of a deck', () => {
     expect(words).toContain('[Condition]: It evaluated Rule 0 "No measure was asked for": layoutAsked false eq false ✓, and chose not asked.');
     expect(words).toContain('[Condition]: No rules matched, fell back to default "The page is written": write page.');
     expect(words).toContain('[Condition]: It evaluated Rule 1 "There is a warning to fix": warnings 4 gt 0 ✓, and chose fix.');
-    expect(run.stages.map((s) => s.stage)).toEqual(['read deck', 'compiles?', 'check rules', 'read notes', 'measure asked?', 'not asked', 'write asked?', 'write page', 'count problems', 'verdict', 'fix']);
+    expect(run.stages.map((s) => s.stage)).toEqual(['read deck', 'compiles?', 'check rules', 'maps made', 'read notes', 'measure asked?', 'not asked', 'write asked?', 'write page', 'count problems', 'verdict', 'fix']);
   });
 
   it('a deck that does not compile is the verdict "broken": one problem, nothing written, and the run stops there', async () => {
@@ -247,5 +247,25 @@ describe('runDeck: what it keeps, and what it never lets cost the answer', () =>
     const blocks = [...readme.matchAll(/```mermaid\n([\s\S]*?)\n```/g)].map((m) => m[1]);
     expect(blocks).toEqual([drawn.run, drawn.measure]);   // a chart that changes changes its drawing
     expect(drawn.run).toContain('measure_asked --> measure');
+  });
+});
+
+describe('run · how a map was made is on the record', () => {
+  it('who placed the blocks, the tile, the cables, and what the build could not do — nothing for a deck with no isometric map', async () => {
+    const {mapsMade} = await import('./stages.js'), {compileDeck} = await import('../compile.js'), {sourceOf} = await import('../test/helpers.js');
+    const iso = (name, more = '') => `<div data-k="${name}" data-iso="block"${more}><b>${name}</b></div>`;
+    const deck = (map) => compileDeck(sourceOf({clicks: '<section data-label="S" data-map="map"><step data-in="*"><h2>All</h2></step></section>', maps: {map}}));
+    // placed by the build, three wires, one of them between two heights
+    const scope = {};
+    mapsMade(scope, {loaded: {compiled: deck(`${iso('a')}${iso('b')}${iso('c', ' data-size="2 2 1"')}<i data-k="w1" class="wire" data-arrow="a to b"></i><i data-k="w2" class="wire" data-arrow="b to c"></i>`)}});
+    expect(scope.maps).toEqual({map: {placed: 'build', tile: expect.any(Number), cables: 2}});
+    // placed by hand, with a wire the floor has no way for and a name too long for its block
+    const hand = {}, grid = '<i data-iso-grid="120 at 960 240"></i>';
+    mapsMade(hand, {loaded: {compiled: deck(`${grid}<div data-k="a" data-iso="block" data-at="0 4"><b>Supercalifragilisticexpialidocious</b></div><div data-k="up" data-iso="block" data-at="6 0 2"><b>Up</b></div><i data-k="w" class="wire" data-arrow="a to up"></i>`)}});
+    expect(hand.maps).toEqual({map: {placed: 'hand', tile: 120, cables: 0, said: {w: 'straight heights'}, tight: ['a']}});
+    // no isometric map: nothing written
+    const flat = {};
+    mapsMade(flat, {loaded: {compiled: deck('<div data-k="a" class="box" style="left:0px;top:0px;width:100px;height:50px">a</div>')}});
+    expect(flat).toEqual({});
   });
 });

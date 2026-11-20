@@ -348,7 +348,7 @@ describe('a wire between two isometric pieces is a cable along the floor', () =>
     const map = `${blocks}<i data-k="w" class="wire req" data-arrow="a to b"></i>`, out = applyTransforms(map, {canvas});
     // out of a's right foot along the cols, one rounded turn, up the rows into b's left foot: the line stops where the head begins
     expect(svgOf(out, 'w')).toContain('<path d="M20 20L230.6 125.3Q254.6 137.3 278.6 125.3L356.4 86.4"/>');
-    expect(tag(out, 'w')).toMatch(/^<svg data-ends="a b" data-k="w" class="wire req" data-sd-cable style="left:[\d.-]+px;top:[\d.-]+px;width:[\d.]+px;height:[\d.]+px;--sd-angle:[\d.-]+deg;--sd-way:path\('M20 20L230\.6 125\.3Q254\.6 137\.3 278\.6 125\.3L356\.4 86\.4'\)" viewBox="0 0 [\d.]+ [\d.]+" aria-hidden="true">$/);
+    expect(tag(out, 'w')).toMatch(/^<svg data-ends="a b" data-k="w" class="wire req" data-sd-cable style="left:[\d.-]+px;top:[\d.-]+px;width:[\d.]+px;height:[\d.]+px;--sd-angle:[\d.-]+deg;--sd-way:path\('M20 20L230\.6 125\.3Q254\.6 137\.3 278\.6 125\.3L356\.4 86\.4'\);--sd-length:[\d.]+px" viewBox="0 0 [\d.]+ [\d.]+" aria-hidden="true">$/);
     // the same line as cable.js lays it, in the wire's own box
     const {way, tip} = lineOf(blocks, ['a', 'b']), [x, y] = cornerOf(out, 'w');
     expect(way.start[0] - x).toBeCloseTo(20, 1);
@@ -492,6 +492,46 @@ describe('a wire between two isometric pieces is a cable along the floor', () =>
     expect(() => applyTransforms(boxed, {canvas})).toThrow('data-arrow="a to b": no way along the floor was laid for it (no place at a foot that can be seen: closed in, or too narrow), and "a" and "b" are too close for a straight wire between them — move them apart, or give the wire numbers');
     // two blocks that touch, asked for a straight wire: the old words, as ever
     expect(() => applyTransforms(boxed.replace('a to b', 'a to b 0'), {canvas})).toThrow('"a" and "b" are too close for a wire between them (they touch or overlap) — move them apart, or give the wire numbers');
+  });
+
+  it('data-head="none": a plain line that runs its whole length, on a cable and on a straight wire', () => {
+    const cable = applyTransforms(`${blocks}<i data-k="w" class="wire" data-arrow="a to b" data-head="none"></i>`, {canvas}), {cable: laid} = lineOf(blocks, ['a', 'b']);
+    expect(svgOf(cable, 'w')).not.toContain('class="head"');
+    const whole = cableWay(laid, 0), [x, y] = cornerOf(cable, 'w'), [, ex, ey] = /L([\d.-]+) ([\d.-]+)"\/>/.exec(svgOf(cable, 'w')).map(Number);
+    expect([ex + x, ey + y]).toEqual([expect.closeTo(laid.points.at(-1)[0], 0), expect.closeTo(laid.points.at(-1)[1], 0)]);   // to the cable's own end, 6 px off the foot
+    expect(tag(cable, 'w')).toContain(`--sd-length:${+whole.length.toFixed(1)}px`);
+    const straight = wires('<i data-k="w" data-arrow="100 300 500 300" data-head="none"></i>');
+    expect(straight).toContain('<path d="M20 20 Q220 20 420 20"/>');   // all 400 px of it: no 14 px left for a head
+    expect(straight).not.toContain('class="head"');
+    expect(wires('<i data-k="w" data-arrow="100 300 500 300"></i>')).toContain('<path d="M20 20 Q220 20 405.6 20"/><path class="head"');
+    expect(() => wires('<i data-k="w" data-arrow="100 300 500 300" data-head="round"></i>')).toThrow('wire data-arrow="100 300 500 300": data-head="round" — a wire has its arrow\'s head, or data-head="none" for a plain line that runs its whole length');
+  });
+
+  it('carries its line\'s length for a deck\'s own CSS, and the build keeps a record of every cable laid', () => {
+    const map = `${blocks}<i data-k="w" class="wire" data-arrow="a to b"></i><i data-k="v" class="wire" data-arrow="b to a 0"></i>`, made = transformed(map, {canvas}), {way, cable} = lineOf(blocks, ['a', 'b']);
+    expect(tag(made.html, 'w')).toContain(`;--sd-length:${+way.length.toFixed(1)}px"`);
+    expect(tag(made.html, 'v')).not.toContain('--sd-length');   // a straight wire is its own short line
+    expect(made.cables).toEqual([{name: 'w', from: 'a', to: 'b', points: cable.points.map(([x, y]) => [+x.toFixed(1), +y.toFixed(1)]), length: +way.length.toFixed(1), unseen: [], behind: [], crosses: 0, shared: 0, bends: 1}]);
+    expect(made.made).toEqual({placed: 'hand', tile: 120, fitted: false});
+    expect(made.tight).toEqual([]);
+    // a stretch a block hides is in the record, in px along the cable
+    const walled = `${grid}<div data-k="a" data-iso="block" data-at="0 4"></div><div data-k="b" data-iso="block" data-at="8 4"></div><div data-k="wall" data-iso="block" data-at="4 5.5" data-size="2 40 2"></div><i data-k="w" class="wire" data-arrow="a to b"></i>`;
+    const [hidden] = transformed(walled, {canvas}).cables;
+    expect(hidden.behind).toEqual(['wall']);
+    expect(hidden.unseen.length).toBeGreaterThan(0);
+    for (const [from, to] of hidden.unseen) expect(from >= 0 && to > from && to <= hidden.length + 20).toBe(true);
+    expect(transformed('<p>no map</p>', {canvas})).toEqual({html: '<p>no map</p>', ways: [], cables: [], tight: [], made: null});
+  });
+
+  it('the picture and the floor are fitted to the wires as well as the blocks: a wire that goes round stays on the slide', () => {
+    // a ring: the wire back from the last block to the first runs round the front of the others
+    const ring = '<div data-k="floor" data-iso="floor"></div>' + ['a', 'b', 'c', 'd'].map((n) => `<div data-k="${n}" data-iso="block"></div>`).join('') + '<i data-k="w1" class="wire" data-arrow="a to b"></i><i data-k="w2" class="wire" data-arrow="b to c"></i><i data-k="w3" class="wire" data-arrow="c to d"></i><i data-k="back" class="wire" data-arrow="d to a"></i>';
+    const area = [60, 200, 1860, 1000], made = transformed(ring, {canvas, area});
+    expect(made.cables).toHaveLength(4);
+    for (const {name, points} of made.cables) for (const [x, y] of points) expect(x >= area[0] && x <= area[2] && y >= area[1] && y <= area[3], `${name} at ${[x, y]}`).toBe(true);
+    // and every corner of every wire is on the fitted floor (the floor's own outline holds it)
+    const [, fx, fy, fw, fh] = /data-k="floor"[^>]*style="left:([\d.-]+)px;top:([\d.-]+)px;width:([\d.]+)px;height:([\d.]+)px/.exec(made.html).map(Number);
+    for (const {points} of made.cables) for (const [x, y] of points) expect(x >= fx && x <= fx + fw && y >= fy && y <= fy + fh).toBe(true);
   });
 
   it('a bend, 0 too, keeps the wire a straight run; so does an end that is no block', () => {

@@ -293,7 +293,14 @@ describe('iso · no places to type: the build places the blocks from what is joi
   it('the same map through the whole helper chain: the wires run between the blocks the build placed', () => {
     const out = applyTransforms(LEAST, {canvas, area});
     expect(out).toBe(applyTransforms(LEAST, {canvas, area}));                   // the same again
-    expect(boxIn(out, 'server')).toEqual(boxIn(isoPieces(LEAST, {canvas, area, links}), 'server'));
+    // the blocks stand as the placing alone stands them, one against another; the picture is moved to hold the wires too
+    const alone = isoPieces(LEAST, {canvas, area, links}), from = (html, name) => { const a = boxIn(html, 'you'), b = boxIn(html, name); return [b.x - a.x, b.y - a.y, b.w, b.h]; };
+    for (const name of ['dns', 'server', 'db']) expect(from(out, name)).toEqual(from(alone, name).map((n) => expect.closeTo(n, 1)));
+    // every wire is inside the slide's area: the picture was fitted to the wires as well as the blocks
+    for (const svg of out.matchAll(/<svg data-ends="[^"]*"[^>]*style="left:([\d.-]+)px;top:([\d.-]+)px;width:([\d.]+)px;height:([\d.]+)px/g)) {
+      const [x, y, w, h] = svg.slice(1).map(Number);
+      expect(x + 20 >= area[0] && y + 20 >= area[1] && x + w - 20 <= area[2] && y + h - 20 <= area[3], `${[x, y, w, h]} in ${area}`).toBe(true);   // 20 px: a wire's box is that much bigger than its line
+    }
     for (const [name, ends] of [['w1', 'you dns'], ['w2', 'you server'], ['w3', 'server db']]) expect(tagOf(out, name)).toContain(`data-ends="${ends}"`);
     expect(out).not.toMatch(/data-arrow|data-iso=|data-at=/);
   });
@@ -395,7 +402,7 @@ describe('iso · no places to type: the build places the blocks from what is joi
     expect(Math.min(...points.map((p) => p[1]))).toBeCloseTo(round_.box.y, 6);                       // the top of its top
     expect(Math.max(...points.map((p) => p[1]))).toBeCloseTo(round_.box.y + round_.box.h, 6);        // the foot of its foot
     expect(isoDrawn('<div data-k="a" data-iso="block" data-at="0 0"></div><div data-k="a" data-iso="block" data-at="4 0"></div>', {canvas}).shapes.size).toBe(0);
-    expect(isoDrawn('<p>no piece</p>', {canvas})).toEqual({html: '<p>no piece</p>', shapes: new Map(), solids: []});
+    expect(isoDrawn('<p>no piece</p>', {canvas})).toEqual({html: '<p>no piece</p>', shapes: new Map(), solids: [], tight: []});
   });
 
   it('the README\'s map with no number in it builds as written', () => {
@@ -416,3 +423,36 @@ describe('iso · no places to type: the build places the blocks from what is joi
     expect(compiled.maps.map.pieces.every((p) => p.box && p.box.w > 0)).toBe(true);
   });
 });
+
+describe('iso · a block\'s name fits its top face', () => {
+  const grid = '<i data-iso-grid="96 at 960 240"></i>';
+  const say = (inner, size = '2 2 1') => /<span class="iso-say"[^>]*>(.*?)<\/span>/.exec(isoPieces(`${grid}<div data-k="a" data-iso="block" data-at="0 0" data-size="${size}">${inner}</div>`, {canvas}))[1];
+  const tightOf = (inner, size = '2 2 1') => isoDrawn(`${grid}<div data-k="a" data-iso="block" data-at="0 0" data-size="${size}">${inner}</div>`, {canvas}).tight;
+
+  it('a name that fits stays as the deck wrote it, to the letter', () => {
+    for (const inner of ['<b>API</b>', '<i class="ic"></i><b>Server</b><small>an API</small>', '<b>Balancer</b>', 'plain words', '<b></b>']) expect(say(inner) ?? '').toBe(inner);
+    expect(tightOf('<b>API</b>')).toEqual([]);
+  });
+
+  it('a longer name is broken onto two lines where they are most alike; a longer one still is made smaller', () => {
+    expect(say('<b>Load Balancer</b>')).toBe('<b>Load<br>Balancer</b>');                                   // a face 192 px wide: 13 letters at 26 px do not fit on one line
+    expect(say('<b>Authentication Service</b><small>OAuth</small>')).toBe('<b style="font-size:20px">Authentication<br>Service</b><small>OAuth</small>');
+    expect(say('<b>Load Balancer</b>', '4 2 1')).toBe('<b>Load Balancer</b>');                             // a wider block: one line
+    expect(say('<b>R&amp;D Lab one</b>')).toBe('<b>R&amp;D Lab one</b>');                                  // an entity is one letter: eleven letters fit, where fifteen would not
+    expect(say('<b>R&amp;D Team Lab</b>')).toBe('<b>R&amp;D<br>Team Lab</b>');                             // and stays as written when the name is broken
+    expect(tightOf('<b>Authentication Service</b>')).toEqual([]);
+  });
+
+  it('a name that cannot fit is drawn at the least size on two lines, and the build is told', () => {
+    expect(say('<b>Supercalifragilisticexpialidocious</b>')).toBe('<b style="font-size:16px">Supercalifragilisticexpialidocious</b>');
+    expect(tightOf('<b>Supercalifragilisticexpialidocious</b>')).toEqual([{name: 'a', text: 'Supercalifragilisticexpialidocious'}]);
+  });
+
+  it('a name with markup or a style of its own is the deck\'s to set: left alone', () => {
+    for (const inner of ['<b style="font-size:40px">A very long name indeed here</b>', '<b class="x">A very long name indeed here</b>', '<b>A very <em>long</em> name indeed here</b>']) {
+      expect(say(inner)).toBe(inner);
+      expect(tightOf(inner)).toEqual([]);
+    }
+  });
+});
+

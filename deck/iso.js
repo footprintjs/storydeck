@@ -41,7 +41,8 @@
 // A piece is what it draws, not the box it is placed by. The box of a block seen from a corner has four empty corners,
 // and a nearer block's box lies over the block behind it: so on the slide shown only its faces and its words take the
 // pointer, and a ring round it (a highlight, explore's hover) follows its faces — isoRing, for whoever rings a piece.
-import {arrange, gridFor, isometric, readThing} from 'footprint-story/isometric';
+import {arrange, gridFor, isometric, readThing, wordsToFit} from 'footprint-story/isometric';
+import {decodeEntities} from './html.js';
 import {attrRule, ownAttribute, pieceTags, tagsWith} from '../pieceRules.js';
 import {closeOf} from './callouts.js';
 
@@ -159,7 +160,7 @@ const quoted = (pieces) => pieces.map((p) => `"${p.name}"`).join(', ');
  * The blocks (and cylinders): all placed by the map, or all placed here from `links` ([[from, to]], the map's wires) —
  * never some of each. A floor with no data-size is fitted round them, a tile of floor showing on every side.
  */
-function place(found, links) {
+function place(found, links, lay) {
   const solid = found.filter((p) => p.kind !== 'floor'), unplaced = solid.filter((p) => p.at === null);
   if (unplaced.length && unplaced.length < solid.length) {
     throw new Error(`${quoted(unplaced)} ${unplaced.length === 1 ? 'has' : 'have'} no data-at and ${quoted(solid.filter((p) => p.at !== null))} ${solid.length - unplaced.length === 1 ? 'has' : 'have'} one: the build places a map's blocks from its wires only when it places them all — take data-at off the others, or give every block one (a block with none stood at "0 0" before 0.17.0)`);
@@ -181,17 +182,20 @@ function place(found, links) {
     }
     solid.forEach((p, i) => { p.at = [...arranged.things[i].at]; });
   }
+  // the blocks stand: the wires are laid between them now, before anything is fitted, so the floor and the picture hold them too
+  const reach = lay ? lay(solid.map((p) => ({name: p.name, kind: p.kind, at: [p.at[0], p.at[1], p.at[2] ?? 0], size: [...p.size]}))) : [];
   for (const floor of found.filter((p) => p.kind === 'floor')) {
     if (floor.size !== null) { floor.at ??= [0, 0]; continue; }
     if (floor.at !== null) throw new Error(`${floor.where}: a floor with a data-at needs its data-size too ("8 5") — or write neither, and the build fits the floor round the blocks`);
     if (!solid.length) throw new Error(`${floor.where}: a floor with no data-size is fitted round the blocks that stand on it, and this map has none — give it a data-size ("8 5")`);
-    const reach = (axis, end) => (end ? Math.ceil(Math.max(...solid.map((p) => p.at[axis] + p.size[axis])) - 1e-9) : Math.floor(Math.min(...solid.map((p) => p.at[axis])) + 1e-9));
-    floor.at = [reach(0, false) - MARGIN, reach(1, false) - MARGIN];
-    floor.size = [reach(0, true) + MARGIN - floor.at[0], reach(1, true) + MARGIN - floor.at[1]];
+    // round the blocks, and round the wires laid between them (a wire that goes round a block reaches past it)
+    const far = (axis, end) => (end ? Math.ceil(Math.max(...solid.map((p) => p.at[axis] + p.size[axis]), ...reach.map((p) => p[axis])) - 1e-9) : Math.floor(Math.min(...solid.map((p) => p.at[axis]), ...reach.map((p) => p[axis])) + 1e-9));
+    floor.at = [far(0, false) - MARGIN, far(1, false) - MARGIN];
+    floor.size = [far(0, true) + MARGIN - floor.at[0], far(1, true) + MARGIN - floor.at[1]];
     // refused here, in the map's own terms: the author wrote no size, so the grid's "not [271,271]" would name numbers nobody typed
     if (Math.max(...floor.size) > MOST_FLOOR) throw new Error(`${floor.where}: fitted round this map's blocks the floor would be ${floor.size[0]} by ${floor.size[1]} tiles, and a floor is at most ${MOST_FLOOR} a side — take the floor out, or give it a data-at and a data-size of its own (it is ground: it need not lie under every block)`);
   }
-  return placedHere;
+  return {placedHere, reach};
 }
 
 /**
@@ -200,7 +204,7 @@ function place(found, links) {
  * been: a tile 120 px wide, its far corner at the slide's middle, 240 px down. A floor is not what the tile is chosen
  * for: it is ground, and runs past the slide's edges as far as it likes.
  */
-function gridOf(found, {fit, canvas, area}) {
+function gridOf(found, {fit, canvas, area, also = []}) {
   const [w, h] = canvas ?? [1920, 1080];
   if (!fit) return isometric({tile: 120, origin: [w / 2, 240]});
   const things = found.filter((p) => p.kind !== 'floor').map((p) => ({at: p.at, size: p.size}));
@@ -211,7 +215,7 @@ function gridOf(found, {fit, canvas, area}) {
     throw new Error(`a fitted picture goes into the slide's area, [x0, y0, x1, y1] in slide px with x1 past x0 and y1 past y0 (deck.json "area") — not ${Array.isArray(into) ? `[${into.map(String).join(', ')}]` : JSON.stringify(into)}`);
   }
   const [x0, y0, x1, y1] = into, inset = Math.min(INSET, (x1 - x0) / 4, (y1 - y0) / 4);   // a small area keeps half of itself
-  return gridFor(things, [x0 + inset, y0 + inset, x1 - inset, y1 - inset], FITTED_TILE);
+  return gridFor(things, [x0 + inset, y0 + inset, x1 - inset, y1 - inset], {...FITTED_TILE, also});   // the blocks, and the floor points their wires reach
 }
 
 /** A round thing's outline as points round it: the upper half of its top, then the lower half of its foot. */
@@ -245,15 +249,40 @@ function shapeOf(p, grid) {
   }
 }
 
+/** A name's size in the page's own CSS (.iso-say): the size it is drawn at when it fits, and the least it is shrunk to. */
+const NAME = Object.freeze({size: 26, least: 16});
+/**
+ * A block's words with its name made to fit its top face: the name is the first <b> holding plain text and no style
+ * of its own. It stays as written when it fits on one line; else it is broken onto two lines, then made smaller
+ * (footprint-story/isometric · wordsToFit: the same rule a film uses). Gives {inner, tight}: `tight` the name and the
+ * size it would need, when it does not fit even at the least size on two lines — the build says so (check ·
+ * name-fit), it never hides a name. `wide`: the face's width on the slide, in px.
+ * WHY counted in letters: a build has no browser. `build --layout` measures the page itself.
+ */
+function fitName(inner, wide) {
+  const found = /<b>([^<]*)<\/b>/.exec(inner);
+  if (!found || !found[1].trim()) return {inner, tight: null};
+  const raw = found[1].trim().split(/\s+/), shown = raw.map((word) => decodeEntities(word));
+  const {lines, size, fits} = wordsToFit(shown.join(' '), [wide * 0.9, 2 * 1.15 * NAME.size + 1], NAME);
+  if (lines.length === 1 && size === NAME.size) return {inner, tight: null};
+  // the words as the deck wrote them (an entity stays an entity), broken where the fitted lines break
+  const first = lines[0].split(' ').length, written = lines.length === 2 ? `${raw.slice(0, first).join(' ')}<br>${raw.slice(first).join(' ')}` : raw.join(' ');
+  const name = `<b${size === NAME.size ? '' : ` style="font-size:${size}px"`}>${written}</b>`;
+  return {inner: inner.slice(0, found.index) + name + inner.slice(found.index + found[0].length), tight: fits ? null : shown.join(' ')};
+}
+
 /** One piece, drawn: its element placed and sized by the floor, its faces, and its words on its top face. */
-function draw(p, html, shape, level) {
+function draw(p, html, shape, level, tile, tight) {
   const {box, art, say} = shape;
   const placed = [`left:${fixed(box.x)}px`, `top:${fixed(box.y)}px`, `width:${fixed(box.w)}px`, `height:${fixed(box.h)}px`, ...(level === null ? [] : [`z-index:${level}`])];
   const css = [...placed, p.style.trim()].filter(Boolean).join(';');
   let at = p.styleCut;   // its attributes without its style (and without data-iso): the one style written below is its only one
   at = attrRule('class').test(at) ? at.replace(attrRule('class'), (_, q, v) => ` class=${q}${/(^|\s)iso(\s|$)/.test(v) ? v : `iso ${v}`}${q}`) : `${at} class="iso"`;
   const svg = `<svg class="iso-art" viewBox="0 0 ${fixed(box.w)} ${fixed(box.h)}" aria-hidden="true">${art}</svg>`;
-  const words = say && p.inner.trim() ? `<span class="iso-say" style="left:${fixed(say.x - box.x)}px;top:${fixed(say.y - box.y)}px">${p.inner}</span>` : '';
+  // its name fitted to its top face: as wide as the face is on the slide, half a tile for each tile of its width and its depth
+  const fitted = say && p.inner.trim() ? fitName(p.inner, (p.size[0] + p.size[1]) * tile / 2) : null;
+  if (fitted?.tight) tight.push({name: p.name, text: fitted.tight});
+  const words = fitted ? `<span class="iso-say" style="left:${fixed(say.x - box.x)}px;top:${fixed(say.y - box.y)}px">${fitted.inner}</span>` : '';
   // a floor is ground: a camera frames what stands on it, never the floor itself (focus.js) — unless it says otherwise (data-ground="false")
   const ground = p.kind === 'floor' && ownAttribute(at, 'data-ground') === null ? ' data-ground' : '';
   return `<${p.tag}${at}${ground} data-sd-iso="${p.kind}" style=${p.quote}${css}${p.quote}>${svg}${words}${html.slice(p.close, p.end)}`;
@@ -272,29 +301,30 @@ export const isoPieces = (html, options) => isoDrawn(html, options).html;
  * `shapes` a Map from a block's or a cylinder's name to {name, outline: [[x, y], …], middle: [x, y]} in slide px (the
  * points round what it draws, and the middle of that) and {kind, at: [col, row, lift], size} in tiles (where it
  * stands); `solids`: every block and cylinder so, those that share a name too (a wire cannot end at one of them, and
- * still must not run under it);
+ * still must not run under it); `tight`: the names that do not fit their block's face even broken and shrunk,
+ * [{name, text}]; `made`: how the map was made — {placed: 'build' | 'hand', tile, fitted};
  * `floor(col, row, lift)`: where a point of the floor is on the slide, [x, y] (absent when the map has no isometric
  * piece). A block is not the box it is placed by: a wire between two blocks is a cable along the floor, from a foot
  * of one to a foot of the other (cable.js), and a wire from a block to a flat piece ends on the block's outline
  * (transforms.js). A name two pieces share has no shape: it is found by its box, as before.
  */
-export function isoDrawn(html, {canvas = null, area = null, links = []} = {}) {
-  const shapes = new Map(), solids = [];
-  if (!MAYBE.test(html) && !MAYBE_GRID.test(html)) return {html, shapes, solids};
+export function isoDrawn(html, {canvas = null, area = null, links = [], lay = null} = {}) {
+  const shapes = new Map(), solids = [], tight = [];
+  if (!MAYBE.test(html) && !MAYBE_GRID.test(html)) return {html, shapes, solids, tight};
   const {html: map, grid: written, fit = false} = readGrid(html), found = readIso(map);
   if (!found.length) {
     if (fit) throw new Error('data-iso-grid="fit": the grid is fitted to the blocks, and this map has none — add a block, or take the grid out');
-    return {html: map, shapes, solids};
+    return {html: map, shapes, solids, tight};
   }
   if (found.length > MOST_ISO_PIECES) throw new Error(`a map holds at most ${MOST_ISO_PIECES} isometric pieces, and this one has ${found.length}`);
-  const placedHere = place(found, links);
-  const grid = written ?? gridOf(found, {fit: fit || placedHere, canvas, area});
+  const {placedHere, reach} = place(found, links, lay);
+  const grid = written ?? gridOf(found, {fit: fit || placedHere, canvas, area, also: reach});
   const drawn = found.map((p) => shapeOf(p, grid));
   // the order they are painted in, the furthest first: a level each, above the floor and the wires (which share level 0)
   const solid = found.filter((p) => p.kind !== 'floor'), order = grid.backToFront(solid, (p) => ({at: p.at, size: p.size}));
   let out = '', from = 0;
   found.forEach((p, i) => {
-    out += map.slice(from, p.start) + draw(p, map, drawn[i], p.kind === 'floor' ? null : order.indexOf(p) + 1);
+    out += map.slice(from, p.start) + draw(p, map, drawn[i], p.kind === 'floor' ? null : order.indexOf(p) + 1, grid.tile[0], tight);
     from = p.end;
   });
   const twice = new Set(solid.map((p) => p.name).filter((name, i, all) => all.indexOf(name) !== i));
@@ -304,7 +334,8 @@ export function isoDrawn(html, {canvas = null, area = null, links = []} = {}) {
     solids.push(shape);
     if (!twice.has(p.name)) shapes.set(p.name, shape);
   }
-  return {html: out + map.slice(from), shapes, solids, floor: (col, row, lift = 0) => { const point = grid.at(col, row, lift); return [point.x, point.y]; }};
+  const made = {placed: placedHere ? 'build' : 'hand', tile: grid.tile[0], fitted: !written && (fit || placedHere)};
+  return {html: out + map.slice(from), shapes, solids, tight, made, floor: (col, row, lift = 0) => { const point = grid.at(col, row, lift); return [point.x, point.y]; }};
 }
 
 const TONE = 'var(--iso-color, var(--sd-tone, #d9e4f3))';

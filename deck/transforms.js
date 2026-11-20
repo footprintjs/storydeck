@@ -37,11 +37,12 @@
 
 import {stripComments} from './html.js';
 import {readAttributes} from '../pieceRules.js';
+import {readPieces} from '../focusHtml.js';
 import {boxFinder, exit, exitOutline} from './boxes.js';
 import {callouts} from './callouts.js';
 import {isoDrawn} from './iso.js';
 import {NO_ROUTE} from 'footprint-story/isometric';
-import {cables, cableWalk, cableWay, held, labelPlace, wayNote, LABEL_LOOKS} from './cable.js';
+import {cables, cablesOn, cableWalk, cableWay, held, labelPlace, layRoutes, reachOf, wayNote, LABEL_LOOKS} from './cable.js';
 
 const fixed = (v) => +v.toFixed(1);
 /** A wire written by the pieces it joins: "from to to [bend]". */
@@ -64,14 +65,15 @@ function wireOptions(attrs, spec) {
   const where = `wire data-arrow="${spec}"`, read = readAttributes(attrs);
   if (!read) throw new Error(`${where}: a quote in its tag is never closed — write a ">" or "<" inside a value as &gt; or &lt;`);
   const value = (name) => read.find((a) => a.name === name)?.value;
-  const label = value('data-label')?.trim() || null, packets = value('data-packets'), speed = value('data-speed');
+  const label = value('data-label')?.trim() || null, packets = value('data-packets'), speed = value('data-speed'), head = value('data-head');
+  if (head !== undefined && head.trim() !== 'none') throw new Error(`${where}: data-head="${head}" — a wire has its arrow's head, or data-head="none" for a plain line that runs its whole length`);
   if (packets !== undefined && !/^[1-9]\d*$/.test(packets.trim())) throw new Error(`${where}: data-packets="${packets}" — the packets that run along it are a whole number, 1 to ${MOST_PACKETS}`);
   const n = packets === undefined ? 0 : Number(packets);
   if (n > MOST_PACKETS) throw new Error(`${where}: data-packets="${packets}" — at most ${MOST_PACKETS} packets run along one wire`);
   if (speed !== undefined && !n) throw new Error(`${where}: data-speed sets how fast its packets run — give it data-packets too`);
   const s = speed === undefined ? 3 : /^\s*\d+(?:\.\d+)?s?\s*$/.test(speed) ? parseFloat(speed) : NaN;
   if (!(s >= SPEEDS[0] && s <= SPEEDS[1])) throw new Error(`${where}: data-speed="${speed}" — the seconds a packet takes to run the wire, ${SPEEDS[0]} to ${SPEEDS[1]}`);
-  return {label, packets: n, speed: s};
+  return {label, packets: n, speed: s, head: head === undefined};
 }
 
 const HEAD = 18;   // an arrow's head, in px: its length (its line stops four fifths of that short of the tip)
@@ -115,7 +117,7 @@ function wireSvg(attrs, spec) {
   const xs = [x1, x2, cx, ...(half ? [lx - half[0] + 20, lx + half[0] - 20] : [])], ys = [y1, y2, cy, ...(half ? [ly - half[1] + 20, ly + half[1] - 20] : [])];
   const pad = 20, X = Math.min(...xs) - pad, Y = Math.min(...ys) - pad;
   const W = Math.max(...xs) + pad - X, H = Math.max(...ys) + pad - Y, f = fixed;
-  const ex = x2 - ux * HEAD * 0.8, ey = y2 - uy * HEAD * 0.8;
+  const back = o.head ? HEAD * 0.8 : 0, ex = x2 - ux * back, ey = y2 - uy * back;   // a line with no head runs its whole length
   const d = `M${f(x1 - X)} ${f(y1 - Y)} Q${f(cx - X)} ${f(cy - Y)} ${f(ex - X)} ${f(ey - Y)}`;
   const at = classed(attrs);
   // the packet rides the curve itself (deck.css · sdPkt): its control point and its end, from where it starts
@@ -126,18 +128,19 @@ function wireSvg(attrs, spec) {
   const label = o.label ? `<text class="label" x="${f(lx - X)}" y="${f(ly - Y)}" text-anchor="middle">${o.label}</text>` : '';
   // which way it runs, start to tip, as a CSS angle (0 up, 90 right): a wire coming in shows itself that way (deck.css · sdReveal)
   const angle = f((Math.atan2(dx, -dy) * 180) / Math.PI);
-  return `<svg${at} style="left:${f(X)}px;top:${f(Y)}px;width:${f(W)}px;height:${f(H)}px;--sd-angle:${angle}deg" viewBox="0 0 ${f(W)} ${f(H)}" aria-hidden="true"><path d="${d}"/>${headAt([x2 - X, y2 - Y], [ux, uy])}${pkt}${runs}${label}</svg>`;
+  return `<svg${at} style="left:${f(X)}px;top:${f(Y)}px;width:${f(W)}px;height:${f(H)}px;--sd-angle:${angle}deg" viewBox="0 0 ${f(W)} ${f(H)}" aria-hidden="true"><path d="${d}"/>${o.head ? headAt([x2 - X, y2 - Y], [ux, uy]) : ''}${pkt}${runs}${label}</svg>`;
 }
 
 /**
  * A cable's SVG: the same wire in every other way — its own attributes, a head, its packets, its options — drawn along
  * its line on the floor (`way`: cable.js · cableWay, straight runs and rounded corners; `points`: the cable's own, its
  * last where its arrow ends).
- * It is marked data-sd-cable and carries its line as --sd-way, which its packets ride (deck.css). Its label stands on
+ * It is marked data-sd-cable and carries its line as --sd-way, which its packets ride (deck.css), and that line's
+ * length as --sd-length, so a deck's own CSS can time a thing to it without measuring. Its label stands on
  * it, on a plate, where `place(way, [half its width, half its height], tip)` says.
  */
 function cableSvg(attrs, spec, way, points, place) {
-  const o = wireOptions(attrs, spec), f = fixed, [x1, y1] = way.start, tip = points.at(-1), before = points.at(-2);
+  const o = wireOptions(attrs, spec), f = fixed, [x1, y1] = way.start, tip = points.at(-1), before = points.at(-2);   // `way` already ends where the head begins, or at the tip when the wire has none
   // the head points the way the cable's last run goes, however short that run is
   const far = Math.hypot(tip[0] - before[0], tip[1] - before[1]) || 1, heading = [(tip[0] - before[0]) / far, (tip[1] - before[1]) / far];
   const half = labelBox(o.label), [lx, ly] = half ? place(way, half, tip) : [0, 0];
@@ -158,7 +161,7 @@ function cableSvg(attrs, spec, way, points, place) {
   // longer than its cable has room for, the arrow's tip is still seen
   const plate = half ? `<rect class="plate" x="${f(lx - X - half[0])}" y="${f(ly - Y - half[1])}" width="${f(2 * half[0])}" height="${f(2 * half[1])}" rx="6"/>` : '';
   const angle = f((Math.atan2(tip[0] - x1, -(tip[1] - y1)) * 180) / Math.PI);
-  return `<svg${at} data-sd-cable style="left:${f(X)}px;top:${f(Y)}px;width:${f(W)}px;height:${f(H)}px;--sd-angle:${angle}deg;--sd-way:path('${d}')" viewBox="0 0 ${f(W)} ${f(H)}" aria-hidden="true"><path d="${d}"/>${pkt}${runs}${plate}${headAt([tip[0] - X, tip[1] - Y], heading)}${label}</svg>`;
+  return `<svg${at} data-sd-cable style="left:${f(X)}px;top:${f(Y)}px;width:${f(W)}px;height:${f(H)}px;--sd-angle:${angle}deg;--sd-way:path('${d}');--sd-length:${f(way.length)}px" viewBox="0 0 ${f(W)} ${f(H)}" aria-hidden="true"><path d="${d}"/>${pkt}${runs}${plate}${o.head ? headAt([tip[0] - X, tip[1] - Y], heading) : ''}${label}</svg>`;
 }
 
 /**
@@ -198,12 +201,14 @@ function replaceEach(html, found, draw) {
  * none, and with a bend, 0 too ("a to b 0"), the wire is a straight run from outline to outline. Gives {between,
  * laid}: `laid` is what cable.js said of each wire it was asked about, a way or the reason there is none.
  */
-function wiresBetween(html, found, {shapes, floor, solids}) {
+function wiresBetween(html, found, {shapes, floor, solids, routes}) {
   const read = found.map((f) => BETWEEN.exec(f.m[1]));
   if (!read.some(Boolean)) return {between: read, laid: []};
   const boxOf = boxFinder(html);
-  // the name is that one isometric piece alone, with no bend asked for: then the wire may lie along the floor
-  const laid = floor ? cables(read.map((m) => (m && m[3] === undefined && [m[1], m[2]].every((name) => shapes.has(name) && boxOf.alone(name)) ? [m[1], m[2]] : null)), shapes, floor, solids) : [];
+  // the wires laid along the floor before the picture was fitted (transformed · lay), put on the slide — or, for a
+  // caller that laid none, laid here: the name is that one isometric piece alone, with no bend asked for
+  const laid = !floor ? [] : routes ? cablesOn(routes, floor)
+    : cables(read.map((m) => (m && m[3] === undefined && [m[1], m[2]].every((name) => shapes.has(name) && boxOf.alone(name)) ? [m[1], m[2]] : null)), shapes, floor, solids);
   /** One end of a wire: its middle, how far a line may stand off that middle and still cross it, and where a ray leaves it. */
   const endOf = (name, where) => {
     // an isometric piece's own outline, when the name is that piece alone: a name several pieces share is one box round them all, as ever
@@ -265,20 +270,22 @@ export const wireTags = (html) => emptyI(html, /\sdata-arrow="([^"<>]+)"/);
 export const wires = (html, iso, looks) => wiresDrawn(html, iso, looks).html;
 
 /**
- * `wires`, with what the build knows of each wire's way: {html, ways} — `ways`: [{name, from, to, way}] for every wire
+ * `wires`, with what the build knows of each wire's way: {html, ways, cables} — `cables`: each cable laid, as the
+ * build's record holds it (laidRecord); `ways`: [{name, from, to, way}] for every wire
  * between two blocks there is something to say of (cable.js · wayNote: it passes behind a block, it lies on another,
  * why it is straight), by the wire's first name and the two it joins. It is handed on beside the page, never written
  * into it: what `check` says of a wire is then only ever the build's own word, never text a deck holds.
  */
-export function wiresDrawn(html, {shapes = new Map(), floor = null, solids = [...shapes.values()]} = {}, looks = {left: LABEL_LOOKS}) {
-  const found = wireTags(html), {between, laid: cabled} = wiresBetween(html, found, {shapes, floor, solids});
+export function wiresDrawn(html, {shapes = new Map(), floor = null, solids = [...shapes.values()], routes = null} = {}, looks = {left: LABEL_LOOKS}) {
+  const found = wireTags(html), {between, laid: cabled} = wiresBetween(html, found, {shapes, floor, solids, routes: routes?.length === found.length ? routes : null});
   // what a cable's label keeps clear of: what stands on the floor (a block is drawn over the floor's wires), each
   // label placed before it, and the other cables — so the labels of a request and its answer, lying side by side,
   // never cover each other, and neither's line runs through the other's words where there is room to avoid it.
   // The cables are walked when the first label asks, and the map's labels share one count of looks: a map with no
   // labelled cable pays nothing, and none pays more than that count.
   const taken = solids.map((shape) => held(shape.outline));
-  const ways = between.map((drawn) => (drawn && typeof drawn === 'object' ? cableWay(drawn, HEAD * 0.8) : null));
+  // each cable's line: up to where its head begins, or its whole length when it has none (data-head="none")
+  const ways = between.map((drawn, i) => (drawn && typeof drawn === 'object' ? cableWay(drawn, wireOptions(found[i].before + found[i].after, found[i].m[1]).head ? HEAD * 0.8 : 0) : null));
   let runs = null;
   const place = (way, [wide, high], tip) => {
     runs ??= ways.filter(Boolean).map((line) => ({...held(cableWalk(line)), of: line}));
@@ -286,16 +293,30 @@ export function wiresDrawn(html, {shapes = new Map(), floor = null, solids = [..
     taken.push(held([[x - wide, y - high], [x + wide, y - high], [x + wide, y + high], [x - wide, y + high]]));
     return [x, y];
   };
-  const said = [];
+  const said = [], record = [];
   const drawn = replaceEach(html, found, ({before, m, after}, i) => {
     if (!between[i]) return wireSvg(before + after, m[1]);
     const [, from, to] = BETWEEN.exec(m[1]), laid = cabled[i], note = laid ? wayNote(laid.route) : '';
     // its first name, read as a browser reads its tag (the wire's own data-k, not those words inside another value)
-    if (note) said.push({name: readAttributes(before + after)?.find((a) => a.name === 'data-k')?.value.trim().split(/\s+/)[0] || `${from} to ${to}`, from, to, way: note});
+    const name = laid ? readAttributes(before + after)?.find((a) => a.name === 'data-k')?.value.trim().split(/\s+/)[0] || `${from} to ${to}` : '';
+    if (note) said.push({name, from, to, way: note});
+    if (ways[i]) record.push(laidRecord(name, laid, ways[i]));
     const named = ` data-ends="${from} ${to}"${before}${after}`;
     return ways[i] ? cableSvg(named, m[1], ways[i], laid.points, place) : wireSvg(named, between[i]);   // a cable's line, or its numbers
   });
-  return {html: drawn, ways: said};
+  return {html: drawn, ways: said, cables: record};
+}
+
+/**
+ * One cable as the build's record holds it: where it runs on the slide and what is true of it, so a deck (or a film)
+ * can time a thing to it without measuring the page — {name, from, to, points: [[x, y], …] (its corners, in slide px),
+ * length (of its drawn line, px), unseen: [[from, to], …] (the stretches a block hides, px along it), behind, crosses,
+ * shared, bends}.
+ */
+function laidRecord(name, {points, tile, route}, way) {
+  const f = fixed;
+  return {name, from: route.from, to: route.to, points: points.map(([x, y]) => [f(x), f(y)]), length: f(way.length), unseen: route.unseen.map(([lo, hi]) => [f(lo * tile), f(hi * tile)]),
+    behind: [...route.behind], crosses: route.crosses, shared: f(route.shared * tile), bends: route.bends};
 }
 
 /** An icon file's drawing: {viewBox, body} from a whole <svg …>…</svg>. */
@@ -334,10 +355,32 @@ export const wireLinks = (html) => wireTags(html).map(({m}) => wireEnds(m[1])).f
 export const applyTransforms = (html, options) => transformed(html, options).html;
 
 /**
- * `applyTransforms`, with what the build knows of each wire's way: {html, ways} (wiresDrawn). The build compiles a map
- * with this, and keeps `ways` for `check`.
+ * The wires that may lie along the floor, before any is drawn: one entry a wire of `found` (wireTags), [from, to] when
+ * it is written between two pieces with no bend and each name is one block or cylinder and nothing else, else null.
+ * `solids`: the map's blocks and cylinders as they stand; `html`: the map, for the names its other pieces have.
+ */
+function floorLinks(html, found, solids) {
+  const count = new Map();
+  for (const piece of readPieces(html).pieces) count.set(piece.keys[0], (count.get(piece.keys[0]) ?? 0) + 1);
+  const alone = (name) => count.get(name) === 1 && solids.some((solid) => solid.name === name);
+  return found.map(({m}) => { const read = BETWEEN.exec(m[1]); return read && read[3] === undefined && alone(read[1]) && alone(read[2]) ? [read[1], read[2]] : null; });
+}
+
+/**
+ * `applyTransforms`, with what the build knows of the map it made: {html, ways, cables, tight, made} — `ways` what
+ * there is to say of a wire (wiresDrawn), `cables` each cable laid (laidRecord), `tight` the names that do not fit
+ * their block, `made` how the map was made ({placed, tile, fitted}, null with no isometric piece). The build
+ * compiles a map with this, and keeps them beside the page: for `check`, for the run's log, and for whoever times a
+ * thing to a cable.
+ *
+ * A map is made in this order, each step one function: its icons drawn; its blocks placed (iso.js); its wires laid
+ * along the floor between them, in tiles (cable.js · layRoutes) — before the floor and the picture are fitted, so
+ * both hold the wires too; its pieces drawn; its callouts; its wires drawn on the slide.
  */
 export function transformed(html, {icons: set = {}, canvas = null, area = null} = {}) {
-  const drawn = icons(html, set), iso = isoDrawn(drawn, {canvas, area, links: wireLinks(drawn)});
-  return wiresDrawn(callouts(iso.html, {canvas}), iso);
+  const drawn = icons(html, set), found = wireTags(drawn);
+  let routes = null;
+  const lay = (solids) => { routes = layRoutes(floorLinks(drawn, found, solids), solids); return reachOf(routes); };
+  const iso = isoDrawn(drawn, {canvas, area, links: wireLinks(drawn), lay});
+  return {...wiresDrawn(callouts(iso.html, {canvas}), {...iso, routes}), tight: iso.tight ?? [], made: iso.made ?? null};
 }

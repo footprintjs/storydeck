@@ -3,7 +3,7 @@
 // adapter with a chart of its own (measure.js), mounted where a measure is asked for; engine.js builds this list with
 // footprintjs. `run` is one run's working memory: what was asked, the deck as compiled, its page.
 import {measureMount, measureWiring} from './measure.js';
-import {broken, checkRules, clean, compiles, countProblems, fix, measureAsked, notAsked, readDeck, readNotes, verdict, writePage, writes} from './stages.js';
+import {broken, checkRules, clean, compiles, countProblems, fix, mapsMade, measureAsked, notAsked, readDeck, readNotes, verdict, writePage, writes} from './stages.js';
 
 export function runWiring(run) {
   const with_ = (stage) => (scope) => stage(scope, run);
@@ -13,6 +13,7 @@ export function runWiring(run) {
       {id: 'check-rules', name: 'check rules', about: 'Every rule a compiled deck is read against', run: with_(checkRules)},
       {id: 'broken', name: 'broken', about: 'It does not compile: that one problem is the answer, and the run stops', run: broken},
     ]},
+    {id: 'maps-made', name: 'maps made', about: 'How each isometric map was made: who placed its blocks, the tile, its cables, and what the build could not do', run: with_(mapsMade)},
     {id: 'read-notes', name: 'read notes', about: 'The notes the person left in their dev page', run: with_(readNotes)},
     {id: 'measure-asked', name: 'measure asked?', about: 'Whether the page is measured in a browser', run: measureAsked(run), branches: [
       {id: 'measure', name: 'measure layout', wiring: measureWiring(run), ...measureMount},
