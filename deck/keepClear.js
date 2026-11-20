@@ -24,6 +24,8 @@ export const CLEAR_CELL = 0.5;
 const SEAM = 0.01;
 /** The most squares of floor one box is asked over: a box the size of a slide on the smallest tile is far fewer. */
 const MOST_CELLS = 200_000;
+/** The furthest a box may stand from the slide, in px: the floor's own reach (footprint-story · FAR). */
+const FAR = 1e6;
 
 export const mayKeepClear = (html) => MAYBE.test(html);
 
@@ -53,9 +55,10 @@ export function readKeepClear(html) {
  * diamond, asked at its middle), those side by side along a row joined into one, each reaching SEAM past its squares. `grid`: footprint-story's isometric
  * grid (`at`, `tileAt`, `tile`, `rise`). Throws, with the fix, when the box covers more floor than a picture needs.
  */
-export function floorUnder({x, y, w, h}, grid, lift = 0, where = 'data-keep-clear') {
+export function floorUnder({x, y, w, h}, grid, lift = 0, where = 'data-keep-clear', budget = {left: Infinity, most: Infinity}) {
   const [tw, th] = grid.tile, hw = CLEAR_CELL * tw / 2, hh = CLEAR_CELL * th / 2, up = lift * grid.rise;
   // the floor at `lift` is drawn `up` px higher: the point of it under a slide point is the floor's under that point lowered
+  if (![x, y, x + w, y + h + up].every((v) => Math.abs(v) <= FAR)) throw new Error(`${where}: its box stands further than ${FAR} px from the slide — give it a place on the slide`);
   const corners = [[x, y], [x + w, y], [x, y + h], [x + w, y + h]].map(([px, py]) => grid.tileAt(px, py + up));
   const snap = (v, high) => (high ? Math.ceil(v / CLEAR_CELL) : Math.floor(v / CLEAR_CELL)) * CLEAR_CELL;
   const c0 = snap(Math.min(...corners.map((p) => p.col)), false) - CLEAR_CELL, c1 = snap(Math.max(...corners.map((p) => p.col)), true) + CLEAR_CELL;
@@ -74,8 +77,32 @@ export function floorUnder({x, y, w, h}, grid, lift = 0, where = 'data-keep-clea
     for (let col = c0; col < c1 + 1e-9; col += CLEAR_CELL) {
       const on = col < c1 - 1e-9 && meets(col, row);
       if (on && from === null) from = col;
-      if (!on && from !== null) { out.push({at: [from - SEAM, row - SEAM, lift], size: [col - from + 2 * SEAM, CLEAR_CELL + 2 * SEAM]}); from = null; }
+      if (!on && from !== null) {
+        // the map's whole budget of stretches, counted as they are made: many boxes at many heights stop at the most, not after
+        if ((budget.left -= 1) < 0) throw new Error(`data-keep-clear: the floor kept clear on this map is more than ${budget.most} stretches, the most a map keeps — keep clear under smaller pieces, or fewer`);
+        out.push({at: [from - SEAM, row - SEAM, lift], size: [col - from + 2 * SEAM, CLEAR_CELL + 2 * SEAM]}); from = null;
+      }
     }
   }
   return out;
+}
+
+/**
+ * Whether a cable's way on the floor, as drawn on the slide ([[x, y], …]), passes strictly inside a box: what `check`
+ * says. The router's kept floor is the half-tile squares round the box (a little wider, so the cable keeps clear of
+ * the words); whether a cable it could not keep off runs under the words is asked of the box itself.
+ */
+export function crossesBox(points, {x, y, w, h}) {
+  return points.slice(1).some(([qx, qy], k) => {
+    const [px, py] = points[k];
+    let t0 = 0, t1 = 1;
+    for (const [delta, lo, hi, from] of [[qx - px, x, x + w, px], [qy - py, y, y + h, py]]) {
+      if (Math.abs(delta) < 1e-12) { if (!(from > lo + 1e-9 && from < hi - 1e-9)) return false; continue; }
+      let a = (lo - from) / delta, b = (hi - from) / delta;
+      if (a > b) [a, b] = [b, a];
+      t0 = Math.max(t0, a); t1 = Math.min(t1, b);
+      if (t1 - t0 <= 1e-9) return false;
+    }
+    return true;
+  });
 }

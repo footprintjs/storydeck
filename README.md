@@ -836,9 +836,11 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   **Words a cable keeps off.** `data-keep-clear` on a piece placed by its own style (a device's name, a note) keeps
   the cables the build lays off the floor under its box where there is another way: a cost to the router, never a
   wall, so no cable is left without a way for words. Where there is none, the cable runs under them and `check` (rule
-  `wire-way`) says which cable runs under which piece, with the fix. It works on a raised floor too (the floor under
-  the box at the blocks' height), and it never moves the other cables. As for a footprint, the floor beside it is
-  written in numbers and every block has its `data-at`.
+  `wire-way`) says which cable runs under which piece (asked of the piece's own box and the cable's way on the floor),
+  with the fix. It works on a raised floor too (the floor under the box at the blocks' height). A piece no cable comes
+  near changes nothing, and it never changes how finely the floor is laid; a cable that goes round words may take the
+  lane another would have had, and a way round can pass behind a block (said, as ever). As for a footprint, the floor
+  beside it is written in numbers and every block has its `data-at`.
 
   ```html
   <div data-k="lap-name" class="name" data-keep-clear style="left:660px;top:420px;width:180px;height:36px">Laptop</div>

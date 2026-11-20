@@ -56,6 +56,7 @@ import {boxFinder, exit, exitOutline} from './boxes.js';
 import {callouts} from './callouts.js';
 import {isoDrawn} from './iso.js';
 import {NO_ROUTE, rounded} from 'footprint-story/isometric';
+import {crossesBox, readKeepClear} from './keepClear.js';
 import {cables, cablesOn, cableWalk, cableWay, held, labelPlace, layRoutes, reachOf, wayNote, LABEL_LOOKS} from './cable.js';
 import {curveLength, leadSeen, leadSpan, piecesLength, quoted, readRide, rideMarks, rideOf, ridersSvg, SPEEDS} from './rides.js';
 
@@ -350,11 +351,21 @@ export function wiresDrawn(html, {shapes = new Map(), floor = null, solids = [..
     return [x, y];
   };
   const said = [], record = [], names = pieceNames(html);
+  // the words a cable runs under, asked of each marked piece's own box (the router's kept floor is a little wider):
+  // its way on the floor, drawn on the slide — never its risers or its leads above the floor
+  let boxes = null;
+  const underBoxes = (laid) => {
+    if (!laid.route.under?.length || !floor) return laid.route;
+    boxes ??= new Map(readKeepClear(html).map(({name, box}) => [name, box]));
+    // (the floor it lies on is the lowest height of its way: a port's plug and the point out of its side stand above it)
+    const path = laid.route.path ?? [], lift = Math.min(...path.map((p) => p[2])), way = path.filter((p) => Math.abs(p[2] - lift) < 1e-9).map(([col, row]) => floor(col, row, lift));
+    return {...laid.route, under: laid.route.under.filter((name) => boxes.has(name) && crossesBox(way, boxes.get(name)))};
+  };
   const rides = options.some((o) => o.rides);   // whether a wire asks how its packets ride: the page then carries RIDE_CSS
   const drawn = replaceEach(html, found, ({before, m, after}, i) => {
     const o = options[i];
     if (!between[i]) return wireSvg(before + after, m[1], o);
-    const [, from, to] = endsRead(m[1], names), laid = cabled[i], note = laid ? wayNote(laid.route) : '';
+    const [, from, to] = endsRead(m[1], names), laid = cabled[i], note = laid ? wayNote(underBoxes(laid)) : '';
     // its first name, read as a browser reads its tag (the wire's own data-k, not those words inside another value)
     const name = laid ? readAttributes(before + after)?.find((a) => a.name === 'data-k')?.value.trim().split(/\s+/)[0] || `${from} to ${to}` : '';
     if (note) said.push({name, from, to, way: note});

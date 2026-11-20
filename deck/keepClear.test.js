@@ -51,12 +51,22 @@ describe('keepClear · a cable keeps off the floor under a name (data-keep-clear
   });
 
   it('where there is no way round, the cable runs under the words and check says which, with the fix', () => {
-    // a name over the switch's port: its riser has no way out but under it
-    const box = [794, 567, 80, 30];
+    // words in a band across the whole slide between the two: every way crosses them
+    const box = [700, 0, 40, 1080];
     const made = transformed(`${grid}${sw}${lap}${label('nm', box)}${wire}`, {canvas});
     expect(made.cables).toHaveLength(1);
     expect(made.ways).toEqual([{name: 'w1', from: 'lap', to: 'sw', way: expect.stringMatching(/(^|; )under nm(;|$)/)}]);
-    expect(readWay('under nm', 'lap', 'sw')).toEqual([{level: 'warn', message: 'runs under nm, kept clear of cables: there was no way round on the floor — move it, or the blocks, so there is floor round it'}]);
+    expect(readWay('under nm', 'lap', 'sw')).toEqual([{level: 'warn', message: 'runs under nm, kept clear of cables: there was no way round on the floor that was not much longer — move it, or the blocks, so there is floor round it'}]);
+  });
+
+  it('says under only of words its way on the floor really crosses — never of floor near them, nor of a riser over them', () => {
+    // tall ports: the cable's riser and lead pass over this box, its floor run does not — not under it
+    const tall = `${sw.replace('4.7 2 0.4', '4.7 2 0.8').replace('0.4 2 0.3', '0.4 2 0.7')}${lap.replace('2 1.4 0.3', '2 1.4 0.6').replace('2 0.7 0.15', '2 0.7 0.5')}`;
+    const made = transformed(`${grid}${tall}${label('nm', [788, 534, 79, 23])}${wire}`, {canvas});
+    expect(made.ways.some((w) => w.way.includes('under'))).toBe(false);
+    // a small box beside the floor run, in the router's half-tile squares round it but off the line: not under it
+    const near = transformed(`${grid}${tall}${label('nm', [796, 608, 45, 11])}${wire}`, {canvas});
+    for (const w of near.ways) if (w.way.includes('under nm')) expect.fail(`said under a box its line does not cross: ${w.way}`);
   });
 
   it('keeps the other cables where they were: kept floor is a cost, it never changes how finely the floor is laid', () => {
@@ -74,7 +84,7 @@ describe('keepClear · a cable keeps off the floor under a name (data-keep-clear
   });
 
   it('knows a piece by its own name, however long, and says it once', () => {
-    const long = `n${'x'.repeat(300)}`, box = [794, 567, 80, 30];
+    const long = `n${'x'.repeat(300)}`, box = [700, 0, 40, 1080];
     const made = transformed(`${grid}${sw}${lap}${label(long, box)}${wire}`, {canvas});
     expect(made.ways[0].way).toContain(`under ${long}`);
     expect(made.ways[0].way.split(`under ${long}`)).toHaveLength(2);
@@ -89,7 +99,14 @@ describe('keepClear · a cable keeps off the floor under a name (data-keep-clear
     // past the most stretches of kept floor a map has: refused, with the fix
     const big = (n) => Array.from({length: n}, (_, i) => label(`big${i}`, [0, 0, 1900, 1000])).join('');
     expect(bad(`${grid}${sw}${big(1)}`)).not.toThrow();
-    expect(bad(`${grid}${sw}${big(8)}`)).toThrow(/^data-keep-clear: the floor kept clear on this map is \d+ stretches, and a map keeps at most 512 — keep clear under smaller pieces, or fewer$/);
+    expect(bad(`${grid}${sw}${big(8)}`)).toThrow('data-keep-clear: the floor kept clear on this map is more than 512 stretches, the most a map keeps — keep clear under smaller pieces, or fewer');
+    // many boxes at many heights stop at the most, as they are made: never all scanned first
+    const lifted = [0, 1, 2, 3].map((h, i) => `<div data-k="b${i}" data-iso="block" data-at="${i * 3} 0 ${h}"></div>`).join('');
+    const many = Array.from({length: 1500}, (_, i) => label(`m${i}`, [0, 0, 440, 220])).join(''), t0 = Date.now();
+    expect(bad(`<i data-iso-grid="4 at 960 150"></i>${lifted}${many}`)).toThrow('the most a map keeps');
+    expect(Date.now() - t0).toBeLessThan(2000);
+    // a box far off the slide: refused naming it
+    expect(bad(`${grid}${sw}${label('far', [2e6, 0, 10, 10])}`)).toThrow('"far" (data-keep-clear): its box stands further than 1000000 px from the slide — give it a place on the slide');
   });
 
   it('a map with no mark is laid as before; a mark in another attribute\'s value is no mark', () => {

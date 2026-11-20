@@ -190,7 +190,7 @@ export function readWay(note, from, to) {
     if (word === 'shared') said('warn', 'lies on another wire for want of room: a foot of a block has a place for three wires — make the block wider (data-size), or take a wire out');
     if (word === 'crosses' && /^\d+$/.test(rest[0] ?? '') && Number(rest[0]) >= CROSSINGS_SAID) said('info', `crosses ${rest[0]} other wires`);
     if (word === 'turns' && /^\d+$/.test(rest[0] ?? '')) said('info', `turns ${rest[0]} times on its way`);
-    if (word === 'under' && rest.length) said('warn', `runs under ${names.join(', ')}, kept clear of cables: there was no way round on the floor — move ${rest.length === 1 ? 'it' : 'them'}, or the blocks, so there is floor round ${rest.length === 1 ? 'it' : 'them'}`);
+    if (word === 'under' && rest.length) said('warn', `runs under ${names.join(', ')}, kept clear of cables: there was no way round on the floor that was not much longer — move ${rest.length === 1 ? 'it' : 'them'}, or the blocks, so there is floor round ${rest.length === 1 ? 'it' : 'them'}`);
     for (const at of word === 'hairpin' ? rest : []) {
       if (!HAIRPIN_WORDS.includes(at)) continue;   // a word of a newer build says nothing
       const [end, hook] = at.split('-'), name = end === 'start' ? from : to;

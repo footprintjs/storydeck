@@ -226,8 +226,8 @@ function place(found, links, lay, feet = [], clear = [], fixedGrid = null) {
   // the floor kept clear at each height the blocks stand at: where a cable could run under the words
   const lifts = [...new Set(standing.map((p) => p.at[2] ?? 0))], grid = clear.length ? fixedGrid() : null;
   // (the kit knows each stretch by a number of ours, `name`; `piece` is the deck's name, any text a deck holds)
-  const keep = clear.flatMap(({name, box, where}, k) => lifts.flatMap((lift) => floorUnder(box, grid, lift, where).map((stretch) => ({...stretch, name: String(k), piece: name}))));
-  if (keep.length > MOST_KEEP) throw new Error(`data-keep-clear: the floor kept clear on this map is ${keep.length} stretches, and a map keeps at most ${MOST_KEEP} — keep clear under smaller pieces, or fewer`);
+  const budget = {left: MOST_KEEP, most: MOST_KEEP};
+  const keep = clear.flatMap(({name, box, where}, k) => lifts.flatMap((lift) => floorUnder(box, grid, lift, where, budget).map((stretch) => ({...stretch, name: String(k), piece: name}))));
   const reach = lay ? lay(standing.map((p) => ({name: p.name, kind: p.kind, at: [p.at[0], p.at[1], p.at[2] ?? 0], size: [...p.size], ports: p.ports})), keep) : [];
   for (const floor of found.filter((p) => p.kind === 'floor')) {
     if (floor.size !== null) { floor.at ??= [0, 0]; continue; }
