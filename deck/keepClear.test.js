@@ -102,6 +102,11 @@ describe('keepClear · a cable keeps off the floor under a name (data-keep-clear
     const many = Array.from({length: 1500}, (_, i) => label(`m${i}`, [0, 0, 440, 220])).join(''), t0 = Date.now();
     expect(bad(`<i data-iso-grid="4 at 960 150"></i>${lifted}${many}`)).toThrow('the most a map keeps');
     expect(Date.now() - t0).toBeLessThan(2000);
+    // a box placed at what is no number (left:1.2.3px), or past counting (a width of 400 digits): far, as 0.27.0 said it
+    const odd = (style) => `<div data-k="nm" data-keep-clear style="${style}">x</div>`;
+    for (const style of ['left:1.2.3px;top:10px;width:50px;height:20px', 'left:10px;top:1.2.3px;width:50px;height:20px', `left:10px;top:10px;width:${'9'.repeat(400)}px;height:20px`, `left:${'9'.repeat(400)}px;top:10px;width:50px;height:20px`]) {
+      expect(bad(`${grid}${sw}${odd(style)}`), style).toThrow('"nm" (data-keep-clear): its box stands further than 1000000 px from the slide — give it a place on the slide');
+    }
     // a box far off the slide: refused naming it
     expect(bad(`${grid}${sw}${label('far', [2e6, 0, 10, 10])}`)).toThrow('"far" (data-keep-clear): its box stands further than 1000000 px from the slide — give it a place on the slide');
   });

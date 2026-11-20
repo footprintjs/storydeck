@@ -24,6 +24,19 @@ const at = (ease, time) => {
 };
 
 describe('how a wire\'s packets ride: data-ride, data-rest, data-keep-size, data-trail, data-behind, data-speed in px (rides.js)', () => {
+  it('a px speed past any run, or past counting, gets the deck\'s advice as on 0.27.0; a wire far longer than a slide still rides', () => {
+    for (const speed of ['2000000000px', `${'9'.repeat(400)}px`]) {
+      expect(() => transformed(`${map}${wire('w1', 'lap.rj45 to sw.p1', ` data-packets="2" data-speed="${speed}"`)}`, {canvas}), speed).toThrow(/— this wire is 439 px long, so a run would take 0 s, and a run takes 0\.5 to 60 s — give it 7\.4px to 877\.9px, or its seconds \(data-speed="3"\)$/);
+    }
+    expect(() => transformed(`${map}${wire('w1', 'lap.rj45 to sw.p1', ` data-packets="2" data-speed="0.${'0'.repeat(320)}1px"`)}`, {canvas})).toThrow(/so a run would take Infinity s/);
+    // a wire through the air 3,000,000,000 px long, with a ride: drawn, as it was
+    const long = transformed('<i data-k="w" data-arrow="0 0 3000000000 0" data-packets="1" data-speed="3" data-ride="ease-ends 0.2 0.1" data-behind="fade" data-rest="end 2s"></i>', {canvas});
+    expect(long.html).toContain('data-sd-ride');
+    expect(long.html).toContain('--sd-ride-ease:linear(');
+    // one whose numbers overflow has no length to ride: said, where 0.27.0 drew a broken ride
+    expect(() => transformed('<i data-k="w" data-arrow="-1.7e308 0 1.7e308 0" data-packets="1" data-speed="3" data-ride="ease-ends 0.5"></i>', {canvas})).toThrow('wire data-arrow="-1.7e308 0 1.7e308 0": its length cannot be measured (its numbers are too large) — give it numbers of a slide\'s size');
+  });
+
   it('a wire that asks for none is drawn as before: no mark, no new loop, and the page carries no ride stylesheet', () => {
     const plain = transformed(`${map}${wire('w1', 'lap.rj45 to sw.p1', ' data-packets="2" data-speed="4"')}`, {canvas});
     expect(plain.html).not.toMatch(/data-sd-ride|sdRide|trail|--sd-seen/);

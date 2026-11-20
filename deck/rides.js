@@ -120,11 +120,17 @@ export const leadSpan = (k, share, length) => (k ? [Math.max(0, share - LEAD_CAP
 export function rideOf(o, length, spec, {unseen = [], leads = [null, null]} = {}) {
   const where = `wire data-arrow="${spec}": data-speed=${quoted(o.written ?? '')}`;
   if (o.perSecond && !(length >= 1)) throw new Error(`${where} — this wire is too short for a speed in px a second (${short(length, 1)} px): give it its seconds (data-speed="3")`);
-  const ease = o.ride ?? [0, 0], seconds = o.perSecond ? rideSeconds(length, o.perSecond, ease) : o.speed;
+  // the run's seconds are asked of the deck's own range first: a px speed far past any run (a huge or endless number), or
+  // one too slow to count, gets the deck's advice — the story library's rideSeconds is asked only of a run that can be,
+  // and gives the same number (the same arithmetic: the line, its eased ends, over the speed)
+  const ease = o.ride ?? [0, 0], along = length * (1 + ease[0] + ease[1]), asked = o.perSecond ? along / o.perSecond : o.speed;
+  const seconds = o.perSecond && asked >= SPEEDS[0] && asked <= SPEEDS[1] ? rideSeconds(length, o.perSecond, ease) : asked;
   if (!(seconds >= SPEEDS[0] && seconds <= SPEEDS[1])) {
-    const along = length * (1 + ease[0] + ease[1]), slowest = Math.ceil((along / SPEEDS[1]) * 10) / 10, fastest = Math.floor((along / SPEEDS[0]) * 10) / 10;
+    const slowest = Math.ceil((along / SPEEDS[1]) * 10) / 10, fastest = Math.floor((along / SPEEDS[0]) * 10) / 10;
     throw new Error(`${where} — this wire is ${short(length, 0)} px long, so a run would take ${short(seconds, 2)} s, and a run takes ${SPEEDS[0]} to ${SPEEDS[1]} s — give it ${slowest}px to ${fastest}px, or its seconds (data-speed="3")`);
   }
+  // a wire whose length overflowed (numbers past what can be measured) has no ride to work out: said, not drawn as noise
+  if (!Number.isFinite(length)) throw new Error(`wire data-arrow="${spec}": its length cannot be measured (its numbers are too large) — give it numbers of a slide's size`);
   const hold = o.rest?.hold ?? 0, period = seconds + hold, share = seconds / period, steady = (length * (1 + ease[0] + ease[1])) / seconds;
   const vars = `--sd-ride-ease:${easing(withHold(rideProfile(ease, length), share))};--sd-show-ease:${easing(showStops(share, {end: Boolean(o.rest)}))}`;
   // a packet is gone before its edge reaches the block: its radius more — on the line itself, or, when it keeps its

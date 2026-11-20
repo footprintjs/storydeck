@@ -2,13 +2,18 @@
 
 ## 0.28.0 — the numbers a film shares live in the story library
 
-No page or compiled record changes: every deck builds byte for byte as on 0.27.0 (checked on `examples/a-request`, a
-second starter deck, and 415 maps — groups, floor labels, kept-clear words, ports, hairpins and packet rides; 400 of
-them random, 80 also through `check` — before and after). What moved is where the work is done: five helpers a film needs too now live once in `footprint-story`
+Pages and compiled records are byte for byte as on 0.27.0 but for the version in the page's generator line, and one
+wire nobody draws on purpose (below). Checked on `examples/a-request`, a second starter deck, and 430 maps — groups,
+floor labels, kept-clear words, ports, hairpins and packet rides, and the edges: a kept-clear box at `left:1.2.3px` or
+400 digits wide, a px speed of 2,000,000,000 or 400 digits or too slow to count, a wire through the air 3,000,000,000
+px long; 400 of the maps random, 80 also through `check` — built before and after, every output and refusal compared.
+The one change: a wire through the air written with numbers near 1e308, whose length overflows to no number, is
+refused naming the wire (`its length cannot be measured`), where 0.27.0 drew it with a broken ride. What moved is where the work is done: five helpers a film needs too now live once in `footprint-story`
 0.17.0, and the deck imports them.
 
 - `deck/ride.js` → `footprint-story/motion` (`rideProfile`, `rideSeconds`, `speedAt`, `withHold`, `showStops`,
-  `hiddenRamps`); `rides.js` reads them, and a ride's eased end is bounded by the kit's `MOST_EASE`.
+  `hiddenRamps`); `rides.js` reads them, and a ride's eased end is bounded by the kit's `MOST_EASE`. A px speed is
+  asked against the 0.5–60 s range first, so one past any run keeps the deck's advice.
 - `deck/cable.js · hairpins` → `footprint-story/isometric · hairpins`; the words `check` says for each stay here
   (`readWay`).
 - `deck/keepClear.js · floorUnder`, `crossesBox` → the kit's `floorUnder` and `crossesBox`. The kit answers a box it
