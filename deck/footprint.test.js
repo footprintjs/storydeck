@@ -61,6 +61,9 @@ describe('a piece that stands on the floor by its footprint (data-footprint)', (
     expect(level('tv')).toBeGreaterThan(level('sw'));
     expect(level('tv') % 2).toBe(0);
     expect(html).toContain('<img data-k="tv" alt="a &quot;tv&quot;" data-footprint="7 9 1 1 1" style="z-index:4;left:900px;top:600px;width:80px;height:80px" data-x=\'y\'>');
+    // every other byte of the tag as written: a new line before its style, a self-closing slash
+    const odd = '<img data-k="tv" data-footprint="7 9 1 1 1"\n\tstyle=\'left:900px;top:600px;width:80px;height:80px\'/>';
+    expect(isoDrawn(`${grid}${sw}${odd}`, {canvas}).html).toContain(odd.replace("style='", "style='z-index:4;"));
     // still a piece, by its own box: a click brings it in, the camera frames it
     const piece = readPieces(html).pieces.find((p) => p.keys[0] === 'tv');
     expect(piece.box).toMatchObject({x: 900, y: 600, w: 80, h: 80});
@@ -91,21 +94,35 @@ describe('a piece that stands on the floor by its footprint (data-footprint)', (
 
   it('refuses, naming the piece and the fix, what it cannot stand on the floor', () => {
     const bad = (html) => () => transformed(html, {canvas});
-    const foot = (spec, more = '', style = 'left:1px;top:1px') => `<div data-k="f" data-footprint="${spec}"${more} style="${style}"></div>`;
+    const foot = (spec, more = '', style = 'left:1px;top:1px;width:9px;height:9px') => `<div data-k="f" data-footprint="${spec}"${more} style="${style}"></div>`;
     expect(bad(`<i data-iso-grid="fit"></i>${sw}${foot('0 0 1 1')}`)).toThrow('"f" (data-footprint="0 0 1 1"): a footprint\'s piece stands where its own style puts it, so the floor is written in numbers beside it — data-iso-grid="120 at 960 240", not "fit"');
     expect(bad(`<div data-k="a" data-iso="block"></div>${foot('0 0 1 1')}`)).toThrow(/"a" has no data-at, and "f" \(data-footprint="0 0 1 1"\) stands where its own style puts it: the build places a map's blocks only when nothing on the floor is placed by hand — give every block its data-at/);
-    expect(bad(`${grid}${foot('0 0 1 1', '', 'left:1px;top:1px;z-index:9')}`)).toThrow('"f" (data-footprint="0 0 1 1"): it is painted in the floor\'s order (a nearer piece over a further one) — take z-index out of its style');
-    expect(bad(`${grid}${foot('0 0 1 1', '', 'width:9px')}`)).toThrow('a footprint\'s piece is placed by its own style — give it a left and a top');
+    expect(bad(`${grid}${foot('0 0 1 1', '', 'left:1px;top:1px;width:9px;height:9px;z-index:9')}`)).toThrow('"f" (data-footprint="0 0 1 1"): it is painted in the floor\'s order (a nearer piece over a further one) — take z-index out of its style');
+    expect(bad(`${grid}${foot('0 0 1 1', '', 'width:9px;height:9px')}`)).toThrow('a footprint\'s piece is placed by its own style — give it a left and a top');
     expect(bad(`${grid}<div data-k="f" data-footprint="0 0 1 1"></div>`)).toThrow('a footprint\'s piece is placed by its own style, written once with quotes ("left:300px;top:420px") — give it one');
     expect(bad(`${grid}<div data-k="f" data-iso="block" data-at="0 0" data-footprint="0 0 1 1"></div>`)).toThrow('"f" (data-footprint="0 0 1 1"): an isometric piece stands on the floor by its own data-at and data-size — take data-footprint off it');
     for (const spec of ['0 0 1', '0 0 1 1 1 1', 'a b c d', '']) expect(bad(`${grid}${foot(spec)}`), spec).toThrow(`"f" (data-footprint="${spec}"): it is the floor the piece takes, "col row wide deep" in tiles, with its height after it ("0 6 2 1.4 0.3")`);
     expect(bad(`${grid}${foot('0 0 0 1')}`)).toThrow(/"f" \(data-footprint="0 0 0 1"\): a footprint's size is \[wide, deep, high\] with wide and deep above 0/);
-    expect(bad(`${grid}<div data-footprint="0 0 1 1" style="left:1px;top:1px"></div>`)).toThrow('data-footprint="0 0 1 1": a footprint is a piece\'s, so a wire can end at it — give the piece a data-k name');
-    expect(bad(`${grid}<div data-k="f" data-footprint=0 style="left:1px;top:1px"></div>`)).toThrow('data-footprint: a footprint is written data-footprint="col row wide deep", once, in lower case and with quotes');
+    expect(bad(`${grid}<div data-footprint="0 0 1 1" style="left:1px;top:1px;width:9px;height:9px"></div>`)).toThrow('data-footprint="0 0 1 1": a footprint is a piece\'s, so a wire can end at it — give the piece a data-k name');
+    expect(bad(`${grid}<div data-k="f" data-footprint=0 style="left:1px;top:1px;width:9px;height:9px"></div>`)).toThrow('data-footprint: a footprint is written data-footprint="col row wide deep", once, in lower case and with quotes');
     // a port where the footprint has no side, in the kit's words with the piece named
     expect(bad(`${grid}${foot('0 0 1 1 0.5', ' data-ports="p: 3 0 0.2"')}`)).toThrow(/"f" \(data-footprint="0 0 1 1 0.5"\)/);
-    // ports on a piece that is neither a block nor a footprint plug nothing in: refused, not ignored
-    expect(bad(`${grid}<div data-k="chip" data-ports="p: 0 0 0" style="left:1px;top:1px"></div>`)).toThrow('"chip": data-ports are on a block (data-iso="block") or on a piece that stands on the floor (data-footprint="col row wide deep") — give it one, or take its ports out');
+    for (const style of ['left:1px;top:1px;width:9px', 'left:1px;top:1px;height:9px']) expect(bad(`${grid}${foot('0 0 1 1', '', style)}`), style).toThrow(/a footprint's piece is placed by its own style — give it a (height|width)$/);
+    expect(bad(`${grid}${foot('0 0 1 1', '', 'top:1px')}`)).toThrow('give it a left, a width and a height');
+    // pieces do not nest: a block or a footprint inside a footprint's element would be placed from its box
+    for (const inner of ['<div data-k="x" data-iso="block" data-at="6 6"></div>', '<span data-k="y" data-footprint="4 4 1 1" style="left:1px;top:1px;width:9px;height:9px"></span>']) {
+      expect(bad(`${grid}<div data-k="g" data-footprint="0 0 2 2" style="left:1px;top:1px;width:300px;height:300px">${inner}</div>`), inner).toThrow('"g" (data-footprint="0 0 2 2"): pieces do not nest, and this one holds a block or a footprint — place it beside it');
+    }
+    expect(bad(`${grid}<div data-k="g" data-footprint="0 0 2 2" style="left:1px;top:1px;width:9px;height:9px"><b title="data-iso">words</b></div>`)).not.toThrow();
+    // a wire or a callout does not stand on the floor
+    expect(bad(`${grid}${sw}<i data-k="w" class="wire" data-arrow="f to sw" data-footprint="9 0 1 1" style="left:1px;top:1px;width:9px;height:9px"></i>`)).toThrow('"w" (data-footprint="9 0 1 1"): a wire does not stand on the floor — put data-footprint on the piece it is about');
+    expect(bad(`${grid}${sw}<div data-k="c" data-callout="sw above" data-footprint="9 0 1 1" style="left:1px;top:1px;width:9px;height:9px">c</div>`)).toThrow('a callout does not stand on the floor');
+    // a hostile value is said back cut short
+    const long = `0 0 1 ${'1'.repeat(5000)}`;
+    expect(() => transformed(`${grid}${foot(long)}`, {canvas})).toThrow(/^"f" \(data-footprint="0 0 1 1{73}…"\): /);
+    // ports on a piece that is neither a block nor a footprint plug nothing in: refused, not ignored — on any map
+    expect(bad('<div data-k="chip" data-ports="p: 0 0 0" style="left:1px;top:1px;width:9px;height:9px">c</div>')).toThrow('"chip": data-ports are on a block');
+    expect(bad(`${grid}<div data-k="chip" data-ports="p: 0 0 0" style="left:1px;top:1px;width:9px;height:9px"></div>`)).toThrow('"chip": data-ports are on a block (data-iso="block") or on a piece that stands on the floor (data-footprint="col row wide deep") — give it one, or take its ports out');
   });
 
   it('leaves a map with no footprint byte for byte as it was', () => {

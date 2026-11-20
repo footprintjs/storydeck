@@ -8,10 +8,10 @@
   clear. A map of footprints alone, with no block, lays its cables too. The piece keeps its place and size and is
   painted in the floor's order with the blocks (its `z-index` is the build's; one in its style is refused). A floor
   with no size is fitted round footprints too. Refused, with the fix: a fitted grid (`fit`) or blocks without
-  `data-at` beside a footprint (the piece would not move with them), a footprint on an isometric piece, one with no
-  left/top, a size that is none.
-- **Ports on a piece that is neither a block nor a footprint are refused** (before 0.23.0 they were ignored, so a
-  wire to them was drawn straight with no word why).
+  `data-at` beside a footprint (the piece would not move with them), a footprint on an isometric piece, a wire or a
+  callout, one whose style lacks a left, top, width or height, one holding a block or a footprint, a size that is none.
+- **Ports on a piece that is neither a block nor a footprint are refused**, on any map (before 0.23.0 they were
+  ignored, so a wire to them was drawn straight with no word why).
 - The run's record says how many pieces stand on the floor by a footprint (`maps[name].footprints`, stage `maps made`).
 
 ## 0.22.0 — cables that plug into a port

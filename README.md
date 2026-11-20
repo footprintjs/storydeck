@@ -761,14 +761,14 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   on the floor by its footprint: the floor it takes, `col row wide deep` in tiles, with its height after it.
 
   ```html
-  <img data-k="lap" src="laptop.svg" data-footprint="0 6 2 1.4 0.3" data-ports="rj45: 2 0.7 0.15" style="left:680px;top:300px;width:170px">
+  <img data-k="lap" src="laptop.svg" data-footprint="0 6 2 1.4 0.3" data-ports="rj45: 2 0.7 0.15" style="left:680px;top:300px;width:170px;height:110px">
   <div data-k="desk" class="desk" data-footprint="3 3 1 6" style="left:840px;top:380px;width:120px;height:40px">desk</div>
   ```
 
   A cable laid along the floor goes round a footprint as it goes round a block, and plugs into its ports
   (`lap.rj45`), written as a block's are; a footprint with no height is floor kept clear. The piece keeps its own place
-  and size (its style), and is painted in the floor's order with the blocks, a nearer piece over a further one, so its
-  `z-index` is the build's. Because it stands where its style puts it, the floor beside it is written in numbers
+  and size (its style: a left, a top, a width and a height), and is painted in the floor's order with the blocks, a
+  nearer piece over a further one, so its `z-index` is the build's. It holds no block or footprint of its own. Because it stands where its style puts it, the floor beside it is written in numbers
   (`data-iso-grid="120 at 960 240"`, not `fit`) and every block has its `data-at`; both are refused otherwise, with
   the fix. Ports on a piece that is neither a block nor a footprint are refused too: they would plug nothing in.
 
