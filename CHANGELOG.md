@@ -19,7 +19,8 @@
   the tile lines with rounded corners, where 0.18.0 drew one long curve. Wires 0.18.0 left straight between two
   blocks on one floor are cables now. A cable's packets ride its line by `offset-path` (every current browser).
   Unchanged: wires between flat pieces, wires by numbers, a wire from a block to a flat piece, a wire with a bend
-  (`0` too), a wire between blocks at different heights, and where a cable's label stands (on it, on a plate).
+  (`0` too), and where a cable's label stands (on it, on a plate). A wire between blocks at different heights is
+  drawn as before and now carries the reason on it (`data-way="straight heights"`).
 - **Not promised.** Wires are laid in the order written and an earlier one is never moved for a later one, so the
   fewest crossings there could be are not promised. A foot has room for three wires; a fourth lies on another, and
   `check` says so.
