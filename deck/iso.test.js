@@ -456,3 +456,20 @@ describe('iso · a block\'s name fits its top face', () => {
   });
 });
 
+describe('iso · a piece that cannot be drawn is refused in the deck\'s words, with wires on the map too', () => {
+  it('names the piece and the fix, as it did before wires were laid first', async () => {
+    const {applyTransforms} = await import('./transforms.js');
+    const grid = '<i data-iso-grid="120 at 960 240"></i>', b = '<div data-k="b" data-iso="block" data-at="6 0"></div><i data-k="w" class="wire" data-arrow="a to b"></i>';
+    expect(() => applyTransforms(`${grid}<div data-k="a" data-iso="cylinder" data-at="0 0" data-size="2 3 1"></div>${b}`, {canvas})).toThrow('"a" (data-iso="cylinder"): a cylinder is round: give it the same width and depth (2 2 1.5) — not [2,3,1]');
+    expect(() => applyTransforms(`${grid}<div data-k="a" data-iso="block" data-at="0 0" data-size="0 2 1"></div>${b}`, {canvas})).toThrow('"a" (data-iso="block"): a block\'s size is [wide, deep, high] with wide and deep above 0 and high 0 or more — not [0,2,1]');
+    expect(() => applyTransforms(`${grid}<div data-k="a" data-iso="block" data-at="2000000 0"></div>${b}`, {canvas})).toThrow(/^"a" \(data-iso="block"\): a block's at is \[col, row\] on the floor/);
+  });
+
+  it('a round thing\'s name is fitted to its round top, narrower than the block on its tiles', () => {
+    const grid = '<i data-iso-grid="96 at 960 240"></i>';
+    const say = (kind) => /<span class="iso-say"[^>]*>(.*?)<\/span>/.exec(isoPieces(`${grid}<div data-k="a" data-iso="${kind}" data-at="0 0"><b>Database 12</b></div>`, {canvas}))[1];
+    expect(say('block')).toBe('<b>Database 12</b>');           // 11 letters fit a face 192 px wide
+    expect(say('cylinder')).toBe('<b style="font-size:25px">Database<br>12</b>');   // and not a top 136 px wide: two lines, a pixel smaller
+  });
+});
+

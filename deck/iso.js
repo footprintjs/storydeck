@@ -182,6 +182,10 @@ function place(found, links, lay) {
     }
     solid.forEach((p, i) => { p.at = [...arranged.things[i].at]; });
   }
+  // every block as the rule that draws it reads it, before a wire is laid round it: a size or a place that is none is
+  // refused here, naming the piece in the deck's words — not later, by whoever lays the wires, in words of its own
+  const unit = isometric();
+  for (const p of solid) shapeOf(p, unit);
   // the blocks stand: the wires are laid between them now, before anything is fitted, so the floor and the picture hold them too
   const reach = lay ? lay(solid.map((p) => ({name: p.name, kind: p.kind, at: [p.at[0], p.at[1], p.at[2] ?? 0], size: [...p.size]}))) : [];
   for (const floor of found.filter((p) => p.kind === 'floor')) {
@@ -280,7 +284,8 @@ function draw(p, html, shape, level, tile, tight) {
   at = attrRule('class').test(at) ? at.replace(attrRule('class'), (_, q, v) => ` class=${q}${/(^|\s)iso(\s|$)/.test(v) ? v : `iso ${v}`}${q}`) : `${at} class="iso"`;
   const svg = `<svg class="iso-art" viewBox="0 0 ${fixed(box.w)} ${fixed(box.h)}" aria-hidden="true">${art}</svg>`;
   // its name fitted to its top face: as wide as the face is on the slide, half a tile for each tile of its width and its depth
-  const fitted = say && p.inner.trim() ? fitName(p.inner, (p.size[0] + p.size[1]) * tile / 2) : null;
+  // (a round thing's top is narrower than the block on its tiles: its width over √2)
+  const fitted = say && p.inner.trim() ? fitName(p.inner, p.kind === 'cylinder' ? p.size[0] * tile / Math.SQRT2 : (p.size[0] + p.size[1]) * tile / 2) : null;
   if (fitted?.tight) tight.push({name: p.name, text: fitted.tight});
   const words = fitted ? `<span class="iso-say" style="left:${fixed(say.x - box.x)}px;top:${fixed(say.y - box.y)}px">${fitted.inner}</span>` : '';
   // a floor is ground: a camera frames what stands on it, never the floor itself (focus.js) — unless it says otherwise (data-ground="false")
