@@ -173,6 +173,12 @@ describe('checkDeck · wire-way: what the build knows of a wire along the floor,
     expect(said[0].message).toBe('"w6" (a to b) lies on another wire for want of room: a foot of a block has a place for three wires — make the block wider (data-size), or take a wire out');
   });
 
+  it('is said at the click that first shows the wire', () => {
+    const map = `${grid}${iso('a', '0 4')}${iso('up', '6 0 2')}<i data-k="w" class="wire" data-arrow="a to up"></i>`;
+    const found = checkDeck(compileDeck(sourceOf({clicks: '<section data-label="S" data-map="map"><step data-in="a up"><h2>Blocks</h2></step><step data-in="w"><h2>Wire</h2></step></section>', maps: {map}}))).filter((p) => p.rule === 'wire-way');
+    expect(found.map((p) => p.click)).toEqual([2]);
+  });
+
   it('a map no part is told on says nothing', () => {
     const source = sourceOf({clicks: '<section data-label="S" data-map="map"><step data-in="*"><h2>All</h2></step></section>', maps: {map: `${grid}${iso('a', '0 4')}${iso('b', '5 1')}`, spare: `${grid}${iso('a', '0 4')}${iso('up', '6 0 2')}<i data-k="w" class="wire" data-arrow="a to up"></i>`}});
     expect(checkDeck(compileDeck(source)).filter((p) => p.rule === 'wire-way')).toEqual([]);

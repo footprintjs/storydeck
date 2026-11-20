@@ -25,21 +25,28 @@ export const WALK_MOST = 512;
 
 /**
  * The cables of a map. `links`: one entry a wire, [from, to] by piece name, or null for a wire that is no cable;
- * `shapes`: a Map from a name to {at: [col, row, lift], size: [wide, deep, high], kind}; `floor(col, row, lift)`: where
- * a floor point is on the slide, [x, y]. Gives, in the same order, null for a wire that was not asked, and else
- * {points, radius, route}: `route` what the kit says of it (its feet, its bends, what it passes behind — or `why` it
- * has none), `points` its way on the slide from 6 px off one foot to 6 px off the other ([[x, y], …], null when it has
- * none), `radius` its corners' rounding in px.
+ * `shapes`: a Map from a name to its one piece, {at: [col, row, lift], size: [wide, deep, high], kind}; `floor(col,
+ * row, lift)`: where a floor point is on the slide, [x, y]; `solids`: every block and cylinder of the map, each {name,
+ * at, size, kind} — those that share a name too: a wire cannot end at one of them, and must still go round it.
+ * Gives, in the same order, null for a wire that was not asked, and else {points, radius, route}: `route` what the
+ * kit says of it (its feet, its bends, what it passes behind — or `why` it has none), `points` its way on the slide
+ * from 6 px off one foot to 6 px off the other ([[x, y], …], null when it has none), `radius` its corners' rounding.
+ *
+ * The kit knows each piece by a number of ours, not by its name: two pieces may share a name, and a name may be any
+ * text a deck holds (the kit keeps names to 200 characters, and would refuse the whole map for one).
  */
-export function cables(links, shapes, floor) {
-  const asked = links.map((link, i) => (link && shapes.has(link[0]) && shapes.has(link[1]) ? i : -1)).filter((i) => i >= 0).slice(0, MOST_ROUTES);   // the kit lays so many; a wire past them stays straight
+export function cables(links, shapes, floor, solids = [...shapes.values()]) {
+  const idOf = new Map(solids.map((piece, i) => [piece, String(i)]));
+  const asked = links.map((link, i) => (link && idOf.has(shapes.get(link[0])) && idOf.has(shapes.get(link[1])) ? i : -1)).filter((i) => i >= 0);
   const laid = links.map(() => null);
   if (!asked.length) return laid;
-  const things = [...shapes].map(([name, {at, size, kind}]) => ({name, at, size, round: kind === 'cylinder'}));
-  const found = routes(things, asked.map((i) => links[i]));
+  const things = solids.map(({at, size, kind}, i) => ({name: String(i), at, size, round: kind === 'cylinder'}));
+  const first = asked.slice(0, MOST_ROUTES);   // the kit lays so many
+  const found = routes(things, first.map((i) => links[i].map((name) => idOf.get(shapes.get(name)))));
   const origin = floor(0, 0, 0), tile = Math.hypot(floor(1, 0, 0)[0] - origin[0], floor(1, 0, 0)[1] - origin[1]);   // a tile along the floor, in slide px
-  asked.forEach((i, k) => {
-    const route = found[k];
+  first.forEach((i, k) => {
+    // the kit's words, with the deck's names back in them
+    const route = {...found[k], from: links[i][0], to: links[i][1], ...(found[k].behind && {behind: found[k].behind.map((id) => solids[Number(id)].name)})};
     if (!route.points) { laid[i] = {points: null, radius: 0, route}; return; }
     const lift = shapes.get(route.from).at[2], points = route.points.map(([col, row]) => floor(col, row, lift));
     // each end 6 px off its foot, along its own run
@@ -48,19 +55,22 @@ export function cables(links, shapes, floor) {
     points[points.length - 1] = off(points.at(-1), points.at(-2));
     laid[i] = {points, radius: CORNER * tile, route};
   });
+  // a wire past what the kit lays stays the straight wire it was, and says why
+  for (const i of asked.slice(MOST_ROUTES)) laid[i] = {points: null, radius: 0, route: {from: links[i][0], to: links[i][1], points: null, why: NO_ROUTE.work}};
   return laid;
 }
 
 /**
- * What there is to say of a wire's way, as the build writes it on the wire (data-way) — '' when it lies well. The
+ * What there is to say of a wire's way, as the build writes it on the wire (data-sd-way) — '' when it lies well. The
  * build knows why a wire is as it is; written on the wire, `check` can tell whoever writes the deck (a person, or a
  * model) in words, with the fix, where a picture would have to be looked at and guessed from.
  *   "behind logs cache; crosses 2; shared; turns 5"    a cable: what it passes behind, how many it crosses, …
  *   "straight heights"                                 no cable: the key of the kit's reason (NO_ROUTE)
+ * A name is written so that no letter of it can be read as part of the note (a name may hold a ";").
  */
 export function wayNote(route) {
   if (!route.points) return `straight ${Object.keys(NO_ROUTE).find((key) => NO_ROUTE[key] === route.why) ?? 'way'}`;
-  return [route.behind.length && `behind ${route.behind.join(' ')}`, route.crosses && `crosses ${route.crosses}`, route.shared && 'shared', route.bends > 3 && `turns ${route.bends}`].filter(Boolean).join('; ');
+  return [route.behind.length && `behind ${route.behind.map(encodeURIComponent).join(' ')}`, route.crosses && `crosses ${route.crosses}`, route.shared && 'shared', route.bends > 3 && `turns ${route.bends}`].filter(Boolean).join('; ');
 }
 
 const CROSSINGS_SAID = 3;   // wires cross in every diagram: a wire's crossings are said from three on
@@ -74,7 +84,7 @@ const STRAIGHT = {
   self: ['info', 'it joins a block to itself'],
 };
 /**
- * A data-way note as what `check` says: [{level: 'warn' | 'info', message}], each with its fix. `from`, `to`: the
+ * A data-sd-way note as what `check` says: [{level: 'warn' | 'info', message}], each with its fix. `from`, `to`: the
  * names the wire joins. An unknown word in a note says nothing (a page written by a newer build).
  */
 export function readWay(note, from, to) {
@@ -82,7 +92,8 @@ export function readWay(note, from, to) {
   for (const part of String(note).split(';').map((p) => p.trim()).filter(Boolean)) {
     const [word, ...rest] = part.split(/\s+/);
     if (word === 'straight' && STRAIGHT[rest[0]]) said(STRAIGHT[rest[0]][0], `is drawn straight, through the air, not along the floor: ${STRAIGHT[rest[0]][1]}`);
-    if (word === 'behind' && rest.length) said('warn', `passes behind ${rest.join(', ')}: that stretch of it is hidden — move ${rest.length === 1 ? 'it' : 'them'} or the two blocks so there is floor to see between, or draw the wire straight (data-arrow="${from} to ${to} 0")`);
+    const names = rest.map((name) => { try { return decodeURIComponent(name); } catch { return name; } });
+    if (word === 'behind' && rest.length) said('warn', `passes behind ${names.join(', ')}: that stretch of it is hidden — move ${rest.length === 1 ? 'it' : 'them'} or the two blocks so there is floor to see between, or draw the wire straight (data-arrow="${from} to ${to} 0")`);
     if (word === 'shared') said('warn', 'lies on another wire for want of room: a foot of a block has a place for three wires — make the block wider (data-size), or take a wire out');
     if (word === 'crosses' && /^\d+$/.test(rest[0] ?? '') && Number(rest[0]) >= CROSSINGS_SAID) said('info', `crosses ${rest[0]} other wires`);
     if (word === 'turns' && /^\d+$/.test(rest[0] ?? '')) said('info', `turns ${rest[0]} times on its way`);
@@ -92,7 +103,7 @@ export function readWay(note, from, to) {
 
 /** A cable's line on the slide: its points, the last pulled `back` px (where an arrow's head begins), its corners rounded — the kit's rounded way. */
 export function cableWay({points, radius}, back = 0) {
-  const tip = points.at(-1), before = points.at(-2), far = Math.hypot(tip[0] - before[0], tip[1] - before[1]) || 1, by = Math.min(back, far - 1);
+  const tip = points.at(-1), before = points.at(-2), far = Math.hypot(tip[0] - before[0], tip[1] - before[1]) || 1, by = Math.max(0, Math.min(back, far - 1));   // never past the run's own start, never forwards
   return rounded([...points.slice(0, -1), [tip[0] - (tip[0] - before[0]) * by / far, tip[1] - (tip[1] - before[1]) * by / far]], radius);
 }
 

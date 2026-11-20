@@ -15,7 +15,7 @@ describe('cable · a wire between two isometric pieces, on the slide', () => {
   it('is the kit\'s route, put on the slide: its points, each end 6 px off its foot, and its corners\' rounding', () => {
     const {shapes, floor} = drawn({a: block([0, 4]), b: block([5, 1])});
     const [cable] = cables([['a', 'b']], shapes, floor), [route] = routes(asKit(shapes), [['a', 'b']]);
-    expect(cable.route).toEqual(route);
+    expect(cable.route).toEqual(route);   // the kit knows the pieces by numbers of ours: the names are back in what it said
     expect(route.points).toEqual([[2, 5], [6, 5], [6, 3]]);   // out of a's right foot along the cols, one turn, into b's left foot
     const onSlide = route.points.map(([col, row]) => floor(col, row, 0));
     expect(cable.points).toHaveLength(3);
@@ -57,11 +57,11 @@ describe('cable · a wire between two isometric pieces, on the slide', () => {
     expect(cable.points[1]).toEqual(floor(6, 5, 1.5));
   });
 
-  it('the kit lays so many wires: one past them is not asked, and stays the straight wire it was', () => {
+  it('the kit lays so many wires: one past them is not asked, stays the straight wire it was, and says so', () => {
     const {shapes, floor} = drawn({a: block([0, 4]), b: block([5, 1])});
     const laid = cables(Array.from({length: MOST_ROUTES + 2}, () => ['a', 'b']), shapes, floor);
     expect(laid.slice(0, MOST_ROUTES).every((cable) => cable.points)).toBe(true);
-    expect(laid.slice(MOST_ROUTES)).toEqual([null, null]);
+    expect(laid.slice(MOST_ROUTES)).toEqual(Array.from({length: 2}, () => ({points: null, radius: 0, route: {from: 'a', to: 'b', points: null, why: NO_ROUTE.work}})));   // and says why
   });
 
   it('its line: the way with the last run pulled back for the arrow\'s head, corners rounded; a point of it; walked', () => {
@@ -74,6 +74,8 @@ describe('cable · a wire between two isometric pieces, on the slide', () => {
     expect(cablePoint(whole, 1)).toEqual([200, 100]);
     // a last run shorter than the head: pulled back to a px from its start, never past it
     expect(cableWay({points: [[0, 0], [200, 0], [200, 10]], radius: 30}, 14.4).at(1)).toEqual([200, 1]);
+    // a last run under a px (a hand-written grid of tiny tiles): not pulled at all, never pushed on past the tip
+    expect(cableWay({points: [[0, 0], [200, 0], [200, 0.5]], radius: 30}, 14.4).at(1)).toEqual([200, 0.5]);
   });
 });
 
@@ -83,6 +85,9 @@ describe('cable · what the build writes of a wire\'s way, and what check says o
   it('nothing for a wire that lies well; else its facts, each a few words', () => {
     expect(wayNote(route())).toBe('');
     expect(wayNote(route({behind: ['logs', 'cache']}))).toBe('behind logs cache');
+    expect(wayNote(route({behind: ['x;shared', 'R&amp;D']}))).toBe('behind x%3Bshared R%26amp%3BD');   // no letter of a name can be read as part of the note
+    expect(readWay(wayNote(route({behind: ['x;shared', 'R&amp;D']})), 'a', 'b')).toEqual([expect.objectContaining({level: 'warn', message: expect.stringContaining('passes behind x;shared, R&amp;D: ')})]);
+    expect(readWay('behind %E0%A4%A', 'a', 'b')[0].message).toContain('passes behind %E0%A4%A:');   // a name nobody can read back is said as it stands
     expect(wayNote(route({behind: ['logs'], crosses: 2, shared: 1.5, bends: 5}))).toBe('behind logs; crosses 2; shared; turns 5');
     expect(wayNote(route({bends: 3}))).toBe('');   // three turns is a way round a block: nothing to say
     for (const [key, why] of Object.entries(NO_ROUTE)) expect(wayNote({from: 'a', to: 'b', points: null, why})).toBe(`straight ${key}`);

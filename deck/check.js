@@ -155,15 +155,17 @@ function acrossStages(compiled) {
 }
 
 /**
- * A wire between two blocks whose way the build could not lay well: what the build wrote on it (data-way), in words,
+ * A wire between two blocks whose way the build could not lay well: what the build wrote on it (data-sd-way), in words,
  * with the fix. The picture need not be looked at to know that a wire is hidden behind a block.
  */
 function wireWaysSaid(compiled) {
   const out = [];
-  for (const [map, {ways = []}] of Object.entries(compiled.maps)) {
-    const click = compiled.clicks.find((c) => c.map === map) ?? null;
-    if (!click) continue;   // a map no part is told on is not part of this deck
-    for (const {name, from, to, way} of ways) for (const {level, message} of readWay(way, from, to)) out.push(problem(level, 'wire-way', click, `"${name}" (${from} to ${to}) ${message}`));
+  for (const [map, {ways = [], pieces}] of Object.entries(compiled.maps)) {
+    const told = compiled.clicks.filter((c) => c.map === map);
+    if (!told.length) continue;   // a map no part is told on is not part of this deck
+    // said at the click that first shows the wire (the map's first click for one no click shows)
+    const shownAt = (name) => { const i = pieces.findIndex((p) => p.keys.includes(name)); return told.find((c) => i >= 0 && c.look.pieces[i]?.state !== 'gone') ?? told[0]; };
+    for (const {name, from, to, way} of ways) { const click = shownAt(name); for (const {level, message} of readWay(way, from, to)) out.push(problem(level, 'wire-way', click, `"${name}" (${from} to ${to}) ${message}`)); }
   }
   return out;
 }

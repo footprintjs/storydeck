@@ -702,8 +702,9 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   A wire between two blocks is a cable on the floor. It leaves a block at one of the two feet a viewer sees (under
   its right face, or under its left), runs along the floor's tile lines, turns in rounded corners, goes round a block
   that stands in its way, and comes into the other block at a foot that is seen, so its arrow's tip is not behind a
-  block. It keeps off floor that a block hides when it can. A request and its answer lie in two lanes, half a tile
-  apart; a wire alone takes the middle of a foot, and a foot has room for three. A block straight in front of
+  block. It keeps off floor that a block hides when it can. On open floor a request and its answer lie in two lanes,
+  half a tile apart, and a wire alone takes the middle of a foot (a foot two tiles wide has room for three); on a
+  crowded floor each takes the cheapest way there is, which may be another foot. A block straight in front of
   another, behind it, or against it is reached the same way. A packet rides the line itself. The way is found by
   `footprint-story/isometric` (`routes`), so a film lays the same wires the same way.
 
@@ -723,7 +724,8 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
         the two stand at different heights
   ```
 
-  It also warns when a wire lies on another for want of room at a foot. A wire is drawn straight, from one block's
+  It also warns when a wire lies on another for want of room at a foot, and notes a wire that crosses three or more
+  others or turns more than three times. These warnings count for `check --strict`. A wire is drawn straight, from one block's
   outline to the other's with its label beside it, when it joins a block to a flat piece, when the two blocks stand at
   different heights, when there is no way along the floor (walled in), and whenever you give it a bend, `0` too:
   `data-arrow="you to server 0"`. Wires are laid in the order written, and an earlier one is never moved for a later
