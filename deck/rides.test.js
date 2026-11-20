@@ -1,7 +1,7 @@
 import {describe, it, expect} from 'vitest';
 import {wires, transformed} from './transforms.js';
 import {RIDE_CSS, quoted, seenOf, leadSeen, leadSpan, easing} from './rides.js';
-import {rideProfile} from './ride.js';
+import {rideProfile} from 'footprint-story/motion';
 
 const canvas = [1920, 1080], grid = '<i data-iso-grid="120 at 960 150"></i>';
 const map = `${grid}<div data-k="lap" data-iso="block" data-at="0 6" data-size="2 1.4 0.3" data-ports="rj45: 2 0.7 0.15"></div>`
@@ -54,7 +54,7 @@ describe('how a wire\'s packets ride: data-ride, data-rest, data-keep-size, data
     expect(loops(straight(' data-speed="2" data-keep-size'))).toEqual([[2, 0]]);   // unitless keeps its meaning: seconds
   });
 
-  it('data-ride="ease-ends 0.15 0.2": the ride\'s easing is ride.js\'s profile for the line; with a px speed, that speed is the steady one', () => {
+  it('data-ride="ease-ends 0.15 0.2": the ride\'s easing is the story library\'s profile for the line (rideProfile); with a px speed, that speed is the steady one', () => {
     const svg = straight(' data-speed="300px" data-ride="ease-ends 0.15 0.2"'), ease = easeOf(svg, 'ride');
     expect(ease).toMatch(/^linear\(0 0%, .*, 1 100%\)$/);
     const stops = [...ease.matchAll(/([\d.]+) ([\d.]+)%/g)].map((m) => [Number(m[2]) / 100, Number(m[1])]);

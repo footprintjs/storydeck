@@ -1,6 +1,7 @@
+// A floor's label in a map (data-label, data-icon): what the build hands footprint-story/isometric · floorLabelPlace to
+// keep clear of, how the label is drawn, and what check says. Where the label lies is the story library's, tested there.
 import {describe, it, expect} from 'vitest';
-import {isometric} from 'footprint-story/isometric';
-import {floorLabelPlace, MOST_LABEL} from './floorLabel.js';
+import {isometric, MOST_FLOOR_LABEL as MOST_LABEL} from 'footprint-story/isometric';
 import {transformed} from './transforms.js';
 import {checkDeck} from './check.js';
 import {compileDeck} from './compile.js';
@@ -11,79 +12,7 @@ const grid = '<i data-iso-grid="120 at 960 150"></i>', floor = isometric({tile: 
 const icons = {acct: {viewBox: '0 0 10 10', body: '<rect width="10" height="10"/>'}};
 const labelOf = (html) => /<span class="iso-floor-label" style="([^"]*)">(.*?)<\/span>/.exec(html);
 
-describe('floorLabel · where a floor\'s name lies', () => {
-  it('lies flat along the floor\'s near-left edge, a little in from its far end, sized from the tile', () => {
-    const place = floorLabelPlace({at: [0, 0], size: [8, 5]}, floor, 'Production account');
-    const start = floor.at(0.3, 4.85);
-    expect([place.x, place.y]).toEqual([start.x, start.y]);
-    // a line runs along the cols, a line's height toward the far rows: both unit steps of the floor
-    const col = [60, 30].map((v) => v / Math.hypot(60, 30));
-    expect(place.matrix.map((v) => +v.toFixed(6))).toEqual([col[0], col[1], -col[0], col[1]].map((v) => +v.toFixed(6)));
-    expect(place).toMatchObject({size: 20, lines: ['Production account'], fits: true, covered: false});
-    // a bigger tile, bigger words, up to the most; a smaller one, smaller, down to the least
-    expect(floorLabelPlace({at: [0, 0], size: [8, 5]}, isometric({tile: 300, origin: [0, 0]}), 'x').size).toBe(28);
-    expect(floorLabelPlace({at: [0, 0], size: [8, 5]}, isometric({tile: 40, origin: [0, 0]}), 'x').size).toBe(14);
-  });
-
-  it('breaks and shrinks a label too long for the edge, and says when it still does not fit', () => {
-    const place = floorLabelPlace({at: [0, 0], size: [2, 2]}, floor, 'Production account with a long name');
-    expect(place).toMatchObject({size: 14, fits: false});
-    expect(place.lines).toHaveLength(2);
-  });
-
-  it('moves along the edge, half a tile at a time, clear of what stands over it — and says when there is no clear place', () => {
-    const at = (c, r, size) => floor.block({at: [c, r], size}).outline.map(({x, y}) => [x, y]);
-    const free = floorLabelPlace({at: [0, 0], size: [8, 5]}, floor, 'Home');
-    // a tall block standing in front of the edge's far end covers it there: the words move on
-    const moved = floorLabelPlace({at: [0, 0], size: [8, 5]}, floor, 'Home', [at(0, 5, [2, 1, 1.2])]);
-    expect(moved.covered).toBe(false);
-    expect(moved.x).toBeGreaterThan(free.x);
-    const {col} = floor.tileAt(moved.x, moved.y);
-    expect((col - 0.3) % 0.5).toBeCloseTo(0, 9);
-    // a block that stands well behind the edge covers nothing
-    expect(floorLabelPlace({at: [0, 0], size: [8, 5]}, floor, 'Home', [at(1, 0, [2, 2, 1])])).toEqual(free);
-    // the whole edge taken: the first place, said covered
-    const wall = floorLabelPlace({at: [0, 0], size: [8, 5]}, floor, 'Home', [at(0, 4.5, [8, 1, 1])]);
-    expect(wall).toMatchObject({covered: true, x: free.x, y: free.y});
-  });
-});
-
-describe('floorLabel · counted honestly: an icon, capitals, the floor\'s depth, a cable over it', () => {
-  const at = (c, r, size) => floor.block({at: [c, r], size}).outline.map(({x, y}) => [x, y]);
-
-  it('counts an icon and capitals in the room the words take', () => {
-    // the same words fit a floor 3 cols long, but not with an icon beside them, nor in capitals
-    const plain = floorLabelPlace({at: [0, 0], size: [3, 3]}, floor, 'Accounts team');
-    expect(plain).toMatchObject({fits: true, size: 20, lines: ['Accounts team']});
-    expect(floorLabelPlace({at: [0, 0], size: [3, 3]}, floor, 'Accounts team', [], {icon: true}).lines).toEqual(['Accounts', 'team']);
-    expect(floorLabelPlace({at: [0, 0], size: [3, 3]}, floor, 'ACCOUNTS TEAM').lines).toEqual(['ACCOUNTS', 'TEAM']);
-  });
-
-  it('keeps a quarter tile clear past the counted words, and moves half a tile at a time', () => {
-    const free = floorLabelPlace({at: [0, 0], size: [8, 5]}, floor, 'Home');
-    // a block standing just past where the words are counted to end, inside the quarter tile: they move on
-    const end = 0.3 + 4 * 0.6 * 20 / Math.hypot(60, 30);
-    const nearBlock = floorLabelPlace({at: [0, 0], size: [8, 5]}, floor, 'Home', [at(end + 0.1, 4, [1, 1, 0])]);
-    expect(nearBlock.x).toBeGreaterThan(free.x);
-    // the first clear place, exactly: half a tile on, and on again while it is still covered
-    const step = floorLabelPlace({at: [0, 0], size: [8, 5]}, floor, 'Home', [at(0, 5, [0.6, 1, 1])]);
-    const {col} = floor.tileAt(step.x, step.y);
-    expect(col).toBeCloseTo(0.8, 9);
-  });
-
-  it('says a label on two lines deeper than its floor does not fit', () => {
-    const place = floorLabelPlace({at: [0, 0], size: [6, 1]}, isometric({tile: 60, origin: [0, 0]}), 'Shared services network');
-    expect(place.lines).toHaveLength(2);
-    expect(place.fits).toBe(false);
-    expect(place.covered).toBe(false);   // said once, as not fitting
-  });
-
-  it('keeps clear of a laid cable as of a block: a stretch of cable is an outline of two points', () => {
-    const free = floorLabelPlace({at: [0, 0], size: [8, 5]}, floor, 'Home');
-    const cable = [floor.at(-1, 4.6), floor.at(2, 4.6)].map(({x, y}) => [x, y]);
-    expect(floorLabelPlace({at: [0, 0], size: [8, 5]}, floor, 'Home', [cable]).x).toBeGreaterThan(free.x);
-  });
-
+describe('floorLabel · a cable over a group\'s floor', () => {
   it('in a map, the label of a group\'s floor moves off the cable that comes into it', () => {
     const b = (k, g) => `<div data-k="${k}" data-iso="block" data-iso-group="${g}"><b>${k}</b></div>`;
     const html = `<div data-k="f1" data-iso="floor" data-iso-group="a" data-label="Front"></div><div data-k="f2" data-iso="floor" data-iso-group="b" data-label="Back team"></div>${b('x', 'a')}${b('y', 'b')}<i data-k="w" class="wire" data-arrow="x to y"></i>`;
@@ -118,11 +47,6 @@ describe('floorLabel · what the map hands it to keep clear of', () => {
     expect(long.tight).toEqual([{name: 'p', text: 'Home', on: 'floor-covered'}]);
   });
 
-  it('a label that does not fit is said as that, never also as covered', () => {
-    const wall = floor.block({at: [0, 0.5], size: [2, 2, 1]}).outline.map(({x, y}) => [x, y]);
-    const place = floorLabelPlace({at: [0, 0], size: [2, 2]}, floor, 'A name far too long for so small a floor', [wall]);
-    expect(place).toMatchObject({fits: false, covered: false});
-  });
 });
 
 describe('floorLabel · a labelled floor in a map (data-label, data-icon)', () => {

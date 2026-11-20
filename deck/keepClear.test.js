@@ -1,6 +1,6 @@
 import {describe, it, expect} from 'vitest';
 import {isometric} from 'footprint-story/isometric';
-import {floorUnder, readKeepClear, CLEAR_CELL} from './keepClear.js';
+import {keptFloor, readKeepClear} from './keepClear.js';
 import {transformed} from './transforms.js';
 import {readWay} from './cable.js';
 
@@ -15,27 +15,19 @@ const inBox = ([px, py], [x, y, w, h]) => px > x + 1 && px < x + w - 1 && py > y
 /** A cable's points sampled along its straight stretches. */
 const along = (points) => points.slice(1).flatMap((b, i) => Array.from({length: 21}, (_, k) => [points[i][0] + (b[0] - points[i][0]) * k / 20, points[i][1] + (b[1] - points[i][1]) * k / 20]));
 
-describe('keepClear · the floor under a box on the slide', () => {
-  for (const lift of [0, 1]) it(`is every square of floor at height ${lift} whose drawn diamond meets the box, joined along a row — checked square by square`, () => {
-    const box = {x: 700, y: 520, w: 80, h: 30}, strips = floorUnder(box, floor, lift);
-    // each stretch reaches a hair (0.01 tile) past its squares, so two side by side overlap: read back its squares
-    const kept = new Set(strips.flatMap(({at: [c, r], size: [w]}) => Array.from({length: Math.round((w - 0.02) / CLEAR_CELL)}, (_, k) => `${+(c + 0.01 + k * CLEAR_CELL).toFixed(6)},${+(r + 0.01).toFixed(6)}`)));
-    // an independent test of each square near the box: its diamond's four corners and its middle, and the box's corners inside the diamond
-    const diamond = (c, r) => [[c, r], [c + CLEAR_CELL, r], [c + CLEAR_CELL, r + CLEAR_CELL], [c, r + CLEAR_CELL]].map(([a, b]) => { const p = floor.at(a, b, lift); return [p.x, p.y]; });
-    const inside = (pts, [px, py]) => { let s = 0; for (let i = 0; i < 4; i++) { const [ax, ay] = pts[i], [bx, by] = pts[(i + 1) % 4]; const c = (bx - ax) * (py - ay) - (by - ay) * (px - ax); if (Math.abs(c) <= 1e-9 || (s && Math.sign(c) !== s)) return false; s = Math.sign(c); } return true; };   // strictly inside: a touch at one point is no meeting
-    const crosses = (pts) => pts.some(([px, py]) => px > box.x && px < box.x + box.w && py > box.y && py < box.y + box.h)
-      || [[box.x, box.y], [box.x + box.w, box.y], [box.x, box.y + box.h], [box.x + box.w, box.y + box.h]].some((p) => inside(pts, p))
-      // an edge of the diamond through the box: sampled
-      || pts.some((a, i) => { const b = pts[(i + 1) % 4]; return Array.from({length: 41}, (_, k) => [a[0] + (b[0] - a[0]) * k / 40, a[1] + (b[1] - a[1]) * k / 40]).some(([px, py]) => px > box.x && px < box.x + box.w && py > box.y && py < box.y + box.h); });
-    for (let c = -4; c < 16; c += CLEAR_CELL) for (let r = -4; r < 16; r += CLEAR_CELL) expect(kept.has(`${c},${r}`), `${c},${r}`).toBe(crosses(diamond(c, r)));
-    expect(strips.length).toBeGreaterThan(0);
-    expect(strips.every(({at: [, , z], size: [w, d]}) => z === lift && w > 0 && Math.abs(d - CLEAR_CELL - 0.02) < 1e-9)).toBe(true);
-  });
-
+describe('keepClear · the floor under a box on the slide (footprint-story/isometric · floorUnder, tested there), in the deck\'s words', () => {
   it('counts the floor a box covers before looking at it: a box many slides wide on a tiny tile is refused at once', () => {
     const tiny = isometric({tile: 4, origin: [960, 150]}), t0 = Date.now();
-    expect(() => floorUnder({x: 0, y: 0, w: 40000, h: 40000}, tiny, 0, '"nm" (data-keep-clear)')).toThrow(/^"nm" \(data-keep-clear\): its box covers more floor than a picture needs \(\d+ squares\) — give it a box the size of its words$/);
+    expect(() => keptFloor({x: 0, y: 0, w: 40000, h: 40000}, tiny, 0, '"nm" (data-keep-clear)')).toThrow(/^"nm" \(data-keep-clear\): its box covers more floor than a picture needs \(\d+ squares\) — give it a box the size of its words$/);
     expect(Date.now() - t0).toBeLessThan(100);
+  });
+
+  it('spends the map\'s budget of stretches as it makes them, and refuses past it — the kit says why, the deck says it', () => {
+    const budget = {left: 512, most: 512}, made = keptFloor({x: 700, y: 520, w: 80, h: 30}, floor, 0, '"nm"', budget);
+    expect(made.length).toBeGreaterThan(0);
+    expect(budget.left).toBe(512 - made.length);
+    expect(() => keptFloor({x: 700, y: 520, w: 80, h: 30}, floor, 0, '"nm"', {left: made.length - 1, most: 9})).toThrow('data-keep-clear: the floor kept clear on this map is more than 9 stretches, the most a map keeps — keep clear under smaller pieces, or fewer');
+    expect(() => keptFloor({x: 2e6, y: 0, w: 10, h: 10}, floor, 0, '"far"')).toThrow('"far": its box stands further than 1000000 px from the slide — give it a place on the slide');
   });
 });
 

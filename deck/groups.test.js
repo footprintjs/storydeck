@@ -1,6 +1,6 @@
 import {describe, it, expect} from 'vitest';
 import {arrange} from 'footprint-story/isometric';
-import {arrangeByGroup, groupWritten} from './groups.js';
+import {groupWritten} from './groups.js';
 import {isoDrawn} from './iso.js';
 import {transformed, wireLinks} from './transforms.js';
 import {checkDeck} from './check.js';
@@ -42,18 +42,6 @@ describe('groups · blocks that belong together, each group on its floor (data-i
     expect(fx).toBeLessThan(bx);   // the frontend's floor starts left of the backend's
     // a labelled floor is not ground: a view that frames it holds its words
     expect(/<div data-k="f-front"[^>]*>/.exec(html)[0]).not.toContain('data-ground');
-  });
-
-  it('arranges each group on the wires inside it, then the groups as things on the wires between them', () => {
-    const solid = [{name: 'a', size: [2, 2, 1], group: 'x'}, {name: 'b', size: [2, 2, 1], group: 'x'}, {name: 'c', size: [2, 2, 1], group: 'y'}, {name: 'd', size: [2, 2, 1], group: null}];
-    const calls = [];
-    const spy = (things, links, options) => { calls.push({names: things.map((t) => t.name), links, options}); return arrange(things, links, options); };
-    const at = arrangeByGroup(solid, [['a', 'b'], ['b', 'c'], ['c', 'd'], ['a', 'a']], spy);
-    expect(at).toHaveLength(4);
-    expect(calls.map((c) => c.names)).toEqual([['a', 'b'], ['c'], ['d'], ['g:x', 'g:y', '\u0001']]);
-    expect(calls[0].links).toEqual([['a', 'b'], ['a', 'a']]);
-    expect(calls[3].links).toEqual([['g:x', 'g:y'], ['g:y', '\u0001']]);
-    expect(calls[3].options).toEqual({across: true});   // arrange's own gaps between groups: a tall group does not hide the next
   });
 
   it('keeps a clear tile between floors even when groups stand on half tiles (floors never meet at a corner)', () => {

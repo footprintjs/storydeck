@@ -55,8 +55,8 @@ import {readPieces} from '../focusHtml.js';
 import {boxFinder, exit, exitOutline} from './boxes.js';
 import {callouts} from './callouts.js';
 import {isoDrawn} from './iso.js';
-import {NO_ROUTE, rounded} from 'footprint-story/isometric';
-import {crossesBox, readKeepClear} from './keepClear.js';
+import {crossesBox, NO_ROUTE, rounded} from 'footprint-story/isometric';
+import {readKeepClear} from './keepClear.js';
 import {cables, cablesOn, cableWalk, cableWay, held, labelPlace, layRoutes, reachOf, wayNote, LABEL_LOOKS} from './cable.js';
 import {curveLength, leadSeen, leadSpan, piecesLength, quoted, readRide, rideMarks, rideOf, ridersSvg, SPEEDS} from './rides.js';
 

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.28.0 — the numbers a film shares live in the story library
+
+No page or compiled record changes: every deck builds byte for byte as on 0.27.0 (checked on `examples/a-request`, a
+second starter deck, and 415 maps — groups, floor labels, kept-clear words, ports, hairpins and packet rides; 400 of
+them random, 80 also through `check` — before and after). What moved is where the work is done: five helpers a film needs too now live once in `footprint-story`
+0.17.0, and the deck imports them.
+
+- `deck/ride.js` → `footprint-story/motion` (`rideProfile`, `rideSeconds`, `speedAt`, `withHold`, `showStops`,
+  `hiddenRamps`); `rides.js` reads them, and a ride's eased end is bounded by the kit's `MOST_EASE`.
+- `deck/cable.js · hairpins` → `footprint-story/isometric · hairpins`; the words `check` says for each stay here
+  (`readWay`).
+- `deck/keepClear.js · floorUnder`, `crossesBox` → the kit's `floorUnder` and `crossesBox`. The kit answers a box it
+  has no floor for with a reason; `keptFloor` (the deck's) says it in the deck's words, as before.
+- `deck/floorLabel.js` → the kit's `floorLabelPlace` (the file is gone; `iso.js` draws the label as before).
+- `deck/groups.js · arrangeByGroup`, `GROUP_MARGIN` → the kit's; `groups.js` keeps reading `data-iso-group`.
+- `footprint-story` 0.17.0 or later.
+
 ## 0.27.0 — cables that keep off words
 
 - **`data-keep-clear`** on a piece placed by its own style (a name, a note): the cables the build lays keep off the
