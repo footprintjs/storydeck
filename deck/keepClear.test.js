@@ -83,6 +83,11 @@ describe('keepClear · a cable keeps off the floor under a name (data-keep-clear
     expect(along(made.cables[0].points).some((p) => inBox(p, box))).toBe(false);
   });
 
+  it('says a cable under either of two pieces that share a name, in either order', () => {
+    const under = label('nm', [794, 567, 80, 30]), other = label('nm', [10, 10, 20, 20]);
+    for (const pair of [`${under}${other}`, `${other}${under}`]) expect(transformed(`${grid}${sw}${lap}${pair}${wire}`, {canvas}).ways[0].way).toContain('under nm');
+  });
+
   it('knows a piece by its own name, however long, and says it once', () => {
     const long = `n${'x'.repeat(300)}`, box = [700, 0, 40, 1080];
     const made = transformed(`${grid}${sw}${lap}${label(long, box)}${wire}`, {canvas});

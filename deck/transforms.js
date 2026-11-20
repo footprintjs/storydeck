@@ -356,10 +356,11 @@ export function wiresDrawn(html, {shapes = new Map(), floor = null, solids = [..
   let boxes = null;
   const underBoxes = (laid) => {
     if (!laid.route.under?.length || !floor) return laid.route;
-    boxes ??= new Map(readKeepClear(html).map(({name, box}) => [name, box]));
+    // every box of a name: two pieces may share one, and a cable under either runs under that name
+    if (!boxes) { boxes = new Map(); for (const {name, box} of readKeepClear(html)) boxes.set(name, [...(boxes.get(name) ?? []), box]); }
     // (the floor it lies on is the lowest height of its way: a port's plug and the point out of its side stand above it)
     const path = laid.route.path ?? [], lift = Math.min(...path.map((p) => p[2])), way = path.filter((p) => Math.abs(p[2] - lift) < 1e-9).map(([col, row]) => floor(col, row, lift));
-    return {...laid.route, under: laid.route.under.filter((name) => boxes.has(name) && crossesBox(way, boxes.get(name)))};
+    return {...laid.route, under: laid.route.under.filter((name) => (boxes.get(name) ?? []).some((box) => crossesBox(way, box)))};
   };
   const rides = options.some((o) => o.rides);   // whether a wire asks how its packets ride: the page then carries RIDE_CSS
   const drawn = replaceEach(html, found, ({before, m, after}, i) => {
