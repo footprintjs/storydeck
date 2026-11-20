@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.25.0 — how a wire's packets ride
+
+- **How a wire's packets ride**, each an attribute on the wire beside `data-packets` (and refused without it):
+  `data-speed="300px"` (px a second: the run takes the wire's length over it — the build measures, a deck never does;
+  a bare number is still seconds), `data-ride="ease-ends 0.15 0.2"` (out of the start over the first 15% of the
+  length, one steady speed, into the end over the last 20%; with a px speed that speed is the steady one),
+  `data-rest="end"` (it stays at the end when it arrives, 1 s or `"end 3s"`, and rests there where loops do not run),
+  `data-keep-size` (its size on the slide kept under the camera's zoom, through the view's move too),
+  `data-trail="3px var(--l1)"` (a line behind it as it rides) and `data-behind="fade"` (out over about three frames
+  before a stretch a block hides, from the build's record, and back after it). On a cable into a port on a seen side
+  the lead carries the packets too, so one resting at the port is seen there, over its block. Each works on a wire
+  through the air too; a wrong value is refused at build, naming the wire and the fix. Under reduced motion, in print
+  and with motion off a packet rests as before (at the end with `data-rest="end"`, at its kept size, no trail). The
+  numbers are one small module, `deck/ride.js` (plain numbers in and out, so a film can ride the same packets later),
+  and `deck/rides.js` turns them into CSS; the page carries their stylesheet only when a wire asks, so every page
+  without them is byte for byte as before.
+- A wire through the air that asks how its packets ride carries them along its curve by length (offset-path, as a
+  cable's), so its eased ends, its px speed and its trail are shares of its length, not of its curve's parameter. A
+  packet that fades behind a block is gone before its edge reaches it (its radius more; over the zoom when it keeps
+  its size). On a lead's stretch only the lead's copy shows, never both, and a resting packet is drawn under the
+  lead's arrowhead. An error quotes at most 60 letters of a value; a trail's colour is at most 100 letters and three
+  brackets deep; a wire with no length is refused a px speed, with seconds as the fix.
+- Known: without a ride option, a packet riding into a port on a seen side still passes under its block for the last
+  short stretch (a page without them stays byte for byte as it was).
+
 ## 0.24.0 — a cable that doubles back is said
 
 - **`check` (rule `wire-way`) says when a cable doubles back on itself near a port, or in a tight U.** It warns when
