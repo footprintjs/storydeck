@@ -4,6 +4,7 @@ import {isoDrawn} from './iso.js';
 import {exitOutline} from './boxes.js';
 import {cables, cableWalk, cableWay, held, labelPlace} from './cable.js';
 import {stripComments} from './html.js';
+import {PACE_CSS} from './pace.js';
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
 import {generated} from './test/helpers.js';
@@ -153,11 +154,44 @@ describe('a packet on the curve, a wire shown in', () => {
     expect(t).toMatch(/:where\(svg\.wire\.sd-enter:not\(\.sd-hot, \.sd-hot-in\)\) \{ --sd-a-more: sdReveal [^}]*var\(--sd-delay, 0s\) both; \}/);
     expect(t).toMatch(/:where\(svg\.wire\.sd-path\.sd-enter:not\(\.sd-hot, \.sd-hot-in\)\) \{ --sd-a-more: sdReveal [^}]*var\(--sd-turn, 0s\) both; \}/);
     // a highlighted wire is never masked (its ring is drawn outside its box); a wire stepping aside waits for the sweep
-    expect(t).toMatch(/:where\(svg\.wire\.sd-enter:not\(\.sd-hot, \.sd-hot-in\)\) \{\n\s+-webkit-mask-image/);
+    expect(t).toMatch(/:where\(svg\.wire\.sd-enter:not\(\.sd-hot, \.sd-hot-in, \[data-sd-lead\]\)\) \{\n\s+-webkit-mask-image/);
     expect(t).toContain(':where(svg.wire.sd-twin-turn) { --sd-twin-lag: .3s; }');
     expect(readFileSync(path.join(process.cwd(), 'focus.css'), 'utf8')).toContain('sdLeave .45s ease calc(var(--sd-turn) + var(--sd-twin-lag, 0s)) both');
     expect(readFileSync(path.join(process.cwd(), 'focus.css'), 'utf8')).toContain('var(--sd-a-path, sdNone 0s), var(--sd-a-more, sdNone 0s), var(--sd-a-loop, sdNone 0s); }');
     expect(wires('<i data-k="w" data-arrow="0 0 9 9"></i>')).not.toContain('pathLength');
+  });
+
+  it('keeps deck.css\'s promise: every rule is :where(), so a deck\'s theme wins over any of them', () => {
+    const text = css().replace(/\/\*[\s\S]*?\*\//g, '');
+    // a selector with each :where(…) taken out: only combinators may be left
+    const outside = (sel) => {
+      let out = '', i = 0;
+      while (i < sel.length) {
+        if (!sel.startsWith(':where(', i)) { out += sel[i++]; continue; }
+        let depth = 0, j = i + 6;
+        for (; j < sel.length; j++) if (sel[j] === '(') depth++; else if (sel[j] === ')' && --depth === 0) break;
+        i = j + 1;
+      }
+      return out.replace(/[\s>+~,]/g, '');
+    };
+    const strong = [];
+    let depth = 0, frames = 0;
+    for (const m of text.matchAll(/([^{}]*)\{|\}/g)) {
+      if (m[0] === '}') { depth--; if (frames && depth < frames) frames = 0; continue; }
+      const sel = m[1].trim();
+      depth++;
+      if (sel.startsWith('@keyframes')) frames = depth;
+      else if (!sel.startsWith('@') && !frames && outside(sel)) strong.push(sel);
+    }
+    expect(strong).toEqual([]);
+  });
+
+  it('shows the lead at a cable\'s far end once the sweep reaches it, by the part\'s pace too — the pace rule leaves it alone', () => {
+    const t = css();
+    expect(t).toContain(':where(svg.wire[data-sd-lead="end"].sd-enter:not(.sd-hot, .sd-hot-in)) { --sd-a-more: sdLeadWait calc(var(--sd-arrive-time, .6s) * .8) linear calc(var(--sd-delay, 0s) + var(--sd-arrive-delay, 0s)) backwards; }');
+    expect(t).toContain(':where(svg.wire.sd-path[data-sd-lead="end"].sd-enter:not(.sd-hot, .sd-hot-in)) { --sd-a-more: sdLeadWait calc(var(--sd-arrive-time, .6s) * .8) linear calc(var(--sd-turn, 0s) + var(--sd-arrive-delay, 0s)) backwards; }');
+    // the pace rules come later on the page at the same (zero) weight: they must not take the far-end lead back
+    expect(PACE_CSS.match(/svg\.wire[^)]*\.sd-enter:not\(\.sd-hot, \.sd-hot-in, \[data-sd-lead="end"\]\)/g)).toHaveLength(2);
   });
 });
 

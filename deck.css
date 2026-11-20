@@ -71,11 +71,12 @@
   /* a highlighted wire keeps its ring, drawn outside its box where no mask paints: it just fades in */
   :where(svg.wire.sd-enter:not(.sd-hot, .sd-hot-in)) { --sd-a-more: sdReveal .6s cubic-bezier(.4, 0, .2, 1) var(--sd-delay, 0s) both; }
   :where(svg.wire.sd-path.sd-enter:not(.sd-hot, .sd-hot-in)) { --sd-a-more: sdReveal .6s cubic-bezier(.4, 0, .2, 1) var(--sd-turn, 0s) both; }
-  :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) svg.wire[data-sd-lead].sd-enter { -webkit-mask-image: none; mask-image: none; }
-  svg.wire[data-sd-lead="end"].sd-enter:not(.sd-hot, .sd-hot-in) { --sd-a-more: sdLeadWait .5s linear var(--sd-delay, 0s) backwards; }
-  svg.wire.sd-path[data-sd-lead="end"].sd-enter:not(.sd-hot, .sd-hot-in) { --sd-a-more: sdLeadWait .5s linear var(--sd-turn, 0s) backwards; }
+  /* the far-end lead waits out most of the sweep: the cable's own seconds and wait, a part's pace included
+     — that rule leaves the far-end lead to this one */
+  :where(svg.wire[data-sd-lead="end"].sd-enter:not(.sd-hot, .sd-hot-in)) { --sd-a-more: sdLeadWait calc(var(--sd-arrive-time, .6s) * .8) linear calc(var(--sd-delay, 0s) + var(--sd-arrive-delay, 0s)) backwards; }
+  :where(svg.wire.sd-path[data-sd-lead="end"].sd-enter:not(.sd-hot, .sd-hot-in)) { --sd-a-more: sdLeadWait calc(var(--sd-arrive-time, .6s) * .8) linear calc(var(--sd-turn, 0s) + var(--sd-arrive-delay, 0s)) backwards; }
   :where(svg.wire.sd-twin-turn) { --sd-twin-lag: .3s; }   /* the wire it hands over to sweeps in: it leaves as the sweep nears the tip */
-  :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) :where(svg.wire.sd-enter:not(.sd-hot, .sd-hot-in)) {
+  :where([data-deck-active]:not([data-sd-instant]):not([data-deck-static])) :where(svg.wire.sd-enter:not(.sd-hot, .sd-hot-in, [data-sd-lead])) {
     -webkit-mask-image: linear-gradient(var(--sd-angle, 90deg), #000 var(--sd-reveal), transparent calc(var(--sd-reveal) + 12%));
     mask-image: linear-gradient(var(--sd-angle, 90deg), #000 var(--sd-reveal), transparent calc(var(--sd-reveal) + 12%));
   }
