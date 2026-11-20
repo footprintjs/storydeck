@@ -1,5 +1,5 @@
 import {describe, it, expect} from 'vitest';
-import {wires, wireTags, transformed, icons, readIcon, applyTransforms} from './transforms.js';
+import {wires, wiresDrawn, wireTags, transformed, icons, readIcon, applyTransforms} from './transforms.js';
 import {isoDrawn} from './iso.js';
 import {exitOutline} from './boxes.js';
 import {cables, cableWalk, cableWay, held, labelPlace} from './cable.js';
@@ -529,9 +529,19 @@ describe('a wire between two isometric pieces is a cable along the floor', () =>
     const area = [60, 200, 1860, 1000], made = transformed(ring, {canvas, area});
     expect(made.cables).toHaveLength(4);
     for (const {name, points} of made.cables) for (const [x, y] of points) expect(x >= area[0] && x <= area[2] && y >= area[1] && y <= area[3], `${name} at ${[x, y]}`).toBe(true);
-    // and every corner of every wire is on the fitted floor (the floor's own outline holds it)
-    const [, fx, fy, fw, fh] = /data-k="floor"[^>]*style="left:([\d.-]+)px;top:([\d.-]+)px;width:([\d.]+)px;height:([\d.]+)px/.exec(made.html).map(Number);
-    for (const {points} of made.cables) for (const [x, y] of points) expect(x >= fx && x <= fx + fw && y >= fy && y <= fy + fh).toBe(true);
+    // and every corner of every wire is on the fitted floor: inside the four-sided ground the floor draws
+    const [, fx, fy] = /data-k="floor"[^>]*style="left:([\d.-]+)px;top:([\d.-]+)px/.exec(made.html).map(Number);
+    const ground = /<polygon class="iso-ground" points="([^"]+)"/.exec(made.html)[1].trim().split(/\s+/).map((pair) => pair.split(',').map(Number)).map(([x, y]) => [x + fx, y + fy]);
+    const onFloor = ([px, py]) => ground.reduce((odd, [xi, yi], i) => { const [xj, yj] = ground.at(i - 1); return (yi > py) !== (yj > py) && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi ? !odd : odd; }, false);
+    for (const {name, points} of made.cables) for (const p of points) expect(onFloor(p), `${name} at ${p}`).toBe(true);
+    expect(onFloor([ground[0][0], ground[0][1] - 50])).toBe(false);   // the check does see a point off the floor
+  });
+
+  it('draws the wires as they were laid: the ways handed to it are the ways it draws, laid once', () => {
+    const map = `${blocks}<i data-k="w" class="wire" data-arrow="a to b"></i>`, iso = isoDrawn(map, {canvas});
+    expect(wiresDrawn(iso.html, {...iso, routes: [null]}).html).not.toContain('data-sd-cable');          // told the wire was not laid: it draws the straight wire
+    expect(wiresDrawn(iso.html, iso).html).toContain('data-sd-cable');                                   // told nothing: it lays the wire itself
+    expect(wiresDrawn(iso.html, {...iso, routes: []}).html).toContain('data-sd-cable');                  // a list that is not this map's wires is not used
   });
 
   it('a bend, 0 too, keeps the wire a straight run; so does an end that is no block', () => {
