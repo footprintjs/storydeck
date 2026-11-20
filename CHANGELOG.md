@@ -9,7 +9,7 @@ floor labels, kept-clear words, ports, hairpins and packet rides, and the edges:
 px long; 400 of the maps random, 80 also through `check` — built before and after, every output and refusal compared.
 The one change: a wire through the air written with numbers near 1e308, whose length overflows to no number, is
 refused naming the wire (`its length cannot be measured`), where 0.27.0 drew it with a broken ride. What moved is where the work is done: five helpers a film needs too now live once in `footprint-story`
-0.17.0, and the deck imports them.
+0.17.1, and the deck imports them.
 
 - `deck/ride.js` → `footprint-story/motion` (`rideProfile`, `rideSeconds`, `speedAt`, `withHold`, `showStops`,
   `hiddenRamps`); `rides.js` reads them, and a ride's eased end is bounded by the kit's `MOST_EASE`. A px speed is
@@ -20,7 +20,7 @@ refused naming the wire (`its length cannot be measured`), where 0.27.0 drew it 
   has no floor for with a reason; `keptFloor` (the deck's) says it in the deck's words, as before.
 - `deck/floorLabel.js` → the kit's `floorLabelPlace` (the file is gone; `iso.js` draws the label as before).
 - `deck/groups.js · arrangeByGroup`, `GROUP_MARGIN` → the kit's; `groups.js` keeps reading `data-iso-group`.
-- `footprint-story` 0.17.0 or later.
+- `footprint-story` 0.17.1 or later (0.17.0 was never published).
 
 ## 0.27.0 — cables that keep off words
 
