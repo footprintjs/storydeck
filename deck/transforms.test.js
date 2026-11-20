@@ -480,7 +480,10 @@ describe('a wire between two isometric pieces is a cable along the floor', () =>
     expect(shapes.has('m')).toBe(false);
     const under = (col, row) => col > 4 && col < 6 && row > 5 && row < 8;
     for (const [[c0, r0], [c1, r1]] of cable.route.points.slice(1).map((p, k) => [cable.route.points[k], p])) for (let t = 0.05; t < 1; t += 0.05) expect(under(c0 + (c1 - c0) * t, r0 + (r1 - r0) * t)).toBe(false);
-    expect(applyTransforms(`${twins}<i data-k="w" class="wire" data-arrow="a to b"></i>`, {canvas})).toContain('data-sd-cable');
+    // drawn so too: the very line the map gets when the second block has a name of its own
+    const wire = '<i data-k="w" class="wire" data-arrow="a to b"></i>', lineIn = (map) => /<path d="([^"]+)"/.exec(svgOf(applyTransforms(`${map}${wire}`, {canvas}), 'w'))[1];
+    expect(tag(applyTransforms(`${twins}${wire}`, {canvas}), 'w')).toContain('data-sd-cable');
+    expect(lineIn(twins)).toBe(lineIn(twins.replace('<div data-k="m" data-iso="block" data-at="4 12">', '<div data-k="m2" data-iso="block" data-at="4 12">')));
     // a name longer than the kit keeps, and one with letters a note is written in
     const long = 'x'.repeat(300);
     const named = `${grid}<div data-k="a" data-iso="block" data-at="0 4"></div><div data-k="b" data-iso="block" data-at="8 4"></div><div data-k="${long}" data-iso="block" data-at="4 5.5" data-size="2 40 2"></div><div data-k="x;shared" data-iso="block" data-at="20 4"></div><i data-k="w" class="wire" data-arrow="a to b"></i><i data-k="v" class="wire" data-arrow="${long} to x;shared"></i>`;
