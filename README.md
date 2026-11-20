@@ -686,9 +686,11 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
 
   `data-at` is "col row" (col runs down and to the right of the slide, row down and to the left; a third number lifts
   the piece), `data-size` is "wide deep high" for a `block` or a `cylinder` (round: the same width and depth) and
-  "cols rows" for a `floor`. Its words stand flat on its top face, and its name (the `<b>`) is made to fit that face:
-  as written when it fits on one line, else broken onto two lines, else smaller, down to 16 px. A name that still does
-  not fit is drawn at 16 px and `check` says so (`name-fit`), with the two ways out: shorten it, or widen the block.
+  "cols rows" for a `floor`. Its words stand flat on its top face, and its name (its first `<b>`, inside no other
+  element) is made to fit that face: as written when it fits on one line, else broken onto two lines, else smaller,
+  down to 16 px. A name that still does not fit is drawn at 16 px and `check` says so (`name-fit`), with the two ways
+  out: shorten it, or give the block a bigger top. A top is a diamond, as wide across its middle as the block's
+  shorter side is long: a block 8 by 1 has room for a short name only, however long it is.
   The fit is counted in letters, since a build has no browser; `build --layout` measures the page itself. Two words
   joined by a no-break space (`&nbsp;`) stay on one line. A `<b>` with a style or markup of its own is left as you
   wrote it. It is a piece like any other: every click, `fit`,

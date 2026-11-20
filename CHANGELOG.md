@@ -6,12 +6,15 @@
   fitted picture cut it off at the slide's edge. The wires are now laid as soon as the blocks stand, before anything
   is fitted: a fitted floor lies under every wire, and the fitted picture keeps every wire on the slide. A map the
   build places, or one with `data-iso-grid="fit"`, may stand a little differently on the slide than in 0.19.0.
-- **A block's name fits its top face.** The name (the `<b>`) stays as written when it fits on one line; else it is
-  broken onto two lines where they are most alike; else it is made smaller, down to 16 px. A name that still does not
-  fit is drawn at 16 px, and a new rule, `name-fit`, warns with the two ways out (shorten it, or widen the block).
+- **A block's name fits its top face.** The name (its first `<b>`, inside no other element) stays as written when it
+  fits on one line; else it is broken onto two lines where they are most alike; else it is made smaller, down to
+  16 px. A name that still does not fit is drawn at 16 px, and a new rule, `name-fit`, warns with the two ways out
+  (shorten it, or give the block a bigger top). The room is the top's own: a diamond, as wide across its middle as
+  the block's shorter side is long, and narrower where a second line stands.
   Counted in letters, since a build has no browser; `build --layout` measures the page. A no-break space (`&nbsp;`)
   keeps two words on one line. A `<b>` with a style or markup of its own is left alone. Names that ran past their block in 0.19.0 are drawn differently now.
-- **`data-head="none"`** on any wire: a plain line that runs its whole length, with no arrow's head.
+- **`data-head="none"`** on any wire: a plain line that runs its whole length, with no arrow's head. `none` is its
+  one value: a wire with any other `data-head` (it meant nothing before) is now refused, naming the fix.
 - **The build's record of a map**, beside the page: `compileDeck(source).maps[name]` has `made` (who placed the
   blocks, the tile, whether the picture was fitted), `cables` (each cable's corners and its line's length in slide
   px, the stretches a block hides, what it passes behind, crosses and shares) and `tight`. The run's log has a new
@@ -19,7 +22,7 @@
   deck's own CSS can time a thing to a cable without measuring.
 - **A map is made in one order, each step one function**: icons, blocks placed, wires laid in tiles, floor and
   picture fitted, pieces drawn, callouts, wires drawn. A wire's way is found once.
-- `footprint-story` 0.12.0 or later (`gridFor` · `also`, `wordsToFit`, `unseen` on a route).
+- `footprint-story` 0.13.0 or later (`gridFor` · `also`, `wordsToFit`, `unseen` on a route, a top's `room`).
 
 ## 0.19.0 — wires that find their way, and say so
 

@@ -448,7 +448,7 @@ describe('iso · a block\'s name fits its top face', () => {
 
   it('the name is the first <b> inside no other element: words in a title, a <b> in a <small> and a styled name are left as written', () => {
     const long = 'Supercalifragilistic expialidocious long';
-    for (const inner of [`<em title="<b>${long}</b>">x</em>`, `<small>x <b>${long}</b></small>`, `<b class="x">${long}</b><b>${long}</b>`, `<b> </b><b>${long}</b>`, `<!-- <b>${long}</b> -->words`, `<svg class="ic"><path d="M0 0"/><text><b>${long}</b></text></svg>`]) {
+    for (const inner of [`<em title="<b>${long}</b>">x</em>`, `<br title="x><b>${long}</b>">words`, `<small>x <b>${long}</b></small>`, `<b class="x">${long}</b><b>${long}</b>`, `<b> </b><b>${long}</b>`, `<!-- <b>${long}</b> -->words`, `<svg class="ic"><path d="M0 0"/><text><b>${long}</b></text></svg>`]) {
       expect(say(inner), inner).toBe(inner);
       expect(tightOf(inner), inner).toEqual([]);
     }
