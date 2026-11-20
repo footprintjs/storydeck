@@ -740,14 +740,31 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   one: the fewest crossings there could be are not promised. `data-head="none"` on any wire draws a plain line that
   runs its whole length, with no arrow's head.
 
+  **A cable that plugs into a port.** A block names points on its sides where a cable plugs in, in its own tiles —
+  x along its width, y along its depth, z up from its base — and a wire names a port as `piece.port`:
+
+  ```html
+  <div data-k="sw" data-iso="block" data-at="6 6" data-size="4.7 2 0.4" data-ports="p1: 0.4 2 0.3 | up: 4.7 1 0.3"></div>
+  <i data-k="w1" class="wire" data-arrow="lap.rj45 to sw.p1" data-head="none"></i>
+  ```
+
+  The cable leaves the port straight out of its side, drops to the floor, runs along the tile lines as any cable does,
+  and comes up into the other port: its line ends on the port itself, 0 px off. Which side a port is on is read from
+  where it is (y = depth is the side toward the lower left, x = width toward the lower right, y = 0 and x = 0 the two
+  sides behind); at a corner, name it after the numbers (`right`, `left`, `back-left`, `back-right`), and a wrong one is
+  refused with the right one. The lead into a port on a side you see is drawn over its block, so the block does not
+  cover it; a port on a side behind is allowed, its stretch runs behind its block, and `check` says so. A name with a
+  dot that some piece goes by is still that piece. Not yet: a port on the top or on a cylinder, and a packet that
+  rides into a port on a side you see passes under its block for the last short stretch (packet options come next).
+
   **The floor and the picture hold the wires too.** A wire that goes round a block reaches past the blocks. The wires
   are laid as soon as the blocks stand, before anything is fitted, so a fitted floor lies under every wire and the
   fitted picture keeps every wire on the slide.
 
   **The build's record of a map.** What the build knows of a map it keeps beside the page, never in it:
   `compileDeck(source).maps[name]` has `made` (who placed the blocks, `build` or `hand`; the tile; whether the picture
-  was fitted), `cables` (each cable's corners and its line's length in slide px, the stretches a block hides, what it
-  passes behind, crosses and shares), `ways` (what `check` says of a wire) and `tight` (names that do not fit, each
+  was fitted), `cables` (each cable's corners and its line's length in slide px — from port to port, risers included,
+  for a cable that plugs in, with its `ports` — the stretches a block hides, what it passes behind, crosses and shares), `ways` (what `check` says of a wire) and `tight` (names that do not fit, each
   by its first 80 characters). The run's log has it too (stage `maps made`, `storydeck log --run 1`). And each cable
   carries its line's length in the page as `--sd-length`, so a deck's own CSS can time a thing to a cable without
   measuring:

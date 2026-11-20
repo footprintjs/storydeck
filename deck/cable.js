@@ -38,22 +38,24 @@ export function layRoutes(links, solids) {
   const idOf = new Map(), twice = new Set();
   solids.forEach(({name}, i) => { if (idOf.has(name)) twice.add(name); else idOf.set(name, String(i)); });
   for (const name of twice) idOf.delete(name);
-  const asked = links.map((link, i) => (link && idOf.has(link[0]) && idOf.has(link[1]) ? i : -1)).filter((i) => i >= 0);
+  // an end is a piece's name, or {name, port}: a port of that piece
+  const nameOf = (end) => (typeof end === 'string' ? end : end.name), kitEnd = (end) => (typeof end === 'string' || end.port === null ? idOf.get(nameOf(end)) : {thing: idOf.get(end.name), port: end.port});
+  const asked = links.map((link, i) => (link && idOf.has(nameOf(link[0])) && idOf.has(nameOf(link[1])) ? i : -1)).filter((i) => i >= 0);
   const laid = links.map(() => null);
   if (!asked.length) return laid;
-  const things = solids.map(({at, size, kind}, i) => ({name: String(i), at, size, round: kind === 'cylinder'}));
+  const things = solids.map(({at, size, kind, ports}, i) => ({name: String(i), at, size, round: kind === 'cylinder', ...(ports?.length ? {ports} : {})}));
   const first = asked.slice(0, MOST_ROUTES);   // the kit lays so many
-  const found = routes(things, first.map((i) => links[i].map((name) => idOf.get(name))));
-  const liftOf = (name) => solids[Number(idOf.get(name))].at[2] ?? 0;
+  const found = routes(things, first.map((i) => links[i].map(kitEnd)));
+  const liftOf = (end) => solids[Number(idOf.get(nameOf(end)))].at[2] ?? 0;
   // the kit's words, with the deck's names back in them
-  first.forEach((i, k) => { laid[i] = {route: {...found[k], from: links[i][0], to: links[i][1], ...(found[k].behind && {behind: found[k].behind.map((id) => solids[Number(id)].name)})}, lift: liftOf(links[i][0])}; });
+  first.forEach((i, k) => { laid[i] = {route: {...found[k], from: nameOf(links[i][0]), to: nameOf(links[i][1]), ...(found[k].behind && {behind: found[k].behind.map((id) => solids[Number(id)].name)})}, lift: liftOf(links[i][0])}; });
   // a wire past what the kit lays stays the straight wire it was, and says why
-  for (const i of asked.slice(MOST_ROUTES)) laid[i] = {route: {from: links[i][0], to: links[i][1], points: null, why: NO_ROUTE.work}, lift: liftOf(links[i][0])};
+  for (const i of asked.slice(MOST_ROUTES)) laid[i] = {route: {from: nameOf(links[i][0]), to: nameOf(links[i][1]), points: null, why: NO_ROUTE.work}, lift: liftOf(links[i][0])};
   return laid;
 }
 
 /** The floor points laid routes reach, [[col, row, lift], …]: what the floor and the picture are fitted to beside the blocks. */
-export const reachOf = (laid) => laid.flatMap((entry) => (entry?.route.points ? entry.route.points.map(([col, row]) => [col, row, entry.lift]) : []));
+export const reachOf = (laid) => laid.flatMap((entry) => (entry?.route.points ? (entry.route.path ?? entry.route.points.map(([col, row]) => [col, row, entry.lift])).map(([col, row, height]) => [col, row, height ?? entry.lift]) : []));
 
 /**
  * Laid routes (layRoutes) put on the slide. `floor(col, row, lift)`: where a floor point is on the slide, [x, y].
@@ -67,12 +69,19 @@ export function cablesOn(laid, floor) {
     if (!entry) return null;
     const {route, lift} = entry;
     if (!route.points) return {points: null, radius: 0, tile, route};
-    const points = route.points.map(([col, row]) => floor(col, row, lift));
-    // each end 6 px off its foot, along its own run
+    // the whole way: out of a port at its height and down, along the floor, and up into the other (route.path)
+    const path = route.path ?? route.points.map(([col, row]) => [col, row, lift]), points = path.map(([col, row, height]) => floor(col, row, height));
+    // an end at a foot stands 6 px off it, along its own run; an end at a port is the port itself
     const off = (p, towards) => { const far = Math.hypot(towards[0] - p[0], towards[1] - p[1]) || 1, by = Math.min(CLEAR, far / 2); return [p[0] + (towards[0] - p[0]) * by / far, p[1] + (towards[1] - p[1]) * by / far]; };
-    points[0] = off(points[0], points[1]);
-    points[points.length - 1] = off(points.at(-1), points.at(-2));
-    return {points, radius: CORNER * tile, tile, route};
+    const ports = route.ports ?? [null, null];
+    if (!ports[0]) points[0] = off(points[0], points[1]);
+    if (!ports[1]) points[points.length - 1] = off(points.at(-1), points.at(-2));
+    // each port end: how many points its lead holds (the port, the point out of its side when it is above the floor, the floor
+    // point), whether its side faces the viewer, and the lead's length in px — what the floor's own measures start after
+    const riser = (p) => p[2] > lift + 1e-9;
+    const ends = [0, 1].map((k) => (ports[k] ? {port: ports[k], seen: route.feet[k] === 'right' || route.feet[k] === 'left', count: riser(k ? path.at(-1) : path[0]) ? 3 : 2} : null));
+    const length = (list) => list.slice(1).reduce((sum, p, i) => sum + Math.hypot(p[0] - list[i][0], p[1] - list[i][1]), 0);
+    return {points, radius: CORNER * tile, tile, route, ends, lead: ends[0] ? length(points.slice(0, ends[0].count)) : 0};
   });
 }
 
@@ -95,7 +104,10 @@ export function cables(links, shapes, floor, solids = [...shapes.values()]) {
  */
 export function wayNote(route) {
   if (!route.points) return `straight ${Object.keys(NO_ROUTE).find((key) => NO_ROUTE[key] === route.why) ?? 'way'}`;
-  return [route.behind.length && `behind ${route.behind.map(encodeURIComponent).join(' ')}`, route.crosses && `crosses ${route.crosses}`, route.shared && 'shared', route.bends > 3 && `turns ${route.bends}`].filter(Boolean).join('; ');
+  // a port on a back side starts (or ends) the cable behind its own block: said as that, not as a block to move
+  const back = [0, 1].filter((k) => route.ports?.[k] && /^back-/.test(route.feet[k])).map((k) => (k ? route.to : route.from));
+  const behind = route.behind.filter((name) => !back.includes(name));
+  return [back.length && `back ${back.map(encodeURIComponent).join(' ')}`, behind.length && `behind ${behind.map(encodeURIComponent).join(' ')}`, route.crosses && `crosses ${route.crosses}`, route.shared && 'shared', route.bends > 3 && `turns ${route.bends}`].filter(Boolean).join('; ');
 }
 
 const CROSSINGS_SAID = 3;   // wires cross in every diagram: a wire's crossings are said from three on
@@ -107,6 +119,8 @@ const STRAIGHT = {
   wide: ['info', 'the blocks stand too far apart for the smallest of them to lay wires between'],
   name: ['info', 'one of its names is no block here'],
   self: ['info', 'it joins a block to itself'],
+  port: ['warn', 'one of its ports has no way out: another block stands right in front of it, or the floor there is closed — move that block, or the port'],
+  portName: ['info', 'one of its ports is no port of its block'],
 };
 /**
  * A note of a wire's way as what `check` says: [{level: 'warn' | 'info', message}], each with its fix. `from`, `to`: the
@@ -119,6 +133,7 @@ export function readWay(note, from, to) {
     if (word === 'straight' && STRAIGHT[rest[0]]) said(STRAIGHT[rest[0]][0], `is drawn straight, through the air, not along the floor: ${STRAIGHT[rest[0]][1]}`);
     const names = rest.map((name) => { try { return decodeURIComponent(name); } catch { return name; } });
     if (word === 'behind' && rest.length) said('warn', `passes behind ${names.join(', ')}: that stretch of it is hidden — move ${rest.length === 1 ? 'it' : 'them'} or the two blocks so there is floor to see between, or draw the wire straight (data-arrow="${from} to ${to} 0")`);
+    if (word === 'back' && rest.length) said('info', `plugs into a port on the back of ${names.join(', ')}: that stretch of it runs behind ${rest.length === 1 ? 'that block' : 'those blocks'}, hidden`);
     if (word === 'shared') said('warn', 'lies on another wire for want of room: a foot of a block has a place for three wires — make the block wider (data-size), or take a wire out');
     if (word === 'crosses' && /^\d+$/.test(rest[0] ?? '') && Number(rest[0]) >= CROSSINGS_SAID) said('info', `crosses ${rest[0]} other wires`);
     if (word === 'turns' && /^\d+$/.test(rest[0] ?? '')) said('info', `turns ${rest[0]} times on its way`);

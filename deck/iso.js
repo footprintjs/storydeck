@@ -41,7 +41,7 @@
 // A piece is what it draws, not the box it is placed by. The box of a block seen from a corner has four empty corners,
 // and a nearer block's box lies over the block behind it: so on the slide shown only its faces and its words take the
 // pointer, and a ring round it (a highlight, explore's hover) follows its faces — isoRing, for whoever rings a piece.
-import {arrange, gridFor, isometric, readThing, wordsToFit} from 'footprint-story/isometric';
+import {arrange, gridFor, isometric, readPorts, readThing, wordsToFit} from 'footprint-story/isometric';
 import {decodeEntities} from './html.js';
 import {attrRule, ownAttribute, pieceTags, tagsWith} from '../pieceRules.js';
 import {closeOf} from './callouts.js';
@@ -140,12 +140,32 @@ function readIso(html) {
     // left out, a block's size is the usual one; a floor's size and anything's place are the build's to work out (place, below)
     const size = read('data-size', kind === 'floor' ? 'a floor\'s size is "cols rows", whole numbers' : 'its size is "wide deep high", in tiles') ?? (kind === 'floor' ? null : [...USUAL_SIZE]);
     const at = read('data-at', 'where it stands is "col row" on the floor, with a third number to lift it');
+    const ports = portsWritten(ownAttribute(attrs, 'data-ports'), kind, size, told);
     const {at: close, end} = closeOf(html, tag, open, told), inner = html.slice(open, close);
     if (pieceTags(inner).length) throw new Error(`${told}: pieces do not nest, and this one holds a piece — place it beside it`);
     if (kind === 'floor' && inner.trim()) throw new Error(`${told}: a floor holds no words — put them in a piece that stands on it`);
-    out.push({start, open, close, end, tag, attrs, where: told, name, kind, at, size, inner, style, quote: styled?.quote ?? '"', styleCut: styled ? styled.before + styled.after : attrs});
+    out.push({start, open, close, end, tag, attrs, where: told, name, kind, at, size, ports, inner, style, quote: styled?.quote ?? '"', styleCut: styled ? styled.before + styled.after : attrs});
   }
   return out;
+}
+
+const PORT = /^\s*([A-Za-z0-9_-]{1,60})\s*:\s*(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)(?:\s+(right|left|back-left|back-right|top))?\s*$/;
+/**
+ * A block's ports as written — data-ports="p1: 0.4 2 0.3 | p3: 1.4 2 0.3 left": each a name, x y z in the block's own
+ * tiles (x along its width, y along its depth, z up from its base) and, at a corner, the side — checked as the kit
+ * checks them (footprint-story/isometric · readPorts), so a wrong one is refused here, naming the piece and the fix.
+ */
+function portsWritten(a, kind, size, told) {
+  if (!a) return [];
+  if (a.bare || a.twice) throw new Error(`${told}: its ports are written data-ports="p1: 0.4 2 0.3 | p3: 1.4 2 0.3", once, with quotes`);
+  if (kind === 'floor') throw new Error(`${told}: a floor has no ports — give them to a block that stands on it`);
+  const ports = a.value.split('|').filter((part) => part.trim()).map((part) => {
+    const m = PORT.exec(part);
+    if (!m) throw new Error(`${told}: data-ports="${a.value}" — each port is "name: x y z", in the block's own tiles, with its side after it at a corner (right, left, back-left, back-right); they are parted by "|"`);
+    return {name: m[1], at: [Number(m[2]), Number(m[3]), Number(m[4])], ...(m[5] ? {face: m[5]} : {})};
+  });
+  try { return readPorts(ports, size, kind === 'cylinder', told).map(({name, at, face}) => ({name, at: [...at], face})); }
+  catch (e) { throw new Error(e.message.replace(/^isometric: /, ''), {cause: e}); }
 }
 
 /** The isometric pieces a map has: [{name, kind}] — nothing for a map without one. */
@@ -187,7 +207,7 @@ function place(found, links, lay) {
   const unit = isometric();
   for (const p of solid) shapeOf(p, unit);
   // the blocks stand: the wires are laid between them now, before anything is fitted, so the floor and the picture hold them too
-  const reach = lay ? lay(solid.map((p) => ({name: p.name, kind: p.kind, at: [p.at[0], p.at[1], p.at[2] ?? 0], size: [...p.size]}))) : [];
+  const reach = lay ? lay(solid.map((p) => ({name: p.name, kind: p.kind, at: [p.at[0], p.at[1], p.at[2] ?? 0], size: [...p.size], ports: p.ports}))) : [];
   for (const floor of found.filter((p) => p.kind === 'floor')) {
     if (floor.size !== null) { floor.at ??= [0, 0]; continue; }
     if (floor.at !== null) throw new Error(`${floor.where}: a floor with a data-at needs its data-size too ("8 5") — or write neither, and the build fits the floor round the blocks`);
@@ -357,17 +377,19 @@ export function isoDrawn(html, {canvas = null, area = null, links = [], lay = nu
   const {placedHere, reach} = place(found, links, lay);
   const grid = written ?? gridOf(found, {fit: fit || placedHere, canvas, area, also: reach});
   const drawn = found.map((p) => shapeOf(p, grid));
-  // the order they are painted in, the furthest first: a level each, above the floor and the wires (which share level 0)
+  // the order they are painted in, the furthest first: a level each, above the floor and the wires (which share level 0).
+  // The levels are even (2, 4, …): the odd one above a block's is where a cable's lead into a port on its seen side stands
+  // (transforms.js · leadSvg), over that block and under the next.
   const solid = found.filter((p) => p.kind !== 'floor'), order = grid.backToFront(solid, (p) => ({at: p.at, size: p.size}));
   let out = '', from = 0;
   found.forEach((p, i) => {
-    out += map.slice(from, p.start) + draw(p, map, drawn[i], p.kind === 'floor' ? null : order.indexOf(p) + 1, tight);
+    out += map.slice(from, p.start) + draw(p, map, drawn[i], p.kind === 'floor' ? null : 2 * (order.indexOf(p) + 1), tight);
     from = p.end;
   });
   const twice = new Set(solid.map((p) => p.name).filter((name, i, all) => all.indexOf(name) !== i));
   for (const p of solid) {
     const {outline, box} = drawn[found.indexOf(p)];
-    const shape = {name: p.name, outline: outline.map(({x, y}) => [x, y]), middle: [box.x + box.w / 2, box.y + box.h / 2], kind: p.kind, at: [p.at[0], p.at[1], p.at[2] ?? 0], size: [...p.size]};
+    const shape = {name: p.name, outline: outline.map(({x, y}) => [x, y]), middle: [box.x + box.w / 2, box.y + box.h / 2], kind: p.kind, at: [p.at[0], p.at[1], p.at[2] ?? 0], size: [...p.size], ports: p.ports, level: 2 * (order.indexOf(p) + 1)};
     solids.push(shape);
     if (!twice.has(p.name)) shapes.set(p.name, shape);
   }
@@ -418,8 +440,8 @@ export const ISO_CSS = `/* isometric pieces: blocks on a floor seen from a corne
 }
 :where(section[data-label] .iso-say small) { font-size: 18px; font-weight: 500; color: color-mix(in srgb, ${INK} 68%, transparent); }
 :where(section[data-label] .iso-say svg.ic) { width: 40px; height: 40px; color: ${INK}; }
-/* a callout is words about the picture: over every block, whose levels end at ${MOST_ISO_PIECES} */
-:where(section[data-label] [data-sd-callout]) { z-index: ${MOST_ISO_PIECES + 1}; }
+/* a callout is words about the picture: over every block, whose levels end at ${2 * MOST_ISO_PIECES} (a lead into a port at one more) */
+:where(section[data-label] [data-sd-callout]) { z-index: ${2 * MOST_ISO_PIECES + 2}; }
 /* its highlight (data-hot) rings what it draws; the box's own ring is off (--sd-hot-width: 0, read by focus.css) */
 ${isoRing('section[data-label] .sd-hot', HOT, HOT_WIDTH)}
 /* on a forward click the ring comes when a box's does: .3s after the piece's moment (--sd-turn: 0 off a route, its turn

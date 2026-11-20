@@ -684,3 +684,62 @@ describe('a wire\'s options: data-label, data-packets, data-speed', () => {
     expect(css).toContain('@keyframes sdRun { 0% { --sd-t: 0; opacity: 0; } 12%, 85% { opacity: 1; } 100% { --sd-t: 1; opacity: 0; } }');
   });
 });
+
+describe('a cable that plugs into a port (data-ports, "piece.port")', () => {
+  const canvas = [1920, 1080];
+  const grid = '<i data-iso-grid="120 at 960 150"></i>';
+  const map = `${grid}<div data-k="lap" data-iso="block" data-at="0 6" data-size="2 1.4 0.3" data-ports="rj45: 2 0.7 0.15"></div>`
+    + '<div data-k="sw" data-iso="block" data-at="6 6" data-size="4.7 2 0.4" data-ports="p1: 0.4 2 0.3 | up: 4.7 1 0.3"></div>'
+    + '<div data-k="router" data-iso="block" data-at="12 2" data-size="2 2 0.8" data-ports="home: 0 1 0.4"></div>';
+  const wire = (k, spec, more = '') => `<i data-k="${k}" class="wire" data-arrow="${spec}"${more}></i>`;
+  // where a port is on the slide: the drawing's own grid, from what isoDrawn says of the floor
+  const portAt = (made, [col, row, height]) => made.floor(col, row, height);
+
+  it('ends on the port itself: its first and last points are the two ports, through the riser of each', () => {
+    const made = transformed(`${map}${wire('w1', 'lap.rj45 to sw.p1', ' data-head="none"')}`, {canvas}), iso = isoDrawn(`${map}${wire('w1', 'lap.rj45 to sw.p1', ' data-head="none"')}`, {canvas, links: [['lap', 'sw']], lay: null});
+    const [cable] = made.cables;
+    expect(cable.ports).toEqual(['rj45', 'p1']);
+    const near = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) < 0.11;   // the record keeps a tenth of a px
+    expect(made.html).toContain('data-sd-cable');
+    expect(near(cable.points[0], portAt(iso, [2, 6.7, 0.15]))).toBe(true);
+    expect(near(cable.points.at(-1), portAt(iso, [6.4, 8, 0.3]))).toBe(true);
+    // out of the side at the port's height, then straight down: the second and third points share an x (a riser is upright on the slide)
+    expect(Math.abs(cable.points[1][0] - cable.points[2][0])).toBeLessThan(0.11);
+    expect(cable.points[2][1]).toBeGreaterThan(cable.points[1][1]);
+    // the wire's ends are its pieces, for a click that lights a piece and what it touches
+    expect(made.html).toMatch(/<svg[^>]*data-ends="lap sw"[^>]*data-sd-cable/);
+  });
+
+  it('draws the lead into a port on a seen side again over its block, one level above it — and none into a port on a back side', () => {
+    const html = `${map}${wire('w1', 'lap.rj45 to sw.p1', ' data-head="none"')}${wire('w3', 'sw.up to router.home')}`, made = transformed(html, {canvas});
+    const levelOf = (name) => Number(new RegExp(`data-k="${name}"[^>]*data-sd-iso="block"[^>]*z-index:(\\d+)`).exec(made.html)[1]);
+    const leads = [...made.html.matchAll(/<svg[^>]*data-k="(w\d)"[^>]*data-sd-lead[^>]*z-index:(\d+)/g)].map(([, k, z]) => [k, Number(z)]);
+    expect(leads).toEqual([['w1', levelOf('lap') + 1], ['w1', levelOf('sw') + 1], ['w3', levelOf('sw') + 1]]);   // router's port is on its back-left side
+    // the lead is the cable's own piece: its name, its class and its ends
+    expect(made.html).toMatch(/<svg data-ends="lap sw" data-k="w1" class="wire"[^>]*data-sd-lead/);
+    // a head at a seen port is drawn on the lead too, so the block does not cover it; a back port's is behind its block, as the cable is
+    expect(/data-k="w3"[^>]*data-sd-lead[^>]*>.*?<\/svg>/.exec(made.html)[0]).not.toContain('class="head"');
+    const headed = transformed(`${map}${wire('w4', 'router.home to sw.p1')}`, {canvas}).html;
+    expect(/data-k="w4"[^>]*data-sd-lead[^>]*>.*?<\/svg>/.exec(headed)[0]).toContain('class="head"');   // the head into sw.p1, over sw
+    // what check says: the back port as itself, not as a block to move
+    expect(made.ways).toContainEqual(expect.objectContaining({name: 'w3', way: expect.stringMatching(/^back router/)}));
+  });
+
+  it('refuses a port it cannot plug into, naming the fix; a piece called "a.b" is still that piece', () => {
+    const bad = (spec) => () => transformed(`${map}${wire('w', spec)}`, {canvas});
+    expect(bad('lap.usb to sw.p1')).toThrow('data-arrow="lap.usb to sw.p1": "lap" has no port "usb" — its ports are rj45');
+    expect(bad('router.home to sw.p1 30')).toThrow('a wire to a port runs along the floor, and a bend draws it straight — take the bend out');
+    expect(() => transformed(`${map}<div data-k="note" style="left:0;top:0;width:10px;height:10px">x</div>${wire('w', 'note.a to sw.p1')}`, {canvas})).toThrow('"note.a" names a port, and a port is on one block — "note" is no block');
+    expect(() => transformed(`${grid}<div data-k="a" data-iso="block" data-at="0 0"></div><div data-k="b" data-iso="block" data-at="6 0"></div>${wire('w', 'a.x to b')}`, {canvas})).toThrow('"a" has no port "x" — it names none (data-ports="p1: x y z | …")');
+    // a name with a dot that some piece goes by is that piece, as it always was
+    const dotted = transformed(`${grid}<div data-k="v1.2" data-iso="block" data-at="0 0"></div><div data-k="b" data-iso="block" data-at="6 0"></div>${wire('w', 'v1.2 to b')}`, {canvas});
+    expect(dotted.cables[0]).toMatchObject({from: 'v1.2', to: 'b'});
+    expect(dotted.cables[0].ports).toBeUndefined();
+  });
+
+  it('a map the build places from its wires places by the pieces a port belongs to', () => {
+    const placed = transformed('<div data-k="a" data-iso="block" data-ports="p: 2 1 0.5"></div><div data-k="b" data-iso="block"></div>' + wire('w', 'a.p to b'), {canvas, area: [60, 200, 1860, 1000]});
+    expect(placed.made.placed).toBe('build');
+    expect(placed.cables[0].ports).toEqual(['p', null]);
+  });
+});

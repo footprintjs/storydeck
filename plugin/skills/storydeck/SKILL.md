@@ -150,7 +150,9 @@ rule `wire-way` says in words when a wire passes behind a block (move that block
 another for want of room (a foot holds three wires: widen the block), or is drawn straight and why. Those are
 warnings, so `check --strict` fails on them; notes (crosses three or more, many turns, two heights, a map too big
 or too wide to lay every wire) do not. A wire written
-`data-arrow="a to b 0"` is a straight line; `data-head="none"` draws any wire as a plain line with no arrow's head. A
+`data-arrow="a to b 0"` is a straight line; `data-head="none"` draws any wire as a plain line with no arrow's head. A block's
+`data-ports="p1: 0.4 2 0.3 | up: 4.7 1 0.3"` names points on its sides (its own tiles: x along its width, y along its
+depth, z up); `data-arrow="lap.rj45 to sw.p1"` plugs a cable into them, ending on the port itself (risers included). A
 block's name (its first `<b>`, inside no other element) is fitted to its top face: broken onto two lines, then made
 smaller; rule `name-fit` warns when it still does not fit. A top is as wide across its middle as the block's SHORTER
 side, so a long thin block holds a short name only: shorten the name, or give the block a bigger top (`data-size`). The picture and a fitted floor hold
