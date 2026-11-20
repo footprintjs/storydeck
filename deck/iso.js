@@ -263,10 +263,13 @@ const NAME = Object.freeze({size: 26, least: 16});
  * name-fit), it never hides a name. `wide`: the face's width on the slide, in px.
  * WHY counted in letters: a build has no browser. `build --layout` measures the page itself.
  */
+const BREAK = /[ \t\n\r\f\v]+/, INSIDE = /[ \t\n\r\f\v]/g;
 function fitName(inner, wide) {
   const found = /<b>([^<]*)<\/b>/.exec(inner);
   if (!found || !found[1].trim()) return {inner, tight: null};
-  const raw = found[1].trim().split(/\s+/), shown = raw.map((word) => decodeEntities(word));
+  // broken where the kit breaks (a space, a tab, a line end): a no-break space, written or as an entity, keeps two words on one
+  // line. A space that comes out of an entity is inside a word here, so the fitted break falls between the words as written.
+  const raw = found[1].split(BREAK).filter(Boolean), shown = raw.map((word) => decodeEntities(word).replace(INSIDE, '\u00A0'));
   const {lines, size, fits} = wordsToFit(shown.join(' '), [wide * 0.9, 2 * 1.15 * NAME.size + 1], NAME);
   if (lines.length === 1 && size === NAME.size) return {inner, tight: null};
   // the words as the deck wrote them (an entity stays an entity), broken where the fitted lines break

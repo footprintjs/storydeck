@@ -443,6 +443,13 @@ describe('iso · a block\'s name fits its top face', () => {
     expect(tightOf('<b>Authentication Service</b>')).toEqual([]);
   });
 
+  it('a no-break space keeps two words on one line, and a space written as an entity is inside its word', () => {
+    expect(say('<b>Load\u00A0Balancer</b>')).toBe('<b style="font-size:22px">Load\u00A0Balancer</b>');     // smaller, never broken there
+    expect(say('<b>Load&nbsp;Balancer</b>')).toBe('<b style="font-size:22px">Load&nbsp;Balancer</b>');
+    expect(say('<b>Big&#32;Data Platform Core</b>')).toBe('<b style="font-size:22px">Big&#32;Data<br>Platform Core</b>');   // the break is between words as written
+    expect(say('<b>  Load \n Balancer </b>')).toBe('<b>Load<br>Balancer</b>');
+  });
+
   it('a name that cannot fit is drawn at the least size on two lines, and the build is told', () => {
     expect(say('<b>Supercalifragilisticexpialidocious</b>')).toBe('<b style="font-size:16px">Supercalifragilisticexpialidocious</b>');
     expect(tightOf('<b>Supercalifragilisticexpialidocious</b>')).toEqual([{name: 'a', text: 'Supercalifragilisticexpialidocious'}]);
