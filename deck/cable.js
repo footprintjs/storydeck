@@ -117,12 +117,15 @@ const TIGHT_U = 0.5;
 const NEAR_PORT = 2;
 /** A stretch shorter than this many tiles is a jog onto the floor's lines, a few px on the slide: no turn to speak of. */
 const JOG = 0.1;
+/** A port faces the cable's other end only when its way out is within about 70° of it (cos above this). */
+const FACING = 0.3;
+const HAIRPIN_WORDS = ['start', 'end', 'start-hook', 'end-hook', 'middle'];
 /**
  * Where a cable doubles back on itself, seen from above — `path` its points in tiles, [col, row, height] (the kit's
  * `route.path`, risers included), `ports` the port at each end (or null):
  *   'start'        it leaves its first port one way and, within NEAR_PORT tiles, runs back the other — and the port
- *                  faces away from the cable's other end: the port is on the wrong side
- *   'start-hook'   the same, but the port faces the other end: the cable hooks back near it to reach the floor's lines
+ *                  faces away from the cable's other end, or sideways to it: the port is on the wrong side
+ *   'start-hook'   the same, but the port faces the other end: a short loop near it (the router's lanes or lines)
  *   'end', 'end-hook'   the same at its last port
  *   'middle'       a tight U on the floor: two stretches of TIGHT_U or more, one each way, with less than TIGHT_U between
  * Asked at a port end only: out of a foot a cable steps half a tile off the block and may step back to change lanes,
@@ -145,7 +148,8 @@ export function hairpins(path, ports = []) {
   const turnsBack = (list) => { let gone = list[0].len; for (let i = 1; i < list.length && gone <= NEAR_PORT; i++) { if (back(list[0], list[i])) return true; gone += list[i].len; } return false; };
   // whether a port's way out faces away from the cable's other end
   const across = [flat.at(-1)[0] - flat[0][0], flat.at(-1)[1] - flat[0][1]];
-  const away = (u, sign) => sign * (u[0] * across[0] + u[1] * across[1]) < 0;
+  // (sideways counts as away: a port at a right angle to the way loops out of it as one turned away does, and the fix is the same)
+  const span = Math.hypot(...across) || 1, away = (u, sign) => sign * (u[0] * across[0] + u[1] * across[1]) / span <= FACING;
   const flipped = [...runs].reverse().map(({u, len}) => ({u: [-u[0], -u[1]], len}));
   const out = [];
   if (ports[0] && turnsBack(runs)) out.push(away(runs[0].u, 1) ? 'start' : 'start-hook');
@@ -185,9 +189,10 @@ export function readWay(note, from, to) {
     if (word === 'crosses' && /^\d+$/.test(rest[0] ?? '') && Number(rest[0]) >= CROSSINGS_SAID) said('info', `crosses ${rest[0]} other wires`);
     if (word === 'turns' && /^\d+$/.test(rest[0] ?? '')) said('info', `turns ${rest[0]} times on its way`);
     for (const at of word === 'hairpin' ? rest : []) {
+      if (!HAIRPIN_WORDS.includes(at)) continue;   // a word of a newer build says nothing
       const [end, hook] = at.split('-'), name = end === 'start' ? from : to;
       if ((end === 'start' || end === 'end') && !hook) said('warn', `doubles back on itself where it leaves ${name}: that port faces away from where the cable goes — put the port on the side of ${name} that faces the way the cable runs, or turn that block`);
-      if ((end === 'start' || end === 'end') && hook === 'hook') said('info', `hooks back near its port on ${name} to reach the floor's lines — move the port a little along its side, onto a line of the floor`);
+      if ((end === 'start' || end === 'end') && hook === 'hook') said('info', `makes a short loop near its port on ${name} — moving the port along its side may straighten it`);
       if (at === 'middle') said('warn', 'doubles back on itself on the floor, a tight U-turn round something in its way — move the blocks so there is a straighter way, or draw the wire straight');
     }
   }

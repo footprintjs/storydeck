@@ -265,7 +265,9 @@ describe('cable · a cable that doubles back on itself (a hairpin)', () => {
     const hook = [[0, 0, 0.3], [0.25, 0, 0.3], [0.25, 0, 0], [0.25, 0.5, 0], [-0.05, 0.5, 0], [-0.05, 1, 0], [6, 1, 0], [6, 0.5, 0]];
     expect(hairpins(hook, ['p', null])).toEqual(['start-hook']);
     expect(hairpins([...hook].reverse(), [null, 'p'])).toEqual(['end-hook']);
-    expect(readWay('hairpin start-hook', 'a', 'b')).toEqual([{level: 'info', message: 'hooks back near its port on a to reach the floor\'s lines — move the port a little along its side, onto a line of the floor'}]);
+    expect(readWay('hairpin start-hook', 'a', 'b')).toEqual([{level: 'info', message: 'makes a short loop near its port on a — moving the port along its side may straighten it'}]);
+    // a port at a right angle to the way to the other end is on the wrong side too: two ports side by side, both facing +row
+    expect(hairpins([[3.79, 3.5, 0.23], [3.79, 3.75, 0.23], [3.79, 3.75, 0], [3.79, 4, 0], [4.75, 4, 0], [4.75, 3.75, 0], [4.75, 3.75, 0.5], [4.75, 3.5, 0.5]], ['p', 'q'])).toEqual(['start', 'end']);
     // a U whose arms are jogs is no U
     expect(hairpins([[0, -0.5, 0], [0, 0, 0], [0.3, 0, 0], [0.3, 0.25, 0], [0, 0.25, 0], [0, 4, 0], [0.5, 4, 0]], [])).toEqual([]);
   });
@@ -276,7 +278,7 @@ describe('cable · a cable that doubles back on itself (a hairpin)', () => {
     expect(readWay('hairpin start', 'sw', 'lap')).toEqual([{level: 'warn', message: 'doubles back on itself where it leaves sw: that port faces away from where the cable goes — put the port on the side of sw that faces the way the cable runs, or turn that block'}]);
     expect(readWay('hairpin end', 'sw', 'lap')[0].message).toContain('where it leaves lap: ');
     expect(readWay('hairpin middle', 'sw', 'lap')[0]).toMatchObject({level: 'warn', message: expect.stringContaining('a tight U-turn')});
-    expect(readWay('hairpin sideways', 'sw', 'lap')).toEqual([]);   // a word of a newer build says nothing
+    for (const word of ['sideways', 'start-', 'start-hook-x']) expect(readWay(`hairpin ${word}`, 'sw', 'lap'), word).toEqual([]);   // a word of a newer build says nothing
   });
 
   it('is said of a cable the build lays out of a port that faces away', () => {
