@@ -34,7 +34,7 @@ export const WALK_MOST = 512;
  * The kit knows each piece by a number of ours, not by its name: two pieces may share a name, and a name may be any
  * text a deck holds (the kit keeps names to 200 characters, and would refuse the whole map for one).
  */
-export function layRoutes(links, solids) {
+export function layRoutes(links, solids, keep = []) {
   const idOf = new Map(), twice = new Set();
   solids.forEach(({name}, i) => { if (idOf.has(name)) twice.add(name); else idOf.set(name, String(i)); });
   for (const name of twice) idOf.delete(name);
@@ -45,10 +45,11 @@ export function layRoutes(links, solids) {
   if (!asked.length) return laid;
   const things = solids.map(({at, size, kind, ports}, i) => ({name: String(i), at, size, round: kind === 'cylinder', ...(ports?.length ? {ports} : {})}));
   const first = asked.slice(0, MOST_ROUTES);   // the kit lays so many
-  const found = routes(things, first.map((i) => links[i].map(kitEnd)));
+  // floor kept clear (keepClear.js): a cost to the kit, never a wall; asked only when a map keeps some, so every other map lays as before
+  const found = routes(things, first.map((i) => links[i].map(kitEnd)), keep.length ? {keep: keep.map(({at, size, name}) => ({at, size, name}))} : undefined);
   const liftOf = (end) => solids[Number(idOf.get(nameOf(end)))].at[2] ?? 0;
   // the kit's words, with the deck's names back in them
-  first.forEach((i, k) => { laid[i] = {route: {...found[k], from: nameOf(links[i][0]), to: nameOf(links[i][1]), ...(found[k].behind && {behind: found[k].behind.map((id) => solids[Number(id)].name)})}, lift: liftOf(links[i][0])}; });
+  first.forEach((i, k) => { laid[i] = {route: {...found[k], from: nameOf(links[i][0]), to: nameOf(links[i][1]), ...(found[k].behind && {behind: found[k].behind.map((id) => solids[Number(id)].name)}), ...(found[k].under && {under: [...new Set(found[k].under.map((id) => keep.find((stretch) => stretch.name === id)?.piece ?? String(id)))]})}, lift: liftOf(links[i][0])}; });
   // a wire past what the kit lays stays the straight wire it was, and says why
   for (const i of asked.slice(MOST_ROUTES)) laid[i] = {route: {from: nameOf(links[i][0]), to: nameOf(links[i][1]), points: null, why: NO_ROUTE.work}, lift: liftOf(links[i][0])};
   return laid;
@@ -108,7 +109,8 @@ export function wayNote(route) {
   const back = [0, 1].filter((k) => route.ports?.[k] && /^back-/.test(route.feet[k])).map((k) => (k ? route.to : route.from));
   const behind = route.behind.filter((name) => !back.includes(name));
   const pins = hairpins(route.path ?? [], route.ports ?? []);
-  return [back.length && `back ${back.map(encodeURIComponent).join(' ')}`, behind.length && `behind ${behind.map(encodeURIComponent).join(' ')}`, route.crosses && `crosses ${route.crosses}`, route.shared && 'shared', pins.length && `hairpin ${pins.join(' ')}`, route.bends > 3 && `turns ${route.bends}`].filter(Boolean).join('; ');
+  const under = route.under ?? [];
+  return [back.length && `back ${back.map(encodeURIComponent).join(' ')}`, behind.length && `behind ${behind.map(encodeURIComponent).join(' ')}`, route.crosses && `crosses ${route.crosses}`, route.shared && 'shared', pins.length && `hairpin ${pins.join(' ')}`, under.length && `under ${under.map(encodeURIComponent).join(' ')}`, route.bends > 3 && `turns ${route.bends}`].filter(Boolean).join('; ');
 }
 
 /** A U-turn whose middle stretch is shorter than this many tiles is a hairpin; a longer one goes round something. */
@@ -188,6 +190,7 @@ export function readWay(note, from, to) {
     if (word === 'shared') said('warn', 'lies on another wire for want of room: a foot of a block has a place for three wires — make the block wider (data-size), or take a wire out');
     if (word === 'crosses' && /^\d+$/.test(rest[0] ?? '') && Number(rest[0]) >= CROSSINGS_SAID) said('info', `crosses ${rest[0]} other wires`);
     if (word === 'turns' && /^\d+$/.test(rest[0] ?? '')) said('info', `turns ${rest[0]} times on its way`);
+    if (word === 'under' && rest.length) said('warn', `runs under ${names.join(', ')}, kept clear of cables: there was no way round on the floor — move ${rest.length === 1 ? 'it' : 'them'}, or the blocks, so there is floor round ${rest.length === 1 ? 'it' : 'them'}`);
     for (const at of word === 'hairpin' ? rest : []) {
       if (!HAIRPIN_WORDS.includes(at)) continue;   // a word of a newer build says nothing
       const [end, hook] = at.split('-'), name = end === 'start' ? from : to;

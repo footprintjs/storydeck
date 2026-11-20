@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.27.0 — cables that keep off words
+
+- **`data-keep-clear`** on a piece placed by its own style (a name, a note): the cables the build lays keep off the
+  floor under its box where there is another way (footprint-story 0.16.0's `keep`: a cost to the router, never a
+  wall). Where there is none, the cable runs under the words and `check` (`wire-way`) warns which cable runs under
+  which piece, with the fix (`under …` in the way note). It works on a raised floor (the floor under the box at the
+  blocks' height) and never moves the other cables. Refused with the fix: a mark with no box or on an element with no
+  `data-k`, a fitted grid or blocks without `data-at` beside it, a box far larger than a picture needs, more kept
+  floor than a map keeps (512 stretches).
+- `footprint-story` 0.16.0 or later.
+
 ## 0.26.0 — named areas: a floor with a name, and groups
 
 - **`data-label` on a floor** (and `data-icon`, an icon of the deck beside it) names the area it is: the words lie

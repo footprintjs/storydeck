@@ -157,7 +157,9 @@ or too wide to lay every wire) do not. A wire written
 `data-ports="p1: 0.4 2 0.3 | up: 4.7 1 0.3"` names points on its sides (its own tiles: x along its width, y along its
 depth, z up); `data-arrow="lap.rj45 to sw.p1"` plugs a cable into them, ending on the port itself (risers included).
 A piece placed by its own style (a picture) stands on the floor with `data-footprint="col row wide deep [high]"`: cables go
-round it and plug into its `data-ports`; the floor beside it is written in numbers and every block has its `data-at`. A
+round it and plug into its `data-ports`; the floor beside it is written in numbers and every block has its `data-at`.
+`data-keep-clear` on such a piece (a name, a note) keeps cables off the floor under its box where there is a way round;
+where there is none, `check` says which cable runs under it. A
 block's name (its first `<b>`, inside no other element) is fitted to its top face: broken onto two lines, then made
 smaller; rule `name-fit` warns when it still does not fit. A top is as wide across its middle as the block's SHORTER
 side, so a long thin block holds a short name only: shorten the name, or give the block a bigger top (`data-size`). The picture and a fitted floor hold
