@@ -707,9 +707,11 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   The words lie flat on the floor along its front edge (the near edge on the left), a little in from its far end, the
   way a diagram heads a group box; they are part of the floor, so they grey, light and hide with it. Their size
   follows the tile (14 to 28 px), so they are as readable as the floor at any zoom. They are fitted to the edge as a
-  block's name is to its top (two lines, then smaller), and they move along the edge, half a tile at a time, clear of
-  any block drawn over them. `check` (`name-fit`) says a label that still does not fit, or one that every place along
-  the edge has covered, with the fix.
+  block's name is to its top (two lines, then smaller; an icon and capitals take more room), and they move along the
+  edge, half a tile at a time, clear of any block or footprint drawn over them and of any cable laid across. `check`
+  (`name-fit`) says a label that still does not fit (or whose two lines are deeper than the floor), or one that every
+  place along the edge has covered, with the fix. A labelled floor is still ground (a view frames the pieces on it,
+  so a close view may leave its words out), unless it names a group.
 
   **Groups.** Blocks that belong together name their group, and a floor with that group is fitted round them alone:
 
@@ -723,8 +725,10 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
 
   When the build places the blocks, it places each group's blocks together from the wires inside it, then the groups
   from the wires between them, the same way: the flow reads left to right, group by group, each on its own floor with
-  a clear tile between floors, and no number is typed. The fitted picture holds every group's floor. Placed by hand, a
-  group still fits its floor. A labelled floor is not ground: a view that frames it holds its words.
+  a clear tile between floors, and no number is typed. The fitted picture holds every group's floor, at a tile down to
+  64 px; when even that runs past the slide, `check` (`map-fit`) says how far, with the fix (two maps, or fewer
+  groups side by side). Placed by hand, a group still fits its floor. A group's labelled floor is not ground: a view
+  that frames it holds its words.
 
   Why the build places it: where a block lands, how big it is and which block is painted over which all follow from
   the floor, so a left, top, width or height of its own is refused, with the fix. The nearer block is painted over the

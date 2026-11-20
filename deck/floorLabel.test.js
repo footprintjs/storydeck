@@ -48,6 +48,51 @@ describe('floorLabel · where a floor\'s name lies', () => {
   });
 });
 
+describe('floorLabel · counted honestly: an icon, capitals, the floor\'s depth, a cable over it', () => {
+  const at = (c, r, size) => floor.block({at: [c, r], size}).outline.map(({x, y}) => [x, y]);
+
+  it('counts an icon and capitals in the room the words take', () => {
+    // the same words fit a floor 3 cols long, but not with an icon beside them, nor in capitals
+    const plain = floorLabelPlace({at: [0, 0], size: [3, 3]}, floor, 'Accounts team');
+    expect(plain).toMatchObject({fits: true, size: 20, lines: ['Accounts team']});
+    expect(floorLabelPlace({at: [0, 0], size: [3, 3]}, floor, 'Accounts team', [], {icon: true}).lines).toEqual(['Accounts', 'team']);
+    expect(floorLabelPlace({at: [0, 0], size: [3, 3]}, floor, 'ACCOUNTS TEAM').lines).toEqual(['ACCOUNTS', 'TEAM']);
+  });
+
+  it('keeps a quarter tile clear past the counted words, and moves half a tile at a time', () => {
+    const free = floorLabelPlace({at: [0, 0], size: [8, 5]}, floor, 'Home');
+    // a block standing just past where the words are counted to end, inside the quarter tile: they move on
+    const end = 0.3 + 4 * 0.6 * 20 / Math.hypot(60, 30);
+    const nearBlock = floorLabelPlace({at: [0, 0], size: [8, 5]}, floor, 'Home', [at(end + 0.1, 4, [1, 1, 0])]);
+    expect(nearBlock.x).toBeGreaterThan(free.x);
+    // the first clear place, exactly: half a tile on, and on again while it is still covered
+    const step = floorLabelPlace({at: [0, 0], size: [8, 5]}, floor, 'Home', [at(0, 5, [0.6, 1, 1])]);
+    const {col} = floor.tileAt(step.x, step.y);
+    expect(col).toBeCloseTo(0.8, 9);
+  });
+
+  it('says a label on two lines deeper than its floor does not fit', () => {
+    const place = floorLabelPlace({at: [0, 0], size: [6, 1]}, isometric({tile: 60, origin: [0, 0]}), 'Shared services network');
+    expect(place.lines).toHaveLength(2);
+    expect(place.fits).toBe(false);
+    expect(place.covered).toBe(false);   // said once, as not fitting
+  });
+
+  it('keeps clear of a laid cable as of a block: a stretch of cable is an outline of two points', () => {
+    const free = floorLabelPlace({at: [0, 0], size: [8, 5]}, floor, 'Home');
+    const cable = [floor.at(-1, 4.6), floor.at(2, 4.6)].map(({x, y}) => [x, y]);
+    expect(floorLabelPlace({at: [0, 0], size: [8, 5]}, floor, 'Home', [cable]).x).toBeGreaterThan(free.x);
+  });
+
+  it('in a map, the label of a group\'s floor moves off the cable that comes into it', () => {
+    const b = (k, g) => `<div data-k="${k}" data-iso="block" data-iso-group="${g}"><b>${k}</b></div>`;
+    const html = `<div data-k="f1" data-iso="floor" data-iso-group="a" data-label="Front"></div><div data-k="f2" data-iso="floor" data-iso-group="b" data-label="Back team"></div>${b('x', 'a')}${b('y', 'b')}<i data-k="w" class="wire" data-arrow="x to y"></i>`;
+    const with_ = transformed(html, {canvas}).html, without = transformed(html.replace('<i data-k="w" class="wire" data-arrow="x to y"></i>', ''), {canvas}).html;
+    const left = (h) => Number(/data-k="f2"[\s\S]*?class="iso-floor-label" style="left:([\d.]+)px/.exec(h)[1]);
+    expect(left(with_)).not.toBe(left(without));
+  });
+});
+
 describe('floorLabel · a labelled floor in a map (data-label, data-icon)', () => {
   const map = (more) => `${grid}<div data-k="prod" data-iso="floor" data-size="8 5"${more}></div><div data-k="a" data-iso="block" data-at="1 1"><b>A</b></div>`;
 
@@ -57,7 +102,7 @@ describe('floorLabel · a labelled floor in a map (data-label, data-icon)', () =
     expect(floorTag).not.toMatch(/data-label|data-icon/);   // read and drawn by the build, not left for a reader of the page
     const [, style, inner] = labelOf(html);
     expect(style).toMatch(/^left:[\d.]+px;top:[\d.]+px;font-size:20px;transform:matrix\(0\.8944,0\.4472,-0\.8944,0\.4472,0,0\) translateY\(-100%\)$/);
-    expect(inner).toBe('<svg class="iso-floor-icon" viewBox="0 0 10 10" aria-hidden="true"><rect width="10" height="10"/></svg>Prod &amp; &lt;b&gt;');
+    expect(inner).toBe('<svg class="ic iso-floor-icon" viewBox="0 0 10 10" aria-hidden="true"><rect width="10" height="10"/></svg>Prod &amp; &lt;b&gt;');
     expect(html.indexOf('iso-floor-label')).toBeLessThan(html.indexOf('data-k="a"'));   // inside the floor, before the next piece
   });
 
@@ -85,7 +130,17 @@ describe('floorLabel · a labelled floor in a map (data-label, data-icon)', () =
     expect(bad(' data-label="P" data-icon="nope"')).toThrow('"prod" (data-iso="floor"): no icon "nope" (there are acct) — add icons/nope.svg');
     expect(bad(' data-label="P" data-icon="a b"')).toThrow('data-icon names an icon of the deck (icons/<name>.svg) — not "a b"');
     expect(bad(' data-label=P')).toThrow('its data-label is written data-label="…", once, with quotes');
+    // letters, not code units: 61 emoji are 61 letters; a control or a direction override is refused
+    expect(() => transformed(map(` data-label="${'\u{1F600}'.repeat(61)}"`), {canvas})).not.toThrow();
+    for (const odd of ['&#x202E;evil', 'a&#0;b', '&#xD800;']) expect(bad(` data-label="${odd}"`), odd).toThrow('a floor\'s label is plain words — take out the control or direction character in it');
     expect(() => transformed(`${grid}<div data-k="b" data-iso="block" data-at="0 0" data-icon="acct"></div>`, {canvas, icons})).toThrow('"b" (data-iso="block"): data-icon on an isometric piece is the icon of a floor\'s label');
+  });
+
+  it('a labelled floor that names no group stays ground; the page carries the label\'s stylesheet only when a floor has a label', () => {
+    expect(/<div data-k="prod"[^>]*>/.exec(transformed(map(' data-label="Prod"'), {canvas}).html)[0]).toContain('data-ground');
+    const deck = (m) => compileDeck(sourceOf({clicks: '<section data-label="S" data-map="map"><step data-in="*"><h2>All</h2></step></section>', maps: {map: m}}));
+    expect(deck(map(' data-label="Prod"')).floorLabels).toBe(true);
+    expect(deck(map('')).floorLabels).toBeUndefined();
   });
 
   it('a floor without a label is drawn byte for byte as before; a block may carry a data-label of its own', () => {

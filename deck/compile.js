@@ -146,7 +146,7 @@ function checkPost(post, labels) {
  * loops its clicks show, for the page's CSS), maps: {name: {pieces, callouts?, ways?, cables?, tight?, made?}} (what the build knows of the map it made — ways: what
  * there is to say of a wire; cables: each cable laid, its points and length; tight: names that do not fit their block;
  * made: placed by the build or by hand, the tile — for check, the run's log, and whoever times a thing to a cable), callouts?: true when it has any,
- * iso?: true when it has an isometric piece, rides?: true when a wire's packets ride their own way (data-ride …)}.
+ * iso?: true when it has an isometric piece, floorLabels?: true when a floor has a label, rides?: true when a wire's packets ride their own way (data-ride …)}.
  * `dev` numbers each map's pieces in the slides (data-sd-at), for the dev page's edits.
  * A slide's notes are what notesData carries ({slide, step, steps, now, earlier}). Throws, naming the part and the
  * click, when a click cannot be planned.
@@ -179,5 +179,7 @@ export function compileDeck(source, {dev = false} = {}) {
     // whether the page needs the isometric pieces' stylesheet: a map or a plain slide that has one (iso.js)
     ...(Object.values(maps).some((m) => m.iso) || parts.some((p) => !p.map && isoIn(p.body).length) ? {iso: true} : {}),
     // whether the page needs the stylesheet of packets that ride their own way: a wire on a map or a plain slide that asks (transforms.js · RIDE_CSS)
-    ...(Object.values(maps).some((m) => m.rides) || planned.some((c) => c.rides) ? {rides: true} : {})};
+    ...(Object.values(maps).some((m) => m.rides) || planned.some((c) => c.rides) ? {rides: true} : {}),
+    // whether the page needs a floor label's stylesheet: a slide that draws one (iso.js · FLOOR_LABEL_CSS)
+    ...(slides.some((sl) => sl.html.includes('class="iso-floor-label"')) ? {floorLabels: true} : {})};
 }

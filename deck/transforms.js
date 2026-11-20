@@ -516,6 +516,8 @@ export function transformed(html, {icons: set = {}, canvas = null, area = null} 
   const drawn = icons(html, set), found = wireTags(drawn);
   let routes = null;
   const lay = (solids) => { routes = layRoutes(floorLinks(drawn, found, solids), solids); return reachOf(routes); };
-  const iso = isoDrawn(drawn, {canvas, area, links: wireLinks(drawn), lay, icons: set});
+  // the laid cables' paths in tiles, for a floor's label to keep clear of (iso.js)
+  const lines = () => (routes ?? []).filter((r) => r?.route.path).map((r) => r.route.path.map(([col, row, high]) => [col, row, high ?? r.lift]));
+  const iso = isoDrawn(drawn, {canvas, area, links: wireLinks(drawn), lay, lines, icons: set});
   return {...wiresDrawn(callouts(iso.html, {canvas}), {...iso, routes}), tight: iso.tight ?? [], made: iso.made ?? null};
 }

@@ -14,6 +14,7 @@
 //   across-stages  a wire or a callout that joins pieces standing on different stages: when one stage's view moves, it is left behind
 //   wire-way       a wire between two blocks that does not lie well on the floor: it passes behind a block, lies on another, doubles back on itself (a hairpin), or is drawn straight — and why
 //   name-fit       a block's name that does not fit its top face (or a floor's label its front edge) even on two lines at the least size
+//   map-fit        a map of groups whose fitted picture runs past the slide even at the least tile
 import {wordCount} from './parse.js';
 import {expandNames} from '../focus.js';
 import {LOOP_NAMES} from './loops.js';
@@ -187,6 +188,15 @@ function namesTight(compiled) {
   return out;
 }
 
+/** A map of groups the build could not fit on the slide even at its least tile: said with how far it runs past, and the fix. */
+function mapsFit(compiled) {
+  return Object.entries(compiled.maps).flatMap(([map, {made}]) => {
+    const first = compiled.clicks.find((c) => c.map === map);
+    if (!first || !made?.outside) return [];
+    return [problem('warn', 'map-fit', first, `map "${map}": its groups need more room than the slide has — at the least tile the picture runs ${made.outside} px past the slide's area: tell it in two maps, or put fewer groups side by side`)];
+  });
+}
+
 /** Every problem of a compiled deck: [{level: 'error' | 'warn' | 'info', rule, click, label, message}]. */
 export function checkDeck(compiled) {
   const out = [];
@@ -196,7 +206,7 @@ export function checkDeck(compiled) {
     out.push(...noChange(c, compiled.clicks[i - 1]));
     out.push(...farView(c));
   });
-  out.push(...neverShown(compiled), ...missingNotes(compiled), ...unstyledThemes(compiled), ...unsetLoops(compiled), ...unsaidDiffers(compiled), ...aloneCallouts(compiled), ...acrossStages(compiled), ...wireWaysSaid(compiled), ...namesTight(compiled));
+  out.push(...neverShown(compiled), ...missingNotes(compiled), ...unstyledThemes(compiled), ...unsetLoops(compiled), ...unsaidDiffers(compiled), ...aloneCallouts(compiled), ...acrossStages(compiled), ...wireWaysSaid(compiled), ...namesTight(compiled), ...mapsFit(compiled));
   return out;
 }
 

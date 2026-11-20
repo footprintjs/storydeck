@@ -3,6 +3,9 @@ import {arrange} from 'footprint-story/isometric';
 import {arrangeByGroup, groupWritten} from './groups.js';
 import {isoDrawn} from './iso.js';
 import {transformed, wireLinks} from './transforms.js';
+import {checkDeck} from './check.js';
+import {compileDeck} from './compile.js';
+import {sourceOf} from './test/helpers.js';
 
 const canvas = [1920, 1080];
 const block = (k, g, kind = 'block', more = '') => `<div data-k="${k}" data-iso="${kind}"${g ? ` data-iso-group="${g}"` : ''}${more}><b>${k}</b></div>`;
@@ -50,7 +53,48 @@ describe('groups · blocks that belong together, each group on its floor (data-i
     expect(calls.map((c) => c.names)).toEqual([['a', 'b'], ['c'], ['d'], ['g:x', 'g:y', '\u0001']]);
     expect(calls[0].links).toEqual([['a', 'b'], ['a', 'a']]);
     expect(calls[3].links).toEqual([['g:x', 'g:y'], ['g:y', '\u0001']]);
-    expect(calls[3].options).toEqual({across: true, gap: 1});
+    expect(calls[3].options).toEqual({across: true});   // arrange's own gaps between groups: a tall group does not hide the next
+  });
+
+  it('keeps a clear tile between floors even when groups stand on half tiles (floors never meet at a corner)', () => {
+    const one = (k, g, size) => `<div data-k="${k}" data-iso="block" data-iso-group="${g}" data-size="${size}"></div>`;
+    const html = [0, 1, 2, 3].map((i) => `<div data-k="f${i}" data-iso="floor" data-iso-group="g${i}"></div>`).join('')
+      + one('b0', 'g0', '2 3 2.1') + one('b1', 'g1', '3 3 0.2') + one('b2', 'g2', '1 3 2.5') + one('b3', 'g3', '3 3 0') + wire('w1', 'b1 to b2') + wire('w2', 'b0 to b2');
+    // the floors' places in tiles, read from what the build fitted them to
+    const fitted = {};
+    const solids = placed(html);
+    for (const [i, name] of ['b0', 'b1', 'b2', 'b3'].entries()) {
+      const {at, size} = solids[name];
+      fitted[`f${i}`] = {c0: Math.floor(at[0] + 1e-9) - 1, r0: Math.floor(at[1] + 1e-9) - 1, c1: Math.ceil(at[0] + size[0] - 1e-9) + 1, r1: Math.ceil(at[1] + size[1] - 1e-9) + 1};
+    }
+    const keys = Object.keys(fitted);
+    for (const a of keys) for (const b of keys) {
+      if (a >= b) continue;
+      const A = fitted[a], B = fitted[b];
+      const gap = Math.max(B.c0 - A.c1, A.c0 - B.c1, B.r0 - A.r1, A.r0 - B.r1);
+      expect(gap, `${a} ${b}`).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('lets arrange keep its own gap by height between groups, so a tall group does not hide the one behind it', () => {
+    const tall = (k, g) => `<div data-k="${k}" data-iso="block" data-iso-group="${g}" data-size="2 2 3"></div>`;
+    const html = `<div data-k="s" data-iso="block" data-iso-group="gs"></div>${tall('a', 'ga')}${tall('b', 'gb')}${wire('w1', 's to a')}${wire('w2', 's to b')}`;
+    const at = placed(html);
+    // a and b stand apart by more than their height's gap would let one hide the other (arrange gives 4.5 for height 3)
+    const apart = Math.max(Math.abs(at.a.at[0] - at.b.at[0]) - 2, Math.abs(at.a.at[1] - at.b.at[1]) - 2);
+    expect(apart).toBeGreaterThanOrEqual(4.5 - 1e-9);
+  });
+
+  it('fits a map of several groups at a smaller tile than blocks alone, and says when the picture still runs past the slide', () => {
+    const chain = (n) => Array.from({length: n}, (_, i) => `<div data-k="f${i}" data-iso="floor" data-iso-group="g${i}" data-label="Tier ${i}"></div>${block(`a${i}`, `g${i}`)}${block(`b${i}`, `g${i}`)}${wire(`in${i}`, `a${i} to b${i}`)}${i ? wire(`x${i}`, `b${i - 1} to a${i}`) : ''}`).join('');
+    const three = transformed(chain(3), {canvas, area: [80, 200, 1840, 1000]});
+    expect(three.made.tile).toBeLessThan(96);
+    expect(three.made.outside).toBeUndefined();
+    const many = transformed(chain(9), {canvas, area: [80, 200, 1840, 1000]});
+    expect(many.made.outside).toBeGreaterThan(0);
+    // and check says so, with the fix
+    const said = checkDeck(compileDeck(sourceOf({clicks: '<section data-label="S" data-map="map"><step data-in="*"><h2>All</h2></step></section>', maps: {map: chain(9)}}))).filter((p) => p.rule === 'map-fit');
+    expect(said).toEqual([expect.objectContaining({level: 'warn', message: expect.stringMatching(/^map "map": its groups need more room than the slide has — at the least tile the picture runs \d+ px past the slide's area: tell it in two maps, or put fewer groups side by side$/)})]);
   });
 
   it('a map with no group is placed byte for byte as before', () => {
