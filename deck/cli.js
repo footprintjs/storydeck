@@ -28,9 +28,10 @@ export const USAGE = `storydeck — make a deck: one picture, built click by cli
                                        the same check, then one self-contained page (deck.json "out", index.html by
                                        default): one reply says what to fix and what was written; --voice carries the
                                        clips narrate made
-  storydeck log [folder] [--run <n>] [--all]
+  storydeck log [folder] [--run <n>] [--why <value>] [--all]
                                        the deck's last checks and builds, kept with you: verdicts, rounds of fixing,
-                                       tool calls (--run: one run in full, with each stage's time and the run in words)
+                                       tool calls (--run: one run in full, with each stage's time and the run in words;
+                                       --run <n> --why verdict: where that value came from, walked back from the run's record)
   storydeck mcp [folder] [--kit <folder>] [--takes <folder>]
                                        the read-first tools for an AI assistant (MCP over stdio); a voice named
                                        here lets its narrate tool voice, and only a voice named here
@@ -38,7 +39,7 @@ export const USAGE = `storydeck — make a deck: one picture, built click by cli
 The folder defaults to the current one. In the page: ← → Space step · T light/dark · N notes · P presenter · L listen.`;
 
 const BOOLEAN = new Set(['all', 'layout', 'strict', 'open', 'help', 'version', 'voice']);
-const VALUED = new Set(['out', 'port', 'click', 'kit', 'takes', 'only', 'run']);
+const VALUED = new Set(['out', 'port', 'click', 'kit', 'takes', 'only', 'run', 'why']);
 
 /** argv → {command, dir, flags}; an unknown flag is refused, naming the ones the command takes. */
 export function parseArgs(argv) {
@@ -114,7 +115,7 @@ export async function runCli(argv, {stdout = process.stdout, stderr = process.st
         return 0;
       }
       case 'log':
-        out(logTool(dir, {home, run: flags.run, all: flags.all}));
+        out(await logTool(dir, {home, run: flags.run, all: flags.all, why: flags.why}));
         return 0;
       case 'narrate':
         out(await narrateTool(dir, {kit: flags.kit, takes: flags.takes, only: flags.only}));

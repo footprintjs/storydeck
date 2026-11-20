@@ -48,6 +48,7 @@ npx footprint-storydeck build my-talk           # THE ONE CALL AFTER AN EDIT: ch
 npx footprint-storydeck build my-talk --layout  # the same, and a browser measures every click (text that spills, stray endless animations): before you call a deck done
 npx footprint-storydeck check my-talk           # the same reply with nothing written (--strict: a warning fails too)
 npx footprint-storydeck log my-talk --run 1     # how the last run was made: each stage's time, each browser call, every decision and what it read
+npx footprint-storydeck log my-talk --run 1 --why verdict   # where one value came from (verdict, errors, warnings, …): read from the run's record, nothing run again
 npx footprint-storydeck narrate my-talk         # voiced or not, per click (--kit <folder> voices what is missing; then build --voice)
 npx footprint-storydeck dev my-talk             # for the person: a save reloads on the same click and replays it
 npx footprint-storydeck feedback my-talk        # the notes the person left in the dev page — read these first

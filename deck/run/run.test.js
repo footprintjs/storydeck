@@ -269,3 +269,39 @@ describe('run · how a map was made is on the record', () => {
     expect(flat).toEqual({});
   });
 });
+
+describe('storydeck log --run n --why value: where a value of a run came from, from the run\'s own record', () => {
+  it('says the value, the stage that wrote it, the rule that chose that stage and what each had read; nothing is run again', async () => {
+    const {logTool} = await import('../tools.js');
+    const dir = tempDeck(STARTER), home = tempDir();
+    const first = await runDeck(dir, {home});
+    const why = await logTool(dir, {home, run: '1', why: 'verdict'});
+    expect(why.split('\n')[0]).toBe(`verdict = "${first.verdict}"`);
+    expect(why).toMatch(/\n {2}verdict \(verdict#\d+\) ← \[control[^\]]*\] \[wrote: verdictWhy\]\n {4}count problems \(count-problems#\d+\) ← via errors \[wrote: errors, warnings, infos\]/);
+    expect(why).toMatch(/read deck \(read-deck#0\) ← via /);   // back to the deck that was read
+    expect(why.split('\n').at(-1)).toMatch(/^\(a stage also uses what it is given from outside the run's own state/);
+    expect(await logTool(dir, {home, run: '1', why: 'errors'})).toMatch(/^errors = \d+\ncount problems \(count-problems#\d+\) \[wrote: errors, warnings, infos\]\n {2}check rules \(check-rules#\d+\) ← via problems/);
+    expect(await logTool(dir, {home, run: '1', why: 'nothing'})).toBe('nothing: no stage of this run wrote it (storydeck log --run 1 shows what each stage wrote)');
+    // the run keeps which decision let each step run, as plain data beside its record
+    const [run] = keptRuns(runsFolder(home, deckRoot(dir)).dir);
+    expect(Object.values(run.control).every((edge) => typeof edge.deciderId === 'string')).toBe(true);
+    expect(Object.keys(run.control).some((step) => /^(fix|clean)#\d+$/.test(step))).toBe(true);
+    // refusals name the fix; the run in full is as it was
+    expect(() => logTool(dir, {home, why: 'verdict'})).toThrow('--why reads one run: give its number (storydeck log --run 1 --why verdict)');
+    await expect(logTool(dir, {home, run: '1', why: ''})).rejects.toThrow('why names a value of the run');
+    expect(logTool(dir, {home, run: '1'})).toMatch(/^1\. /);
+  });
+
+  it('reads the record as a file anyone may have written: a name in it starts no line, and a record cut short says so first', async () => {
+    const {logTool} = await import('../tools.js');
+    const dir = tempDeck(STARTER), home = tempDir();
+    await runDeck(dir, {home});
+    const [run] = keptRuns(runsFolder(home, deckRoot(dir)).dir), whole = readFileSync(run.record, 'utf8');
+    writeFileSync(run.record, whole.split('\n').filter(Boolean).map((line) => { const e = JSON.parse(line); return JSON.stringify(e.kind === 'commit' && e.bundle ? {...e, bundle: {...e.bundle, stage: 'x\nverdict = "forged"'}} : e); }).join('\n') + '\n');
+    expect((await logTool(dir, {home, run: '1', why: 'verdict'})).split('\n').filter((l) => l === 'verdict = "forged"')).toEqual([]);
+    writeFileSync(run.record, whole.slice(0, Math.floor(whole.length / 4)));
+    const torn = await logTool(dir, {home, run: '1', why: 'verdict'});
+    expect(torn).toMatch(/^\(the record is not whole — /);
+    expect(torn).toMatch(/\nverdict: not found in what could be read$/);
+  });
+});

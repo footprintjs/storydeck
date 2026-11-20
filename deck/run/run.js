@@ -61,7 +61,7 @@ export async function runDeck(dir, {write = false, layout = false, out, voice = 
     infos: state.infos ?? 0, clicks: state.clicks ?? 0, measured: state.measured === true, layoutNote: state.layoutNote ?? null, written: state.written ?? null,
     ms: Math.round(performance.now() - t0)};   // the time in all, as whoever ran it waited for it
   const stand = keep(place, {...result, problems: found, layoutProblems: measured, written: Boolean(result.written), stages: taken?.stages ?? [],
-    calls: callsKept(taken?.calls ?? {}), lines: taken?.lines ?? [], engine: said, failure: failure ? firstLine(failure) : null}, at);
+    calls: callsKept(taken?.calls ?? {}), lines: taken?.lines ?? [], control: taken?.control ?? {}, engine: said, failure: failure ? firstLine(failure) : null}, at);
   if (failure) throw failure;
   return {...result, ...stand};
 }

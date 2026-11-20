@@ -38,8 +38,9 @@ export const MCP_TOOLS = Object.freeze([
     inputSchema: {type: 'object', properties: {dir: DIR, say: {type: 'string', description: 'voice what is missing: "all", or clicks like "1-3,7". Takes minutes, and every clip it finishes is kept. A call that times out leaves it running: call narrate with no say to see how far it has got.'}}}},
   {name: 'build', description: 'The one call after an edit: the same check, then the deck\'s self-contained page written (deck.json "out", index.html by default). One reply: the verdict first (clean, fix <n>, or broken: nothing written), each problem with its click and its fix, what was written, and what changed since the run before (fixed, new, the round of fixing). layout: true also measures the page in a browser: ask for it before you call a deck done.',
     inputSchema: {type: 'object', properties: {dir: DIR, layout: LAYOUT, all: ALL}}},
-  {name: 'log', description: 'The deck\'s last checks and builds, kept with the person: each run\'s verdict, its round of fixing, how often each tool was called. run: a number from that list (1 the newest) gives that run in full — each stage\'s time, each browser call, and the run in words, with every decision and what it read.',
-    inputSchema: {type: 'object', properties: {dir: DIR, run: {type: 'string', description: 'a run\'s number in the list (1 the newest)'}, all: {type: 'boolean', description: 'every line of that run'}}}},
+  {name: 'log', description: 'The deck\'s last checks and builds, kept with the person: each run\'s verdict, its round of fixing, how often each tool was called. run: a number from that list (1 the newest) gives that run in full — each stage\'s time, each browser call, and the run in words, with every decision and what it read. run and why: where one value of that run came from.',
+    inputSchema: {type: 'object', properties: {dir: DIR, run: {type: 'string', description: 'a run\'s number in the list (1 the newest)'}, all: {type: 'boolean', description: 'every line of that run'},
+      why: {type: 'string', description: 'with run: a value the run wrote (verdict, errors, warnings, …): what it is, the stage that wrote it, the decision that let that stage run and what each had read, walked back from the run\'s own record — nothing is run again'}}}},
 ]);
 
 /** The deck a call names: the server's folder, or a folder inside it (by its real path); anything else is refused. */
@@ -108,7 +109,7 @@ async function answerTool(name, args, dir, home, voice) {
         const r = await buildTool(deck, {layout: args.layout === true, all: args.all === true, more: 'all: true', measure: 'layout: true', home});
         return {...(r.verdict === 'broken' && {isError: true}), content: [{type: 'text', text: r.text}]};   // broken: nothing was written
       }
-      case 'log': return {content: [{type: 'text', text: logTool(deck, {home, run: args.run === undefined ? undefined : String(args.run), all: args.all === true, measure: 'layout: true'})}]};
+      case 'log': return {content: [{type: 'text', text: await logTool(deck, {home, run: args.run === undefined ? undefined : String(args.run), all: args.all === true, measure: 'layout: true', why: args.why === undefined ? undefined : String(args.why)})}]};
       case 'narrate': return {content: [{type: 'text', text: await narrateCall(deck, args, voice)}]};
       default: return {isError: true, content: [{type: 'text', text: `no tool called "${name}" (the tools are ${MCP_TOOLS.map((t) => t.name).join(', ')})`}]};
     }

@@ -109,6 +109,10 @@ const OUTSIDE = Object.freeze({round: 0, first: null, closed: null, since: null,
 
 const counts = (v) => ({errors: whole(plain(v).errors), warnings: whole(plain(v).warnings)});
 
+/** Which decision let which step run, as a run keeps it and reads it back: {step: {deciderId, label?}}, plain and bounded (the record's reader checks each edge against the record). */
+const controlKept = (control) => Object.fromEntries(Object.entries(plain(control)).slice(0, 200).filter(([, edge]) => typeof plain(edge).deciderId === 'string')
+  .map(([step, edge]) => [text(step, 200), {deciderId: text(edge.deciderId, 200), ...(typeof edge.label === 'string' ? {label: text(edge.label, 200)} : {})}]));
+
 /** A kept run as this module reads it back: every field by its type, or null when the file is not one of ours. */
 function readRun(data) {
   const d = plain(data);
@@ -129,6 +133,7 @@ function readRun(data) {
     calls, failure: d.failure === null || d.failure === undefined ? null : text(d.failure, 2000),
     lines: (Array.isArray(d.lines) ? d.lines : []).slice(0, MOST.lines).map((l) => text(l)),
     engine: (Array.isArray(d.engine) ? d.engine : []).slice(0, 20).map((l) => text(l)),
+    control: controlKept(d.control),
   };
 }
 
@@ -198,7 +203,7 @@ export function keepRun(dir, files, run, at = new Date()) {
   const body = {v: 1, at: at.toISOString(), kind: run.kind, verdict: run.verdict, errors: run.errors, warnings: run.warnings, infos: run.infos,
     clicks: run.clicks, measured: run.measured, written: run.written, ms: run.ms, ...stand, keys,
     stages: (run.stages ?? []).slice(0, 64).map((st) => ({stage: text(st.stage, 80), ms: whole(st.ms)})), calls: run.calls ?? {},
-    failure: run.failure ? text(run.failure, 2000) : null, engine: (run.engine ?? []).slice(0, 20).map((w) => text(w)), lines: keptLines(run.lines ?? [])};
+    failure: run.failure ? text(run.failure, 2000) : null, engine: (run.engine ?? []).slice(0, 20).map((w) => text(w)), control: controlKept(run.control), lines: keptLines(run.lines ?? [])};
   let out = JSON.stringify(body);
   // text in another script is three bytes a character: a run in words that would not fit goes, and the counts stay
   if (Buffer.byteLength(out) > MOST.bytes) out = JSON.stringify({...body, lines: [], keys: keys.slice(0, 50), layout: stand.layout.slice(0, 50), cut: true});

@@ -131,6 +131,7 @@ was in. A deck keeps its newest 30 runs.
 ```bash
 storydeck log my-talk              # the runs, newest first, and how the fixing went
 storydeck log my-talk --run 1      # one run in full
+storydeck log my-talk --run 1 --why verdict   # where that value came from, walked back from the run's record
 ```
 
 ```text
@@ -165,3 +166,26 @@ To read the record itself: `readRecordFile(file)` from `footprintjs/sinks` gives
 - **A page that hangs.** Every call through the browser has a time limit; the browser is closed whatever happens (one
   still starting when its opening was given up on is closed as it arrives), and the folder the page was opened from is
   removed. A browser that does not close when asked is recorded as timed out: StoryDeck cannot end it, and says so.
+
+## Asking why
+
+A run's record holds every commit as it was written, with the keys each stage had read by then; the run's own file
+holds which decision let each step run. So one value can be asked for, and nothing is run again:
+
+```text
+$ storydeck log my-talk --run 1 --why verdict
+verdict = "fix"
+fix (fix#11) [wrote: verdict]
+  verdict (verdict#10) ← [control: There is a warning to fix] [wrote: verdictWhy]
+    count problems (count-problems#9) ← via errors [wrote: errors, warnings, infos]
+      check rules (check-rules#2) ← via problems [wrote: problems]
+        compiles? (compiles#1) ← [control] [wrote: compiledWhy]
+          read deck (read-deck#0) ← via compiled [wrote: writeAsked, layoutAsked, voiceAsked, compiled, clicks, problems]
+(a stage also uses what it is given from outside the run's own state: the record holds what stages read and wrote, and no more)
+```
+
+The reader is `footprint-story/record` · `whyFromRecord`, the same one StoryReel uses: the record is read as a file
+anyone may have written (bounded, one run, every line of the answer one line), and one that is not whole says so
+first. Two things in `stages.js` exist for it: a decider writes its reason (`verdictWhy`, `compiledWhy`), because a
+record keeps a stage's reads with what it writes; and what a stage is given from outside the run's state (the deck's
+files, a browser) is in no record, which every answer ends by saying.

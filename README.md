@@ -510,6 +510,7 @@ npx footprint-storydeck dev my-talk       # live preview: a save rebuilds, reloa
 npx footprint-storydeck feedback my-talk  # the notes left in the dev page, for whoever edits next
 npx footprint-storydeck build my-talk     # checks, then my-talk/index.html — one page, every runtime inside, no network request
 npx footprint-storydeck log my-talk       # the last checks and builds: verdicts, rounds of fixing, tool calls
+npx footprint-storydeck log my-talk --run 1 --why verdict   # where a value of that run came from, from its record
 ```
 
 `build` is the one call after an edit. It reads the deck once, checks it, writes the page, and answers in one order:

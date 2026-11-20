@@ -27,8 +27,18 @@ export function readDeck(scope, run) {
   }
 }
 
+/**
+ * A decision that writes its reason (`key`): the record keeps a stage's reads with what it writes, so a decider that
+ * wrote nothing would leave no trace of what it read, and `storydeck log --why` would stop at it.
+ */
+function decided(run, scope, key, rules, otherwise) {
+  const d = run.decide(scope, rules, otherwise);
+  scope[key] = d.evidence?.rules?.find((r) => r.matched)?.label ?? otherwise.label;
+  return d;
+}
+
 /** Did it compile? */
-export const compiles = (run) => (scope) => run.decide(scope,
+export const compiles = (run) => (scope) => decided(run, scope, 'compiledWhy',
   [{when: {compiled: {eq: false}}, then: 'broken', label: 'The deck does not compile'}],
   {branch: 'check-rules', label: 'The deck compiles'});
 
@@ -97,7 +107,7 @@ export function countProblems(scope) {
 }
 
 /** Is there anything to fix? */
-export const verdict = (run) => (scope) => run.decide(scope,
+export const verdict = (run) => (scope) => decided(run, scope, 'verdictWhy',
   [{when: {errors: {gt: 0}}, then: 'fix', label: 'There is an error to fix'},
     {when: {warnings: {gt: 0}}, then: 'fix', label: 'There is a warning to fix'}],
   {branch: 'clean', label: 'Nothing to fix'});

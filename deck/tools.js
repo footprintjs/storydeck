@@ -71,14 +71,25 @@ export const buildTool = (dir, options = {}) => runTool(dir, {...options, write:
  * newest), with each stage's time, each tool's calls and the run in words (`all`: every line). `measure`: how its
  * caller asks for a measure in a browser, for a run that left one unanswered.
  */
-export function logTool(dir, {home = storydeckHome(), run, all = false, measure} = {}) {
+export function logTool(dir, {home = storydeckHome(), run, all = false, measure, why: value} = {}) {
   const {dir: folder, why} = runsFolder(home, deckRoot(dir));
   if (!folder) throw new Error(`this deck's runs are not kept: ${why}`);
   const runs = keptRuns(folder);
-  if (run === undefined || run === null || run === '') return listText(runs, callCounts(folder), {kept: RUNS_KEPT, measure});
+  const asked = value !== undefined && value !== null && value !== false;
+  if (run === undefined || run === null || run === '') {
+    if (asked) throw new Error('--why reads one run: give its number (storydeck log --run 1 --why verdict)');
+    return listText(runs, callCounts(folder), {kept: RUNS_KEPT, measure});
+  }
   const n = Number(run);
   if (!Number.isInteger(n) || n < 1 || n > runs.length) throw new Error(runs.length ? `--run is a run's number in the list, 1 (the newest) to ${runs.length}, not ${run}` : 'no runs kept yet: storydeck check and storydeck build each leave one');
+  // why a value of that run is what it is, walked back from the run's own record: a promise of the text (footprint-story/record)
+  if (asked) return whyOf(runs[n - 1], n, typeof value === 'string' ? value : '', all);
   return runText(runs[n - 1], n, {all, measure});
+}
+
+async function whyOf(run, n, key, all) {
+  const {whyFromRecord} = await import('footprint-story/record');
+  return whyFromRecord({file: run.record, control: run.control, key, run: `run ${n}`, all, listed: `storydeck log --run ${n} shows what each stage wrote`, more: 'add --all'});
 }
 
 /** One more call of a tool on a deck, counted for `log` (run/log.js): never a reason for the tool to fail. */

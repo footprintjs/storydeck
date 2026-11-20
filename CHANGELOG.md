@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.21.0 — a run can say why
+
+- **`storydeck log --run <n> --why <value>`** (and the MCP tool `log` with `why`): where a value of a run came from,
+  walked back from the run's own record — its value, the stage that wrote it, the rule that chose that stage and what
+  each had read. `--why verdict` goes from the verdict to the counts, the rules and the deck that was read. Nothing is
+  run again, and a value no stage wrote is said so. The reader is `footprint-story/record`, the one StoryReel uses:
+  the record is read as a file anyone may have written, and one that is not whole says so first.
+- A run's record now keeps, with each write, the keys its stage had read by then, and the run keeps which decision
+  let each step run. The two deciders write their reason (`compiledWhy`, `verdictWhy`), so the walk goes through them.
+- `footprint-story` 0.14.0 or later.
+
 ## 0.20.0 — a picture that holds its wires, names that fit, and the build's record of a map
 
 - **The floor and the picture hold the wires too.** A wire that goes round a block reaches past the blocks, and a
