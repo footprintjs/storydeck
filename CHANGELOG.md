@@ -8,7 +8,7 @@
   moved along the edge clear of blocks, footprints and cables drawn over it. `check` (`name-fit`) says a label that
   does not fit (or is deeper than its floor) or that is covered all along, with the fix. A labelled floor stays
   ground unless it names a group. A floor written as an empty `<i>` keeps its `data-icon` for its label. Refused with
-  the fix: an empty label or one over 120 letters, a control or direction character, an icon without a label or one
+  the fix: an empty label or one over 120 letters, a control, direction or other unseen character, an icon without a label or one
   the deck does not have, `data-icon` on a block. The page carries the label's stylesheet only when a floor has one.
 - **`data-iso-group`** on blocks and on a floor: when the build places the blocks it places each group together (from
   the wires inside it), then the groups (from the wires between them, with arrange's own gaps), left to right, each
