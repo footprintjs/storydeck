@@ -256,6 +256,20 @@ describe('cable · a cable that doubles back on itself (a hairpin)', () => {
     expect(hairpins([], [])).toEqual([]);
   });
 
+  it('reads no turn into a jog onto the floor\'s lines, and tells a port on the wrong side from a hook near a good one', () => {
+    // a jog of a few px (0.07 of a tile) back before the port: no U-turn
+    expect(hairpins([[2.64, 3, 0], [4.75, 3, 0], [4.75, 6.25, 0], [5, 6.25, 0], [5, 6.18, 0], [5.25, 6.18, 0], [5.25, 6.18, 0.3], [5.5, 6.18, 0.3]], [null, 'p'])).toEqual([]);
+    // a reversal of 0.047 of a tile right out of a port: none
+    expect(hairpins([[0, 0, 0.3], [0.25, 0, 0.3], [0.25, 0, 0], [0.203, 0, 0], [0.203, 3, 0], [5, 3, 0]], ['p', null])).toEqual([]);
+    // out of a port that faces the other end, a short hook back to reach a line of the floor: said as a hook, not a wrong side
+    const hook = [[0, 0, 0.3], [0.25, 0, 0.3], [0.25, 0, 0], [0.25, 0.5, 0], [-0.05, 0.5, 0], [-0.05, 1, 0], [6, 1, 0], [6, 0.5, 0]];
+    expect(hairpins(hook, ['p', null])).toEqual(['start-hook']);
+    expect(hairpins([...hook].reverse(), [null, 'p'])).toEqual(['end-hook']);
+    expect(readWay('hairpin start-hook', 'a', 'b')).toEqual([{level: 'info', message: 'hooks back near its port on a to reach the floor\'s lines — move the port a little along its side, onto a line of the floor'}]);
+    // a U whose arms are jogs is no U
+    expect(hairpins([[0, -0.5, 0], [0, 0, 0], [0.3, 0, 0], [0.3, 0.25, 0], [0, 0.25, 0], [0, 4, 0], [0.5, 4, 0]], [])).toEqual([]);
+  });
+
   it('is written in the way note and read back by check as a warning, naming the end and the fix', () => {
     const route = {from: 'sw', to: 'lap', points: [[0, 0], [1, 0]], path: away, ports: ['p1', null], feet: ['right', 'left'], bends: 2, behind: [], crosses: 0, shared: 0};
     expect(wayNote(route)).toBe('hairpin start');

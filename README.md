@@ -732,9 +732,9 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
         the two stand at different heights
   ```
 
-  It also warns when a cable doubles back on itself (a hairpin): out of a port that faces away from where it goes, or
-  in a tight U-turn on the floor, naming the end and the fix (put the port on the side that faces the way, or turn
-  the block). It warns when a wire lies on another for want of room at a foot, and notes a wire that crosses three or more
+  It also warns when a cable doubles back on itself (a hairpin): out of a port that faces away from its other end,
+  within two tiles, or in a tight U-turn on the floor, naming the end and the fix (put the port on the side that
+  faces the way, or turn the block); a short hook near a port that faces the right way is a note. It warns when a wire lies on another for want of room at a foot, and notes a wire that crosses three or more
   others or turns more than three times. These warnings count for `check --strict`. A wire is drawn straight, from one block's
   outline to the other's with its label beside it, when it joins a block to a flat piece, when the two blocks stand at
   different heights, when there is no way along the floor (walled in), and whenever you give it a bend, `0` too:

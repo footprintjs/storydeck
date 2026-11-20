@@ -2,12 +2,15 @@
 
 ## 0.24.0 — a cable that doubles back is said
 
-- **`check` (rule `wire-way`) warns when a cable doubles back on itself** — a hairpin: it leaves a port one way and,
-  within two tiles, runs back the other (the port faces away from where the cable goes), or it makes a tight U-turn
-  on the floor (its middle under half a tile). The warning names the end and the fix: put the port on the side that
-  faces the way the cable runs, or turn that block. A cable out of a foot that steps back to change lanes is no
-  hairpin. The note is `hairpin start|end|middle` in `maps[name].ways`. The build does not yet lay a way round a
-  hairpin: it says so instead (`cable.js · hairpins`, on the kit's 3D path).
+- **`check` (rule `wire-way`) says when a cable doubles back on itself near a port, or in a tight U.** It warns when
+  a cable leaves a port one way and, within two tiles, runs back the other while the port faces away from the cable's
+  other end (the port is on the wrong side: put it on the side that faces the way, or turn the block), and when it
+  makes a tight U-turn on the floor (two stretches of half a tile or more, one each way, less than half a tile
+  apart). A short hook back near a port that faces the right way is a note, with its own fix (move the port onto a
+  line of the floor). Jogs under a tenth of a tile, a foot's step to change lanes and a wide U (more than two tiles
+  out before turning) are not said. The note is `hairpin start|end|start-hook|end-hook|middle` in `maps[name].ways`.
+  The build does not yet lay a way round a hairpin; it says so instead (`cable.js · hairpins`, on the kit's 3D path).
+  New warnings: `check --strict` fails on a deck whose ports face away.
 
 ## 0.23.0 — pictures that stand on the floor
 
