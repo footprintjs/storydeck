@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.24.0 — a cable that doubles back is said
+
+- **`check` (rule `wire-way`) warns when a cable doubles back on itself** — a hairpin: it leaves a port one way and,
+  within two tiles, runs back the other (the port faces away from where the cable goes), or it makes a tight U-turn
+  on the floor (its middle under half a tile). The warning names the end and the fix: put the port on the side that
+  faces the way the cable runs, or turn that block. A cable out of a foot that steps back to change lanes is no
+  hairpin. The note is `hairpin start|end|middle` in `maps[name].ways`. The build does not yet lay a way round a
+  hairpin: it says so instead (`cable.js · hairpins`, on the kit's 3D path).
+
 ## 0.23.0 — pictures that stand on the floor
 
 - **`data-footprint="col row wide deep [high]"`** on a piece you place yourself (a picture, an icon, a card): the

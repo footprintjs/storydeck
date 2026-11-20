@@ -12,7 +12,7 @@
 //   callout-alone  a callout shown on a click that does not show the piece it points at: its tail points at nothing
 //   view-far       a click whose view stands further out than half size (a fit over a wide picture): its words are small
 //   across-stages  a wire or a callout that joins pieces standing on different stages: when one stage's view moves, it is left behind
-//   wire-way       a wire between two blocks that does not lie well on the floor: it passes behind a block, lies on another, or is drawn straight — and why
+//   wire-way       a wire between two blocks that does not lie well on the floor: it passes behind a block, lies on another, doubles back on itself (a hairpin), or is drawn straight — and why
 //   name-fit       a block's name that does not fit its top face even on two lines at the least size
 import {wordCount} from './parse.js';
 import {expandNames} from '../focus.js';
