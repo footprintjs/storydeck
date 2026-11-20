@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.23.0 — pictures that stand on the floor
+
+- **`data-footprint="col row wide deep [high]"`** on a piece you place yourself (a picture, an icon, a card): the
+  floor it takes, in tiles. A cable laid along the floor goes round it as it goes round a block, and plugs into its
+  ports (`data-ports`, written as a block's are: `data-arrow="lap.rj45 to sw.p1"`); with no height it is floor kept
+  clear. A map of footprints alone, with no block, lays its cables too. The piece keeps its place and size and is
+  painted in the floor's order with the blocks (its `z-index` is the build's; one in its style is refused). A floor
+  with no size is fitted round footprints too. Refused, with the fix: a fitted grid (`fit`) or blocks without
+  `data-at` beside a footprint (the piece would not move with them), a footprint on an isometric piece, a wire or a
+  callout, one whose style lacks a left, top, width or height, one holding a block or a footprint, a size that is none.
+- **Ports on a piece that is neither a block nor a footprint are refused**, on any map (before 0.23.0 they were
+  ignored, so a wire to them was drawn straight with no word why).
+- The run's record says how many pieces stand on the floor by a footprint (`maps[name].footprints`, stage `maps made`).
+
 ## 0.22.0 — cables that plug into a port
 
 - **Ports.** A block names points on its sides where a cable plugs in — `data-ports="p1: 0.4 2 0.3 | up: 4.7 1 0.3"`,

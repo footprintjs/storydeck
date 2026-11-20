@@ -299,7 +299,7 @@ export const wires = (html, iso, looks) => wiresDrawn(html, iso, looks).html;
  * why it is straight), by the wire's first name and the two it joins. It is handed on beside the page, never written
  * into it: what `check` says of a wire is then only ever the build's own word, never text a deck holds.
  */
-export function wiresDrawn(html, {shapes = new Map(), floor = null, solids = [...shapes.values()], routes = null} = {}, looks = {left: LABEL_LOOKS}) {
+export function wiresDrawn(html, {shapes = new Map(), floor = null, solids = [...shapes.values()], routes = null, levels = new Map([...shapes].map(([name, shape]) => [name, shape.level]))} = {}, looks = {left: LABEL_LOOKS}) {
   const found = wireTags(html), {between, laid: cabled} = wiresBetween(html, found, {shapes, floor, solids, routes: routes?.length === found.length ? routes : null});
   // what a cable's label keeps clear of: what stands on the floor (a block is drawn over the floor's wires), each
   // label placed before it, and the other cables — so the labels of a request and its answer, lying side by side,
@@ -328,7 +328,7 @@ export function wiresDrawn(html, {shapes = new Map(), floor = null, solids = [..
     if (!ways[i]) return wireSvg(named, between[i]);   // its numbers
     // a cable's line — and, at an end that plugs into a port on a seen side, its lead over that block (leadSvg)
     const head = wireOptions(before + after, m[1]).head ? HEAD * 0.8 : 0;
-    return cableSvg(named, m[1], ways[i], laid.points, place) + [0, 1].map((k) => leadSvg(named, laid, k, k === 1 ? head : 0, shapes.get(k ? laid.route.to : laid.route.from)?.level)).join('');
+    return cableSvg(named, m[1], ways[i], laid.points, place) + [0, 1].map((k) => leadSvg(named, laid, k, k === 1 ? head : 0, levels.get(k ? laid.route.to : laid.route.from))).join('');
   });
   return {html: drawn, ways: said, cables: record};
 }

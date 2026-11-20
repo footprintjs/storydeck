@@ -41,7 +41,9 @@
 // A piece is what it draws, not the box it is placed by. The box of a block seen from a corner has four empty corners,
 // and a nearer block's box lies over the block behind it: so on the slide shown only its faces and its words take the
 // pointer, and a ring round it (a highlight, explore's hover) follows its faces — isoRing, for whoever rings a piece.
-import {arrange, gridFor, isometric, readPorts, readThing, wordsToFit} from 'footprint-story/isometric';
+import {arrange, gridFor, isometric, readThing, wordsToFit} from 'footprint-story/isometric';
+import {portsWritten} from './portsWritten.js';
+import {mayHoldFootprint, paintFootprints, readFootprints} from './footprint.js';
 import {decodeEntities} from './html.js';
 import {attrRule, ownAttribute, pieceTags, tagsWith} from '../pieceRules.js';
 import {closeOf} from './callouts.js';
@@ -149,25 +151,6 @@ function readIso(html) {
   return out;
 }
 
-const PORT = /^\s*([A-Za-z0-9_-]{1,60})\s*:\s*(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)(?:\s+(right|left|back-left|back-right|top))?\s*$/;
-/**
- * A block's ports as written — data-ports="p1: 0.4 2 0.3 | p3: 1.4 2 0.3 left": each a name, x y z in the block's own
- * tiles (x along its width, y along its depth, z up from its base) and, at a corner, the side — checked as the kit
- * checks them (footprint-story/isometric · readPorts), so a wrong one is refused here, naming the piece and the fix.
- */
-function portsWritten(a, kind, size, told) {
-  if (!a) return [];
-  if (a.bare || a.twice) throw new Error(`${told}: its ports are written data-ports="p1: 0.4 2 0.3 | p3: 1.4 2 0.3", once, with quotes`);
-  if (kind === 'floor') throw new Error(`${told}: a floor has no ports — give them to a block that stands on it`);
-  const ports = a.value.split('|').filter((part) => part.trim()).map((part) => {
-    const m = PORT.exec(part);
-    if (!m) throw new Error(`${told}: data-ports="${a.value.length > 80 ? `${a.value.slice(0, 79)}…` : a.value}" — each port is "name: x y z", in the block's own tiles, with its side after it at a corner (right, left, back-left, back-right); they are parted by "|"`);
-    return {name: m[1], at: [Number(m[2]), Number(m[3]), Number(m[4])], ...(m[5] ? {face: m[5]} : {})};
-  });
-  try { return readPorts(ports, size, kind === 'cylinder', told).map(({name, at, face}) => ({name, at: [...at], face})); }
-  catch (e) { throw new Error(e.message.replace(/^isometric: /, ''), {cause: e}); }
-}
-
 /** The isometric pieces a map has: [{name, kind}] — nothing for a map without one. */
 export const isoIn = (html) => readIso(html).map(({name, kind}) => ({name, kind}));
 
@@ -180,12 +163,14 @@ const quoted = (pieces) => pieces.map((p) => `"${p.name}"`).join(', ');
  * The blocks (and cylinders): all placed by the map, or all placed here from `links` ([[from, to]], the map's wires) —
  * never some of each. A floor with no data-size is fitted round them, a tile of floor showing on every side.
  */
-function place(found, links, lay) {
+function place(found, links, lay, feet = []) {
   const solid = found.filter((p) => p.kind !== 'floor'), unplaced = solid.filter((p) => p.at === null);
   if (unplaced.length && unplaced.length < solid.length) {
     throw new Error(`${quoted(unplaced)} ${unplaced.length === 1 ? 'has' : 'have'} no data-at and ${quoted(solid.filter((p) => p.at !== null))} ${solid.length - unplaced.length === 1 ? 'has' : 'have'} one: the build places a map's blocks from its wires only when it places them all — take data-at off the others, or give every block one (a block with none stood at "0 0" before 0.17.0)`);
   }
   const placedHere = unplaced.length > 0;
+  // a footprint stands where its piece's style puts it: the build cannot place blocks round a picture it does not move
+  if (placedHere && feet.length) throw new Error(`${quoted(unplaced)} ${unplaced.length === 1 ? 'has' : 'have'} no data-at, and ${feet[0].where} stands where its own style puts it: the build places a map's blocks only when nothing on the floor is placed by hand — give every block its data-at`);
   if (placedHere) {
     // a piece is known by the first name in its data-k: the wires say it, and the build places by it
     const twice = solid.map((p) => p.name).find((name, i, all) => all.indexOf(name) !== i);
@@ -207,13 +192,14 @@ function place(found, links, lay) {
   const unit = isometric();
   for (const p of solid) shapeOf(p, unit);
   // the blocks stand: the wires are laid between them now, before anything is fitted, so the floor and the picture hold them too
-  const reach = lay ? lay(solid.map((p) => ({name: p.name, kind: p.kind, at: [p.at[0], p.at[1], p.at[2] ?? 0], size: [...p.size], ports: p.ports}))) : [];
+  const standing = [...solid, ...feet];
+  const reach = lay ? lay(standing.map((p) => ({name: p.name, kind: p.kind, at: [p.at[0], p.at[1], p.at[2] ?? 0], size: [...p.size], ports: p.ports}))) : [];
   for (const floor of found.filter((p) => p.kind === 'floor')) {
     if (floor.size !== null) { floor.at ??= [0, 0]; continue; }
     if (floor.at !== null) throw new Error(`${floor.where}: a floor with a data-at needs its data-size too ("8 5") — or write neither, and the build fits the floor round the blocks`);
-    if (!solid.length) throw new Error(`${floor.where}: a floor with no data-size is fitted round the blocks that stand on it, and this map has none — give it a data-size ("8 5")`);
+    if (!standing.length) throw new Error(`${floor.where}: a floor with no data-size is fitted round the blocks that stand on it, and this map has none — give it a data-size ("8 5")`);
     // round the blocks, and round the wires laid between them (a wire that goes round a block reaches past it)
-    const far = (axis, end) => (end ? Math.ceil(Math.max(...solid.map((p) => p.at[axis] + p.size[axis]), ...reach.map((p) => p[axis])) - 1e-9) : Math.floor(Math.min(...solid.map((p) => p.at[axis]), ...reach.map((p) => p[axis])) + 1e-9));
+    const far = (axis, end) => (end ? Math.ceil(Math.max(...standing.map((p) => p.at[axis] + p.size[axis]), ...reach.map((p) => p[axis])) - 1e-9) : Math.floor(Math.min(...standing.map((p) => p.at[axis]), ...reach.map((p) => p[axis])) + 1e-9));
     floor.at = [far(0, false) - MARGIN, far(1, false) - MARGIN];
     floor.size = [far(0, true) + MARGIN - floor.at[0], far(1, true) + MARGIN - floor.at[1]];
     // refused here, in the map's own terms: the author wrote no size, so the grid's "not [271,271]" would name numbers nobody typed
@@ -366,35 +352,44 @@ export const isoPieces = (html, options) => isoDrawn(html, options).html;
  * (transforms.js). A name two pieces share has no shape: it is found by its box, as before.
  */
 export function isoDrawn(html, {canvas = null, area = null, links = [], lay = null} = {}) {
-  const shapes = new Map(), solids = [], tight = [];
-  if (!MAYBE.test(html) && !MAYBE_GRID.test(html)) return {html, shapes, solids, tight};
-  const {html: map, grid: written, fit = false} = readGrid(html), found = readIso(map);
-  if (!found.length) {
+  const shapes = new Map(), solids = [], tight = [], levels = new Map();
+  if (!MAYBE.test(html) && !MAYBE_GRID.test(html) && !mayHoldFootprint(html)) return {html, shapes, solids, tight};
+  const {html: map, grid: written, fit = false} = readGrid(html), found = readIso(map), feet = readFootprints(map);
+  if (!found.length && !feet.length) {
     if (fit) throw new Error('data-iso-grid="fit": the grid is fitted to the blocks, and this map has none — add a block, or take the grid out');
     return {html: map, shapes, solids, tight};
   }
-  if (found.length > MOST_ISO_PIECES) throw new Error(`a map holds at most ${MOST_ISO_PIECES} isometric pieces, and this one has ${found.length}`);
-  const {placedHere, reach} = place(found, links, lay);
+  // a footprint's piece stands where its style puts it: a floor fitted to the slide would move under it
+  if (feet.length && fit) throw new Error(`${feet[0].where}: a footprint's piece stands where its own style puts it, so the floor is written in numbers beside it — data-iso-grid="120 at 960 240", not "fit"`);
+  if (found.length + feet.length > MOST_ISO_PIECES) throw new Error(`a map holds at most ${MOST_ISO_PIECES} isometric pieces${feet.length ? ' and footprints together' : ''}, and this one has ${found.length + feet.length}`);
+  const {placedHere, reach} = place(found, links, lay, feet);
   const grid = written ?? gridOf(found, {fit: fit || placedHere, canvas, area, also: reach});
   const drawn = found.map((p) => shapeOf(p, grid));
   // the order they are painted in, the furthest first: a level each, above the floor and the wires (which share level 0).
   // The levels are even (2, 4, …): the odd one above a block's is where a cable's lead into a port on its seen side stands
-  // (transforms.js · leadSvg), over that block and under the next.
-  const solid = found.filter((p) => p.kind !== 'floor'), order = grid.backToFront(solid, (p) => ({at: p.at, size: p.size}));
+  // (transforms.js · leadSvg), over that block and under the next. A footprint's piece takes its place in that order too.
+  const solid = found.filter((p) => p.kind !== 'floor'), standing = [...solid, ...feet];
+  const order = grid.backToFront(standing, (p) => ({at: p.at, size: p.size})), levelOf = (p) => 2 * (order.indexOf(p) + 1);
   let out = '', from = 0;
-  found.forEach((p, i) => {
-    out += map.slice(from, p.start) + draw(p, map, drawn[i], p.kind === 'floor' ? null : 2 * (order.indexOf(p) + 1), tight);
+  const painted = [...found, ...feet].sort((a, b) => a.start - b.start);
+  for (const p of painted) {
+    if (p.kind === 'footprint') out += paintFootprints(map.slice(from, p.end), [{...p, start: p.start - from, end: p.end - from}], () => levelOf(p));
+    else out += map.slice(from, p.start) + draw(p, map, drawn[found.indexOf(p)], p.kind === 'floor' ? null : levelOf(p), tight);
     from = p.end;
-  });
-  const twice = new Set(solid.map((p) => p.name).filter((name, i, all) => all.indexOf(name) !== i));
-  for (const p of solid) {
-    const {outline, box} = drawn[found.indexOf(p)];
-    const shape = {name: p.name, outline: outline.map(({x, y}) => [x, y]), middle: [box.x + box.w / 2, box.y + box.h / 2], kind: p.kind, at: [p.at[0], p.at[1], p.at[2] ?? 0], size: [...p.size], ports: p.ports, level: 2 * (order.indexOf(p) + 1)};
-    solids.push(shape);
-    if (!twice.has(p.name)) shapes.set(p.name, shape);
   }
-  const made = {placed: placedHere ? 'build' : 'hand', tile: grid.tile[0], fitted: !written && (fit || placedHere)};
-  return {html: out + map.slice(from), shapes, solids, tight, made, floor: (col, row, lift = 0) => { const point = grid.at(col, row, lift); return [point.x, point.y]; }};
+  const twice = new Set(standing.map((p) => p.name).filter((name, i, all) => all.indexOf(name) !== i));
+  for (const p of standing) {
+    // a footprint's outline is the floor it takes, raised to its height: what a cable's label keeps clear of
+    const {outline, box} = p.kind === 'footprint' ? shapeOf({...p, kind: 'block'}, grid) : drawn[found.indexOf(p)];
+    const shape = {name: p.name, outline: outline.map(({x, y}) => [x, y]), middle: [box.x + box.w / 2, box.y + box.h / 2], kind: p.kind, at: [p.at[0], p.at[1], p.at[2] ?? 0], size: [...p.size], ports: p.ports, level: levelOf(p)};
+    solids.push(shape);
+    if (twice.has(p.name)) continue;
+    levels.set(p.name, shape.level);
+    // a wire to a footprint's piece that is not laid along the floor ends on the piece's own box, as a flat piece's does
+    if (p.kind !== 'footprint') shapes.set(p.name, shape);
+  }
+  const made = {placed: placedHere ? 'build' : 'hand', tile: grid.tile[0], fitted: !written && (fit || placedHere), ...(feet.length ? {footprints: feet.length} : {})};
+  return {html: out + map.slice(from), shapes, solids, tight, levels, made, floor: (col, row, lift = 0) => { const point = grid.at(col, row, lift); return [point.x, point.y]; }};
 }
 
 const TONE = 'var(--iso-color, var(--sd-tone, #d9e4f3))';
