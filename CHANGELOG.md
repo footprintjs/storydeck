@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.28.0 — the numbers a film shares live in the story library
+
+Pages and compiled records are byte for byte as on 0.27.0 but for the version in the page's generator line, and one
+wire nobody draws on purpose (below). Checked on `examples/a-request`, a second starter deck, and 430 maps — groups,
+floor labels, kept-clear words, ports, hairpins and packet rides, and the edges: a kept-clear box at `left:1.2.3px` or
+400 digits wide, a px speed of 2,000,000,000 or 400 digits or too slow to count, a wire through the air 3,000,000,000
+px long; 400 of the maps random, 80 also through `check` — built before and after, every output and refusal compared.
+The one change: a wire through the air written with numbers near 1e308, whose length overflows to no number, is
+refused naming the wire (`its length cannot be measured`), where 0.27.0 drew it with a broken ride. What moved is where the work is done: five helpers a film needs too now live once in `footprint-story`
+0.17.1, and the deck imports them.
+
+- `deck/ride.js` → `footprint-story/motion` (`rideProfile`, `rideSeconds`, `speedAt`, `withHold`, `showStops`,
+  `hiddenRamps`); `rides.js` reads them, and a ride's eased end is bounded by the kit's `MOST_EASE`. A px speed is
+  asked against the 0.5–60 s range first, so one past any run keeps the deck's advice.
+- `deck/cable.js · hairpins` → `footprint-story/isometric · hairpins`; the words `check` says for each stay here
+  (`readWay`).
+- `deck/keepClear.js · floorUnder`, `crossesBox` → the kit's `floorUnder` and `crossesBox`. The kit answers a box it
+  has no floor for with a reason; `keptFloor` (the deck's) says it in the deck's words, as before.
+- `deck/floorLabel.js` → the kit's `floorLabelPlace` (the file is gone; `iso.js` draws the label as before).
+- `deck/groups.js · arrangeByGroup`, `GROUP_MARGIN` → the kit's; `groups.js` keeps reading `data-iso-group`.
+- `footprint-story` 0.17.1 or later (0.17.0 was never published).
+
 ## 0.27.0 — cables that keep off words
 
 - **`data-keep-clear`** on a piece placed by its own style (a name, a note): the cables the build lays keep off the

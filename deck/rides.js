@@ -1,5 +1,5 @@
-// rides — how a wire's packets ride, as a page draws it: the ride options read and checked, and ride.js's numbers
-// turned into the CSS a wire's SVG carries. transforms.js draws the wire; this file says how its packets ride it.
+// rides — how a wire's packets ride, as a page draws it: the ride options read and checked, and the ride's numbers
+// (footprint-story/motion · rideProfile, rideSeconds, withHold, showStops, hiddenRamps) turned into the CSS a wire's SVG carries. transforms.js draws the wire; this file says how its packets ride it.
 //
 //   readRide(value, where, packets, speed)   the options as written on the wire: data-speed in px, data-ride,
 //                                            data-rest, data-keep-size, data-trail, data-behind — refused with the fix
@@ -9,17 +9,18 @@
 //   RIDE_CSS                                 the stylesheet, which a page carries only when a wire asks
 //
 // WHY its own file: transforms.js is a wire's shape; this is its packets' motion, and it grows with every option. The
-// numbers stay in ride.js (plain numbers, nothing drawn), so a film can ride the same packets the same way.
+// numbers are the story library's (plain numbers, nothing drawn; deck/ride.js until 0.28.0), so a film rides the same
+// packets the same way.
 //
 // A wire that asks for any option rides every packet on its own line by length (CSS offset-path, its path as
 // --sd-way: a cable's floor line, a wire through the air its curve), two loops on one clock — sdRide carries --sd-t
 // by the ride's easing, sdShow carries --sd-show — and is marked data-sd-ride. A wire that asks for none is drawn as
 // it always was (deck.css · sdRun), so its page is byte for byte the same.
-import {hiddenRamps, rideProfile, rideSeconds, showStops, withHold} from './ride.js';
+import {hiddenRamps, rideProfile, rideSeconds, showStops, withHold, MOST_EASE} from 'footprint-story/motion';
 
 export const SPEEDS = [0.5, 60];   // seconds a packet takes to run the wire
 const HOLD = {plain: 1, most: 60};   // seconds a packet that rests at the end stays there: unless the wire says, and at most
-const EASED = 0.5;   // the most of a line's length one eased end may take
+const EASED = MOST_EASE;   // the most of a line's length one eased end may take (the story library's, which refuses more)
 const TRAIL = [0.5, 24];   // px a trail may be wide
 const COLOUR_MOST = {letters: 100, depth: 3};   // a trail's colour: at most so many letters, and brackets so deep (color-mix(in srgb, var(--a), rgb(…)))
 const NUMBER = '(\\d+(?:\\.\\d+)?|\\.\\d+)';
@@ -80,15 +81,15 @@ export function readRide(value, where, packets, speed) {
 /** A number for a page: at most `places` decimals, no trailing zeros, never "-0". */
 export const short = (v, places = 4) => +v.toFixed(places) + 0;
 /**
- * Stops [[time, value], …] (ride.js) as CSS's linear() easing: `linear` itself for a steady ride. A value keeps six
+ * Stops [[time, value], …] (footprint-story/motion · rideProfile, showStops) as CSS's linear() easing: `linear` itself for a steady ride. A value keeps six
  * decimals (a millionth of the line: well under a px on any slide), a time three of its percent — so the emitted
- * easing keeps ride.js's half-px promise.
+ * easing keeps rideProfile's half-px promise.
  */
 export const easing = (stops) => (stops.length === 2 && stops[0][1] === 0 && stops[1][1] === 1 ? 'linear' : `linear(${stops.map(([t, v]) => `${short(v, 6)} ${short(t * 100, 3)}%`).join(', ')})`);
 
 /**
  * Where a packet shows along its line, as CSS on its --sd-t: 1 in the open, 0 behind a block, straight between; ''
- * where nothing hides it. `ramps`: ride.js · hiddenRamps; `pad`: a CSS share more each ramp keeps off its stretch (a
+ * where nothing hides it. `ramps`: footprint-story/motion · hiddenRamps; `pad`: a CSS share more each ramp keeps off its stretch (a
  * packet that keeps its size is a different size on the line at each zoom: its radius over --sd-keep); `leads`:
  * [startShare | null, endShare | null], the shares a lead's copy shows instead (the cable's own is hidden there).
  */
@@ -119,11 +120,17 @@ export const leadSpan = (k, share, length) => (k ? [Math.max(0, share - LEAD_CAP
 export function rideOf(o, length, spec, {unseen = [], leads = [null, null]} = {}) {
   const where = `wire data-arrow="${spec}": data-speed=${quoted(o.written ?? '')}`;
   if (o.perSecond && !(length >= 1)) throw new Error(`${where} — this wire is too short for a speed in px a second (${short(length, 1)} px): give it its seconds (data-speed="3")`);
-  const ease = o.ride ?? [0, 0], seconds = o.perSecond ? rideSeconds(length, o.perSecond, ease) : o.speed;
+  // the run's seconds are asked of the deck's own range first: a px speed far past any run (a huge or endless number), or
+  // one too slow to count, gets the deck's advice — the story library's rideSeconds is asked only of a run that can be,
+  // and gives the same number (the same arithmetic: the line, its eased ends, over the speed)
+  const ease = o.ride ?? [0, 0], along = length * (1 + ease[0] + ease[1]), asked = o.perSecond ? along / o.perSecond : o.speed;
+  const seconds = o.perSecond && asked >= SPEEDS[0] && asked <= SPEEDS[1] ? rideSeconds(length, o.perSecond, ease) : asked;
   if (!(seconds >= SPEEDS[0] && seconds <= SPEEDS[1])) {
-    const along = length * (1 + ease[0] + ease[1]), slowest = Math.ceil((along / SPEEDS[1]) * 10) / 10, fastest = Math.floor((along / SPEEDS[0]) * 10) / 10;
+    const slowest = Math.ceil((along / SPEEDS[1]) * 10) / 10, fastest = Math.floor((along / SPEEDS[0]) * 10) / 10;
     throw new Error(`${where} — this wire is ${short(length, 0)} px long, so a run would take ${short(seconds, 2)} s, and a run takes ${SPEEDS[0]} to ${SPEEDS[1]} s — give it ${slowest}px to ${fastest}px, or its seconds (data-speed="3")`);
   }
+  // a wire whose length overflowed (numbers past what can be measured) has no ride to work out: said, not drawn as noise
+  if (!Number.isFinite(length)) throw new Error(`wire data-arrow="${spec}": its length cannot be measured (its numbers are too large) — give it numbers of a slide's size`);
   const hold = o.rest?.hold ?? 0, period = seconds + hold, share = seconds / period, steady = (length * (1 + ease[0] + ease[1])) / seconds;
   const vars = `--sd-ride-ease:${easing(withHold(rideProfile(ease, length), share))};--sd-show-ease:${easing(showStops(share, {end: Boolean(o.rest)}))}`;
   // a packet is gone before its edge reaches the block: its radius more — on the line itself, or, when it keeps its

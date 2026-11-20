@@ -41,11 +41,10 @@
 // A piece is what it draws, not the box it is placed by. The box of a block seen from a corner has four empty corners,
 // and a nearer block's box lies over the block behind it: so on the slide shown only its faces and its words take the
 // pointer, and a ring round it (a highlight, explore's hover) follows its faces — isoRing, for whoever rings a piece.
-import {arrange, gridFor, isometric, readThing, wordsToFit, MOST_KEEP} from 'footprint-story/isometric';
+import {arrange, arrangeByGroup, floorLabelPlace, gridFor, isometric, readThing, wordsToFit, GROUP_MARGIN, MOST_FLOOR_LABEL, MOST_KEEP} from 'footprint-story/isometric';
 import {portsWritten} from './portsWritten.js';
-import {floorLabelPlace, MOST_LABEL} from './floorLabel.js';
-import {arrangeByGroup, groupWritten, GROUP_MARGIN} from './groups.js';
-import {floorUnder, mayKeepClear, readKeepClear} from './keepClear.js';
+import {groupWritten} from './groups.js';
+import {keptFloor, mayKeepClear, readKeepClear} from './keepClear.js';
 import {mayHoldFootprint, paintFootprints, readFootprints} from './footprint.js';
 import {decodeEntities, esc} from './html.js';
 import {attrRule, ownAttribute, pieceTags, tagsWith} from '../pieceRules.js';
@@ -151,7 +150,7 @@ function readIso(html) {
     const {at: close, end} = closeOf(html, tag, open, told), inner = html.slice(open, close);
     if (pieceTags(inner).length) throw new Error(`${told}: pieces do not nest, and this one holds a piece — place it beside it`);
     if (kind === 'floor' && inner.trim()) throw new Error(`${told}: a floor holds no words — put them in a piece that stands on it`);
-    // a floor's label and its icon (floorLabel.js), read here and drawn by the build: taken off the element it writes
+    // a floor's label and its icon, read here and drawn by the build (floorLabelHtml): taken off the element it writes
     let styleCut = styled ? styled.before + styled.after : attrs, label = null, icon = null;
     for (const attr of ['data-label', 'data-icon']) {
       const a = ownAttribute(styleCut, attr);
@@ -162,7 +161,7 @@ function readIso(html) {
       const value = decodeEntities(a.value).replace(/[\t\n\r]+/g, ' ').trim();
       if (attr === 'data-label') {
         const letters = [...value].length;
-        if (!value || letters > MOST_LABEL) throw new Error(`${told}: a floor's label is a name of 1 to ${MOST_LABEL} letters — not ${value ? `${letters} letters` : 'none'}`);
+        if (!value || letters > MOST_FLOOR_LABEL) throw new Error(`${told}: a floor's label is a name of 1 to ${MOST_FLOOR_LABEL} letters — not ${value ? `${letters} letters` : 'none'}`);
         // a control, a direction mark or another character that draws nothing would read differently in the page and in
         // check's words: refused, not drawn (a joiner inside an emoji stays)
         if (/\p{Cc}|(?!\u200D)\p{Cf}|[\uD800-\uDFFF]/u.test(value)) throw new Error(`${told}: a floor's label is plain words — take out the control or direction character in it`);
@@ -210,8 +209,8 @@ function place(found, links, lay, feet = [], clear = [], fixedGrid = null) {
     }
     let arranged;
     try {
-      // a slide is wider than it is tall; blocks in groups are placed group by group (groups.js)
-      arranged = solid.some((p) => p.group !== null) ? arrangeByGroup(solid, links, arrange) : arrange(solid.map((p) => ({name: p.name, size: p.size})), links, {across: true}).things.map((t) => t.at);
+      // a slide is wider than it is tall; blocks in groups are placed group by group (footprint-story/isometric · arrangeByGroup)
+      arranged = solid.some((p) => p.group !== null) ? arrangeByGroup(solid.map((p) => ({name: p.name, size: p.size, group: p.group})), links) : arrange(solid.map((p) => ({name: p.name, size: p.size})), links, {across: true}).things.map((t) => t.at);
     } catch (e) {
       throw new Error(`the build cannot place this map's blocks: ${e.message.replace(/^isometric: /, '')} — or give every block its data-at`, {cause: e});
     }
@@ -227,13 +226,13 @@ function place(found, links, lay, feet = [], clear = [], fixedGrid = null) {
   const lifts = [...new Set(standing.map((p) => p.at[2] ?? 0))], grid = clear.length ? fixedGrid() : null;
   // (the kit knows each stretch by a number of ours, `name`; `piece` is the deck's name, any text a deck holds)
   const budget = {left: MOST_KEEP, most: MOST_KEEP};
-  const keep = clear.flatMap(({name, box, where}, k) => lifts.flatMap((lift) => floorUnder(box, grid, lift, where, budget).map((stretch) => ({...stretch, name: String(k), piece: name}))));
+  const keep = clear.flatMap(({name, box, where}, k) => lifts.flatMap((lift) => keptFloor(box, grid, lift, where, budget).map((stretch) => ({...stretch, name: String(k), piece: name}))));
   const reach = lay ? lay(standing.map((p) => ({name: p.name, kind: p.kind, at: [p.at[0], p.at[1], p.at[2] ?? 0], size: [...p.size], ports: p.ports})), keep) : [];
   for (const floor of found.filter((p) => p.kind === 'floor')) {
     if (floor.size !== null) { floor.at ??= [0, 0]; continue; }
     if (floor.at !== null) throw new Error(`${floor.where}: a floor with a data-at needs its data-size too ("8 5") — or write neither, and the build fits the floor round the blocks`);
     if (!standing.length) throw new Error(`${floor.where}: a floor with no data-size is fitted round the blocks that stand on it, and this map has none — give it a data-size ("8 5")`);
-    // a group's floor is fitted round its group's blocks alone (groups.js); any other round them all, and round the wires
+    // a group's floor is fitted round its group's blocks alone (GROUP_MARGIN, the margin arrangeByGroup leaves); any other round them all, and round the wires
     // laid between them (a wire that goes round a block reaches past it)
     const on = floor.group === null ? standing : standing.filter((p) => p.group === floor.group), reached = floor.group === null ? reach : [];
     if (!on.length) throw new Error(`${floor.where}: its group "${floor.group}" has no block — give blocks data-iso-group="${floor.group}", or take the group off the floor`);
@@ -377,7 +376,18 @@ function draw(p, html, shape, level, tight) {
   return `<${p.tag}${at}${ground} data-sd-iso="${p.kind}" style=${p.quote}${css}${p.quote}>${svg}${words}${named}${html.slice(p.close, p.end)}`;
 }
 
-/** A floor's label (floorLabel.js) as drawn: flat on the floor, its icon first; a label too long for its edge is said (tight). */
+/**
+ * A floor's label as drawn — its name flat on the floor along its front edge, the way a diagram heads a group box:
+ *
+ *   <div data-k="prod" data-iso="floor" data-size="8 5" data-label="Production account" data-icon="account"></div>
+ *
+ * Where it lies is the story library's (footprint-story/isometric · floorLabelPlace: along the floor's cols, just in
+ * from the edge nearest the viewer on the left, fitted with wordsToFit, moved half a tile at a time clear of the blocks,
+ * footprints and laid cables drawn over it), so a film lays it in the same place. Here it is a span inside the floor's
+ * element, so it greys, lights and hides with its floor; its icon first; a label too long for its edge, or covered all
+ * along it, is said (tight → check · name-fit) — never cut. WHY flat: a plate standing on the floor reads as one more
+ * object; words on the ground read as the name of the ground.
+ */
 function floorLabelHtml(p, {label: place, iconSvg}, box, tight) {
   const letters = [...p.label], said = letters.length > SHOWN ? `${letters.slice(0, SHOWN).join('')}…` : p.label;
   if (!place.fits) tight.push({name: p.name, text: said, on: 'floor'});
@@ -489,7 +499,7 @@ export const isoRing = (piece, colour, width = '4px') => `:where(${piece}:is(${S
  * piece (--iso-color): its top a little lighter, its two sides darker by different amounts, as light from the upper
  * left would leave them. Its words are drawn flat on its top face, in --iso-ink (dark by default, as the faces are light).
  */
-/** A floor label's look (floorLabel.js): the page carries it only when a floor has a label, so every other page is as before. */
+/** A floor label's look (floorLabelHtml): the page carries it only when a floor has a label, so every other page is as before. (Its own comment, written into the page, still says floorLabel.js — kept, so a page is byte for byte as before.) */
 export const FLOOR_LABEL_CSS = `/* a floor's label (floorLabel.js): flat on the floor along its front edge, a part of the floor that greys and lights with it */
 :where(section[data-label] .iso-floor-label) {
   position: absolute; transform-origin: 0 0; white-space: nowrap; line-height: 1.15;

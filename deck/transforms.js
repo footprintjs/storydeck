@@ -36,7 +36,7 @@
 //                                     under reduced motion, in print and with motion off, where one rests at its middle
 //   data-speed="300px"                with a unit, px a second: the run takes the wire's length over that speed (the
 //                                     build knows the length — a deck never measures a path)
-// and how they ride (rides.js reads them and draws the CSS, ride.js has the numbers; each needs data-packets, and
+// and how they ride (rides.js reads them and draws the CSS, footprint-story/motion has the numbers; each needs data-packets, and
 // works on a cable and on a wire through the air alike, as data-packets does):
 //   data-ride="ease-ends 0.15 0.2"    out of the start over the first 15% of the length, one steady speed, into the end
 //                                     over the last 20% (with a px speed, that speed is the steady one)
@@ -55,8 +55,8 @@ import {readPieces} from '../focusHtml.js';
 import {boxFinder, exit, exitOutline} from './boxes.js';
 import {callouts} from './callouts.js';
 import {isoDrawn} from './iso.js';
-import {NO_ROUTE, rounded} from 'footprint-story/isometric';
-import {crossesBox, readKeepClear} from './keepClear.js';
+import {crossesBox, NO_ROUTE, rounded} from 'footprint-story/isometric';
+import {readKeepClear} from './keepClear.js';
 import {cables, cablesOn, cableWalk, cableWay, held, labelPlace, layRoutes, reachOf, wayNote, LABEL_LOOKS} from './cable.js';
 import {curveLength, leadSeen, leadSpan, piecesLength, quoted, readRide, rideMarks, rideOf, ridersSvg, SPEEDS} from './rides.js';
 
