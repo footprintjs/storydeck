@@ -186,6 +186,12 @@ fix (fix#11) [wrote: verdict]
 
 The reader is `footprint-story/record` · `whyFromRecord`, the same one StoryReel uses: the record is read as a file
 anyone may have written (bounded, one run, every line of the answer one line), and one that is not whole says so
-first. Two things in `stages.js` exist for it: a decider writes its reason (`verdictWhy`, `compiledWhy`), because a
-record keeps a stage's reads with what it writes; and what a stage is given from outside the run's state (the deck's
+first. Two things in `stages.js` exist for it: every decider writes its reason (`compiledWhy`, `measureWhy`,
+`writeWhy`, `verdictWhy`), because a record keeps a stage's reads with what it writes; and what a stage is given from outside the run's state (the deck's
 files, a browser) is in no record, which every answer ends by saying.
+
+A run that measured in a browser mounts the adapter's chart, which keeps a log of its own in the same record: the
+run's own log is walked, and the answer says so. A run kept before 0.21.0 has a record without the reads: its answer
+shows who wrote the value and the decisions, and says the reads are not there. Where a rule read two counts
+(`errors`, `warnings`) the walk names the stage that wrote them once, by the first: `--why warnings` shows that count's
+own path.

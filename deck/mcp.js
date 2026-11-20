@@ -109,7 +109,7 @@ async function answerTool(name, args, dir, home, voice) {
         const r = await buildTool(deck, {layout: args.layout === true, all: args.all === true, more: 'all: true', measure: 'layout: true', home});
         return {...(r.verdict === 'broken' && {isError: true}), content: [{type: 'text', text: r.text}]};   // broken: nothing was written
       }
-      case 'log': return {content: [{type: 'text', text: await logTool(deck, {home, run: args.run === undefined ? undefined : String(args.run), all: args.all === true, measure: 'layout: true', why: args.why === undefined ? undefined : String(args.why)})}]};
+      case 'log': return {content: [{type: 'text', text: await logTool(deck, {home, run: args.run === undefined ? undefined : String(args.run), all: args.all === true, measure: 'layout: true', why: args.why === undefined ? undefined : typeof args.why === 'string' ? args.why : ''})}]};   // a why that is no name is refused by the reader, in words
       case 'narrate': return {content: [{type: 'text', text: await narrateCall(deck, args, voice)}]};
       default: return {isError: true, content: [{type: 'text', text: `no tool called "${name}" (the tools are ${MCP_TOOLS.map((t) => t.name).join(', ')})`}]};
     }

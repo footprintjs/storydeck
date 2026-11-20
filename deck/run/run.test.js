@@ -286,6 +286,15 @@ describe('storydeck log --run n --why value: where a value of a run came from, f
     const [run] = keptRuns(runsFolder(home, deckRoot(dir)).dir);
     expect(Object.values(run.control).every((edge) => typeof edge.deciderId === 'string')).toBe(true);
     expect(Object.keys(run.control).some((step) => /^(fix|clean)#\d+$/.test(step))).toBe(true);
+    // every decider writes its reason, so each walk goes through it to what it read
+    await runDeck(dir, {home, write: true});
+    expect(await logTool(dir, {home, run: '1', why: 'written'})).toMatch(/write asked\? \(writes#\d+\) ← \[control[^\]]*\] \[wrote: writeWhy\]\n\s+read deck \(read-deck#0\) ← via writeAsked/);
+    expect(await logTool(dir, {home, run: '1', why: 'measured'})).toMatch(/measure asked\? \(measure-asked#\d+\) ← \[control: No measure was asked for\] \[wrote: measureWhy\]\n\s+read deck \(read-deck#0\) ← via layoutAsked/);
+    // a run that measured in a browser mounts the adapter's chart, which keeps a log of its own in the same record: the run's own is walked
+    await runDeck(dir, {home, layout: true, driver: fakeDriver()});
+    const measured = await logTool(dir, {home, run: '1', why: 'verdict'});
+    expect(measured).toMatch(/^verdict = "(clean|fix)"\n/);
+    expect(measured).toMatch(/\n\(a chart this run mounted keeps a log of its own: what happened inside is not walked here\)\n/);
     // refusals name the fix; the run in full is as it was
     expect(() => logTool(dir, {home, why: 'verdict'})).toThrow('--why reads one run: give its number (storydeck log --run 1 --why verdict)');
     await expect(logTool(dir, {home, run: '1', why: ''})).rejects.toThrow('why names a value of the run');

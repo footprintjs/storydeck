@@ -74,7 +74,7 @@ export function readNotes(scope, run) {
 }
 
 /** Is the page measured in a browser? */
-export const measureAsked = (run) => (scope) => run.decide(scope,
+export const measureAsked = (run) => (scope) => decided(run, scope, 'measureWhy',
   [{when: {layoutAsked: {eq: false}}, then: 'not-asked', label: 'No measure was asked for'}],
   {branch: 'measure', label: 'A measure was asked for'});
 
@@ -87,7 +87,7 @@ export function notAsked(scope) {
 export const pageHtml = (run) => (run.page ??= pageOf(run.dir, run.loaded).html);
 
 /** Is the page written? */
-export const writes = (run) => (scope) => run.decide(scope,
+export const writes = (run) => (scope) => decided(run, scope, 'writeWhy',
   [{when: {writeAsked: {eq: false}}, then: 'check-only', label: 'Only a check was asked for'}],
   {branch: 'write-page', label: 'The page is written'});
 
