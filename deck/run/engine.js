@@ -14,9 +14,10 @@ let loading = null;
 
 /** footprintjs's doors, loaded once: {flowChart, FlowChartExecutor, decide, narrative, metrics, attempts, fileSink}, and foottrace's parseAttemptId (how a recorded call is named). */
 export function engine() {
-  loading ??= Promise.all([import('footprintjs'), import('footprintjs/recorders'), import('footprintjs/sinks'), import('foottrace')])
-    .then(([core, recorders, sinks, trace]) => ({flowChart: core.flowChart, FlowChartExecutor: core.FlowChartExecutor, decide: core.decide,
-      narrative: recorders.narrative, metrics: recorders.metrics, attempts: recorders.attempts, fileSink: sinks.fileSink, parseAttemptId: trace.parseAttemptId}))
+  loading ??= Promise.all([import('footprintjs'), import('footprintjs/recorders'), import('footprintjs/sinks'), import('foottrace'), import('footprintjs/trace'), import('footprint-story/record')])
+    .then(([core, recorders, sinks, trace, walkers, record]) => ({flowChart: core.flowChart, FlowChartExecutor: core.FlowChartExecutor, decide: core.decide,
+      narrative: recorders.narrative, metrics: recorders.metrics, attempts: recorders.attempts, fileSink: sinks.fileSink, parseAttemptId: trace.parseAttemptId,
+      controlDepRecorder: walkers.controlDepRecorder, controlEdges: record.controlEdges}))
     .catch((error) => { loading = null; throw error; });   // a load that failed is tried again by the next run
   return loading;
 }
@@ -61,21 +62,24 @@ const callCounts = (eng, recorder) => Object.fromEntries([...recorder.byTarget()
 }]));
 
 /**
- * Run a chart once: {state, lines, stages, calls} — the state it ended with, the run in words ([{type, text, stage}]),
- * each stage's time and each tool's calls. `record`, a file path, also keeps the record itself there, written as the
+ * Run a chart once: {state, lines, stages, calls, control} — the state it ended with, the run in words ([{type, text, stage}]),
+ * each stage's time, each tool's calls, and which decision let each step run. `record`, a file path, also keeps the record itself there, written as the
  * run goes (one JSON line an entry: footprintjs/sinks · readRecordFile reads it back); a record that cannot be kept
  * never costs the run. A run that throws keeps what it got to: the error carries the same as `error.run`.
  */
 export async function runChart(eng, chart, {record = null} = {}) {
-  const words = eng.narrative(), times = eng.metrics(), calls = eng.attempts();
+  const words = eng.narrative(), times = eng.metrics(), calls = eng.attempts(), control = eng.controlDepRecorder();
   let sink = null;
   try { sink = record ? eng.fileSink(record) : null; } catch { /* no record: the run goes on */ }
-  const executor = new eng.FlowChartExecutor(chart, sink ? {sink} : {});
-  for (const recorder of [words, times, calls]) executor.attachCombinedRecorder(recorder);
+  // the record keeps, with each write, the keys its stage had read by then; `control` which decision let each step run: what
+  // `storydeck log --run n --why <value>` walks back over (footprint-story/record)
+  const executor = new eng.FlowChartExecutor(chart, {...(sink ? {sink} : {}), writeProvenance: 'reads-prefix'});
+  for (const recorder of [words, times, calls, control]) executor.attachCombinedRecorder(recorder);
+  const edges = () => { try { return eng.controlEdges(executor.getSnapshot().commitLog, control); } catch { return {}; } };
   const taken = () => ({
     state: structuredClone(executor.getSnapshot().sharedState),   // the engine's view is live: the run keeps its own copy
     lines: words.getEntries().map((e) => ({type: String(e.type), text: String(e.text ?? ''), stage: e.stageId ?? null})),
-    stages: stageTimes(times), calls: callCounts(eng, calls),
+    stages: stageTimes(times), calls: callCounts(eng, calls), control: edges(),
   });
   try {
     await executor.run();

@@ -39,7 +39,7 @@ describe('engine: a chart from its wiring', () => {
 
   it('loads the engine once', async () => {
     expect(await engine()).toBe(await engine());
-    expect(Object.keys(await engine()).sort()).toEqual(['FlowChartExecutor', 'attempts', 'decide', 'fileSink', 'flowChart', 'metrics', 'narrative', 'parseAttemptId']);
+    expect(Object.keys(await engine()).sort()).toEqual(['FlowChartExecutor', 'attempts', 'controlDepRecorder', 'controlEdges', 'decide', 'fileSink', 'flowChart', 'metrics', 'narrative', 'parseAttemptId']);
   });
 
   it('keeps what the engine warns of, and prints none of its other lines', () => {
