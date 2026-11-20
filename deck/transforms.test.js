@@ -561,6 +561,11 @@ describe('a wire between two isometric pieces is a cable along the floor', () =>
       const iso = isoDrawn(map, {canvas});
       expect(wiresDrawn(iso.html, iso).html, map).toBe(made.html);
     }
+    // a callout is placed before the wires are drawn, so one that shares a block's name is a second piece with a box: laying and
+    // drawing agree that the name is no block alone (no cable is laid for it, and none is drawn)
+    const noted = transformed(`${blocks}<div data-k="c" data-iso="block" data-at="9 4"></div><div data-k="b" data-callout="c right">a note</div>${wire('w')}`, {canvas});
+    expect(noted.cables).toEqual([]);
+    expect(noted.html).not.toContain('data-sd-cable');
     // a second piece with a box shares the name: the name is a box round both, as ever, and the wire runs straight to it
     const shared = transformed(`${blocks}<div data-k="b" class="chip" style="left:1500px;top:400px;width:50px;height:20px">b</div>${wire('w')}`, {canvas});
     expect(shared.cables).toEqual([]);

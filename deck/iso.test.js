@@ -455,6 +455,9 @@ describe('iso · a block\'s name fits its top face', () => {
     // an element before it that is closed, a tag that closes itself and a void one do not hide it; capitals are a <b> too
     expect(say('<svg class="ic"><path d="M0 0"/></svg><br><b>Load Balancer</b>')).toBe('<svg class="ic"><path d="M0 0"/></svg><br><b style="font-size:25px">Load<br>Balancer</b>');
     expect(say('<B>Load Balancer</B>')).toBe('<b style="font-size:25px">Load<br>Balancer</b>');
+    expect(say('<svg class="ic"/><b>Load Balancer</b>')).toBe('<svg class="ic"/><b style="font-size:25px">Load<br>Balancer</b>');
+    // a "/>" closes a tag inside a drawing only: in HTML <div/> opens a div, and the <b> after it is inside
+    expect(say('<div/><b>Load Balancer</b>')).toBe('<div/><b>Load Balancer</b>');
     // what the build is told of a name that does not fit is enough to find it, never a megabyte
     const [{text}] = tightOf(`<b>${'Long'.repeat(5000)}</b>`);
     expect(text).toBe(`${'Long'.repeat(20)}…`);

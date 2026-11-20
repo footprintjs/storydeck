@@ -270,16 +270,18 @@ const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input'
  * written; so is a <b> inside a <small>, and the words "<b>" inside an attribute's value).
  */
 function nameOf(inner) {
-  let depth = 0;
+  let depth = 0, drawing = 0;   // drawing: inside an <svg> or a <math>, where a tag that ends "/>" is closed (in HTML it is not: <div/> opens a div)
   for (const m of inner.matchAll(TAG)) {
     if (m[2] === undefined) continue;   // a comment
-    const tag = m[2].toLowerCase();
-    if (m[1]) { depth = Math.max(0, depth - 1); continue; }
+    const tag = m[2].toLowerCase(), foreign = tag === 'svg' || tag === 'math';
+    if (m[1]) { depth = Math.max(0, depth - 1); if (foreign) drawing = Math.max(0, drawing - 1); continue; }
     if (depth === 0 && tag === 'b') {
       const after = m.index + m[0].length, close = m[3].trim() ? null : /^([^<]*)<\/b\s*>/i.exec(inner.slice(after));
       return close && close[1].trim() ? {from: m.index, to: after + close[0].length, text: close[1]} : null;
     }
-    if (!VOID.has(tag) && !/\/\s*$/.test(m[3])) depth += 1;
+    if (VOID.has(tag) || ((foreign || drawing > 0) && /\/\s*$/.test(m[3]))) continue;
+    depth += 1;
+    if (foreign) drawing += 1;
   }
   return null;
 }

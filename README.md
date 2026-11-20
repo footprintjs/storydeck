@@ -746,9 +746,10 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   **The build's record of a map.** What the build knows of a map it keeps beside the page, never in it:
   `compileDeck(source).maps[name]` has `made` (who placed the blocks, `build` or `hand`; the tile; whether the picture
   was fitted), `cables` (each cable's corners and its line's length in slide px, the stretches a block hides, what it
-  passes behind, crosses and shares), `ways` (what `check` says of a wire) and `tight` (names that do not fit). The
-  run's log has it too (stage `maps made`, `storydeck log --run 1`). And each cable carries its line's length in the
-  page as `--sd-length`, so a deck's own CSS can time a thing to a cable without measuring:
+  passes behind, crosses and shares), `ways` (what `check` says of a wire) and `tight` (names that do not fit, each
+  by its first 80 characters). The run's log has it too (stage `maps made`, `storydeck log --run 1`). And each cable
+  carries its line's length in the page as `--sd-length`, so a deck's own CSS can time a thing to a cable without
+  measuring:
   `animation-duration: calc(var(--sd-length) / 300px * 1s)`.
   Not yet: moving a block by dragging it in the dev page (change its `data-at`).
   A deck to start from: [examples/a-request](examples/a-request) (blocks on a floor, a view that follows them, an order
