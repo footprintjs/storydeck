@@ -29,7 +29,7 @@
 // A wire's options (deck.css draws them from the theme's tokens; a ">" or "<" in a value is written &gt; or &lt;, as a
 // tag ends at its first ">"):
 //   data-label="InvokeAgentRuntime"   its name, at its middle, on its left (a request's above it, its answer's below);
-//                                     on a cable, on the cable itself, where no block is over it (cable.js · labelPlace)
+//                                     on a cable, on the cable itself, where no block is over it (footprint-story · labelPlace)
 //   class "halo"                      a soft glow around it (--wire-halo)
 //   data-packets="2" data-speed="5"   packets that keep running along it while its slide is shown, 5 s a run, evenly
 //                                     spaced (--packet, --packet-glow): loops (deck-stage.js USAGE (i)), so they stop
@@ -52,13 +52,13 @@
 import {stripComments} from './html.js';
 import {ownAttribute, pieceTags, readAttributes} from '../pieceRules.js';
 import {readPieces} from '../focusHtml.js';
-import {boxFinder, exit, exitOutline} from './boxes.js';
+import {boxFinder} from './boxes.js';
 import {callouts} from './callouts.js';
 import {isoDrawn} from './iso.js';
-import {crossesBox, NO_ROUTE, rounded} from 'footprint-story/isometric';
+import {arrowHead, bentWire, crossesBox, curveWay, headingOf, held, labelHalf, labelPlace, lanesOf, rounded, straightRun, walkWay, CABLE, NO_ROUTE} from 'footprint-story/isometric';
 import {readKeepClear} from './keepClear.js';
-import {cables, cablesOn, cableWalk, cableWay, held, labelPlace, layRoutes, reachOf, wayNote, LABEL_LOOKS} from './cable.js';
-import {curveLength, leadSeen, leadSpan, piecesLength, quoted, readRide, rideMarks, rideOf, ridersSvg, SPEEDS} from './rides.js';
+import {cables, cablesOn, cableWay, layRoutes, reachOf, wayNote} from './cable.js';
+import {leadSeen, leadSpan, piecesLength, quoted, readRide, rideMarks, rideOf, ridersSvg, SPEEDS} from './rides.js';
 
 const fixed = (v) => +v.toFixed(1);
 /** A wire written by the pieces it joins: "from to to [bend]". */
@@ -88,11 +88,12 @@ function pieceNames(html) {
 }
 /** A wire as the rest reads it: [spec, from, to, bend] by piece name (a port's piece), or null. */
 const endsRead = (spec, names) => { const e = wireEndsOf(spec, names); return e && [spec, e.from.name, e.to.name, e.bend]; };
-const LANE = 80;   // px between two wires joining the same pieces, at most (less when a box is too small to hold them)
-const GAP = 6;     // px between a wire's end and the box it leaves or reaches
+// A straight wire's numbers — CABLE.lane px between two joining the same pieces at most (less when a box is too small to
+// hold them), CABLE.gap px between its end and what it leaves or reaches — and its rule are footprint-story/isometric's
+// (lanesOf, straightRun), so a film draws the same straight wire (moved there in 0.30.0).
 
 const MOST_PACKETS = 6;
-const LABEL = {size: 18, char: 12, clear: 8};   // deck.css's label: its px size, a generous width per letter, px clear of the wire
+const LABEL = {clear: 8};   // px a wire's label stands clear of a wire through the air (its size and width a letter: CABLE.label, deck.css's)
 /** The letters a label shows: one written as an entity (&amp;) is one letter, not five. */
 const shown = (label) => label.replace(/&(?:#\d+|#x[\da-f]+|[a-z][a-z\d]*);/gi, '.').length;
 /** Where a cable's running packets may rest when they do not run: its middle first, then further to each side by turns. */
@@ -120,19 +121,20 @@ function wireOptions(attrs, spec) {
   return {label, packets: n, speed: s, head: head === undefined, ...ride};
 }
 
-const HEAD = 18;   // an arrow's head, in px: its length (its line stops four fifths of that short of the tip)
+const HEAD = CABLE.head;   // an arrow's head, in px: its length (its line stops CABLE.headShort, four fifths, of that short of the tip)
+const SHORT = HEAD * CABLE.headShort;
 /** A wire's own attributes with "wire" in its class. */
 function classed(attrs) {
   const at = attrs.replace(/\sclass="([^"]*)"/, (_, c) => ` class="${/(^|\s)wire(\s|$)/.test(c) ? c : `wire ${c}`}"`);
   return /\sclass="/.test(at) ? at : `${at} class="wire"`;
 }
-/** An arrow's head at `tip` (in the wire's own box), pointing the way [ux, uy]. */
-function headAt(tip, [ux, uy]) {
-  const f = fixed, back = [tip[0] - ux * HEAD, tip[1] - uy * HEAD], nx = -uy * HEAD * 0.6, ny = ux * HEAD * 0.6;
-  return `<path class="head" d="M${f(tip[0])} ${f(tip[1])}L${f(back[0] + nx)} ${f(back[1] + ny)}L${f(back[0] - nx)} ${f(back[1] - ny)}Z"/>`;
+/** An arrow's head at `tip` (in the wire's own box), pointing the way `heading` (its corners: footprint-story/isometric · arrowHead). */
+function headAt(tip, heading) {
+  const f = fixed, [t, l, r] = arrowHead(tip, heading, HEAD);
+  return `<path class="head" d="M${f(t[0])} ${f(t[1])}L${f(l[0])} ${f(l[1])}L${f(r[0])} ${f(r[1])}Z"/>`;
 }
-/** Half a label's box: the letters it shows, and 4 px round them. */
-const labelBox = (label) => (label ? [(shown(label) * LABEL.char) / 2 + 4, LABEL.size / 2 + 4] : null);
+/** Half a label's box: the letters it shows (footprint-story/isometric · labelHalf: a generous width a letter, the pad round them). */
+const labelBox = (label) => (label ? labelHalf(shown(label)) : null);
 /** When the k-th of a wire's running packets starts: each its share of a run behind the one before, on one clock (deck.css · sdRun). */
 const loopOf = (o, k) => `--loop:sdRun ${o.speed}s linear ${+((-k * o.speed) / o.packets).toFixed(3) + 0}s infinite`;
 
@@ -148,8 +150,9 @@ function wireSvg(attrs, spec, o) {
   }
   const [x1, y1, x2, y2, bend = 0] = parts;
   const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
-  const cx = (x1 + x2) / 2 - (dy / len) * bend, cy = (y1 + y2) / 2 + (dx / len) * bend;
-  const tl = Math.hypot(x2 - cx, y2 - cy) || 1, ux = (x2 - cx) / tl, uy = (y2 - cy) / tl;
+  // the bend's control point beside the middle of the run, the line's end short of the tip for its head, the way it
+  // arrives: footprint-story/isometric · bentWire, a film's straight wire's too
+  const {corner: [cx, cy], tip: [ex, ey], heading: [ux, uy]} = bentWire([x1, y1], [x2, y2], bend, o.head ? SHORT : 0);
   // the label: beside the curve's middle, B(½), to the left of the way it runs there (its tangent is end − start), as
   // far off as half the label measures across the wire, and LABEL.clear more: above a level wire, beside a standing one
   const half = labelBox(o.label);   // the box holds it, so a wire showing itself in shows it too
@@ -161,7 +164,6 @@ function wireSvg(attrs, spec, o) {
   const xs = [x1, x2, cx, ...(half ? [lx - half[0] + 20, lx + half[0] - 20] : [])], ys = [y1, y2, cy, ...(half ? [ly - half[1] + 20, ly + half[1] - 20] : [])];
   const pad = 20, X = Math.min(...xs) - pad, Y = Math.min(...ys) - pad;
   const W = Math.max(...xs) + pad - X, H = Math.max(...ys) + pad - Y, f = fixed;
-  const back = o.head ? HEAD * 0.8 : 0, ex = x2 - ux * back, ey = y2 - uy * back;   // a line with no head runs its whole length
   const d = `M${f(x1 - X)} ${f(y1 - Y)} Q${f(cx - X)} ${f(cy - Y)} ${f(ex - X)} ${f(ey - Y)}`;
   const at = classed(attrs);
   // the packet rides the curve itself (deck.css · sdPkt): its control point and its end, from where it starts
@@ -170,7 +172,7 @@ function wireSvg(attrs, spec, o) {
   // packets that keep running (deck.css · sdRun): loops on one clock, each its share of a run behind the one before
   // — or, when it asks how they ride (rides.js), along its curve by length as a cable's do: the curve as --sd-way, its
   // length walked (nothing hides a wire through the air)
-  const r = o.rides ? rideOf(o, curveLength([x1, y1], [cx, cy], [ex, ey]), spec) : null, marks = r ? rideMarks(o, r, d) : {attrs: '', style: ''};
+  const r = o.rides ? rideOf(o, curveWay([x1, y1], [cx, cy], [ex, ey]).length, spec) : null, marks = r ? rideMarks(o, r, d) : {attrs: '', style: ''};
   const runs = r ? ridersSvg(o, r, {d})
     : Array.from({length: o.packets}, (_, k) => `<circle class="run" data-loop cx="${f(x1 - X)}" cy="${f(y1 - Y)}" r="7" style="${ride};${loopOf(o, k)}"/>`).join('');
   const label = o.label ? `<text class="label" x="${f(lx - X)}" y="${f(ly - Y)}" text-anchor="middle">${o.label}</text>` : '';
@@ -194,7 +196,7 @@ const wayPath = (way, X, Y) => `M${fixed(way.start[0] - X)} ${fixed(way.start[1]
 function cableSvg(attrs, spec, o, way, points, place, r = null) {
   const f = fixed, [x1, y1] = way.start, tip = points.at(-1), before = points.at(-2);   // `way` already ends where the head begins, or at the tip when the wire has none
   // the head points the way the cable's last run goes, however short that run is
-  const far = Math.hypot(tip[0] - before[0], tip[1] - before[1]) || 1, heading = [(tip[0] - before[0]) / far, (tip[1] - before[1]) / far];
+  const heading = headingOf(before, tip);
   const half = labelBox(o.label), [lx, ly] = half ? place(way, half, tip) : [0, 0];
   const marks = [way.start, tip, ...way.pieces.flatMap((piece) => (piece.corner ? [piece.corner, piece.to] : [piece.to]))];
   const xs = [...marks.map((p) => p[0]), ...(half ? [lx - half[0] + 20, lx + half[0] - 20] : [])], ys = [...marks.map((p) => p[1]), ...(half ? [ly - half[1] + 20, ly + half[1] - 20] : [])];
@@ -242,10 +244,10 @@ function replaceEach(html, found, draw) {
 
 /**
  * Each wire written between pieces as its numbers, "x1 y1 x2 y2 bend" (others: null). A piece is found as boxes.js ·
- * boxFinder finds it. Wires joining the same two pieces are spread across the line between their middles, LANE apart at
+ * boxFinder finds it. Wires joining the same two pieces are spread across the line between their middles, CABLE.lane apart at
  * most and always inside both pieces, each keeping to its left (a request going right above its answer coming back,
  * whatever the pieces are called), in the order written; each then runs from the edge of one piece to the edge of the
- * other, GAP clear of both.
+ * other, CABLE.gap clear of both — footprint-story/isometric's rule (lanesOf, straightRun), which a film draws by too.
  *
  * An isometric piece (`shapes`: iso.js · isoDrawn) is not the box it is placed by: its edge is the outline of what it
  * draws. So a wire to a block ends on the block, not in the empty corner of its box, and two blocks that stand clear
@@ -264,47 +266,33 @@ function wiresBetween(html, found, {shapes, floor, solids, routes}) {
   // caller that laid none, laid here: the name is that one isometric piece alone, with no bend asked for
   const laid = !floor ? [] : routes ? cablesOn(routes, floor)
     : cables(read.map((m) => (m && m[3] === undefined && [m[1], m[2]].every((name) => shapes.has(name) && boxOf.alone(name)) ? [m[1], m[2]] : null)), shapes, floor, solids);
-  /** One end of a wire: its middle, how far a line may stand off that middle and still cross it, and where a ray leaves it. */
+  /** One end of a wire, as straightRun reads it: its middle, and its edge — an isometric piece's outline, or a box. */
   const endOf = (name, where) => {
     // an isometric piece's own outline, when the name is that piece alone: a name several pieces share is one box round them all, as ever
     const shape = boxOf.alone(name) ? shapes.get(name) : undefined;
-    if (shape) return {middle: shape.middle, across: (n) => Math.min(exitOutline(shape.outline, shape.middle, n), exitOutline(shape.outline, shape.middle, [-n[0], -n[1]])), exit: (p, u) => exitOutline(shape.outline, p, u)};
+    if (shape) return {middle: shape.middle, outline: shape.outline};
     const box = boxOf(name, where);
-    // half the box measured across the line: a lane closer to the middle than this, less 8 px, crosses the box, so its
-    // ends are found on the box's edges (exit: from any point of such a line, as the line leaves the box)
-    return {middle: [box.x + box.w / 2, box.y + box.h / 2], across: (n) => (Math.abs(n[0]) * box.w + Math.abs(n[1]) * box.h) / 2, exit: (p, u) => exit(box, p, u)};
+    return {middle: [box.x + box.w / 2, box.y + box.h / 2], box};
   };
   // a pair's wires across its line, in its own direction (its names in order): those running that way first, on their
   // left of it, then those running back — on their own left. A cable is not on that line: it takes no lane.
-  const pairOf = (m) => [m[1], m[2]].sort().join('\u0000'), lanes = new Map();
-  read.forEach((m, i) => { if (m && !laid[i]?.points) lanes.set(pairOf(m), [...(lanes.get(pairOf(m)) ?? []), i]); });
-  for (const [key, ids] of lanes) {
-    const along = (i) => read[i][1] === key.split('\u0000')[0];
-    lanes.set(key, [...ids.filter(along), ...ids.filter((i) => !along(i))]);
-  }
+  const lanes = lanesOf(read.map((m, i) => (m && m[1] !== m[2] && !laid[i]?.points ? [m[1], m[2]] : null)));
   const between = read.map((m, i) => {
     if (!m) return null;
     const spec = found[i].m[1];
     if (m[1] === m[2]) throw new Error(`data-arrow="${spec}": a wire joins two pieces, not "${m[1]}" to itself`);
     if (laid[i]?.points) return laid[i];
     // in the pair's own direction (its names in order), so the wires both ways share one set of lanes
-    const [a, b] = [m[1], m[2]].sort(), A = endOf(a, `data-arrow="${spec}"`), B = endOf(b, `data-arrow="${spec}"`);
-    const ca = A.middle, cb = B.middle, len = Math.hypot(cb[0] - ca[0], cb[1] - ca[1]);
-    if (len === 0) throw new Error(`data-arrow="${spec}": "${a}" and "${b}" share a middle — place them apart, or give the wire numbers`);
-    const u = [(cb[0] - ca[0]) / len, (cb[1] - ca[1]) / len], n = [-u[1], u[0]];
-    const lane = lanes.get(pairOf(m)), k = lane.indexOf(i), most = Math.max(0, Math.min(A.across(n), B.across(n)) - 8);
-    const step = lane.length > 1 ? Math.min(LANE, (2 * most) / (lane.length - 1)) : 0, off = (k - (lane.length - 1) / 2) * step;
-    const pa = [ca[0] + n[0] * off, ca[1] + n[1] * off], pb = [cb[0] + n[0] * off, cb[1] + n[1] * off];
-    const ta = A.exit(pa, u) + GAP, tb = B.exit(pb, [-u[0], -u[1]]) + GAP;
+    const [a, b] = [m[1], m[2]].sort(), run = straightRun(endOf(a, `data-arrow="${spec}"`), endOf(b, `data-arrow="${spec}"`), lanes[i]);
+    if (run.why === 'middle') throw new Error(`data-arrow="${spec}": "${a}" and "${b}" share a middle — place them apart, or give the wire numbers`);
     // a wire the floor had no way for says so: "too close" alone would name the wrong cause
-    if (!(len - ta - tb >= 12)) {
+    if (run.why === 'close') {
       const why = laid[i]?.route.why;
       if (!why) throw new Error(`data-arrow="${spec}": "${a}" and "${b}" are too close for a wire between them (they touch or overlap) — move them apart, or give the wire numbers`);
       const cure = why === NO_ROUTE.work ? 'take wires or blocks out of this map so that every wire is laid, or ' : '';
       throw new Error(`data-arrow="${spec}": no way along the floor was laid for it (${why}), and "${a}" and "${b}" are too close for a straight wire between them — ${cure}move them apart, or give the wire numbers`);
     }
-    const start = [pa[0] + u[0] * ta, pa[1] + u[1] * ta], end = [pb[0] - u[0] * tb, pb[1] - u[1] * tb];
-    const [from, to] = m[1] === a ? [start, end] : [end, start];
+    const [from, to] = lanes[i].flip ? [run.end, run.start] : [run.start, run.end];
     return [...from, ...to, Number(m[3] ?? 0)].map(fixed).join(' ');
   });
   return {between, laid};
@@ -320,7 +308,7 @@ export const wireTags = (html) => emptyI(html, /\sdata-arrow="([^"<>]+)"/);
  * Every <i data-arrow="…"></i> as its wire; one written between pieces runs between them and carries data-ends.
  * `iso`: what iso.js · isoDrawn gave of the map's isometric pieces ({shapes, solids, floor}) — a wire between two of
  * them is a cable along the floor, and a wire from one to a flat piece ends on its outline. `looks`: {left}, what the
- * map's cable labels may spend finding their places (cable.js · LABEL_LOOKS).
+ * map's cable labels may spend finding their places (footprint-story/isometric · CABLE.looks).
  */
 export const wires = (html, iso, looks) => wiresDrawn(html, iso, looks).html;
 
@@ -332,7 +320,7 @@ export const wires = (html, iso, looks) => wiresDrawn(html, iso, looks).html;
  * why it is straight), by the wire's first name and the two it joins. It is handed on beside the page, never written
  * into it: what `check` says of a wire is then only ever the build's own word, never text a deck holds.
  */
-export function wiresDrawn(html, {shapes = new Map(), floor = null, solids = [...shapes.values()], routes = null, levels = new Map([...shapes].map(([name, shape]) => [name, shape.level]))} = {}, looks = {left: LABEL_LOOKS}) {
+export function wiresDrawn(html, {shapes = new Map(), floor = null, solids = [...shapes.values()], routes = null, levels = new Map([...shapes].map(([name, shape]) => [name, shape.level]))} = {}, looks = {left: CABLE.looks}) {
   const found = wireTags(html), {between, laid: cabled} = wiresBetween(html, found, {shapes, floor, solids, routes: routes?.length === found.length ? routes : null});
   // what a cable's label keeps clear of: what stands on the floor (a block is drawn over the floor's wires), each
   // label placed before it, and the other cables — so the labels of a request and its answer, lying side by side,
@@ -342,10 +330,10 @@ export function wiresDrawn(html, {shapes = new Map(), floor = null, solids = [..
   const taken = solids.map((shape) => held(shape.outline));
   // each wire's options, read once; each cable's line: up to where its head begins, or its whole length when it has none (data-head="none")
   const options = found.map((f) => wireOptions(f.before + f.after, f.m[1]));
-  const ways = between.map((drawn, i) => (drawn && typeof drawn === 'object' ? cableWay(drawn, options[i].head ? HEAD * 0.8 : 0) : null));
+  const ways = between.map((drawn, i) => (drawn && typeof drawn === 'object' ? cableWay(drawn, options[i].head ? SHORT : 0) : null));
   let runs = null;
   const place = (way, [wide, high], tip) => {
-    runs ??= ways.filter(Boolean).map((line) => ({...held(cableWalk(line)), of: line}));
+    runs ??= ways.filter(Boolean).map((line) => ({...held(walkWay(line)), of: line}));
     const [x, y] = labelPlace(way, [wide, high], taken, runs, looks, tip);
     taken.push(held([[x - wide, y - high], [x + wide, y - high], [x + wide, y + high], [x - wide, y + high]]));
     return [x, y];
@@ -377,7 +365,7 @@ export function wiresDrawn(html, {shapes = new Map(), floor = null, solids = [..
     // a cable's line — and, at an end that plugs into a port on a seen side, its lead over that block (leadSvg). Its
     // packets, when it asks how they ride, ride the line the record measures, past the stretches the record says are
     // hidden, and hand over to a lead's copy on the lead's stretch (the share of the line each lead holds)
-    const head = o.head ? HEAD * 0.8 : 0, ends = [0, 1].map((k) => levels.get(k ? laid.route.to : laid.route.from));
+    const head = o.head ? SHORT : 0, ends = [0, 1].map((k) => levels.get(k ? laid.route.to : laid.route.from));
     const held = [0, 1].map((k) => { const lead = o.rides && ends[k] !== undefined ? leadOf(laid, k, k === 1 ? head : 0) : null; return lead ? Math.min(1, piecesLength(lead.way.start, lead.pieces) / ways[i].length) : null; });
     const r = o.rides ? rideOf(o, ways[i].length, m[1], {unseen: kept.unseen, leads: [held[0], held[1] === null ? null : 1 - held[1]]}) : null;
     return cableSvg(named, m[1], o, ways[i], laid.points, place, r) + [0, 1].map((k) => leadSvg(named, laid, k, k === 1 ? head : 0, ends[k], r && {o, r, way: ways[i], share: held[k]})).join('');
@@ -431,8 +419,8 @@ function leadSvg(attrs, laid, k, back, level, ride = null) {
   const marks = [way.start, ...pieces.flatMap((piece) => (piece.corner ? [piece.corner, piece.to] : [piece.to])), ...(back ? [points.at(k ? -1 : 0)] : [])];
   const pad = 20, X = Math.min(...marks.map((p) => p[0])) - pad, Y = Math.min(...marks.map((p) => p[1])) - pad, W = Math.max(...marks.map((p) => p[0])) + pad - X, H = Math.max(...marks.map((p) => p[1])) + pad - Y;
   const d = wayPath({start: way.start, pieces}, X, Y);
-  const tip = points.at(-1), before = points.at(-2), far = Math.hypot(tip[0] - before[0], tip[1] - before[1]) || 1;
-  const head = back ? headAt([tip[0] - X, tip[1] - Y], [(tip[0] - before[0]) / far, (tip[1] - before[1]) / far]) : '';
+  const tip = points.at(-1), before = points.at(-2);
+  const head = back ? headAt([tip[0] - X, tip[1] - Y], headingOf(before, tip)) : '';
   // the packets' copy, on the cable's own line in this box's px
   let tag = {attrs: '', style: ''}, riders = '';
   if (ride) {

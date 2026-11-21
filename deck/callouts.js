@@ -16,7 +16,8 @@ import {attrRule, attrValue, closeOf, pieceTags, readAttributes, styleLength, ta
 
 export {closeOf};
 import {plainText} from './parse.js';
-import {boxFinder, exit} from './boxes.js';
+import {boxFinder} from './boxes.js';
+import {exitBox as exit} from 'footprint-story/isometric';
 
 const SIDES = ['above', 'below', 'left', 'right'];
 const ATTR = /\sdata-callout([\w-]*)=(["'])(.*?)\2/;

@@ -41,7 +41,7 @@
 // A piece is what it draws, not the box it is placed by. The box of a block seen from a corner has four empty corners,
 // and a nearer block's box lies over the block behind it: so on the slide shown only its faces and its words take the
 // pointer, and a ring round it (a highlight, explore's hover) follows its faces — isoRing, for whoever rings a piece.
-import {arrange, arrangeByGroup, floorLabelPlace, gridFor, isometric, readThing, wordsToFit, GROUP_MARGIN, MOST_FLOOR_LABEL, MOST_KEEP} from 'footprint-story/isometric';
+import {arrange, arrangeByGroup, floorLabelPlace, gridFor, isometric, readThing, wordsToFit, GROUP_MARGIN, MOST_FLOOR_LABEL, MOST_KEEP, roundOutline} from 'footprint-story/isometric';
 import {portsWritten} from './portsWritten.js';
 import {groupWritten} from './groups.js';
 import {keptFloor, mayKeepClear, readKeepClear} from './keepClear.js';
@@ -269,12 +269,6 @@ function gridOf(found, {fit, canvas, area, also = [], least = FITTED_TILE.least}
   return gridFor(things, [x0 + inset, y0 + inset, x1 - inset, y1 - inset], {...FITTED_TILE, least, also});   // the blocks, and the floor points their wires reach
 }
 
-/** A round thing's outline as points round it: the upper half of its top, then the lower half of its foot. */
-function roundOutline(top, bottom, steps = 12) {
-  const arc = (e, from) => Array.from({length: steps + 1}, (_, i) => { const a = from + (Math.PI * i) / steps; return {x: e.cx + e.rx * Math.cos(a), y: e.cy + e.ry * Math.sin(a)}; });
-  return [...arc(top, Math.PI), ...arc(bottom, 0)];
-}
-
 /**
  * What the grid says of a piece, with the refusal naming the piece: {box, art, say} — and, for a block or a cylinder,
  * {outline}: the points round what it draws on the slide, and {room}: how wide words so tall may be on its top.
@@ -292,7 +286,7 @@ function shapeOf(p, grid, covers = []) {
     if (p.kind === 'cylinder') {
       const c = grid.cylinder(thing), {x, y} = c.box, t = c.top, b = c.bottom;
       const side = `M${fixed(t.cx - t.rx - x)} ${fixed(t.cy - y)}L${fixed(b.cx - b.rx - x)} ${fixed(b.cy - y)}A${fixed(b.rx)} ${fixed(b.ry)} 0 0 0 ${fixed(b.cx + b.rx - x)} ${fixed(b.cy - y)}L${fixed(t.cx + t.rx - x)} ${fixed(t.cy - y)}Z`;
-      return {box: c.box, art: `<path class="iso-side" d="${side}"/><ellipse class="iso-top" cx="${fixed(t.cx - x)}" cy="${fixed(t.cy - y)}" rx="${fixed(t.rx)}" ry="${fixed(t.ry)}"/>`, say: c.centre, room: (high) => grid.room({...thing, round: true}, high), outline: roundOutline(t, b)};
+      return {box: c.box, art: `<path class="iso-side" d="${side}"/><ellipse class="iso-top" cx="${fixed(t.cx - x)}" cy="${fixed(t.cy - y)}" rx="${fixed(t.rx)}" ry="${fixed(t.ry)}"/>`, say: c.centre, room: (high) => grid.room({...thing, round: true}, high), outline: roundOutline(t, b)};   // a round thing's outline: footprint-story/isometric's, so a film's cylinder has the same edge
     }
     const b = grid.block(thing), {x, y} = b.box;
     return {box: b.box, art: `<polygon class="iso-left" points="${points(b.left, x, y)}"/><polygon class="iso-right" points="${points(b.right, x, y)}"/><polygon class="iso-top" points="${points(b.top, x, y)}"/>`, say: b.centre, room: (high) => grid.room(thing, high), outline: b.outline};

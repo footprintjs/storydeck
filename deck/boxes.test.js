@@ -1,5 +1,7 @@
 import {describe, it, expect} from 'vitest';
-import {boxFinder, exit, exitOutline} from './boxes.js';
+import {boxFinder} from './boxes.js';
+// how far a ray runs in an outline or a box is footprint-story's since 0.30.0: these pin what the deck gets from it
+import {exitBox as exit, exitOutline} from 'footprint-story/isometric';
 
 describe('boxes · where a piece stands, and where a line leaves it', () => {
   const square = [[0, 0], [10, 0], [10, 10], [0, 10]];
