@@ -213,6 +213,12 @@ describe('each isometric map built again by the map flow, its record kept for lo
     expect(mapLines(refused, null)).toEqual([]);   // a run not kept offers nothing to ask
   });
 
+  it('whatever goes wrong around a map\'s run is that map\'s failure, said: never a throw out of the stage', async () => {
+    const {built} = loadDeck(oneMap(HAND, 'a b')).compiled.maps.map, scope = {$call: (target, fn) => fn()};
+    const broken = await flowMaps(scope, {engine: {}, mapRecord: () => null}, [{name: 'map', built}]);
+    expect(broken.runs[0]).toMatchObject({name: 'map', file: null, differs: expect.stringMatching(/^the map flow failed where the deck built the map: /)});
+  });
+
   it('builds at most MAPS_MOST maps a run, and says how many more were not', async () => {
     const eng = await engine(), scope = {$call: (target, fn) => fn()};
     const {built} = loadDeck(oneMap(HAND, 'a b')).compiled.maps.map;

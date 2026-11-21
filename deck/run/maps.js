@@ -84,13 +84,15 @@ const limitOf = (limits) => (Number.isFinite(limits?.[MAP_FLOW]) && limits[MAP_F
  * kept is removed), `control` which decision let each step run (footprint-story/record · controlEdges).
  */
 async function flowOne(scope, run, {name, built}, file, ms) {
-  const eng = run.engine, flow = run.options.mapFlow ?? (await import('footprint-story/mapflow')).runMapFlow;   // loaded only for a deck with a map
+  const eng = run.engine;
+  // the map flow, loaded only for a deck with a map, inside the call: a door that cannot load is that map's failure, said
+  const flowOf = async () => run.options?.mapFlow ?? (await import('footprint-story/mapflow')).runMapFlow;
   let sink = null;
   try { sink = file ? eng.fileSink(file) : null; } catch { /* no record: the map is still built, and compared */ }
   const control = eng.controlDepRecorder();
   let made;
   try {
-    made = readMade(await scope.$call(MAP_FLOW, () => flow(built.spec, DECK, {...(sink ? {sink} : {}), recorders: [control]}), {attempts: 1, timeoutMs: ms}));
+    made = readMade(await scope.$call(MAP_FLOW, async () => (await flowOf())(built.spec, DECK, {...(sink ? {sink} : {}), recorders: [control]}), {attempts: 1, timeoutMs: ms}));
   } catch (e) {
     made = {failed: e?.name === 'AttemptTimeoutError' ? `it did not finish within ${ms / 1000} s` : thrownText(e)};
   }
@@ -114,11 +116,17 @@ async function flowOne(scope, run, {name, built}, file, ms) {
  * Returns {runs: [{name, file, control, keys, differs?}], skipped}.
  */
 export async function flowMaps(scope, run, maps) {
-  const runs = [], ms = limitOf(run.options.limits);
+  const runs = [], ms = limitOf(run.options?.limits);
   for (const one of maps.slice(0, MAPS_MOST)) {
     let file = null;
     try { file = run.mapRecord?.(runs.length) ?? null; } catch { /* a folder that cannot hold a record: the map is built without one */ }
-    runs.push(await flowOne(scope, run, one, file, ms));
+    // whatever goes wrong around a map's run is that map's failure, said: never the run's, never a promise left unhandled
+    try {
+      runs.push(await flowOne(scope, run, one, file, ms));
+    } catch (e) {
+      if (file) rmSync(file, {force: true});
+      runs.push({name: one.name, file: null, control: {}, keys: [], differs: `the map flow failed where the deck built the map: ${thrownText(e)}`});
+    }
   }
   return {runs, skipped: Math.max(0, maps.length - MAPS_MOST)};
 }
