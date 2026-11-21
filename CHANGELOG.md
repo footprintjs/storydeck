@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.33.0 — maps are built with footprint-story's steps
+
+- **An isometric map is built by footprint-story 0.25.0's map steps** (`footprint-story/isometric` · `buildIsoMap`, under
+  `ISO_MAP_POLICIES.deck`): placing the blocks, laying the wires along the floor, fitting the floors, choosing the
+  tile, fitting each block's name, placing each floor's label and the paint order are the same steps a film builds its
+  map with. The deck's own copies of them are gone (`deck/iso.js` · `place`, `gridOf`, `fitName`, the label and order
+  code; `deck/cable.js` · `layRoutes`, `reachOf`). The deck still reads the HTML, says what is wrong in its own words,
+  and writes the page, its levels, its CSS and the build's record. New: `deck/isoSpec.js` (the adapter: the read
+  pieces handed over as the steps' spec, the built map read back in the deck's names) and `deck/isoRules.js` (the
+  deck's own refusals, asked before the map is built). footprint-story is now `^0.25.0`.
+- **Pages are unchanged.** Every test's expected HTML is as it was. The example deck (`examples/a-request`), the
+  starter deck and 6000 generated maps (blocks placed by hand and by the build, groups, cylinders, footprints, floor kept
+  clear, labelled floors with icons, ports, written, fitted and usual grids, shared and long names, flat pieces,
+  callouts) were built with 0.32.0 and with this release and compared: every page, record (`ways`, `cables`, `tight`,
+  `made`) and refusal is the same, apart from StoryDeck's own version where a page names it. That comparison was run
+  for this release and is not checked in; `deck/isoSpec.test.js` pins that the deck draws by `buildIsoMap`'s numbers
+  for the example map and generated maps, and that no source file imports a map step itself.
+- **What a deck writer may see differently** — each only on a map 0.32.0 drew or refused for a reason past the limits:
+  - A block's name longer than 2000 letters (the most the steps fit; a name that long fits no block) is drawn whole and
+    said not to fit, as before; where it breaks onto two lines now follows its first 2000 letters.
+  - A map whose blocks the build places, with a block whose first name is longer than 200 letters, was refused
+    ("thing 1 has a name, some text of at most 200 characters"); it is now drawn. The steps know a name past 64 letters
+    (or one two pieces share) by a name made from its first 40 letters and `~` with a number, which a refusal of the
+    steps may show: `the build cannot place this map's blocks: "aaaa…a~0"'s size is […] — or give every block its data-at`.
+  - A map whose blocks the build places, with more than 1024 wires, was refused ("arrange reads at most 1024 links");
+    the build now places by the first wire between each two blocks, and refuses only past 1024 of those, in the steps'
+    words (`this map's wires holds at most 1024, and this one has … — split the map in two`).
+  - A refusal that none of the deck's own rules says first comes in the steps' words, naming the piece as the deck
+    does and without footprint-story's `isometric: `: wires the floor cannot lay (`this map: the wires cannot be laid:
+    … — check each wire's ends and the blocks' ports`), a picture that cannot be fitted (`this map: its picture (fitted
+    into the area): …`), a floor's label with too much drawn over its edge (`"f" (data-iso="floor"): its label: …`).
+    Before, the first two were footprint-story's bare words and the third had no `its label: `. None is known to reach
+    a deck the deck itself accepts.
+  - A map with two things wrong may name the other one first: a cylinder that is not round is said before the build
+    tries to place the blocks, and a floor's size before the slide's area or a fitted grid.
+- For whoever calls the deck's modules directly (not the package's doors): `isoDrawn` takes `floorWires(solids)` (which
+  wires lie along the floor, asked before the map is built) where it took `lay` and `lines`, and gives `routes`, the
+  ways the steps laid; `cable.js · cables` lays by the same steps (`isoSpec.js · layRoutes`). `iso.js · GROUPED_LEAST`
+  is gone (the policy's `fit.grouped`); `FITTED_TILE` is read from the policy. `deck/groups.test.js` reads where the
+  blocks stand from `isoDrawn`'s `solids`, where it listened on the removed `lay`.
+
 ## 0.32.0 — a block picks how its name breaks
 
 - **`data-break="fill"` on a block or a cylinder**: its name's first line takes as many words as fit, the rest go

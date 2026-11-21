@@ -741,7 +741,10 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   The floor is ground (see below), so the view follows the pieces. One colour a piece (`--iso-color`): its top is drawn
   lighter and its sides darker; `--iso-ink`, `--iso-line`, `--iso-grid` and `--iso-floor` are the other tokens, and
   class `ok`, `warn` or `bad` colours one. The numbers come from `footprint-story/isometric`, the grid a film can draw
-  with too. A block is what it draws, not the box it is placed by: on the slide shown its faces and its words take the
+  with too, and so does the map itself: since 0.33.0 the build hands the map's pieces to that package's map steps
+  (`buildIsoMap`, with the deck's own numbers), which place the blocks, lay the wires, fit the floors, choose the tile,
+  fit the names, place the floor labels and set the paint order — the same steps a film builds its map with. The deck
+  reads your HTML, says what is wrong in its own words, and writes the page. A block is what it draws, not the box it is placed by: on the slide shown its faces and its words take the
   pointer (the empty corners of its box do not, so a block behind is not covered by them), a ring round it — a highlight
   (`data-hot`) or explore's hover — follows its faces.
 
@@ -752,7 +755,7 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   half a tile apart, and a wire alone takes the middle of a foot (a foot two tiles wide has room for three); on a
   crowded floor each takes the cheapest way there is, which may be another foot. A block straight in front of
   another, behind it, or against it is reached the same way. A packet rides the line itself. The way is found by
-  `footprint-story/isometric` (`routes`), so a film lays the same wires the same way.
+  `footprint-story/isometric` (`routes`, laid by its map steps), so a film lays the same wires the same way.
 
   Its `data-label` stands on the cable itself, on a plate of the slide's ground (`--bg`; on a tinted floor set
   `--wire-plate`): at the cable's middle, or along it at the nearest place where no block is over it, no label placed

@@ -13,11 +13,7 @@ const wire = (k, arrow) => `<i data-k="${k}" class="wire" data-arrow="${arrow}">
 const floors = '<div data-k="f-front" data-iso="floor" data-iso-group="front" data-label="Frontend team"></div><div data-k="f-back" data-iso="floor" data-iso-group="back" data-label="Backend team"></div>';
 const teams = `${floors}${block('web', 'front')}${block('cdn', 'front')}${block('api', 'back')}${block('db', 'back', 'cylinder')}${block('queue', 'back')}${wire('w1', 'cdn to web')}${wire('w2', 'web to api')}${wire('w3', 'api to db')}${wire('w4', 'api to queue')}`;
 /** Each piece's place and size in tiles, as the drawing placed it: read back from its own drawing (the floor's data-at is the build's). */
-const placed = (html) => {
-  const seen = [];
-  isoDrawn(html, {canvas, links: wireLinks(html), lay: (solids) => { seen.push(...solids); return []; }});
-  return Object.fromEntries(seen.map((s) => [s.name, {at: s.at, size: s.size}]));
-};
+const placed = (html) => Object.fromEntries(isoDrawn(html, {canvas, links: wireLinks(html)}).solids.map((s) => [s.name, {at: s.at, size: s.size}]));
 const overlapping = (a, b) => a.at[0] < b.at[0] + b.size[0] && b.at[0] < a.at[0] + a.size[0] && a.at[1] < b.at[1] + b.size[1] && b.at[1] < a.at[1] + a.size[1];
 
 describe('groups · blocks that belong together, each group on its floor (data-iso-group)', () => {
