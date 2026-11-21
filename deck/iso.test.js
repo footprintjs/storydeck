@@ -483,6 +483,35 @@ describe('iso · a block\'s name fits its top face', () => {
   });
 });
 
+describe('iso · a block picks how its name breaks onto two lines (data-break)', () => {
+  const grid = '<i data-iso-grid="96 at 960 240"></i>';
+  const block = (more, inner = '<b>Logs to S3 Archive</b>') => `${grid}<div data-k="a" data-iso="block" data-at="0 0" data-size="2 2 1"${more}>${inner}</div>`;
+  const say = (more, inner) => /<span class="iso-say"[^>]*>(.*?)<\/span>/.exec(isoPieces(block(more, inner), {canvas}))[1];
+
+  it('"even" is the usual (the two lines alike); "fill" sets the first line as full as it goes — and the page does not carry the attribute', () => {
+    expect(say('')).toBe('<b style="font-size:21px">Logs to<br>S3 Archive</b>');
+    expect(say(' data-break="even"')).toBe(say(''));
+    expect(say(' data-break="fill"')).toBe('<b style="font-size:21px">Logs to S3<br>Archive</b>');
+    expect(isoPieces(block(' data-break="fill"'), {canvas})).not.toMatch(/data-break/);
+    // a name that fits on one line is the same either way
+    expect(say(' data-break="fill"', '<b>API</b>')).toBe('<b>API</b>');
+    // the run's record names the rule each block's writer picked, and only those
+    expect(isoDrawn(block(' data-break="fill"'), {canvas}).made.breaks).toEqual([['a', 'fill']]);
+    expect(isoDrawn(block(''), {canvas}).made).not.toHaveProperty('breaks');
+  });
+
+  it('refuses a rule it does not know, a bare or doubled attribute, and one on a floor — naming the piece and the fix', () => {
+    expect(() => isoPieces(block(' data-break="balanced"'), {canvas})).toThrow(/"a" \(data-iso="block"\): data-break="balanced" — a name breaks by "fill" or "even": "fill" sets the first line as full as it goes, "even" \(the usual\) makes the two lines alike/);
+    // written exactly, as a film's recipe key is: padding is refused, not trimmed
+    expect(() => isoPieces(block(' data-break=" fill "'), {canvas})).toThrow(/data-break=" fill " — a name breaks by "fill" or "even"/);
+    // a rule for a name it does not have (plain words, an empty block, a styled name the build leaves as written)
+    for (const inner of ['just text', '', '<b style="font-size:20px">Logs to S3 Archive</b>']) expect(() => isoPieces(block(' data-break="fill"', inner), {canvas})).toThrow(/"a" \(data-iso="block"\): data-break says how its name breaks onto two lines, and it has no name the build fits .* — give it one, or take data-break out/);
+    expect(() => isoPieces(block(' data-break'), {canvas})).toThrow(/data-break is written data-break="fill" or data-break="even", once, in lower case and with quotes/);
+    expect(() => isoPieces(block(' data-break="fill" data-break="even"'), {canvas})).toThrow(/once, in lower case and with quotes/);
+    expect(() => isoPieces(`${grid}<div data-k="f" data-iso="floor" data-at="0 0" data-size="4 4" data-break="fill"></div>`, {canvas})).toThrow(/"f" \(data-iso="floor"\): data-break says how a block's name breaks onto two lines, and a floor holds no words — put it on the block/);
+  });
+});
+
 describe('iso · a piece that cannot be drawn is refused in the deck\'s words, with wires on the map too', () => {
   it('names the piece and the fix, as it did before wires were laid first', async () => {
     const {applyTransforms} = await import('./transforms.js');

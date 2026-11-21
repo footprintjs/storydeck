@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.32.0 — a block picks how its name breaks
+
+- **`data-break="fill"` on a block or a cylinder**: its name's first line takes as many words as fit, the rest go
+  beneath ("Logs to S3 / Archive"). `data-break="even"` is the usual and what every page had: the two lines as alike as
+  they can be ("Logs to / S3 Archive"). The rules are footprint-story 0.22.0's (`wordsToFit`'s `break`, the names of
+  `BREAK_RULES`), so a film breaks a name the same way. Pages that write no `data-break` are unchanged; on a block or a
+  cylinder the attribute is read and not written into the page (on any other element it is not read).
+- The run's record names the rule each block's writer picked: `maps made` gains `breaks: [[block, rule], …]`, only
+  when a map has one (`storydeck log --run N` shows it).
+- Refused, naming the piece and the fix: a value that is not exactly `fill` or `even` (no padding, as a film's recipe
+  key), a bare or doubled `data-break`, one on a block with no name the build fits (as a film refuses a `break` with no
+  label), and one on a floor (a floor holds no words).
+
 ## 0.31.0 — a lead into a port ends at its floor corner, worked out by the story library
 
 A lead into a port on a seen side (the stretch of a cable drawn again over its block) now comes from

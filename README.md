@@ -123,6 +123,7 @@ names, a `step` of 0–5 s, a text `line`, a `lineAt` of `'x y'` — and refused
 | the view to move on without changing size | `data-focus="pan"` |
 | a panel or a legend that stays put while the view moves | `data-stage="panel"` on its pieces |
 | a floor or a backdrop the view should not frame | `data-ground` on it |
+| a block's long name broken with the first line full ("Logs to S3 / Archive"), not the two lines alike | `data-break="fill"` on the block (`"even"` is the usual) |
 | blocks on a floor without working out where each goes | `data-iso="block"` with no `data-at` on any block, and a wire for each thing joined: the build places them |
 | pieces to come one after another | `data-focus="path"`, in the order of `data-on` or `data-focus-route` |
 | some to come together, or a turn to take longer | `data-focus-route="a (b c) w1:1.2"` |
@@ -690,7 +691,11 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   "cols rows" for a `floor`. Its words stand flat on its top face, and its name (its first `<b>`, inside no other
   element) is made to fit that face: as written when it fits on one line, else broken onto two lines, else smaller,
   down to 16 px. A name that still does not fit is drawn at 16 px and `check` says so (`name-fit`), with the two ways
-  out: shorten it, or give the block a bigger top. A top is a diamond, as wide across its middle as the block's
+  out: shorten it, or give the block a bigger top. Where two lines part is a rule you may pick: `data-break="even"`
+  (the usual: the two lines as alike as they can be, "Logs to / S3 Archive") or `data-break="fill"` (the first line as
+  full as it goes, "Logs to S3 / Archive") — footprint-story's named rules, so the run's record says which one each
+  block asked for (`maps made` · `breaks`). Any other value (padding too), one on a block with no plain name, or one
+  on a floor is refused. A top is a diamond, as wide across its middle as the block's
   shorter side is long: a block 8 by 1 has room for a short name only, however long it is.
   The fit is counted in letters, since a build has no browser; `build --layout` measures the page itself. Two words
   joined by a no-break space (`&nbsp;`) stay on one line. A `<b>` with a style or markup of its own is left as you
