@@ -125,7 +125,7 @@ export interface CompiledDeck {
   readonly explore: { readonly slides: readonly (string | null)[]; readonly targets: Readonly<Record<string, Readonly<Record<string, number>>>> } | null;
   /** The parts' entrances as the page plays them: each distinct change sampled once (kinds), and its key per slide — or null when no part has one. */
   readonly transitions: { readonly kinds: Readonly<Record<string, unknown>>; readonly enter: readonly (string | null)[] } | null;
-  readonly maps: Readonly<Record<string, { readonly pieces: readonly FocusPiece[]; readonly callouts?: readonly DeckCallout[]; /** What the build knows of a wire's way along the floor, for check (rule wire-way): absent when every wire lies well. */ readonly ways?: readonly { readonly name: string; readonly from: string; readonly to: string; readonly way: string }[]; /** Each cable laid along the floor: its corners and its drawn line's length in slide px, the stretches a block hides (px along it), what it passes behind, crosses and shares. */ readonly cables?: readonly { readonly name: string; readonly from: string; readonly to: string; /** The port at each end (null for a foot), on a cable that plugs into one. */ readonly ports?: readonly [string | null, string | null]; readonly points: readonly (readonly [number, number])[]; readonly length: number; readonly unseen: readonly (readonly [number, number])[]; readonly behind: readonly string[]; readonly crosses: number; readonly shared: number; readonly bends: number }[]; /** Names that do not fit their block's top face (rule name-fit). */ readonly tight?: readonly { readonly name: string; readonly text: string }[]; /** How an isometric map was made: who placed its blocks, the tile's width in px, whether the picture was fitted, how many pieces stand on the floor by a footprint (absent when none), how many px a fitted map of groups runs past the slide's area (absent when it fits). */ readonly made?: { readonly placed: 'build' | 'hand'; readonly tile: number; readonly fitted: boolean; readonly footprints?: number; readonly outside?: number } }>>;
+  readonly maps: Readonly<Record<string, { readonly pieces: readonly FocusPiece[]; readonly callouts?: readonly DeckCallout[]; /** What the build knows of a wire's way along the floor, for check (rule wire-way): absent when every wire lies well. */ readonly ways?: readonly { readonly name: string; readonly from: string; readonly to: string; readonly way: string }[]; /** Each cable laid along the floor: its corners and its drawn line's length in slide px, the stretches a block hides (px along it), what it passes behind, crosses and shares. */ readonly cables?: readonly { readonly name: string; readonly from: string; readonly to: string; /** The port at each end (null for a foot), on a cable that plugs into one. */ readonly ports?: readonly [string | null, string | null]; readonly points: readonly (readonly [number, number])[]; readonly length: number; readonly unseen: readonly (readonly [number, number])[]; readonly behind: readonly string[]; readonly crosses: number; readonly shared: number; readonly bends: number }[]; /** Names that do not fit their block's top face (rule name-fit). */ readonly tight?: readonly { readonly name: string; readonly text: string }[]; /** How an isometric map was made: who placed its blocks, the tile's width in px, whether the picture was fitted, how many pieces stand on the floor by a footprint (absent when none), how many px a fitted map of groups runs past the slide's area (absent when it fits). */ readonly made?: { readonly placed: 'build' | 'hand'; readonly tile: number; readonly fitted: boolean; readonly footprints?: number; readonly outside?: number }; /** The very spec the map's steps were handed and the map they built, both frozen: what the run's map flow is handed again (absent with no isometric piece). */ readonly built?: { readonly spec: unknown; readonly map: unknown } }>>;
   /** Present when the deck has a callout: the page then carries a callout's stylesheet. */
   readonly callouts?: true;
   /** Present when a wire's packets ride their own way (data-ride, data-rest, data-keep-size, data-trail, data-behind, a data-speed in px): the page then carries their stylesheet. */
@@ -196,6 +196,14 @@ export interface DeckRun {
   carried?: number;
   /** why the run was not kept for `storydeck log` */
   unkept?: string;
+  /**
+   * each isometric map built again by footprint-story's map flow, its record kept for `storydeck log --why <key> --map
+   * <map>`: `file` the record (null when none was kept), `control` which decision let each step run, `keys` what the
+   * map's run wrote, `differs` where its map parted from the page's; `skipped` the maps past the most a run builds
+   */
+  maps: { runs: { name: string; file: string | null; control: unknown; keys: string[]; differs?: string }[]; skipped: number };
+  /** the run's id when it was kept: what `storydeck log --run <id>` names it by (its number moves, its id never) */
+  id?: string;
 }
 /**
  * Run a deck folder once: read and compiled once, read against every rule, measured in a browser when `layout` asks
@@ -205,7 +213,9 @@ export interface DeckRun {
  * A deck that does not compile is the verdict 'broken', never a throw; a page that may not be written throws.
  */
 export function runDeck(dir: string, options?: { write?: boolean; layout?: boolean; out?: string; voice?: boolean; chromium?: unknown; driver?: LayoutDriver;
-  limits?: { 'browser.open': number; 'browser.measure': number; 'browser.close': number }; home?: string; keep?: boolean }): Promise<DeckRun>;
+  limits?: Partial<Record<'browser.open' | 'browser.measure' | 'browser.close' | 'map.flow', number>>; home?: string; keep?: boolean;
+  /** a stand-in for footprint-story/mapflow · runMapFlow (a test's): called with the map's spec, the deck's policy and {sink, recorders} */
+  mapFlow?: (spec: unknown, policy: unknown, options: { sink?: unknown; recorders: unknown[] }) => unknown }): Promise<DeckRun>;
 
 /** The browser port the layout check drives (the video's deckStageDriver, with measure). */
 export interface LayoutDriver {

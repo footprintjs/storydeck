@@ -226,7 +226,8 @@ That is the example deck (`examples/a-request`), whose blocks are placed by hand
 answers through `place: build` (`[control: no block has an at: the build places them from their wires, …]`). `--why
 view` answers through the grid's decision — written in numbers, fitted, or the usual grid (`[control: no grid is
 written and the map placed its blocks: it is the usual grid the tool handed in]`) — and `--why names` through the
-names step. `--why` with `--map` and no key lists what that map's run wrote. Pinned by `maps.test.js`.
+names step. `--why` with no key is refused, as the run's own is, naming what that map's run wrote. Pinned by
+`maps.test.js`.
 
 **The ⚠ line.** The `read` step takes the spec and the policy as the run's input, not from the run's state, so no
 earlier step wrote what it read and the walk ends there: what `read` took is the map as the deck wrote it.
@@ -247,9 +248,11 @@ earlier step wrote what it read and the walk ends there: what `read` took is the
 - **A record that cannot be written never costs the run.** The map is still built and compared, and the reply says
   `map map: its record was not kept`. A map's record goes when its run is dropped.
 - **The call the reply offers names the run by its id**: a run's number moves when another is kept. `--run` takes
-  either.
+  either, and an answer asked by id names the run by it. A map's name is quoted past letters, digits and `_`; one the
+  command line would read as a flag (it starts with `--`) is never offered.
 - **Refusals name what there is**: an unknown map names the run's maps; a run with none says why (no isometric map, or
   a deck that did not compile) and names the deck's maps; a run kept before 0.34.0 says it kept no map records.
 - **Cost.** A map of 100 blocks takes about 45 ms more to build when its blocks are placed by hand, and 65–85 ms when
-  the build places them (measured on one laptop, by the run's own `map.flow` call times), and keeps a record of about
-  180 KB.
+  the build places them (measured on one laptop, by the run's own `map.flow` call times). Its record is about 180–230 KB
+  for each map, each kept run: a deck keeps 30 runs, so one such map holds up to about 7 MB of records, and a deck of
+  several reaches tens of MB (at most 32 maps a run). They go with their runs.

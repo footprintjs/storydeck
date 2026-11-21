@@ -6,6 +6,7 @@
 import path from 'node:path';
 import {problemLine, worstFirst} from '../check.js';
 import {plural} from './words.js';
+import {MAP_NAME} from './log.js';
 
 /** The most problems one reply lists: the rest are counted by rule, and `all` lists every one. */
 export const MOST_LISTED = 30;
@@ -54,18 +55,28 @@ function standingLine(r) {
 }
 
 /**
+ * A map's name as an offered call gives it: as it is when it is letters, digits and _, else quoted for a shell; null
+ * when it is not to be offered — a name a kept run would not keep (log.js · MAP_NAME), or one the command line would
+ * read as a flag (it starts with --).
+ */
+export function mapArg(name) {
+  if (typeof name !== 'string' || !MAP_NAME.test(name) || name.startsWith('--')) return null;
+  return /^\w+$/.test(name) ? name : `'${name}'`;
+}
+
+/**
  * What the reply says of the deck's isometric maps (run/maps.js), one line each at most: a drift aloud, a record not
  * kept, the maps not built again, then how to ask — the run named by its id (a run's number moves when another is
  * kept, its id never), the first map that kept a record. Nothing when the deck has no isometric map.
  */
 export function mapLines({runs = [], skipped = 0} = {}, id = null) {
   if (!runs.length) return [];
-  const asked = runs.find((m) => m.file);
+  const asked = runs.find((m) => m.file && mapArg(m.name));
   return [
     ...runs.filter((m) => m.differs).map((m) => `drift · map ${m.name}: footprint-story's map flow did not build the map the page draws — ${m.differs} (the page draws the deck's map; report it to footprint-story)`),
     ...(id ? runs.filter((m) => !m.file).map((m) => `map ${m.name}: its record was not kept, so log --why cannot answer for it`) : []),
     ...(skipped ? [`maps: ${skipped} more not built again (a run builds the first ${runs.length})`] : []),
-    ...(id && asked ? [`maps: ${runs.map((m) => m.name).join(', ')} — why a block stands where it does: storydeck log --run ${id} --why at --map ${asked.name}`] : []),
+    ...(id && asked ? [`maps: ${runs.map((m) => m.name).join(', ')} — why a block stands where it does: storydeck log --run ${id} --why at --map ${mapArg(asked.name)}`] : []),
   ];
 }
 

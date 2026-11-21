@@ -2,7 +2,7 @@
 // each stage's time, each tool's calls, and the run in words. A person or an assistant reads how a result was made
 // instead of running it again. Every line shown was read from a file: its caller shows it as plain text.
 import {plural} from './words.js';
-import {verdictLine} from './reply.js';
+import {mapArg, verdictLine} from './reply.js';
 
 /** How many lines of one run's words are shown (`all`: every one kept). */
 export const LINES_SHOWN = 60;
@@ -44,9 +44,9 @@ function callText(target, c) {
 /** The isometric maps a run built again (run/maps.js), and how to ask one why: by the run's id, which never moves. */
 function mapsText(run, n) {
   if (!run.maps?.length) return [];
-  const asked = run.maps.find((m) => m.record);
+  const asked = run.maps.find((m) => m.record && mapArg(m.name));
   return [`maps: ${run.maps.map((m) => `${m.name}${m.record ? '' : ' (no record kept)'}${m.differs ? ' (drift: its map flow parted from the page\'s map)' : ''}`).join(', ')}${run.mapsSkipped ? ` · ${run.mapsSkipped} more not built again` : ''}`,
-    ...(asked ? [`  why a block stands where it does: storydeck log --run ${run.id ?? n} --why at --map ${asked.name}`] : [])];
+    ...(asked ? [`  why a block stands where it does: storydeck log --run ${run.id ?? n} --why at --map ${mapArg(asked.name)}`] : [])];
 }
 
 /** One run in full. */

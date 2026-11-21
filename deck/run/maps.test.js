@@ -6,7 +6,7 @@ import {runMapFlow} from 'footprint-story/mapflow';
 import {runDeck} from './run.js';
 import {engine} from './engine.js';
 import {firstDifference, flowMaps, MAP_FLOW, MAPS_MOST} from './maps.js';
-import {mapLines, replyText} from './reply.js';
+import {mapArg, mapLines, replyText} from './reply.js';
 import {keptRuns, runsFolder} from './log.js';
 import {logTool} from '../tools.js';
 import {loadDeck} from '../build.js';
@@ -69,10 +69,9 @@ describe('each isometric map built again by the map flow, its record kept for lo
     expect(view.split('\n')[0]).toBe('view = {"tile":[120,60],"origin":[960,240],"rise":73.48469228349535}');
     expect(view).toMatch(/^grid: usual \(usual#\d+\) \[wrote: view\]$/m);
     expect(view).toContain('[control: no grid is written and the map placed its blocks: it is the usual grid the tool handed in]');
-    // --why with no key lists what that map's run wrote; a key no step wrote says what there is
-    const keys = await logTool(usual, {home, run: '1', why: '', map: 'map'});
-    expect(keys).toMatch(/^run 1 map map: --why names a value its steps wrote — who, blocks, .*\bat\b.*\bview\b.*\bnames\b/);
-    expect(keys.split('\n')).toHaveLength(1);
+    // --why with no key is refused, as the run's own is, naming what that map's run wrote; a key no step wrote says what there is
+    await expect(logTool(usual, {home, run: '1', why: '', map: 'map'})).rejects.toThrow(/^why names a value of run 1 map map, one of what its steps wrote \(a map's steps write who, blocks, .*\bat\b.*\bview\b.*\bnames\b.*\)$/);
+    await expect(logTool(usual, {home, run: '1', why: ''})).rejects.toThrow('why names a value of the run, one of what its stages wrote (storydeck log --run 1 shows what each stage wrote)');
     expect(await logTool(usual, {home, run: '1', why: 'nope', map: 'map'})).toMatch(/^nope: no stage of this run wrote it \(a map's steps write .*placedWhy/);
   });
 
@@ -166,6 +165,28 @@ describe('each isometric map built again by the map flow, its record kept for lo
     writeFileSync(file, JSON.stringify({...data, maps: [{...data.maps[0], name: '../x\nverdict = 1'}, data.maps[1]]}));
     expect(await logTool(dir, {home, run: '1', why: 'placed', map: 'two'})).toMatch(/^placed = "build"/);
     await expect(logTool(dir, {home, run: '1', why: 'placed', map: 'one'})).rejects.toThrow('run 1 has no map "one": its isometric maps are two');
+  });
+
+  it('a run asked by its id is named by it; an id no kept run has says so; a kept failure cannot forge a line', async () => {
+    const home = tempDir(), dir = oneMap(MAP, 'a', 'flat');
+    const r = await runDeck(dir, {home});
+    await expect(logTool(dir, {home, run: r.id, why: 'at', map: 'flat'})).rejects.toThrow(`run ${r.id} kept no map: its deck has no isometric map`);
+    await expect(logTool(dir, {home, run: r.id, why: ''})).rejects.toThrow(`(storydeck log --run ${r.id} shows what each stage wrote)`);
+    expect(await logTool(dir, {home, run: r.id, why: 'nothing'})).toBe(`nothing: no stage of this run wrote it (storydeck log --run ${r.id} shows what each stage wrote)`);
+    expect(() => logTool(dir, {home, run: '2026-01-01T00-00-00-000Z-build.abcdef', why: 'at'})).toThrow('--run is a run\'s number in the list (1 the newest, to 1) or its id; no kept run has id "2026-01-01T00-00-00-000Z-build.abcdef"');
+    expect(() => logTool(dir, {home, run: 'x\ny'})).toThrow('no kept run has id "x y"');
+    const file = path.join(folderOf(home, dir), `${r.id}.json`), data = JSON.parse(readFileSync(file, 'utf8'));
+    writeFileSync(file, JSON.stringify({...data, verdict: 'failed', flat: [], failure: 'boom\nverdict = "forged"\u2028x'}));
+    const said = await logTool(dir, {home, run: '1', why: 'at', map: 'flat'}).catch((e) => e.message);
+    expect(said).toBe('run 1 kept no map: it could not finish (boom verdict = "forged" x)');
+    expect(logTool(dir, {home, run: '1'}).split('\n').some((line) => line.startsWith('verdict'))).toBe(false);
+  });
+
+  it('a map is offered by a name the command line takes: quoted past letters and digits, never one it reads as a flag', () => {
+    expect(['map', 'my-map', '-x', '--x', 'x'.repeat(101), 'a b'].map(mapArg)).toEqual(['map', '\'my-map\'', '\'-x\'', null, null, null]);
+    const runs = [{name: '--x', file: '/r/0', control: {}, keys: []}, {name: 'my-map', file: '/r/1', control: {}, keys: []}];
+    expect(mapLines({runs, skipped: 0}, 'the-id').at(-1)).toBe('maps: --x, my-map — why a block stands where it does: storydeck log --run the-id --why at --map \'my-map\'');
+    expect(mapLines({runs: runs.slice(0, 1), skipped: 0}, 'the-id')).toEqual([]);   // nothing the command line takes: nothing offered
   });
 
   it('a run kept before 0.34.0 says it kept no map records, never "no map"', async () => {

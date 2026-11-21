@@ -25,9 +25,12 @@ place: hand (hand#2) [wrote: at]
   its own record beside the run's: `<run id>.map-<k>.record.jsonl` (named by the map's place, never by the deck's
   words). New: `deck/run/maps.js` (`flowMaps`) and `deck/run/why.js` (`whyText`).
 - **`storydeck log --run <n|id> --why <key> --map <map>`**: the map by the deck's own name for it — the one `data-map`
-  gives and `maps made` writes. `--why` with `--map` and no key lists what that map's run wrote; an unknown map names
-  the run's maps; a run with none says why, and names the deck's other maps. `--run` now takes a run's id too, and a
-  `--why` with no value asks what there is to ask. The MCP `log` tool has a `map` argument.
+  gives and `maps made` writes. `--why` with no key is refused (exit 1), naming what there is to ask: with `--map`, what
+  that map's run wrote; without, where the run's own stages are listed. An unknown map names the run's maps; a run
+  with none says why, and names the deck's other maps. `--run` now takes a run's id too, and an answer asked by id
+  names the run by it; an id no kept run has (a dropped run's) says so. The offered call quotes a map's name past
+  letters and digits, and never offers one the command line would read as a flag.
+- **The MCP `log` tool's schema grew** by the `map` argument and a line in `run`'s description.
 - **The two maps must be equal.** A difference is a `drift` line in the reply (where they first part) and heads every
   answer for that map. It counts in no verdict: the page draws the deck's map.
 - **Each map flow is a named call** (`map.flow`, 30 s at most): a map flow that throws, returns nothing or never
@@ -37,7 +40,8 @@ place: hand (hand#2) [wrote: at]
   deck with no isometric map runs nothing new, and its reply is unchanged; its kept run now says it built no maps
   (`maps: []`, `flat`), so a run kept before 0.34.0 is told apart ("kept before 0.34.0, which kept no map records").
 - **Pages unchanged**: every example page and expected HTML is the same. Cost: a 100-block map takes about 45 ms
-  more (placed by hand) or 65–85 ms more (placed by the build), and keeps a record of about 180 KB.
+  more (placed by hand) or 65–85 ms more (placed by the build), and keeps a record of about 180–230 KB per map per
+  kept run: at the cap of 30 kept runs, tens of MB for a deck of a few such maps (`deck/run/README.md` · Cost).
 
 ## 0.33.0 — maps are built with footprint-story's steps
 

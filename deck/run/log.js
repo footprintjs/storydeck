@@ -52,7 +52,7 @@ export const MAPS_KEPT = 32, NAMES_KEPT = 200;
 /** A key a map's run wrote, as it is kept and listed: a plain name. */
 export const KEY = /^[A-Za-z_]\w{0,39}$/;
 /** A map's name as a run keeps it: the deck's own (source.js · mapFile: letters, digits, - and _), never other text. */
-const MAP_NAME = /^[\w-]{1,100}$/;
+export const MAP_NAME = /^[\w-]{1,100}$/;
 
 /**
  * A map's record file, beside its run's: `<run id>.map-<k>.record.jsonl`, k its place in the run's list of maps. WHY a
@@ -154,7 +154,7 @@ function readRun(data) {
     since: d.since ? {fixed: whole(plain(d.since).fixed), new: whole(plain(d.since).new)} : null,
     keys: pairs(d.keys, MOST.keys), layout: pairs(d.layout, MOST.keys), carried: whole(d.carried),
     stages: (Array.isArray(d.stages) ? d.stages : []).slice(0, 64).map((s) => ({stage: text(plain(s).stage, 80), ms: whole(plain(s).ms)})),
-    calls, failure: d.failure === null || d.failure === undefined ? null : text(d.failure, 2000),
+    calls, failure: d.failure === null || d.failure === undefined ? null : text(typeof d.failure === 'string' ? d.failure.replace(/\s+/g, ' ') : d.failure, 2000),   // one line: a file edited by hand cannot add one
     lines: (Array.isArray(d.lines) ? d.lines : []).slice(0, MOST.lines).map((l) => text(l)),
     engine: (Array.isArray(d.engine) ? d.engine : []).slice(0, 20).map((l) => text(l)),
     control: controlKept(d.control),

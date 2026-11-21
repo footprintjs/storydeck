@@ -85,9 +85,13 @@ export function logTool(dir, {home = storydeckHome(), run, all = false, measure,
     return listText(runs, callCounts(folder), {kept: RUNS_KEPT, measure});
   }
   const byId = runs.findIndex((r) => r.id === String(run)), n = byId >= 0 ? byId + 1 : Number(run);
-  if (!Number.isInteger(n) || n < 1 || n > runs.length) throw new Error(runs.length ? `--run is a run's number in the list, 1 (the newest) to ${runs.length}, not ${run}` : 'no runs kept yet: storydeck check and storydeck build each leave one');
-  // why a value of that run is what it is, walked back from a record: a promise of the text (run/why.js)
-  if (asked) return whyText(runs[n - 1], n, typeof value === 'string' ? value : '', {all, map: mapAsked ? String(map) : null});
+  if (!runs.length) throw new Error('no runs kept yet: storydeck check and storydeck build each leave one');
+  // a name that is no number is an id: one no kept run has (a dropped run's too) says so
+  if (byId < 0 && !/^\d+$/.test(String(run))) throw new Error(`--run is a run's number in the list (1 the newest, to ${runs.length}) or its id; no kept run has id ${JSON.stringify(printable(String(run)).replace(/\s+/g, ' ').slice(0, 80))}`);
+  if (!Number.isInteger(n) || n < 1 || n > runs.length) throw new Error(`--run is a run's number in the list, 1 (the newest) to ${runs.length}, not ${run}`);
+  // why a value of that run is what it is, walked back from a record: a promise of the text (run/why.js) — asked by
+  // its id, every line names the run by its id
+  if (asked) return whyText(runs[n - 1], byId >= 0 ? runs[n - 1].id : n, typeof value === 'string' ? value : '', {all, map: mapAsked ? String(map) : null});
   return runText(runs[n - 1], n, {all, measure});
 }
 
