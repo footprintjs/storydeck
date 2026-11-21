@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.29.0 — framing and a part that differs: the rules live in the story library
+
+Pages and compiled records are byte for byte as on 0.28.0 but for the version in the page's generator line. Checked on
+`examples/a-request` and 600 decks made from it — every click's camera and side mover (`zoom`, `fit`, `pan`, `left`,
+`right`, `up`, `down`, with random `share`, `most`, `least`, `grow`, `fill`, `scale`, `gap`, `align`, including
+options that are no number) and a part's random `data-differs-*` — built before and after, every page, record and
+refusal compared; and function for function against 0.28.0's `readDiffers`, `refuseEnglishWords`, `refuseStepDiffers`
+and focus strategies over 50,000 generated inputs each. What moved is where the rules are: a film needs them too.
+
+- `focus.js` · the size `zoom`, `fit` and the side movers give → `footprint-story/layout · frameZoom` (the box
+  contained in the room, a share of that, held between two bounds; the same operations, so a view rounded to 4 places
+  rounds as before). An unchecked `zoom` option that is no number still gives the view it gave.
+- `deck/differs.js` · the rules a part that differs is held to and its default words → `footprint-story`
+  (`differsProblem`, `differsLines`, `timeProblem`, `differsEnglish`, `timeWords`, `analogyWords` and the bounds).
+  Reading the attributes and every sentence of a refusal stay here, word for word.
+- `footprint-story` 0.18.0 or later.
+
 ## 0.28.0 — the numbers a film shares live in the story library
 
 Pages and compiled records are byte for byte as on 0.27.0 but for the version in the page's generator line, and one

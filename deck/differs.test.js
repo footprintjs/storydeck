@@ -1,5 +1,6 @@
 import {describe, it, expect} from 'vitest';
-import {readDiffers, differsHtml, saidInNotes, timeWords, DIFFERS_CSS, DIFFERS_MOST, DIFFERS_SAID_MOST} from './differs.js';
+import {timeWords, DIFFERS_MOST, DIFFERS_SAID_MOST} from 'footprint-story';
+import {readDiffers, differsHtml, saidInNotes, DIFFERS_CSS} from './differs.js';
 import {checkDeck} from './check.js';
 import {compileDeck} from './compile.js';
 import {deckPage} from './page.js';
