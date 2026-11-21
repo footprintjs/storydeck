@@ -28,6 +28,8 @@ export const DECK = ISO_MAP_POLICIES.deck;
 export const usualGrid = (canvas) => ({tile: 120, origin: [(canvas ?? [1920, 1080])[0] / 2, 240]});
 /** The map, as a refusal of the steps names it. */
 const MAP = 'this map';
+/** A plain value frozen at every level: the spec, lists and objects of numbers and words (a copy is frozen, never the deck's pieces). */
+const frozen = (v) => { if (v && typeof v === 'object' && !Object.isFrozen(v)) { Object.freeze(v); Object.values(v).forEach(frozen); } return v; };
 
 const letters = (text) => [...text].length;
 /**
@@ -127,9 +129,11 @@ function handedWires(links, ends, idOf, byBuild) {
  *   keep      [{at, size, name, piece}]   (floor kept clear, in tiles; `piece` the deck's name of the words over it)
  *   links, ends   the wires (handedWires)
  *   grid      {tile, origin, rise?} as written, 'fit', or null;   canvas, area   the slide and where a fitted picture goes
- * Gives {map, ids: {blocks, floors, obstacles}, routes}: `map` the built map (buildIsoMap: frozen plain data), `ids`
- * the spec's name of each piece, `routes` one entry a link — {route, lift} for a wire laid (or not: its why), else null,
- * as cable.js · cablesOn reads them, the deck's names back in the kit's words.
+ * Gives {map, spec, ids: {blocks, floors, obstacles}, routes}: `map` the built map (buildIsoMap: frozen plain data),
+ * `spec` the very spec buildIsoMap was handed, frozen at every level — WHY kept: the run hands this spec to the map flow
+ * (run/maps.js), so the record is of the map the page draws, never of one made again — `ids` the spec's name of each
+ * piece, `routes` one entry a link — {route, lift} for a wire laid (or not: its why), else null, as cable.js · cablesOn
+ * reads them, the deck's names back in the kit's words.
  */
 export function builtMap({blocks = [], floors = [], obstacles = [], keep = [], links = [], ends = links.map(() => null), grid = null, canvas = null, area = null}) {
   const names = specNames([...blocks, ...floors, ...obstacles].map((p) => p.name));
@@ -140,13 +144,14 @@ export function builtMap({blocks = [], floors = [], obstacles = [], keep = [], l
   const idOf = new Map(standing.filter(([name]) => count.get(name) === 1));
   const byBuild = blocks.some((p) => p.at === null);
   const {wires, laid} = handedWires(links, ends, idOf, byBuild);
-  const spec = {
+  // a copy, frozen at every level, is what the steps are handed: the pieces' own lists stay the deck's to use
+  const spec = frozen(structuredClone({
     who: MAP,
     blocks: blocks.map((p, i) => ({name: ids.blocks[i], kind: p.kind, at: p.at, size: p.size, label: p.label ?? null, rule: p.rule ?? null, group: p.group ?? null, ports: p.ports ?? [], who: whoOf(p.who)})),
     floors: floors.map((f, i) => ({name: ids.floors[i], at: f.size ? (f.at ?? [0, 0]).slice(0, 2) : null, size: f.size, label: f.label ?? null, icon: Boolean(f.icon), group: f.group ?? null, who: whoOf(f.who)})),
     obstacles: obstacles.map((o, i) => ({name: ids.obstacles[i], at: o.at, size: o.size, ports: o.ports ?? [], who: whoOf(o.who)})),
     keep: keep.map(({at, size, name}) => ({at, size, name})), wires, grid, usualGrid: usualGrid(canvas), area,
-  };
+  }));
   let map;
   try { map = buildIsoMap(spec, DECK); } catch (e) {
     const pieces = [...blocks, ...floors, ...obstacles];
@@ -164,7 +169,7 @@ export function builtMap({blocks = [], floors = [], obstacles = [], keep = [], l
     const r = map.routes[how];
     return {route: {...r, from, to, ...(r.behind && {behind: r.behind.map((id) => deckName.get(id))}), ...(r.under && {under: [...new Set(r.under.map((k) => keep.find((s) => s.name === k)?.piece ?? k))]})}, lift};
   });
-  return {map, ids, routes};
+  return {map, spec, ids, routes};
 }
 
 /**

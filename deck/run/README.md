@@ -93,11 +93,13 @@ stopped["stopped"]
 |---|---|
 | `chart.js` | the run's wiring, as data: which stage follows which, and where the adapter is mounted |
 | `stages.js` | what each stage does: read and compile once, check the rules, put on the record how each isometric map was made (`maps made`: who placed its blocks, the tile, its cables, what the build could not do — so the log answers "why is that wire straight" without the page being looked at), read the notes, write the page, count, give the verdict |
+| `maps.js` | each isometric map built again by footprint-story's map flow, at `maps made`, with its own record (`flowMaps`); a map flow whose map is not the page's is said (`differs`) |
 | `measure.js` | the browser, as an adapter: find one, open the page offline, measure every click, say what it found or why it could not |
 | `engine.js` | the one module that calls footprintjs: builds a chart from wiring, runs it with the recorders, hands back what they hold |
 | `run.js` | `runDeck`: build the chart, run it, keep the run, hand back what a reply is made of |
 | `reply.js` | the reply, as text: verdict, problems, what was written, what changed |
 | `log.js` · `logText.js` | the runs of a deck, kept with the person, and `storydeck log` as text |
+| `why.js` | `storydeck log --why <key> [--map <map>]` as text: walked back from the run's record, or from one map's |
 
 ## Laws
 
@@ -195,3 +197,59 @@ run's own log is walked, and the answer says so. A run kept before 0.21.0 has a 
 shows who wrote the value and the decisions, and says the reads are not there. Where a rule read two counts
 (`errors`, `warnings`) the walk names the stage that wrote them once, by the first: `--why warnings` shows that count's
 own path.
+
+## Asking why a map is so
+
+A deck with an isometric map has each map built twice: by the compile, with footprint-story's `buildIsoMap`, to draw
+the page; and by the run, at `maps made`, with footprint-story's map flow (`runMapFlow`, a footprintjs chart of the same
+steps), so a record holds a real run of them. Each map's run keeps its own record, beside the run's:
+`<run id>.map-<k>.record.jsonl`, k its place in the run's list (a record holds one run; a file is never named by the
+deck's words). `--map` picks which record `--why` reads, by the deck's own name for the map — the name a part's
+`data-map` gives, the one `maps made` writes:
+
+```text
+$ storydeck build my-talk
+clean — nothing to fix
+✓ my-talk/index.html · 5 clicks · 178 KB · 71 ms
+maps: map — why a block stands where it does: storydeck log --run 2026-11-21T23-11-07-965Z-build.3c220e --why at --map map
+$ storydeck log my-talk --run 2026-11-21T23-11-07-965Z-build.3c220e --why at --map map
+at = [[0,5,0],[4,1,0],[7,4,0],[12,2,0]]
+place: hand (hand#2) [wrote: at]
+  read (read#0) ← via blocks [wrote: who, blocks, floors, wires, obstacles, keep, written, usualGrid, area, style, policy]
+    ⚠ also consumed args — slice may be incomplete here
+  place (place#1) ← [control: every block has an at: the map placed them] [wrote: placed, placedWhy]
+    ↳ read#0 (see above)
+(a stage also uses what it is given from outside the run's own state: the record holds what stages read and wrote, and no more)
+```
+
+That is the example deck (`examples/a-request`), whose blocks are placed by hand. A map whose blocks the build places
+answers through `place: build` (`[control: no block has an at: the build places them from their wires, …]`). `--why
+view` answers through the grid's decision — written in numbers, fitted, or the usual grid (`[control: no grid is
+written and the map placed its blocks: it is the usual grid the tool handed in]`) — and `--why names` through the
+names step. `--why` with `--map` and no key lists what that map's run wrote. Pinned by `maps.test.js`.
+
+**The ⚠ line.** The `read` step takes the spec and the policy as the run's input, not from the run's state, so no
+earlier step wrote what it read and the walk ends there: what `read` took is the map as the deck wrote it.
+
+- **The same spec, the same policy.** The compile keeps the spec it handed `buildIsoMap`, frozen at every level
+  (`isoSpec.js` · `builtMap`, the compiled map's `built`), and the run hands that very spec, with the deck's policy, to
+  the map flow (`maps.js` · `flowMaps`): never one made again.
+- **The two maps must be equal.** footprint-story pins it with a property test; the run compares them again. A
+  difference is a `drift` line in the reply (where they first part, both values) and heads every answer for that map.
+  It counts in no verdict: the page draws the deck's map.
+- **A tool outside is a named call.** Each map flow is `scope.$call('map.flow', …)` with a time limit (30 s, `maps.js` ·
+  `MAP_FLOW_MS`): the run's record and its log count them (`map.flow × 1: 26 ms`). One that throws, returns no map or
+  never settles is a `drift` line saying so; the run goes on, and a record it began is removed. The bound on closing a
+  record is a timer that is not unref'd: unref'd, a promise that never settles lets node end before it.
+- **Nothing new for a deck with no isometric map**: no call, no record, and its reply as it was. A run kept from 0.34.0
+  says which maps it built again (`maps`, empty when none) and names the deck's others (`flat`). At most 32 maps a run
+  (`MAPS_MOST`); the rest are counted, and the reply says so.
+- **A record that cannot be written never costs the run.** The map is still built and compared, and the reply says
+  `map map: its record was not kept`. A map's record goes when its run is dropped.
+- **The call the reply offers names the run by its id**: a run's number moves when another is kept. `--run` takes
+  either.
+- **Refusals name what there is**: an unknown map names the run's maps; a run with none says why (no isometric map, or
+  a deck that did not compile) and names the deck's maps; a run kept before 0.34.0 says it kept no map records.
+- **Cost.** A map of 100 blocks takes about 45 ms more to build when its blocks are placed by hand, and 65–85 ms when
+  the build places them (measured on one laptop, by the run's own `map.flow` call times), and keeps a record of about
+  180 KB.

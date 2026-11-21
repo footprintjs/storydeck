@@ -18,6 +18,7 @@ import {runDeck} from './run/run.js';
 import {replyText} from './run/reply.js';
 import {RUNS_KEPT, callCounts, countCall, keptRuns, runsFolder} from './run/log.js';
 import {listText, runText} from './run/logText.js';
+import {whyText} from './run/why.js';
 
 /** Text as a terminal or a model is shown it: what a reader cannot see (html.js · UNSEEN) shown as \uFFFD. */
 export const printable = (text) => String(text).replace(UNSEEN, '\uFFFD');
@@ -68,28 +69,26 @@ export const buildTool = (dir, options = {}) => runTool(dir, {...options, write:
 
 /**
  * The deck's kept runs as text: the list, newest first — or one run in full (`run`: its number in that list, 1 the
- * newest), with each stage's time, each tool's calls and the run in words (`all`: every line). `measure`: how its
- * caller asks for a measure in a browser, for a run that left one unanswered.
+ * newest, or its id — the id never moves, a number does when a run is kept), with each stage's time, each tool's
+ * calls and the run in words (`all`: every line). `measure`: how its caller asks for a measure in a browser, for a run
+ * that left one unanswered. `why`: a value of that run, walked back from its record; with `map`, from that isometric
+ * map's own record (run/why.js).
  */
-export function logTool(dir, {home = storydeckHome(), run, all = false, measure, why: value} = {}) {
+export function logTool(dir, {home = storydeckHome(), run, all = false, measure, why: value, map} = {}) {
   const {dir: folder, why} = runsFolder(home, deckRoot(dir));
   if (!folder) throw new Error(`this deck's runs are not kept: ${why}`);
   const runs = keptRuns(folder);
-  const asked = value !== undefined && value !== null && value !== false;
+  const asked = value !== undefined && value !== null && value !== false, mapAsked = map !== undefined && map !== null;
+  if (mapAsked && !asked) throw new Error('--map picks the record --why reads: ask with --why (storydeck log --run 1 --why at --map map)');
   if (run === undefined || run === null || run === '') {
     if (asked) throw new Error('--why reads one run: give its number (storydeck log --run 1 --why verdict)');
     return listText(runs, callCounts(folder), {kept: RUNS_KEPT, measure});
   }
-  const n = Number(run);
+  const byId = runs.findIndex((r) => r.id === String(run)), n = byId >= 0 ? byId + 1 : Number(run);
   if (!Number.isInteger(n) || n < 1 || n > runs.length) throw new Error(runs.length ? `--run is a run's number in the list, 1 (the newest) to ${runs.length}, not ${run}` : 'no runs kept yet: storydeck check and storydeck build each leave one');
-  // why a value of that run is what it is, walked back from the run's own record: a promise of the text (footprint-story/record)
-  if (asked) return whyOf(runs[n - 1], n, typeof value === 'string' ? value : '', all);
+  // why a value of that run is what it is, walked back from a record: a promise of the text (run/why.js)
+  if (asked) return whyText(runs[n - 1], n, typeof value === 'string' ? value : '', {all, map: mapAsked ? String(map) : null});
   return runText(runs[n - 1], n, {all, measure});
-}
-
-async function whyOf(run, n, key, all) {
-  const {whyFromRecord} = await import('footprint-story/record');
-  return whyFromRecord({file: run.record, control: run.control, key, run: `run ${n}`, all, listed: `storydeck log --run ${n} shows what each stage wrote`, more: 'add --all'});
 }
 
 /** One more call of a tool on a deck, counted for `log` (run/log.js): never a reason for the tool to fail. */

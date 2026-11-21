@@ -54,6 +54,22 @@ function standingLine(r) {
 }
 
 /**
+ * What the reply says of the deck's isometric maps (run/maps.js), one line each at most: a drift aloud, a record not
+ * kept, the maps not built again, then how to ask — the run named by its id (a run's number moves when another is
+ * kept, its id never), the first map that kept a record. Nothing when the deck has no isometric map.
+ */
+export function mapLines({runs = [], skipped = 0} = {}, id = null) {
+  if (!runs.length) return [];
+  const asked = runs.find((m) => m.file);
+  return [
+    ...runs.filter((m) => m.differs).map((m) => `drift · map ${m.name}: footprint-story's map flow did not build the map the page draws — ${m.differs} (the page draws the deck's map; report it to footprint-story)`),
+    ...(id ? runs.filter((m) => !m.file).map((m) => `map ${m.name}: its record was not kept, so log --why cannot answer for it`) : []),
+    ...(skipped ? [`maps: ${skipped} more not built again (a run builds the first ${runs.length})`] : []),
+    ...(id && asked ? [`maps: ${runs.map((m) => m.name).join(', ')} — why a block stands where it does: storydeck log --run ${id} --why at --map ${asked.name}`] : []),
+  ];
+}
+
+/**
  * A run as its reply. `all` lists every problem; `more` names how to ask for that, and `measure` how to ask for a
  * measure in a browser, in the caller's words (a flag, or a tool's argument); `cwd` is what file names are shown against.
  */
@@ -64,6 +80,7 @@ export function replyText(r, {all = false, more = '--all', measure = '--layout',
     r.verdict === 'fix' && r.carried ? `and ${unmeasured(r.carried, measure)}` : null,
     r.written ? writtenLine(r.written, r.ms, cwd) : null,
     standingLine(r),
+    ...mapLines(r.maps, r.id ?? null),
     r.layoutNote ?? null,
     r.unkept ? `this run was not kept for storydeck log: ${r.unkept}` : null,
   ].filter((line) => line !== null).join('\n');

@@ -512,6 +512,7 @@ npx footprint-storydeck feedback my-talk  # the notes left in the dev page, for 
 npx footprint-storydeck build my-talk     # checks, then my-talk/index.html — one page, every runtime inside, no network request
 npx footprint-storydeck log my-talk       # the last checks and builds: verdicts, rounds of fixing, tool calls
 npx footprint-storydeck log my-talk --run 1 --why verdict   # where a value of that run came from, from its record
+npx footprint-storydeck log my-talk --run 1 --why at --map map   # why an isometric map is so (where its blocks stand), from that map's own record
 ```
 
 `build` is the one call after an edit. It reads the deck once, checks it, writes the page, and answers in one order:

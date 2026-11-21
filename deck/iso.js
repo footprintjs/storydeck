@@ -355,7 +355,8 @@ export const isoPieces = (html, options) => isoDrawn(html, options).html;
  * points round what it draws, and the middle of that) and {kind, at: [col, row, lift], size} in tiles (where it
  * stands); `solids`: every block and cylinder so, those that share a name too (a wire cannot end at one of them, and
  * still must not run under it); `tight`: the names that do not fit their block's face even broken and shrunk,
- * [{name, text}]; `made`: how the map was made — {placed: 'build' | 'hand', tile, fitted};
+ * [{name, text}]; `made`: how the map was made — {placed: 'build' | 'hand', tile, fitted}; `built`: {spec, map} — the
+ * spec the steps were handed and the map they built, both frozen, for the run's map flow (run/maps.js);
  * `floor(col, row, lift)`: where a point of the floor is on the slide, [x, y] (absent when the map has no isometric
  * piece); `routes`: one entry a link — the way the steps laid that wire along the floor ({route, lift}, as cable.js ·
  * cablesOn reads it), or null. A block is not the box it is placed by: a wire between two blocks is a cable along the
@@ -397,7 +398,7 @@ export function isoDrawn(html, {canvas = null, area = null, links = [], floorWir
   const fitted = !written && (fit || byBuild);
   // a block's name, as the steps fit it
   const words = solid.map((p) => (p.inner.trim() ? nameWords(p.inner) : null));
-  const {map: built, ids, routes} = builtMap({
+  const {map: built, spec, ids, routes} = builtMap({
     blocks: solid.map((p, i) => ({name: p.name, kind: p.kind, at: p.at, size: p.size, label: fittedPart(words[i]?.label ?? null), rule: words[i]?.label ? p.rule : null, group: p.group, ports: p.ports, who: p.where})),
     floors: floors.map((f) => ({name: f.name, at: f.at, size: f.size, label: f.label, icon: Boolean(f.icon), group: f.group, who: f.where})),
     obstacles: feet.map((f) => ({name: f.name, at: f.at, size: f.size, ports: f.ports, who: f.where})),
@@ -444,7 +445,7 @@ export function isoDrawn(html, {canvas = null, area = null, links = [], floorWir
   // the break rules its writer picked, by block (none written: nothing here, so a map that picks none records as before)
   const breaks = found.filter((p) => p.rule).map((p) => [p.name, p.rule]);
   const made = {placed: built.placed, tile: built.view.tile[0], fitted: built.grid === 'fitted', ...(feet.length ? {footprints: feet.length} : {}), ...(outside > 0.5 ? {outside: Math.round(outside)} : {}), ...(breaks.length ? {breaks} : {})};
-  return {html: out + map.slice(from), shapes, solids, tight, levels, made, routes, floor: (col, row, lift = 0) => { const point = grid.at(col, row, lift); return [point.x, point.y]; }};
+  return {html: out + map.slice(from), shapes, solids, tight, levels, made, built: {spec, map: built}, routes, floor: (col, row, lift = 0) => { const point = grid.at(col, row, lift); return [point.x, point.y]; }};
 }
 
 const TONE = 'var(--iso-color, var(--sd-tone, #d9e4f3))';

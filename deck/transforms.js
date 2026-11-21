@@ -502,7 +502,8 @@ function floorLinks(html, found, solids) {
  * `applyTransforms`, with what the build knows of the map it made: {html, ways, cables, tight, made, rides?} — `rides`
  * true when a wire asks how its packets ride (compile.js then has the page carry rides.js · RIDE_CSS), `ways` what
  * there is to say of a wire (wiresDrawn), `cables` each cable laid (laidRecord), `tight` the names that do not fit
- * their block, `made` how the map was made ({placed, tile, fitted}, null with no isometric piece). The build
+ * their block, `made` how the map was made ({placed, tile, fitted}, null with no isometric piece), `built` the spec
+ * the steps were handed and the map they built ({spec, map}, frozen; absent with none: run/maps.js runs it again). The build
  * compiles a map with this, and keeps them beside the page: for `check`, for the run's log, and for whoever times a
  * thing to a cable.
  *
@@ -520,5 +521,5 @@ export function transformed(html, {icons: set = {}, canvas = null, area = null} 
   // each wire's way as the steps laid it, by the wire it is (null for one written in numbers)
   const routes = iso.routes ? found.map(() => null) : null;
   joined.forEach((i, k) => { if (routes) routes[i] = iso.routes[k]; });
-  return {...wiresDrawn(callouts(iso.html, {canvas}), {...iso, routes}), tight: iso.tight ?? [], made: iso.made ?? null};
+  return {...wiresDrawn(callouts(iso.html, {canvas}), {...iso, routes}), tight: iso.tight ?? [], made: iso.made ?? null, ...(iso.built ? {built: iso.built} : {})};
 }

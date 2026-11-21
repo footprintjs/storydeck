@@ -41,6 +41,14 @@ function callText(target, c) {
   return `  ${target} × ${c.count}: ${times}${ended ? ` — ${ended}` : ''}`;
 }
 
+/** The isometric maps a run built again (run/maps.js), and how to ask one why: by the run's id, which never moves. */
+function mapsText(run, n) {
+  if (!run.maps?.length) return [];
+  const asked = run.maps.find((m) => m.record);
+  return [`maps: ${run.maps.map((m) => `${m.name}${m.record ? '' : ' (no record kept)'}${m.differs ? ' (drift: its map flow parted from the page\'s map)' : ''}`).join(', ')}${run.mapsSkipped ? ` · ${run.mapsSkipped} more not built again` : ''}`,
+    ...(asked ? [`  why a block stands where it does: storydeck log --run ${run.id ?? n} --why at --map ${asked.name}`] : [])];
+}
+
 /** One run in full. */
 export function runText(run, n, {all = false, measure} = {}) {
   const shown = all ? run.lines : run.lines.slice(0, LINES_SHOWN), rest = run.lines.length - shown.length;
@@ -48,6 +56,7 @@ export function runText(run, n, {all = false, measure} = {}) {
     run.stages.length ? `stages: ${run.stages.map((s) => `${s.stage} ${s.ms} ms`).join(' · ')}` : null,
     ...(Object.keys(run.calls).length ? ['calls:', ...Object.entries(run.calls).map(([target, c]) => callText(target, c))] : []),
     ...(run.engine.length ? ['the engine warned:', ...run.engine.map((w) => `  ${w}`)] : []),
+    ...mapsText(run, n),
     shown.length ? 'the run in words:' : null, ...shown,
     rest > 0 ? `… and ${rest} more lines: --all shows every one` : null,
     `the record itself: ${run.record} (one JSON line an entry: footprintjs/sinks · readRecordFile reads it)`].filter((line) => line !== null).join('\n');

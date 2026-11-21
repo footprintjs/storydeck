@@ -28,10 +28,11 @@ export const USAGE = `storydeck — make a deck: one picture, built click by cli
                                        the same check, then one self-contained page (deck.json "out", index.html by
                                        default): one reply says what to fix and what was written; --voice carries the
                                        clips narrate made
-  storydeck log [folder] [--run <n>] [--why <value>] [--all]
+  storydeck log [folder] [--run <n|id>] [--why <value>] [--map <map>] [--all]
                                        the deck's last checks and builds, kept with you: verdicts, rounds of fixing,
                                        tool calls (--run: one run in full, with each stage's time and the run in words;
-                                       --run <n> --why verdict: where that value came from, walked back from the run's record)
+                                       --run <n> --why verdict: where that value came from, walked back from the run's record;
+                                       --why at --map <map>: why an isometric map is so, from that map's own record)
   storydeck mcp [folder] [--kit <folder>] [--takes <folder>]
                                        the read-first tools for an AI assistant (MCP over stdio); a voice named
                                        here lets its narrate tool voice, and only a voice named here
@@ -39,7 +40,7 @@ export const USAGE = `storydeck — make a deck: one picture, built click by cli
 The folder defaults to the current one. In the page: ← → Space step · T light/dark · N notes · P presenter · L listen.`;
 
 const BOOLEAN = new Set(['all', 'layout', 'strict', 'open', 'help', 'version', 'voice']);
-const VALUED = new Set(['out', 'port', 'click', 'kit', 'takes', 'only', 'run', 'why']);
+const VALUED = new Set(['out', 'port', 'click', 'kit', 'takes', 'only', 'run', 'why', 'map']);
 
 /** argv → {command, dir, flags}; an unknown flag is refused, naming the ones the command takes. */
 export function parseArgs(argv) {
@@ -52,6 +53,9 @@ export function parseArgs(argv) {
     const [name, inline] = a.slice(2).split(/=(.*)/s);
     if (BOOLEAN.has(name)) { flags[name] = true; continue; }
     if (!VALUED.has(name)) throw new Error(`unknown flag --${name} (the flags are ${[...VALUED].map((f) => `--${f} <value>`).concat([...BOOLEAN].map((f) => `--${f}`)).join(', ')})`);
+    const next = inline ?? rest[i + 1];
+    // --why with no value asks what there is to ask (with --map: the keys a map's steps write)
+    if (name === 'why' && (next === undefined || (inline === undefined && next.startsWith('--')))) { flags.why = ''; continue; }
     const value = inline ?? rest[++i];
     if (value === undefined || (inline === undefined && value.startsWith('--'))) throw new Error(`--${name} needs a value`);
     flags[name] = value;
@@ -115,7 +119,7 @@ export async function runCli(argv, {stdout = process.stdout, stderr = process.st
         return 0;
       }
       case 'log':
-        out(await logTool(dir, {home, run: flags.run, all: flags.all, why: flags.why}));
+        out(await logTool(dir, {home, run: flags.run, all: flags.all, why: flags.why, map: flags.map}));
         return 0;
       case 'narrate':
         out(await narrateTool(dir, {kit: flags.kit, takes: flags.takes, only: flags.only}));
