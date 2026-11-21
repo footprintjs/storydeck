@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.30.1 — a cable's line stops for its head by the story library's rule
+
+Pages are byte for byte as on 0.30.0 but for the version in the page's generator line (checked on `examples/a-request`
+built before and after, and by footprint-story 0.20.0's property tests of `cableWay` and `stopShort` against copies of
+0.30.0's `cableWay` and `leadOf`).
+
+- `deck/cable.js` · `cableWay` (a cable's line, its tip pulled back for its head, never past 1 px short of its last
+  run's start, its corners rounded) moved to `footprint-story/isometric` · `cableWay`, so a film's cable stops where a
+  deck's does; `deck/transforms.js` imports it from there. It is no longer exported from `deck/cable.js`.
+- `deck/transforms.js` · `leadOf` (a lead into a port on a seen side, drawn again over its block) held a second copy of
+  that pull-back; it now asks the kit's `stopShort` (the points alone, before rounding). footprint-story's property test
+  holds a lead built this way to a copy of 0.30.0's `leadOf`.
+- Needs `footprint-story ^0.20.0`.
+
 ## 0.30.0 — a cable's label and a straight wire live in the story library; zoom checks its options
 
 Pages and compiled records are byte for byte as on 0.29.0 but for the version in the page's generator line. Checked on
