@@ -41,6 +41,7 @@
 // of the slide (slide pixels) where moved things may go — below a headline, above a footer.
 
 import {readTurns} from 'footprint-story/motion';
+import {frameZoom} from 'footprint-story/layout';
 
 const KINDS = ['look', 'camera', 'mover', 'overlay', 'order'];
 /** On a route, the view's move: its turn. A piece really called this is itself (as `name+` is). */
@@ -71,7 +72,6 @@ function union(boxes) {
   return {x: x0, y: y0, w: x1 - x0, h: y1 - y0};
 }
 const centre = b => [b.x + b.w / 2, b.y + b.h / 2];
-const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const num = (v, d) => (v === undefined || v === null || v === '' ? d : Number(v));
 const round = (v, d = 2) => Math.round(v * 10 ** d) / 10 ** d;
 /** A group move {o, s, t}: a point p goes to o + s·(p − o) + t. */
@@ -102,8 +102,9 @@ function aside(side) {
       up: [across(a.x, a.w, w), a.y + gap + h / 2], down: [across(a.x, a.w, w), a.y + a.h - gap - h / 2]}[side];
     const room = {left: {x: a.x + 2 * gap + w, y: a.y, w: a.w - 2 * gap - w, h: a.h}, right: {x: a.x, y: a.y, w: a.w - 2 * gap - w, h: a.h},
       up: {x: a.x, y: a.y + 2 * gap + h, w: a.w, h: a.h - 2 * gap - h}, down: {x: a.x, y: a.y, w: a.w, h: a.h - 2 * gap - h}}[side];
-    const fit = Math.min(Math.max(room.w, 1) / Math.max(subject.w, 1), Math.max(room.h, 1) / Math.max(subject.h, 1)) * fill;
-    return {context: toCentre(context, s, at), ...(options.move === 'aside' ? {} : {subject: toCentre(subject, clamp(fit, num(options.least, .5), grow), centre(room))})};
+    // the subject grows to fill `fill` of the room (a room with no space counts as a pixel), held between least and grow
+    const k = frameZoom([subject.w, subject.h], [Math.max(room.w, 1), Math.max(room.h, 1)], {share: fill, least: num(options.least, .5), most: grow, smallest: 1});
+    return {context: toCentre(context, s, at), ...(options.move === 'aside' ? {} : {subject: toCentre(subject, k, centre(room))})};
   }});
 }
 
@@ -150,9 +151,11 @@ export const FOCUS = Object.freeze({
    * The view closes in on the subject — where the click's mover leaves it — so it fills `share` (0.7) of the area,
    * never closer than `most` (2.5×). A camera, not a mover: it goes with left/right/up/down, place and apart.
    */
+  // zoom, fit and the side movers size by one rule, footprint-story/layout · frameZoom: the box contained in the room,
+  // a share of that, held between two bounds — the rule a film frames a named thing by, written once.
   zoom: Object.freeze({name: 'zoom', kind: 'camera', place({subject, area, options}) {
     if (!subject) return {};
-    const k = clamp(num(options.share, .7) * Math.min(area.w / Math.max(subject.w, 1), area.h / Math.max(subject.h, 1)), 1, num(options.most, 2.5));
+    const k = frameZoom([subject.w, subject.h], [area.w, area.h], {share: num(options.share, .7), least: 1, most: num(options.most, 2.5), smallest: 1});
     return {stage: toCentre(subject, k, centre(area))};
   }}),
   /**
@@ -170,7 +173,7 @@ export const FOCUS = Object.freeze({
     if (!(least >= .01 && most >= least && most <= 100)) throw new Error(`focus "fit": least and most are how far out and how close the view may go, from 0.01 to 100, most no smaller than least (0.25 and 2.5) — not "${options.least ?? .25}" and "${options.most ?? 2.5}"`);
     const shown = union(look === 'hide' ? [subject] : [subject, context]);
     if (!shown) return {};
-    return {stage: toCentre(shown, clamp(share * Math.min(area.w / Math.max(shown.w, 1), area.h / Math.max(shown.h, 1)), least, most), centre(area))};
+    return {stage: toCentre(shown, frameZoom([shown.w, shown.h], [area.w, area.h], {share, least, most, smallest: 1}), centre(area))};
   }}),
   /**
    * The view moves to the subject and keeps its size: the scale the last click left this stage at (1 on a stage no

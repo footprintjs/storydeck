@@ -24,7 +24,7 @@ text. Each module does one job, and they compose in one direction:
 | `source.js` | the folder read from disk (Node) — only its own files, never through a link that leaves it |
 | `transitions.js` | how a part arrives (`data-enter`): footprint-story/motion's changes of picture, read and sampled into keyframes for both slides, and the page's runtime that plays them on a forward step |
 | `explore.js` | where each piece leads when a viewer explores (deck.json "explore": the click about it), and the page's runtime that follows it |
-| `differs.js` | a part that differs from the real thing says so (`data-differs-*`): its declaration read and checked, its labels drawn with their CSS, its phrases looked for in the notes |
+| `differs.js` | a part that differs from the real thing says so (`data-differs-*`): its declaration read and refused in the deck's words by footprint-story's rules (`differsProblem`, `timeProblem`, `differsLines`), its labels drawn with their CSS, its phrases looked for in the notes |
 | `pace.js` | how a part's pieces arrive and leave (`data-arrive`, its times): read and checked, carried on its slides, with the CSS the page adds only when a part asks |
 | `compile.js` | clicks planned (each map's focus state carried from click to click) and drawn as `<deck-stage>` slides |
 | `lenses.js` | one page to read, scroll or click through (deck.json "lenses"): its words as plain HTML, its slides copied in at rest, with the CSS and runtime the page adds only when a deck asks |
