@@ -16,11 +16,10 @@
 // is declared, and cannot see a speed-up nobody declared. The rules and the default words are footprint-story's
 // (differsProblem, differsLines, timeProblem …), the same ones StoryReel's differs.mjs holds: a deck and a film say it
 // alike. What stays here is reading the attributes as a browser reads them and saying each refusal in the deck's words.
-import {normSpeech, timeWords, analogyWords, foldDiffers, timeProblem, differsLines, differsProblem, differsEnglish, DIFFERS_MOST, DIFFERS_SAID_MOST, DIFFERS_TIME_MOST, DIFFERS_ANALOGY} from 'footprint-story';
+import {normSpeech, foldDiffers, timeProblem, differsLines, differsProblem, differsEnglish, DIFFERS_MOST, DIFFERS_SAID_MOST, DIFFERS_TIME_MOST, DIFFERS_ANALOGY} from 'footprint-story';
 import {readAttributes} from '../pieceRules.js';
 import {decodeEntities, esc} from './html.js';
 
-export {DIFFERS_MOST, DIFFERS_SAID_MOST, DIFFERS_TIME_MOST, timeWords, analogyWords};
 const NAMES = ['data-differs-time', 'data-differs-scale', 'data-differs-analogy', 'data-differs-shown', 'data-differs-said'];
 
 /** A value as a browser reads it, with spaces and control characters made one space: a declaration's words stay on one line wherever they are printed. */
