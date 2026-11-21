@@ -30,8 +30,19 @@ export const usualGrid = (canvas) => ({tile: 120, origin: [(canvas ?? [1920, 108
 const MAP = 'this map';
 
 const letters = (text) => [...text].length;
-/** The deck's words for a piece, as a refusal names it: whole when the kit takes them (at most 200 letters), else cut. */
-const whoOf = (where) => (letters(where) <= ISO_MAP_LIMITS.who ? where : `${[...where].slice(0, ISO_MAP_LIMITS.who - 1).join('')}…`);
+/**
+ * The deck's words for a piece, as a refusal names it: whole when the kit takes them, else cut, with "…". The kit
+ * counts a `who` in UTF-16 units (at most 200: footprint-story/isometric · mapSpec.js · whoOf), so it is cut by them,
+ * a whole character at a time — a name of 100 emoji is 200 units, and its words longer still.
+ */
+function whoOf(where) {
+  if (where.length <= ISO_MAP_LIMITS.who) return where;
+  let cut = '';
+  for (const ch of where) { if (cut.length + ch.length > ISO_MAP_LIMITS.who - 1) break; cut += ch; }
+  return `${cut}…`;
+}
+/** A piece's name in a refusal as 0.32.0 showed it (the kit's `shown`): at most 60 units, then "…". */
+const shortName = (name) => (name.length > 60 ? `${name.slice(0, 60)}…` : name);
 
 /**
  * A name of its own for each piece, in the order given: its first name when no other piece has it and the kit takes
@@ -57,14 +68,18 @@ export function specNames(names) {
  * tests and docs say, are said in those words still: blocks the build cannot place, and a floor fitted too big. Where
  * the kit names a piece by its name in the spec and not by its `who` (a placing refusal says which block), a name made
  * for it (specNames: a shared or a long name) is put back as the deck wrote it — `renamed`: [[made, deck's name]] — so
- * a deck writer never reads a name they did not write.
+ * a deck writer never reads a name they did not write — cut as 0.32.0 cut a name in a refusal (shortName).
  */
 function deckWords(e, renamed = []) {
-  const named = (text) => renamed.reduce((out, [made, name]) => out.split(JSON.stringify(made)).join(`"${name}"`), text);
+  const named = (text) => renamed.reduce((out, [made, name]) => out.split(JSON.stringify(made)).join(`"${shortName(name)}"`), text);
   const said = String(e?.message ?? e).replace(/^isometric: /, '');
   if (said.startsWith(`${MAP}: the blocks cannot be placed from their wires: `) && e.cause) {
     return new Error(named(`the build cannot place this map's blocks: ${String(e.cause.message ?? e.cause).replace(/^isometric: /, '')} — or give every block its data-at`), {cause: e});
   }
+  // the build places blocks by at most so many wires (every wire laid along the floor, and the first between each two
+  // blocks): past them, the deck's fix as well as the steps'
+  const wires = new RegExp(`^${MAP}'s wires holds at most (\\d+), and this one has (\\d+) — split the map in two$`).exec(said);
+  if (wires) return new Error(`the build cannot place this map's blocks: it places them by at most ${wires[1]} wires — every wire laid along the floor, and the first between each two blocks — and this map has ${wires[2]} such wires — split the map in two, or give every block its data-at`, {cause: e});
   const big = /^([^]*): fitted round its blocks the floor would be (\d+) by (\d+) tiles, and a floor is at most (\d+) a side — give it an at and a size of its own, or take it out$/.exec(said);
   if (big) return new Error(`${big[1]}: fitted round this map's blocks the floor would be ${big[2]} by ${big[3]} tiles, and a floor is at most ${big[4]} a side — take the floor out, or give it a data-at and a data-size of its own (it is ground: it need not lie under every block)`, {cause: e});
   return new Error(named(said), {cause: e});

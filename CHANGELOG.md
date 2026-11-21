@@ -25,17 +25,27 @@
     (or one two pieces share) by a name made for it, and a refusal of theirs puts the deck's name back: it never shows
     the made one (`the build cannot place this map's blocks: "<the name as written>"'s size is […] — or give every
     block its data-at`).
-  - A map whose blocks the build places, with more than 1024 wires, was refused ("arrange reads at most 1024 links");
-    the build now places by the first wire between each two blocks, and refuses only past 1024 of those, in the steps'
-    words (`this map's wires holds at most 1024, and this one has … — split the map in two`).
+  - A map whose blocks the build places, with more than 1024 wires written between pieces, was refused ("arrange reads
+    at most 1024 links"). The build now places by the wires it hands the steps — every wire laid along the floor (up to
+    the 1024 the kit lays, a pair joined twice counted twice) and the first wire between each other two blocks — and
+    refuses only when those come to more than 1024, counting the wires handed, not those written:
+    `the build cannot place this map's blocks: it places them by at most 1024 wires — every wire laid along the floor,
+    and the first between each two blocks — and this map has 1043 such wires — split the map in two, or give every
+    block its data-at`.
+  - A piece whose words are past the 200 UTF-16 units the steps take as its name in a refusal (a data-k of 100 emoji)
+    is drawn as before; a refusal of the steps names it by its words cut there, with "…". A name inside a refusal is
+    cut at 60 letters, as 0.32.0 cut it.
   - A refusal that none of the deck's own rules says first comes in the steps' words, naming the piece as the deck
     does and without footprint-story's `isometric: `: wires the floor cannot lay (`this map: the wires cannot be laid:
     … — check each wire's ends and the blocks' ports`), a picture that cannot be fitted (`this map: its picture (fitted
     into the area): …`), a floor's label with too much drawn over its edge (`"f" (data-iso="floor"): its label: …`).
     Before, the first two were footprint-story's bare words and the third had no `its label: `. None is known to reach
     a deck the deck itself accepts.
-  - A map with two things wrong may name the other one first: a cylinder that is not round is said before the build
-    tries to place the blocks, and a floor's size before the slide's area or a fitted grid.
+  - A map with two things wrong may name the other one first. On a map whose blocks the build places, these are now
+    said before "the build cannot place this map's blocks": a cylinder that is not round; a floor with a data-at and no
+    data-size; a floor whose group has no block; a floor whose size is not whole tiles; a wire to a port its block
+    lacks (or a port on a name two pieces share, or a port with a bend). And a floor's size is said before the slide's
+    area or a fitted grid.
 - For whoever calls the deck's modules directly (not the package's doors): `isoDrawn` takes `floorWires(solids)` (which
   wires lie along the floor, asked before the map is built) where it took `lay` and `lines`, and gives `routes`, the
   ways the steps laid; `cable.js · cables` lays by the same steps (`isoSpec.js · layRoutes`). `iso.js · GROUPED_LEAST`

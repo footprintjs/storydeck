@@ -262,7 +262,7 @@ function wiresBetween(html, found, {shapes, floor, solids, routes}) {
   const names = pieceNames(html), read = found.map((f) => endsRead(f.m[1], names));
   if (!read.some(Boolean)) return {between: read, laid: []};
   const boxOf = boxFinder(html);
-  // the wires laid along the floor before the picture was fitted (transformed · lay), put on the slide — or, for a
+  // the wires laid along the floor before the picture was fitted (iso.js · isoDrawn's routes), put on the slide — or, for a
   // caller that laid none, laid here: the name is that one isometric piece alone, with no bend asked for
   const laid = !floor ? [] : routes ? cablesOn(routes, floor)
     : cables(read.map((m) => (m && m[3] === undefined && [m[1], m[2]].every((name) => shapes.has(name) && boxOf.alone(name)) ? [m[1], m[2]] : null)), shapes, floor, solids);

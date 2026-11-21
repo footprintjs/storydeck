@@ -14,8 +14,9 @@
 //
 // WHY arrange twice and not a rule of our own: a group is a thing to the arrangement — a box as big as its blocks and
 // their floor — so the rule that places blocks from what joins them places groups the same way. WHY the story
-// library's: a film places the same groups the same way. This file reads the group a tag writes (iso.js places them
-// and fits each group's floor round its blocks, GROUP_MARGIN tiles clear).
+// library's: a film places the same groups the same way. This file reads the group a tag writes; footprint-story's
+// map steps place them and fit each group's floor round its blocks, GROUP_MARGIN tiles clear (buildIsoMap · place,
+// fitFloors — handed the map by isoSpec.js).
 import {ownAttribute} from '../pieceRules.js';
 
 const NAME = /^[A-Za-z0-9_-]{1,60}$/;

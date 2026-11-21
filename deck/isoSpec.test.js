@@ -159,9 +159,30 @@ describe('isoSpec · what the deck reads back of the built map', () => {
     const shared = refusal('<div data-k="a" data-iso="floor"></div><div data-k="a" data-iso="block" data-size="70 2 1"></div><div data-k="b" data-iso="block"></div>');
     expect(shared).toBe('the build cannot place this map\'s blocks: "a"\'s size is [wide, deep, high] with wide and deep above 0, high 0 or more, none over 64 — not [70,2,1] — or give every block its data-at');
     const longer = refusal(`<div data-k="${long}" data-iso="block" data-size="70 2 1"></div><div data-k="b" data-iso="block"></div>`);
-    expect(longer).toBe(`the build cannot place this map's blocks: "${long}"'s size is [wide, deep, high] with wide and deep above 0, high 0 or more, none over 64 — not [70,2,1] — or give every block its data-at`);
+    expect(longer).toBe(`the build cannot place this map's blocks: "${'n'.repeat(60)}…"'s size is [wide, deep, high] with wide and deep above 0, high 0 or more, none over 64 — not [70,2,1] — or give every block its data-at`);
     for (const said of [shared, longer]) expect(said).not.toMatch(/~\d/);
   });
+
+  it('cuts a name in a refusal as 0.32.0 did, at 60 letters, however long the data-k', () => {
+    const said = (() => { try { transformed(`<div data-k="${'q'.repeat(5000)}" data-iso="block" data-size="70 2 1"></div><div data-k="b" data-iso="block"></div>`, {canvas: [1920, 1080]}); } catch (e) { return e.message; } return null; })();
+    expect(said).toContain(`"${'q'.repeat(60)}…"'s size`);
+    expect(said.length).toBeLessThan(300);
+  });
+
+  it('draws a piece whose name is 100 emoji (its words past the 200 UTF-16 units the steps take as a who): a block, a floor, and blocks the build places', () => {
+    const e = '\u{1F600}'.repeat(100), grid = '<i data-iso-grid="120 at 960 240"></i>', canvas = [1920, 1080];
+    expect(transformed(`${grid}<div data-k="${e}" data-iso="block" data-at="0 0"><b>x</b></div>`, {canvas}).html).toContain('data-sd-iso="block"');
+    expect(transformed(`${grid}<div data-k="${e}" data-iso="floor" data-size="3 3"></div>`, {canvas}).html).toContain('data-sd-iso="floor"');
+    expect(transformed(`<div data-k="${e}" data-iso="block"></div><div data-k="b" data-iso="block"></div><i data-k="w" class="wire" data-arrow="${e} to b"></i>`, {canvas}).made.placed).toBe('build');
+  });
+
+  it('refuses more wires than the build places blocks by, in the deck\'s words, with its fix', () => {
+    const blocks = Array.from({length: 20}, (_, i) => `<div data-k="a${i}" data-iso="block"></div>`).join('');
+    const laid = Array.from({length: 1030}, (_, i) => `<i data-k="w${i}" class="wire" data-arrow="a0 to a1"></i>`).join('');
+    const bent = Array.from({length: 19}, (_, i) => `<i data-k="v${i}" class="wire" data-arrow="a${i + 1} to a${(i + 2) % 20} 0"></i>`).join('');
+    // 1024 laid along the floor (the most the kit lays), and the first bent wire between each of 19 more pairs of blocks
+    expect(() => transformed(blocks + laid + bent, {canvas: [1920, 1080]})).toThrow('the build cannot place this map\'s blocks: it places them by at most 1024 wires — every wire laid along the floor, and the first between each two blocks — and this map has 1043 such wires — split the map in two, or give every block its data-at');
+  }, 60_000);
 });
 
 describe('isoSpec · no source file of the deck holds a copy of the map steps', () => {
@@ -175,16 +196,19 @@ describe('isoSpec · no source file of the deck holds a copy of the map steps', 
     return /\.(m?js|jsx)$/.test(e.name) && !/\.test\.jsx?$/.test(e.name) && !rel.startsWith(`deck${path.sep}test`) ? [rel] : [];
   });
 
-  it('imports no step by name, never the whole door, and asks no grid for the paint order', () => {
+  it('imports or hands on no step by name, never the whole door, and asks no grid for the paint order', () => {
     const files = sources('.');
     expect(files).toContain(path.join('deck', 'iso.js'));
     for (const file of files) {
       const text = readFileSync(path.join(root, file), 'utf8');
-      expect(text, file).not.toMatch(/import\s*\*\s*as\s+\w+\s+from\s*['"]footprint-story(?:\/isometric)?['"]/);
+      expect(text, file).not.toMatch(/import\s*(?:[\w$]+\s*,\s*)?\*\s*as\s+[\w$]+\s+from\s*['"]footprint-story(?:\/isometric)?['"]/);
+      expect(text, file).not.toMatch(/import\s+[\w$]+\s+from\s*['"]footprint-story(?:\/isometric)?['"]/);
       expect(text, file).not.toMatch(/import\(\s*['"]footprint-story(?:\/isometric)?['"]/);
       expect(text, file).not.toMatch(/from\s*['"]footprint-story\/src\//);
       expect(text, file).not.toMatch(/\.backToFront\(/);
-      for (const m of text.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"]footprint-story(?:\/isometric)?['"]/g)) {
+      expect(text, file).not.toMatch(/export\s*\*\s*(?:as\s+\w+\s+)?from\s*['"]footprint-story(?:\/isometric)?['"]/);
+      // import {…}, import x, {…} and export {…} from the door: each name it brings in, or hands on
+      for (const m of text.matchAll(/(?:import\s*(?:[\w$]+\s*,\s*)?|export\s*)\{([^}]*)\}\s*from\s*['"]footprint-story(?:\/isometric)?['"]/g)) {
         const names = m[1].split(',').map((part) => part.trim().split(/\s+as\s+/)[0]).filter(Boolean);
         for (const name of names) if (STEPS.includes(name)) expect(ALLOWED[name] ?? [], `${file} imports ${name}`).toContain(file);
       }
