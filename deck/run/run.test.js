@@ -252,28 +252,31 @@ describe('runDeck: what it keeps, and what it never lets cost the answer', () =>
 
 describe('run · how a map was made is on the record', () => {
   it('who placed the blocks, the tile, the cables, and what the build could not do — nothing for a deck with no isometric map', async () => {
-    const {mapsMade} = await import('./stages.js'), {compileDeck} = await import('../compile.js'), {sourceOf} = await import('../test/helpers.js');
+    const {mapsMade} = await import('./stages.js'), {compileDeck} = await import('../compile.js'), {sourceOf} = await import('../test/helpers.js'), {engine} = await import('./engine.js');
+    // what a stage really gets: a run with its engine and options, and a scope with $call (kept out of the scope's own keys)
+    const eng = await engine(), runOf = (compiled) => ({loaded: {compiled}, options: {}, engine: eng, mapRecord: () => null});
+    const stageScope = () => Object.defineProperty({}, '$call', {value: (target, fn) => fn()});
     const iso = (name, more = '') => `<div data-k="${name}" data-iso="block"${more}><b>${name}</b></div>`;
     const deck = (map) => compileDeck(sourceOf({clicks: '<section data-label="S" data-map="map"><step data-in="*"><h2>All</h2></step></section>', maps: {map}}));
     // placed by the build, three wires, one of them between two heights
-    const scope = {};
-    mapsMade(scope, {loaded: {compiled: deck(`${iso('a')}${iso('b')}${iso('c', ' data-size="2 2 1"')}<i data-k="w1" class="wire" data-arrow="a to b"></i><i data-k="w2" class="wire" data-arrow="b to c"></i>`)}});
+    const scope = stageScope();
+    await mapsMade(scope, runOf(deck(`${iso('a')}${iso('b')}${iso('c', ' data-size="2 2 1"')}<i data-k="w1" class="wire" data-arrow="a to b"></i><i data-k="w2" class="wire" data-arrow="b to c"></i>`)));
     expect(scope.maps).toEqual({map: {placed: 'build', tile: expect.any(Number), cables: 2}});
     // placed by hand, with a wire the floor has no way for and a name too long for its block
-    const hand = {}, grid = '<i data-iso-grid="120 at 960 240"></i>';
-    mapsMade(hand, {loaded: {compiled: deck(`${grid}<div data-k="a" data-iso="block" data-at="0 4"><b>Supercalifragilisticexpialidocious</b></div><div data-k="up" data-iso="block" data-at="6 0 2"><b>Up</b></div><i data-k="w" class="wire" data-arrow="a to up"></i>`)}});
+    const hand = stageScope(), grid = '<i data-iso-grid="120 at 960 240"></i>';
+    await mapsMade(hand, runOf(deck(`${grid}<div data-k="a" data-iso="block" data-at="0 4"><b>Supercalifragilisticexpialidocious</b></div><div data-k="up" data-iso="block" data-at="6 0 2"><b>Up</b></div><i data-k="w" class="wire" data-arrow="a to up"></i>`)));
     expect(hand.maps).toEqual({map: {placed: 'hand', tile: 120, cables: 0, said: [['w', 'straight heights']], tight: ['a']}});
     // pictures that stand on the floor by a footprint, counted, with the cable laid between them
-    const feet = {}, foot = (k, at, port) => `<img data-k="${k}" data-footprint="${at} 2 2 0.5" data-ports="${port}" style="left:10px;top:10px;width:60px;height:60px">`;
-    mapsMade(feet, {loaded: {compiled: deck(`${grid}${foot('lap', '0 0', 'p: 2 1 0.2')}${foot('tv', '6 0', 'q: 1 2 0.2')}<i data-k="w" class="wire" data-arrow="lap.p to tv.q"></i>`)}});
+    const feet = stageScope(), foot = (k, at, port) => `<img data-k="${k}" data-footprint="${at} 2 2 0.5" data-ports="${port}" style="left:10px;top:10px;width:60px;height:60px">`;
+    await mapsMade(feet, runOf(deck(`${grid}${foot('lap', '0 0', 'p: 2 1 0.2')}${foot('tv', '6 0', 'q: 1 2 0.2')}<i data-k="w" class="wire" data-arrow="lap.p to tv.q"></i>`)));
     expect(feet.maps).toEqual({map: {placed: 'hand', tile: 120, cables: 1, footprints: 2}});
     // a block whose writer picked how its name breaks: the rule, by block
-    const picked = {};
-    mapsMade(picked, {loaded: {compiled: deck(`${grid}<div data-k="a" data-iso="block" data-at="0 0" data-break="fill"><b>Logs to S3 Archive</b></div>`)}});
+    const picked = stageScope();
+    await mapsMade(picked, runOf(deck(`${grid}<div data-k="a" data-iso="block" data-at="0 0" data-break="fill"><b>Logs to S3 Archive</b></div>`)));
     expect(picked.maps).toEqual({map: {placed: 'hand', tile: 120, cables: 0, breaks: [['a', 'fill']]}});
     // no isometric map: nothing written
-    const flat = {};
-    mapsMade(flat, {loaded: {compiled: deck('<div data-k="a" class="box" style="left:0px;top:0px;width:100px;height:50px">a</div>')}});
+    const flat = stageScope();
+    await mapsMade(flat, runOf(deck('<div data-k="a" class="box" style="left:0px;top:0px;width:100px;height:50px">a</div>')));
     expect(flat).toEqual({});
   });
 });

@@ -7,6 +7,7 @@ import {loadDeck, pageOf, writeDeck} from '../build.js';
 import {checkDeck, failure} from '../check.js';
 import {noteProblems} from '../notes.js';
 import {deckRoot} from '../paths.js';
+import {flowMaps} from './maps.js';
 
 const count = (problems, level) => problems.filter((p) => p.level === level).length;
 
@@ -52,14 +53,29 @@ export function checkRules(scope, run) {
  * these blocks" and "why is that wire straight" without the page being looked at: {map: {placed: 'build' | 'hand',
  * tile, cables, footprints?: how many pieces stand on the floor by a footprint, said: [[wire, note], …], tight: [names],
  * breaks?: [[block, rule], …] — the break rule each block's writer picked for its name (data-break)}}.
- * A deck with no such map writes nothing.
+ * A deck with no such map writes nothing, and runs nothing more. One that has one also builds each map again with the
+ * map flow, for its own record (mapRecords).
  */
 export function mapsMade(scope, run) {
   const made = Object.entries(run.loaded.compiled.maps).filter(([, map]) => map.made).map(([name, map]) => [name, {
     placed: map.made.placed, tile: map.made.tile, cables: map.cables?.length ?? 0, ...(map.made.footprints ? {footprints: map.made.footprints} : {}),
     ...(map.ways?.length ? {said: map.ways.map((w) => [w.name, w.way])} : {}), ...(map.tight?.length ? {tight: map.tight.map((t) => t.name)} : {}), ...(map.made.breaks ? {breaks: map.made.breaks} : {}),
   }]);
-  if (made.length) scope.maps = Object.fromEntries(made);
+  if (!made.length) return undefined;   // no isometric map: nothing more runs, and the stage stays as it was
+  scope.maps = Object.fromEntries(made);
+  return mapRecords(scope, run);
+}
+
+/**
+ * Each isometric map built again by footprint-story's map flow, its run's record kept beside this run's (maps.js), so
+ * `storydeck log --why at --map <map>` answers from a real run of the steps. What it found is a fact for the record:
+ * {map: {kept, differs?}} — kept, whether that map's record was written; differs, where its map parted from the page's.
+ */
+async function mapRecords(scope, run) {
+  const built = Object.entries(run.loaded.compiled.maps).filter(([, map]) => map.made && map.built).map(([name, map]) => ({name, built: map.built}));
+  run.mapRuns = await flowMaps(scope, run, built);
+  scope.mapFlows = Object.fromEntries(run.mapRuns.runs.map((m) => [m.name, {kept: m.file !== null, ...(m.differs ? {differs: m.differs} : {})}]));
+  if (run.mapRuns.skipped) scope.mapsSkipped = run.mapRuns.skipped;
 }
 
 /** It does not compile: that one problem is the answer, and the run stops here. */

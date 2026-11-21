@@ -93,6 +93,9 @@ describe('callTool', () => {
     expect(await callTool('log', {run: 7}, {dir, home})).toMatchObject({isError: true, content: [{text: expect.stringMatching(/^--run is a run's number in the list, 1 \(the newest\) to 2/)}]});
     expect((await callTool('paint', {}, {dir, home})).isError).toBe(true);
     expect((await callTool('log', {}, {dir, home})).content[0].text).toContain('tool calls: check 1, build 1, log 4');   // a name that is no tool counted nothing
+    // a map of null is no map: the run's own record is asked (and a broken deck's run kept none of a map)
+    expect((await callTool('log', {run: 1, why: 'verdict', map: null}, {dir, home})).content[0].text).toMatch(/^verdict = "broken"/);
+    expect(await callTool('log', {run: 1, why: 'verdict', map: 'null'}, {dir, home})).toMatchObject({isError: true, content: [{text: 'run 1 kept no map: its deck did not compile, so no map was built'}]});
   });
 
   it('turns a refusal into an error result with the reason', async () => {

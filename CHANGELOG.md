@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.34.0 — ask why a map is so, from its own record
+
+A deck with an isometric map now keeps, for each map, a record of how it was built, and `storydeck log` answers from
+it: why a block stands where it does, why the grid is fitted or the usual one, why a name is that size.
+
+```
+$ storydeck build my-talk
+clean — nothing to fix
+✓ my-talk/index.html · 5 clicks · 178 KB · 71 ms
+maps: map — why a block stands where it does: storydeck log --run 2026-11-21T23-11-07-965Z-build.3c220e --why at --map map
+$ storydeck log my-talk --run 2026-11-21T23-11-07-965Z-build.3c220e --why at --map map
+at = [[0,5,0],[4,1,0],[7,4,0],[12,2,0]]
+place: hand (hand#2) [wrote: at]
+  read (read#0) ← via blocks [wrote: who, blocks, floors, wires, obstacles, keep, written, usualGrid, area, style, policy]
+    ⚠ also consumed args — slice may be incomplete here
+  place (place#1) ← [control: every block has an at: the map placed them] [wrote: placed, placedWhy]
+```
+
+- **Where it runs: the run's `maps made` stage**, in `storydeck check` and `storydeck build` alike. The compile still
+  draws with `buildIsoMap` (0.33.0). The run also builds each map with footprint-story 0.25.0's map flow
+  (`runMapFlow`), handed the very spec the compile handed `buildIsoMap` (`deck/isoSpec.js` · `builtMap` now gives it,
+  frozen at every level, as `spec`; the compiled map keeps it as `built`), with the deck's policy. Each map's run keeps
+  its own record beside the run's: `<run id>.map-<k>.record.jsonl` (named by the map's place, never by the deck's
+  words). New: `deck/run/maps.js` (`flowMaps`) and `deck/run/why.js` (`whyText`).
+- **`storydeck log --run <n|id> --why <key> --map <map>`**: the map by the deck's own name for it — the one `data-map`
+  gives and `maps made` writes. `--why` with no key is refused (exit 1), naming what there is to ask: with `--map`, what
+  that map's run wrote; without, where the run's own stages are listed. An unknown map names the run's maps; a run
+  with none says why, and names the deck's other maps. `--run` now takes a run's id too, and an answer asked by id
+  names the run by it; an id no kept run has (a dropped run's) says so. The offered call quotes a map's name past
+  letters and digits, and never offers one the command line would read as a flag.
+- **The MCP `log` tool's schema grew** by the `map` argument and a line in `run`'s description.
+- **The two maps must be equal.** A difference is a `drift` line in the reply (where they first part) and heads every
+  answer for that map. It counts in no verdict: the page draws the deck's map.
+- **Each map flow is a named call** (`map.flow`, 30 s at most): a map flow that throws, returns nothing or never
+  settles is a `drift` line, never a failed run, and a record it began is removed. A record that cannot be written
+  never costs the run: the reply says `map map: its record was not kept`. At most 32 maps a run; the rest are counted.
+- **The reply of a deck with a map gains its `maps:` line**, offering the call by the run's id (a number moves). A
+  deck with no isometric map runs nothing new, and its reply is unchanged; its kept run now says it built no maps
+  (`maps: []`, `flat`), so a run kept before 0.34.0 is told apart ("kept before 0.34.0, which kept no map records").
+- **Pages unchanged**: every example page and expected HTML is the same. Cost: a 100-block map takes about 45 ms
+  more (placed by hand) or 65–85 ms more (placed by the build), and keeps a record of about 180–230 KB per map per
+  kept run: at the cap of 30 kept runs, tens of MB for a deck of a few such maps (`deck/run/README.md` · Cost).
+
 ## 0.33.0 — maps are built with footprint-story's steps
 
 - **An isometric map is built by footprint-story 0.25.0's map steps** (`footprint-story/isometric` · `buildIsoMap`, under

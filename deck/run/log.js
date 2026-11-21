@@ -24,7 +24,7 @@ export const COUNTED = Object.freeze(['outline', 'review', 'feedback', 'check', 
 
 const NOFOLLOW = constants.O_NOFOLLOW ?? 0, NONBLOCK = constants.O_NONBLOCK ?? 0;
 const RUN = /^(\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-\d{3}Z)-(check|build)\.([0-9a-f]{6})\.json$/;
-const RUN_FILE = /^\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-\d{3}Z-(check|build)\.[0-9a-f]{6}\.(json|record\.jsonl)$/;
+const RUN_FILE = /^\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-\d{3}Z-(check|build)\.[0-9a-f]{6}\.(json|record\.jsonl|map-\d{1,2}\.record\.jsonl)$/;
 const CALLS = 'calls.json';
 const VERDICTS = ['clean', 'fix', 'broken', 'failed'];
 
@@ -46,6 +46,30 @@ export function runsFolder(home, root) {
     return {why: error.message};
   }
 }
+
+/** How many maps a run keeps (maps.js · MAPS_MOST builds no more), and the most map names it keeps of a deck. */
+export const MAPS_KEPT = 32, NAMES_KEPT = 200;
+/** A key a map's run wrote, as it is kept and listed: a plain name. */
+export const KEY = /^[A-Za-z_]\w{0,39}$/;
+/** A map's name as a run keeps it: the deck's own (source.js · mapFile: letters, digits, - and _), never other text. */
+export const MAP_NAME = /^[\w-]{1,100}$/;
+
+/**
+ * A map's record file, beside its run's: `<run id>.map-<k>.record.jsonl`, k its place in the run's list of maps. WHY a
+ * file each: a record holds one run, and each map flow is a run of its own. WHY by number: a file's name is never made
+ * from the deck's words.
+ */
+export const mapRecordOf = (files, k) => path.join(path.dirname(files.file), `${files.id}.map-${k}.record.jsonl`);
+
+/**
+ * The maps a run built again, as it keeps them: {name, k, kept, control, keys, differs?} each, bounded (maps.js ·
+ * flowMaps). `k` is the map's place in the run's list, which names its record file: one whose name is not a map's is
+ * dropped without moving the others.
+ */
+const keptMaps = (runs) => (Array.isArray(runs) ? runs : []).slice(0, MAPS_KEPT).map((m, k) => [plain(m), k]).filter(([m]) => MAP_NAME.test(m.name))
+  .map(([m, k]) => ({name: m.name, k, kept: m.file !== undefined ? Boolean(m.file) : m.kept === true, control: controlKept(m.control), keys: (Array.isArray(m.keys) ? m.keys : []).filter((k) => KEY.test(k)).slice(0, 60), ...(typeof m.differs === 'string' ? {differs: text(m.differs.replace(/\s+/g, ' '))} : {})}));
+/** The deck's other maps, by name: those with no isometric piece. */
+const keptNames = (names) => (Array.isArray(names) ? names : []).filter((n) => MAP_NAME.test(n)).slice(0, NAMES_KEPT);
 
 /** A new run's two files in a folder: {id, file (what this module writes), record (what the engine writes as the run goes)}. */
 export function runFiles(dir, kind, at = new Date()) {
@@ -130,10 +154,12 @@ function readRun(data) {
     since: d.since ? {fixed: whole(plain(d.since).fixed), new: whole(plain(d.since).new)} : null,
     keys: pairs(d.keys, MOST.keys), layout: pairs(d.layout, MOST.keys), carried: whole(d.carried),
     stages: (Array.isArray(d.stages) ? d.stages : []).slice(0, 64).map((s) => ({stage: text(plain(s).stage, 80), ms: whole(plain(s).ms)})),
-    calls, failure: d.failure === null || d.failure === undefined ? null : text(d.failure, 2000),
+    calls, failure: d.failure === null || d.failure === undefined ? null : text(typeof d.failure === 'string' ? d.failure.replace(/\s+/g, ' ') : d.failure, 2000),   // one line: a file edited by hand cannot add one
     lines: (Array.isArray(d.lines) ? d.lines : []).slice(0, MOST.lines).map((l) => text(l)),
     engine: (Array.isArray(d.engine) ? d.engine : []).slice(0, 20).map((l) => text(l)),
     control: controlKept(d.control),
+    // a run kept before 0.34.0 has no `maps`: it kept no map records, which is not "no map" (run/why.js says which)
+    ...(Array.isArray(d.maps) ? {maps: keptMaps(d.maps), flat: keptNames(d.flat), mapsSkipped: whole(d.mapsSkipped)} : {}),
   };
 }
 
@@ -151,13 +177,22 @@ function readJson(file) {
   }
 }
 
+/** Is a plain file at `file` (never a link)? */
+const plainFile = (file) => { try { return lstatSync(file).isFile(); } catch { return false; } };
+
 /** The names of a folder's kept runs, oldest first. */
 const runNames = (dir) => { try { return readdirSync(dir).filter((n) => RUN.test(n)).sort(); } catch { return []; } };
 
 /** One kept run by its file's name: as readRun gives it, with its `id` and its `record` file — or null. */
 function runNamed(dir, name) {
-  const run = readRun(readJson(path.join(dir, name))), id = name.slice(0, -'.json'.length);
-  return run && {id, record: path.join(dir, `${id}.record.jsonl`), ...run};
+  const run = readRun(readJson(path.join(dir, name))), id = name.slice(0, -'.json'.length), file = path.join(dir, name);
+  if (!run) return null;
+  // each map with the record file at its place, when one is there (a plain file, never a link)
+  const maps = run.maps?.map((m) => {
+    const record = mapRecordOf({id, file}, m.k);
+    return {...m, ...(m.kept && plainFile(record) ? {record} : {})};
+  });
+  return {id, record: path.join(dir, `${id}.record.jsonl`), ...run, ...(maps ? {maps} : {})};
 }
 
 /** The kept runs of a folder, newest first. */
@@ -182,7 +217,7 @@ function writeNew(file, body) {
 function dropOld(dir) {
   let names;
   try { names = readdirSync(dir).filter((n) => RUN_FILE.test(n)); } catch { return; }
-  const idOf = (name) => name.replace(/\.(json|record\.jsonl)$/, '');
+  const idOf = (name) => name.replace(/\.(json|record\.jsonl|map-\d{1,2}\.record\.jsonl)$/, '');
   const old = new Set([...new Set(names.map(idOf))].sort().slice(0, -RUNS_KEPT));   // a record whose summary was never written goes in its turn too
   for (const name of names) if (old.has(idOf(name))) rmSync(path.join(dir, name), {force: true});
 }
@@ -194,7 +229,9 @@ const keptLines = (lines) => lines.slice(0, MOST.lines).map((l) => `${l.type ===
  * Keep one run: its file written in `files` (runFiles), and where it stands against the last run that finished
  * ({round, first, closed, since, layout, carried}: progress). `run`: {kind, verdict, problems (what the rules found),
  * layoutProblems (what the browser found), errors, warnings, infos, clicks, measured, written, ms, stages, calls,
- * lines, engine, failure?} — calls already hold which click was slowest, as a number.
+ * lines, engine, failure?, maps?: {runs, skipped} (maps.js · flowMaps), flat?: the deck's other maps} — calls already
+ * hold which click was slowest, as a number. Each map's record is already in place (mapRecordOf): a map that kept none
+ * says so.
  */
 export function keepRun(dir, files, run, at = new Date()) {
   // what the adapter handed back is what a browser found only when it measured every click: else it is what stopped it
@@ -203,7 +240,9 @@ export function keepRun(dir, files, run, at = new Date()) {
   const body = {v: 1, at: at.toISOString(), kind: run.kind, verdict: run.verdict, errors: run.errors, warnings: run.warnings, infos: run.infos,
     clicks: run.clicks, measured: run.measured, written: run.written, ms: run.ms, ...stand, keys,
     stages: (run.stages ?? []).slice(0, 64).map((st) => ({stage: text(st.stage, 80), ms: whole(st.ms)})), calls: run.calls ?? {},
-    failure: run.failure ? text(run.failure, 2000) : null, engine: (run.engine ?? []).slice(0, 20).map((w) => text(w)), control: controlKept(run.control), lines: keptLines(run.lines ?? [])};
+    failure: run.failure ? text(run.failure, 2000) : null, engine: (run.engine ?? []).slice(0, 20).map((w) => text(w)), control: controlKept(run.control),
+    // every run from 0.34.0 says which maps it built again, even none, so one kept before is told apart
+    maps: keptMaps(run.maps?.runs), flat: keptNames(run.flat), ...(run.maps?.skipped ? {mapsSkipped: whole(run.maps.skipped)} : {}), lines: keptLines(run.lines ?? [])};
   let out = JSON.stringify(body);
   // text in another script is three bytes a character: a run in words that would not fit goes, and the counts stay
   if (Buffer.byteLength(out) > MOST.bytes) out = JSON.stringify({...body, lines: [], keys: keys.slice(0, 50), layout: stand.layout.slice(0, 50), cut: true});
