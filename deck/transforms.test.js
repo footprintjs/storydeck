@@ -1,8 +1,8 @@
 import {describe, it, expect} from 'vitest';
 import {wires, wiresDrawn, wireTags, transformed, icons, readIcon, applyTransforms} from './transforms.js';
 import {isoDrawn} from './iso.js';
-import {exitOutline, held, labelPlace, walkWay as cableWalk} from 'footprint-story/isometric';
-import {cables, cableWay} from './cable.js';
+import {cableWay, exitOutline, held, labelPlace, walkWay as cableWalk} from 'footprint-story/isometric';
+import {cables} from './cable.js';
 import {stripComments} from './html.js';
 import {PACE_CSS} from './pace.js';
 import {readFileSync} from 'node:fs';

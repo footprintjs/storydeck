@@ -3,8 +3,9 @@
 // The way is the kit's (footprint-story/isometric · routes): it leaves a block at one of the two feet a viewer sees,
 // runs along the floor's tile lines, turns square, goes round what stands in its way, keeps off floor a block hides
 // when it can, and comes into the other block at a foot that is seen; a request and its answer lie in two lanes. A film
-// lays the same wires the same way. This file puts that way on the slide: its points in slide px, its corners rounded
-// (the kit's `rounded`), and where its label stands on it.
+// lays the same wires the same way. This file puts that way on the slide — its points in slide px — and says what
+// happened to it in words. Its line, stopped for its head and its corners rounded, is the kit's `cableWay` (StoryDeck's
+// rule, moved there in 0.30.1), asked by transforms.js.
 //
 // WHY the kit and not a curve of our own (0.18.0 drew one curve between two fixed feet): one curve cannot go round a
 // block, so a block in front of another, or close beside it, got no cable, and a cable to a block two steps away ran
@@ -13,7 +14,7 @@
 // A wire has no cable when the kit finds no way (its `why` says which: two heights, no free place at a foot, walled
 // in); it is then drawn straight, from outline to outline (transforms.js). A wire that should run straight anyway
 // says so with a bend of 0 ("a to b 0").
-import {hairpins, routes, rounded, CABLE, MOST_ROUTES, NO_ROUTE} from 'footprint-story/isometric';
+import {hairpins, routes, CABLE, MOST_ROUTES, NO_ROUTE} from 'footprint-story/isometric';
 
 // The cable's numbers (how far its ends stand off a foot, its corners' rounding) and where its label stands on it are
 // footprint-story/isometric's (CABLE; labelPlace, held, walkWay, LABEL_PLACES), so a deck and a film put a cable and its
@@ -157,8 +158,3 @@ export function readWay(note, from, to) {
   return out;
 }
 
-/** A cable's line on the slide: its points, the last pulled `back` px (where an arrow's head begins), its corners rounded — the kit's rounded way. */
-export function cableWay({points, radius}, back = 0) {
-  const tip = points.at(-1), before = points.at(-2), far = Math.hypot(tip[0] - before[0], tip[1] - before[1]) || 1, by = Math.max(0, Math.min(back, far - 1));   // never past the run's own start, never forwards
-  return rounded([...points.slice(0, -1), [tip[0] - (tip[0] - before[0]) * by / far, tip[1] - (tip[1] - before[1]) * by / far]], radius);
-}

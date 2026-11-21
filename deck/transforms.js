@@ -55,9 +55,9 @@ import {readPieces} from '../focusHtml.js';
 import {boxFinder} from './boxes.js';
 import {callouts} from './callouts.js';
 import {isoDrawn} from './iso.js';
-import {arrowHead, bentWire, crossesBox, curveWay, headingOf, held, labelHalf, labelPlace, lanesOf, rounded, straightRun, walkWay, CABLE, NO_ROUTE} from 'footprint-story/isometric';
+import {arrowHead, bentWire, cableWay, crossesBox, curveWay, headingOf, held, labelHalf, labelPlace, lanesOf, rounded, stopShort, straightRun, walkWay, CABLE, NO_ROUTE} from 'footprint-story/isometric';
 import {readKeepClear} from './keepClear.js';
-import {cables, cablesOn, cableWay, layRoutes, reachOf, wayNote} from './cable.js';
+import {cables, cablesOn, layRoutes, reachOf, wayNote} from './cable.js';
 import {leadSeen, leadSpan, piecesLength, quoted, readRide, rideMarks, rideOf, ridersSvg, SPEEDS} from './rides.js';
 
 const fixed = (v) => +v.toFixed(1);
@@ -186,7 +186,7 @@ const wayPath = (way, X, Y) => `M${fixed(way.start[0] - X)} ${fixed(way.start[1]
 
 /**
  * A cable's SVG: the same wire in every other way — its own attributes, a head, its packets, its options — drawn along
- * its line on the floor (`way`: cable.js · cableWay, straight runs and rounded corners; `points`: the cable's own, its
+ * its line on the floor (`way`: footprint-story/isometric · cableWay, straight runs and rounded corners; `points`: the cable's own, its
  * last where its arrow ends).
  * It is marked data-sd-cable and carries its line as --sd-way, which its packets ride (deck.css), and that line's
  * length as --sd-length, so a deck's own CSS can time a thing to it without measuring. Its label stands on
@@ -394,9 +394,10 @@ function laidRecord(name, {points, tile, route, lead = 0}, way) {
 function leadOf({points, radius, ends}, k, back) {
   const end = ends?.[k];
   if (!end?.seen) return null;
-  const run = k ? [...points].reverse() : [...points];
-  if (back) { const [tip, next] = run, far = Math.hypot(next[0] - tip[0], next[1] - tip[1]) || 1, by = Math.max(0, Math.min(back, far - 1)); run[0] = [tip[0] + (next[0] - tip[0]) * by / far, tip[1] + (next[1] - tip[1]) * by / far]; }
-  const way = rounded(run, radius);
+  // the cable's points with end k last, its tip pulled back for its head by the one rule (the kit's stopShort, as
+  // cableWay stops the whole line), then turned round so the lead is rounded from that end
+  const toEnd = k ? [...points] : [...points].reverse();
+  const way = rounded((back ? stopShort(toEnd, back) : toEnd).reverse(), radius);
   return {way, pieces: way.pieces.slice(0, 2 * (end.count - 2) + 2)};
 }
 
