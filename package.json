@@ -1,6 +1,6 @@
 {
   "name": "footprint-storydeck",
-  "version": "0.30.1",
+  "version": "0.31.0",
   "description": "React views and a deck CLI for turning one structured story into an article, scrollytelling page, slide deck, narrated video or PowerPoint.",
   "type": "module",
   "license": "MIT",

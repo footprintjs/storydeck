@@ -17,7 +17,6 @@
 // by the ride's easing, sdShow carries --sd-show — and is marked data-sd-ride. A wire that asks for none is drawn as
 // it always was (deck.css · sdRun), so its page is byte for byte the same.
 import {hiddenRamps, rideProfile, rideSeconds, seenTerms, showStops, withHold, MOST_EASE} from 'footprint-story/motion';
-import {curveWay} from 'footprint-story/isometric';
 
 export const SPEEDS = [0.5, 60];   // seconds a packet takes to run the wire
 const HOLD = {plain: 1, most: 60};   // seconds a packet that rests at the end stays there: unless the wire says, and at most
@@ -160,16 +159,6 @@ export function ridersSvg(o, r, {d, seen = r.seen, span = [0, 1], restAt = r.res
 }
 /** What a wire whose packets ride adds to its SVG's tag: the marks RIDE_CSS reads, its easings — and its line as --sd-way, when `way` (a path's d) is given. */
 export const rideMarks = (o, r, way = null) => ({attrs: ` data-sd-ride${o.keep ? ' data-sd-keep' : ''}`, style: `${way === null ? '' : `;--sd-way:path('${way}')`};${r.vars}`});
-
-/**
- * The length of a rounded way's pieces (footprint-story · rounded) from `start`, in px: a corner walked in 12 straight
- * runs, as the kit walks it (footprint-story/isometric · curveWay: a curve's length, the one a film measures too).
- */
-export function piecesLength(start, pieces) {
-  let length = 0, at = start;
-  for (const piece of pieces) { length += piece.corner ? curveWay(at, piece.corner, piece.to, 12).length : Math.hypot(piece.to[0] - at[0], piece.to[1] - at[1]); at = piece.to; }
-  return length;
-}
 
 /**
  * The stylesheet of packets that ride (a wire marked data-sd-ride), which the page carries only when a deck has one —

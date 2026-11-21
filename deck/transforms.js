@@ -55,10 +55,10 @@ import {readPieces} from '../focusHtml.js';
 import {boxFinder} from './boxes.js';
 import {callouts} from './callouts.js';
 import {isoDrawn} from './iso.js';
-import {arrowHead, bentWire, cableWay, crossesBox, curveWay, headingOf, held, labelHalf, labelPlace, lanesOf, rounded, stopShort, straightRun, walkWay, CABLE, NO_ROUTE} from 'footprint-story/isometric';
+import {arrowHead, bentWire, cableLead, cableWay, crossesBox, curveWay, headingOf, held, labelHalf, labelPlace, lanesOf, straightRun, walkWay, CABLE, NO_ROUTE} from 'footprint-story/isometric';
 import {readKeepClear} from './keepClear.js';
 import {cables, cablesOn, layRoutes, reachOf, wayNote} from './cable.js';
-import {leadSeen, leadSpan, piecesLength, quoted, readRide, rideMarks, rideOf, ridersSvg, SPEEDS} from './rides.js';
+import {leadSeen, leadSpan, quoted, readRide, rideMarks, rideOf, ridersSvg, SPEEDS} from './rides.js';
 
 const fixed = (v) => +v.toFixed(1);
 /** A wire written by the pieces it joins: "from to to [bend]". */
@@ -366,7 +366,7 @@ export function wiresDrawn(html, {shapes = new Map(), floor = null, solids = [..
     // packets, when it asks how they ride, ride the line the record measures, past the stretches the record says are
     // hidden, and hand over to a lead's copy on the lead's stretch (the share of the line each lead holds)
     const head = o.head ? SHORT : 0, ends = [0, 1].map((k) => levels.get(k ? laid.route.to : laid.route.from));
-    const held = [0, 1].map((k) => { const lead = o.rides && ends[k] !== undefined ? leadOf(laid, k, k === 1 ? head : 0) : null; return lead ? Math.min(1, piecesLength(lead.way.start, lead.pieces) / ways[i].length) : null; });
+    const held = [0, 1].map((k) => { const lead = o.rides && ends[k] !== undefined ? leadOf(laid, k, k === 1 ? head : 0) : null; return lead ? Math.min(1, lead.length / ways[i].length) : null; });
     const r = o.rides ? rideOf(o, ways[i].length, m[1], {unseen: kept.unseen, leads: [held[0], held[1] === null ? null : 1 - held[1]]}) : null;
     return cableSvg(named, m[1], o, ways[i], laid.points, place, r) + [0, 1].map((k) => leadSvg(named, laid, k, k === 1 ? head : 0, ends[k], r && {o, r, way: ways[i], share: held[k]})).join('');
   });
@@ -386,19 +386,15 @@ function laidRecord(name, {points, tile, route, lead = 0}, way) {
 }
 
 /**
- * A cable's lead at end `k` (0 the start, 1 the end) when it plugs into a port on a seen side: {way, pieces} — the
- * cable's points from that end, rounded, and the pieces of it the lead holds (out of the port, the riser and on to the
- * end of its floor corner: the upper part of that corner can be behind the block's face too); null for no lead.
- * `back`: px the line stops short of the tip there, for its head.
+ * A cable's lead at end `k` (0 the start, 1 the end) when it plugs into a port on a seen side: {way, pieces, length} —
+ * the kit's cableLead (the cable's points from that end, rounded, the pieces the lead holds out of the port, the riser
+ * and through its floor corner, and their length); null for no lead. `back`: px the line stops short of the tip there,
+ * for its head. Which ends have a lead (a port on a seen side) is this deck's to say; the numbers are the kit's, so a
+ * film's lead is the same (footprint-story 0.21.0, from this function and rides.js · piecesLength).
  */
 function leadOf({points, radius, ends}, k, back) {
   const end = ends?.[k];
-  if (!end?.seen) return null;
-  // the cable's points with end k last, its tip pulled back for its head by the one rule (the kit's stopShort, as
-  // cableWay stops the whole line), then turned round so the lead is rounded from that end
-  const toEnd = k ? [...points] : [...points].reverse();
-  const way = rounded((back ? stopShort(toEnd, back) : toEnd).reverse(), radius);
-  return {way, pieces: way.pieces.slice(0, 2 * (end.count - 2) + 2)};
+  return end?.seen ? cableLead({points, radius}, k, end.count, back) : null;
 }
 
 /**

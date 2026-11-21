@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.31.0 — a lead into a port ends at its floor corner, worked out by the story library
+
+A lead into a port on a seen side (the stretch of a cable drawn again over its block) now comes from
+`footprint-story/isometric` · `cableLead`, and ends where it should: at the end of the floor point's corner.
+
+**A fix, so pages change.** 0.30.1 counted the lead's pieces (4 for a port above the floor: out of the port, a corner,
+down the riser, the floor corner). Where the riser is shorter than its two corners' rounding — common at a low port —
+there is no straight run down it, and the count ran one piece on along the floor. In a before/after run over 560
+generated maps with ports (not checked in), 232 of 822 leads were that piece shorter: 4.7 px at the median, 8.1 px at
+most. A packet on such a cable now passes onto the lead at that share of the line. `deck/lead.test.js` pins a low
+port's lead (it fails on 0.30.1). Where 0.30.1's count ended at the floor point, the lead is as it was: footprint-story
+0.21.0's property test against copies of the code it replaced (`leadOf` as of 0.30.0, `piecesLength` as of 0.29.0;
+the same numbers since). `examples/a-request` has no ports; its page is as on 0.30.1 but for the version in its
+generator line.
+
+- `deck/transforms.js` · `leadOf` asks `cableLead` for its way, its pieces and their length; which ends have a lead
+  stays this deck's to say. `deck/rides.js` · `piecesLength` moved there with it and is no longer exported. A film's
+  lead is now the same.
+- Needs `footprint-story ^0.21.0`.
+
 ## 0.30.1 — a cable's line stops for its head by the story library's rule
 
 Pages are byte for byte as on 0.30.0 but for the version in the page's generator line (checked on `examples/a-request`
