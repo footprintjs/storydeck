@@ -42,6 +42,7 @@
 // and a nearer block's box lies over the block behind it: so on the slide shown only its faces and its words take the
 // pointer, and a ring round it (a highlight, explore's hover) follows its faces — isoRing, for whoever rings a piece.
 import {arrange, arrangeByGroup, floorLabelPlace, gridFor, isometric, readThing, wordsToFit, GROUP_MARGIN, MOST_FLOOR_LABEL, MOST_KEEP, roundOutline} from 'footprint-story/isometric';
+import {BREAK_RULES} from 'footprint-story/layout';
 import {portsWritten} from './portsWritten.js';
 import {groupWritten} from './groups.js';
 import {keptFloor, mayKeepClear, readKeepClear} from './keepClear.js';
@@ -152,6 +153,11 @@ function readIso(html) {
     if (kind === 'floor' && inner.trim()) throw new Error(`${told}: a floor holds no words — put them in a piece that stands on it`);
     // a floor's label and its icon, read here and drawn by the build (floorLabelHtml): taken off the element it writes
     let styleCut = styled ? styled.before + styled.after : attrs, label = null, icon = null;
+    // how its name breaks onto two lines, when the writer picks (breakWritten): taken off the element like a label
+    const broken = breakWritten(styleCut, kind, told);
+    if (broken) styleCut = broken.rest;
+    // a rule for a name it does not have: refused, as a film refuses a break with no label
+    if (broken && !nameOf(inner)) throw new Error(`${told}: data-break says how its name breaks onto two lines, and it has no name the build fits (a first <b> of plain words, inside no other element, with no style of its own) — give it one, or take data-break out`);
     for (const attr of ['data-label', 'data-icon']) {
       const a = ownAttribute(styleCut, attr);
       if (!a) continue;
@@ -173,9 +179,28 @@ function readIso(html) {
       styleCut = a.before + a.after;
     }
     if (icon && !label) throw new Error(`${told}: data-icon on a floor goes beside its label — give the floor a data-label too`);
-    out.push({start, open, close, end, tag, attrs, where: told, name, kind, at, size, ports, inner, style, quote: styled?.quote ?? '"', styleCut, label, icon, group: groupWritten(attrs, told)});
+    out.push({start, open, close, end, tag, attrs, where: told, name, kind, at, size, ports, inner, style, quote: styled?.quote ?? '"', styleCut, label, icon, rule: broken?.rule ?? null, group: groupWritten(attrs, told)});
   }
   return out;
+}
+
+/**
+ * The rule a block's name breaks by, when its writer picks one: data-break="fill" (the first line as full as it goes)
+ * or "even" (the usual: the two lines as alike as they can be) — footprint-story/isometric · wordsToFit's `break`, the
+ * names of footprint-story/layout's BREAK_RULES. Gives {rule, rest} (its attributes without data-break, so the page
+ * does not carry it), or null when none is written. WHY a name and not a free value: the common package tests each
+ * rule and the run's record names the one used (maps made · breaks). A floor holds no words, so it takes none.
+ */
+function breakWritten(attrs, kind, told) {
+  const a = ownAttribute(attrs, 'data-break');
+  if (!a) return null;
+  const names = BREAK_RULES.map((r) => `"${r}"`).join(' or ');
+  if (a.bare || a.twice) throw new Error(`${told}: data-break is written data-break="fill" or data-break="even", once, in lower case and with quotes`);
+  if (kind === 'floor') throw new Error(`${told}: data-break says how a block's name breaks onto two lines, and a floor holds no words — put it on the block`);
+  // written exactly, as a film's recipe key is (StoryReel refuses " fill " too): a map moved into a film reads the same
+  const rule = a.value;
+  if (!BREAK_RULES.includes(rule)) throw new Error(`${told}: data-break="${a.value.slice(0, 40)}" — a name breaks by ${names}: "fill" sets the first line as full as it goes, "even" (the usual) makes the two lines alike`);
+  return {rule, rest: a.before + a.after};
 }
 
 /** The isometric pieces a map has: [{name, kind}] — nothing for a map without one. */
@@ -336,13 +361,13 @@ function nameOf(inner) {
  * (the grid's: a block's top is a diamond, as wide across its middle as the block's shorter side is long).
  * WHY counted in letters: a build has no browser. `build --layout` measures the page itself.
  */
-function fitName(inner, room) {
+function fitName(inner, room, rule) {
   const found = nameOf(inner);
   if (!found) return {inner, tight: null};
   // broken where the common package breaks: a no-break space, written or as an entity, keeps two words on one line. A space
   // that comes out of an entity is inside a word here, so the fitted break falls between the words as written.
   const raw = found.text.split(BREAK).filter(Boolean), shown = raw.map((word) => decodeEntities(word).replace(INSIDE, '\u00A0'));
-  const {lines, size, fits} = wordsToFit(shown.join(' '), (high) => CLEAR * room(high), NAME);
+  const {lines, size, fits} = wordsToFit(shown.join(' '), (high) => CLEAR * room(high), rule ? {...NAME, break: rule} : NAME);
   if (lines.length === 1 && size === NAME.size) return {inner, tight: null};
   // the words as the deck wrote them (an entity stays an entity), broken where the fitted lines break
   const first = lines[0].split(' ').length, written = lines.length === 2 ? `${raw.slice(0, first).join(' ')}<br>${raw.slice(first).join(' ')}` : raw.join(' ');
@@ -359,7 +384,7 @@ function draw(p, html, shape, level, tight) {
   at = attrRule('class').test(at) ? at.replace(attrRule('class'), (_, q, v) => ` class=${q}${/(^|\s)iso(\s|$)/.test(v) ? v : `iso ${v}`}${q}`) : `${at} class="iso"`;
   const svg = `<svg class="iso-art" viewBox="0 0 ${fixed(box.w)} ${fixed(box.h)}" aria-hidden="true">${art}</svg>`;
   // its name fitted to its top face, by the room the grid says words have there
-  const fitted = say && p.inner.trim() ? fitName(p.inner, shape.room) : null;
+  const fitted = say && p.inner.trim() ? fitName(p.inner, shape.room, p.rule) : null;
   if (fitted?.tight) tight.push({name: p.name, text: fitted.tight});
   const words = fitted ? `<span class="iso-say" style="left:${fixed(say.x - box.x)}px;top:${fixed(say.y - box.y)}px">${fitted.inner}</span>` : '';
   const named = p.label ? floorLabelHtml(p, shape, box, tight) : '';
@@ -468,7 +493,9 @@ export function isoDrawn(html, {canvas = null, area = null, links = [], lay = nu
   const fitted = !written && (fit || placedHere);
   // a fitted picture at its least tile may still not hold every group's floor: how far past the slide's area it runs, in px
   const outside = fitted && areas.length ? beyondArea(areas.map(([c, r]) => grid.at(c, r)), area ?? [0, 0, ...(canvas ?? [1920, 1080])]) : 0;
-  const made = {placed: placedHere ? 'build' : 'hand', tile: grid.tile[0], fitted, ...(feet.length ? {footprints: feet.length} : {}), ...(outside > 0.5 ? {outside: Math.round(outside)} : {})};
+  // the break rules its writer picked, by block (none written: nothing here, so a map that picks none records as before)
+  const breaks = found.filter((p) => p.rule).map((p) => [p.name, p.rule]);
+  const made = {placed: placedHere ? 'build' : 'hand', tile: grid.tile[0], fitted, ...(feet.length ? {footprints: feet.length} : {}), ...(outside > 0.5 ? {outside: Math.round(outside)} : {}), ...(breaks.length ? {breaks} : {})};
   return {html: out + map.slice(from), shapes, solids, tight, levels, made, floor: (col, row, lift = 0) => { const point = grid.at(col, row, lift); return [point.x, point.y]; }};
 }
 

@@ -267,6 +267,10 @@ describe('run · how a map was made is on the record', () => {
     const feet = {}, foot = (k, at, port) => `<img data-k="${k}" data-footprint="${at} 2 2 0.5" data-ports="${port}" style="left:10px;top:10px;width:60px;height:60px">`;
     mapsMade(feet, {loaded: {compiled: deck(`${grid}${foot('lap', '0 0', 'p: 2 1 0.2')}${foot('tv', '6 0', 'q: 1 2 0.2')}<i data-k="w" class="wire" data-arrow="lap.p to tv.q"></i>`)}});
     expect(feet.maps).toEqual({map: {placed: 'hand', tile: 120, cables: 1, footprints: 2}});
+    // a block whose writer picked how its name breaks: the rule, by block
+    const picked = {};
+    mapsMade(picked, {loaded: {compiled: deck(`${grid}<div data-k="a" data-iso="block" data-at="0 0" data-break="fill"><b>Logs to S3 Archive</b></div>`)}});
+    expect(picked.maps).toEqual({map: {placed: 'hand', tile: 120, cables: 0, breaks: [['a', 'fill']]}});
     // no isometric map: nothing written
     const flat = {};
     mapsMade(flat, {loaded: {compiled: deck('<div data-k="a" class="box" style="left:0px;top:0px;width:100px;height:50px">a</div>')}});
