@@ -54,16 +54,20 @@ export function specNames(names) {
 /**
  * The deck's words for a refusal of the steps. The kit names the piece by its `who` (the deck's words), so its own
  * reason is said as it is, without the kit's "isometric: ". Two refusals the deck had words of its own for, which its
- * tests and docs say, are said in those words still: blocks the build cannot place, and a floor fitted too big.
+ * tests and docs say, are said in those words still: blocks the build cannot place, and a floor fitted too big. Where
+ * the kit names a piece by its name in the spec and not by its `who` (a placing refusal says which block), a name made
+ * for it (specNames: a shared or a long name) is put back as the deck wrote it — `renamed`: [[made, deck's name]] — so
+ * a deck writer never reads a name they did not write.
  */
-function deckWords(e) {
+function deckWords(e, renamed = []) {
+  const named = (text) => renamed.reduce((out, [made, name]) => out.split(JSON.stringify(made)).join(`"${name}"`), text);
   const said = String(e?.message ?? e).replace(/^isometric: /, '');
   if (said.startsWith(`${MAP}: the blocks cannot be placed from their wires: `) && e.cause) {
-    return new Error(`the build cannot place this map's blocks: ${String(e.cause.message ?? e.cause).replace(/^isometric: /, '')} — or give every block its data-at`, {cause: e});
+    return new Error(named(`the build cannot place this map's blocks: ${String(e.cause.message ?? e.cause).replace(/^isometric: /, '')} — or give every block its data-at`), {cause: e});
   }
   const big = /^([^]*): fitted round its blocks the floor would be (\d+) by (\d+) tiles, and a floor is at most (\d+) a side — give it an at and a size of its own, or take it out$/.exec(said);
   if (big) return new Error(`${big[1]}: fitted round this map's blocks the floor would be ${big[2]} by ${big[3]} tiles, and a floor is at most ${big[4]} a side — take the floor out, or give it a data-at and a data-size of its own (it is ground: it need not lie under every block)`, {cause: e});
-  return new Error(said, {cause: e});
+  return new Error(named(said), {cause: e});
 }
 
 /**
@@ -129,7 +133,10 @@ export function builtMap({blocks = [], floors = [], obstacles = [], keep = [], l
     keep: keep.map(({at, size, name}) => ({at, size, name})), wires, grid, usualGrid: usualGrid(canvas), area,
   };
   let map;
-  try { map = buildIsoMap(spec, DECK); } catch (e) { throw deckWords(e); }
+  try { map = buildIsoMap(spec, DECK); } catch (e) {
+    const pieces = [...blocks, ...floors, ...obstacles];
+    throw deckWords(e, names.flatMap((made, i) => (made === pieces[i].name ? [] : [[made, pieces[i].name]])));
+  }
   // each name the kit says, as the deck's: a block's or a footprint's, and the words a wire runs under
   const deckName = new Map([...blocks.map((p, i) => [ids.blocks[i], p.name]), ...obstacles.map((o, i) => [ids.obstacles[i], o.name])]);
   const at = new Map([...blocks.map((p, i) => [p.name, map.at[i]]), ...obstacles.map((o) => [o.name, o.at])]);

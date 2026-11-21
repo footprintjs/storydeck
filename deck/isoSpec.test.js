@@ -9,7 +9,8 @@ import path from 'node:path';
 import {buildIsoMap, isometric, ISO_MAP_POLICIES, MOST_KEEP} from 'footprint-story/isometric';
 import {isoDrawn} from './iso.js';
 import {keptFloor} from './keepClear.js';
-import {specNames} from './isoSpec.js';
+import {layRoutes, specNames} from './isoSpec.js';
+import {transformed} from './transforms.js';
 import {icons as drawIcons, readIcon} from './transforms.js';
 
 const DECK = ISO_MAP_POLICIES.deck;
@@ -126,7 +127,7 @@ describe('isoSpec · the deck\'s maps are built by footprint-story\'s map steps'
       built += 1;
     }
     expect(built).toBeGreaterThan(100);
-  });
+  }, 60_000);   // 160 maps, each built twice: seconds under a full suite's load
 
   it('hands each piece a name of its own: its first name when it is one piece\'s and short enough, else one made for it', () => {
     const long = 'x'.repeat(70);
@@ -136,6 +137,30 @@ describe('isoSpec · the deck\'s maps are built by footprint-story\'s map steps'
     expect(made[3]).toBe('a~0');                                   // a name the deck wrote keeps it
     expect(made.slice(0, 3).every((name) => [...name].length <= 64)).toBe(true);
     expect(made[0]).not.toBe('a~0');                                // and a made name never takes it
+  });
+});
+
+describe('isoSpec · what the deck reads back of the built map', () => {
+  it('gives a wire the height of the floor it leaves from: the block it starts at, never the one it ends at', () => {
+    const raised = {name: 'a', kind: 'block', at: [0, 4, 1], size: [2, 2, 1]}, low = {name: 'b', kind: 'block', at: [5, 1, 0], size: [2, 2, 1]};
+    const [up, down] = layRoutes([['a', 'b'], ['b', 'a']], [raised, low]);
+    expect([up.lift, down.lift]).toEqual([1, 0]);
+    expect(up.route.points).toBe(null);   // two heights: no way along the floor, and the kit says why
+    // and on the slide: two blocks raised alike are joined at their height, its floor point where the grid puts it
+    const map = '<i data-iso-grid="120 at 960 240"></i><div data-k="a" data-iso="block" data-at="0 4 1.5"></div><div data-k="b" data-iso="block" data-at="5 1 1.5"></div><div data-k="c" data-iso="block" data-at="9 9"></div>';
+    const drawn = isoDrawn(map, {canvas: [1920, 1080], links: [['a', 'b'], ['c', 'a']], floorWires: () => [[{name: 'a', port: null}, {name: 'b', port: null}], [{name: 'c', port: null}, {name: 'a', port: null}]]});
+    expect(drawn.routes.map((r) => r.lift)).toEqual([1.5, 0]);
+  });
+
+  it('names a piece in a refusal of the steps as the deck wrote it, never by a name made for it', () => {
+    const long = 'n'.repeat(70), canvas = [1920, 1080];
+    const refusal = (html) => { try { transformed(html, {canvas}); } catch (e) { return e.message; } return null; };
+    // a name a floor and a block share, and a name past the 64 letters the steps take: each known to the steps by a name made for it
+    const shared = refusal('<div data-k="a" data-iso="floor"></div><div data-k="a" data-iso="block" data-size="70 2 1"></div><div data-k="b" data-iso="block"></div>');
+    expect(shared).toBe('the build cannot place this map\'s blocks: "a"\'s size is [wide, deep, high] with wide and deep above 0, high 0 or more, none over 64 — not [70,2,1] — or give every block its data-at');
+    const longer = refusal(`<div data-k="${long}" data-iso="block" data-size="70 2 1"></div><div data-k="b" data-iso="block"></div>`);
+    expect(longer).toBe(`the build cannot place this map's blocks: "${long}"'s size is [wide, deep, high] with wide and deep above 0, high 0 or more, none over 64 — not [70,2,1] — or give every block its data-at`);
+    for (const said of [shared, longer]) expect(said).not.toMatch(/~\d/);
   });
 });
 

@@ -22,8 +22,9 @@
     said not to fit, as before; where it breaks onto two lines now follows its first 2000 letters.
   - A map whose blocks the build places, with a block whose first name is longer than 200 letters, was refused
     ("thing 1 has a name, some text of at most 200 characters"); it is now drawn. The steps know a name past 64 letters
-    (or one two pieces share) by a name made from its first 40 letters and `~` with a number, which a refusal of the
-    steps may show: `the build cannot place this map's blocks: "aaaa…a~0"'s size is […] — or give every block its data-at`.
+    (or one two pieces share) by a name made for it, and a refusal of theirs puts the deck's name back: it never shows
+    the made one (`the build cannot place this map's blocks: "<the name as written>"'s size is […] — or give every
+    block its data-at`).
   - A map whose blocks the build places, with more than 1024 wires, was refused ("arrange reads at most 1024 links");
     the build now places by the first wire between each two blocks, and refuses only past 1024 of those, in the steps'
     words (`this map's wires holds at most 1024, and this one has … — split the map in two`).
