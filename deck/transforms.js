@@ -57,7 +57,7 @@ import {callouts} from './callouts.js';
 import {isoDrawn} from './iso.js';
 import {arrowHead, bentWire, cableLead, cableWay, crossesBox, curveWay, headingOf, held, labelHalf, labelPlace, lanesOf, straightRun, walkWay, CABLE, NO_ROUTE} from 'footprint-story/isometric';
 import {readKeepClear} from './keepClear.js';
-import {cables, cablesOn, layRoutes, reachOf, wayNote} from './cable.js';
+import {cables, cablesOn, wayNote} from './cable.js';
 import {leadSeen, leadSpan, quoted, readRide, rideMarks, rideOf, ridersSvg, SPEEDS} from './rides.js';
 
 const fixed = (v) => +v.toFixed(1);
@@ -262,7 +262,7 @@ function wiresBetween(html, found, {shapes, floor, solids, routes}) {
   const names = pieceNames(html), read = found.map((f) => endsRead(f.m[1], names));
   if (!read.some(Boolean)) return {between: read, laid: []};
   const boxOf = boxFinder(html);
-  // the wires laid along the floor before the picture was fitted (transformed · lay), put on the slide — or, for a
+  // the wires laid along the floor before the picture was fitted (iso.js · isoDrawn's routes), put on the slide — or, for a
   // caller that laid none, laid here: the name is that one isometric piece alone, with no bend asked for
   const laid = !floor ? [] : routes ? cablesOn(routes, floor)
     : cables(read.map((m) => (m && m[3] === undefined && [m[1], m[2]].every((name) => shapes.has(name) && boxOf.alone(name)) ? [m[1], m[2]] : null)), shapes, floor, solids);
@@ -469,7 +469,8 @@ export const applyTransforms = (html, options) => transformed(html, options).htm
 /**
  * The wires that may lie along the floor, before any is drawn: one entry a wire of `found` (wireTags), [from, to] when
  * it is written between two pieces with no bend and each name is one block or cylinder and nothing else, else null.
- * `solids`: the map's blocks and cylinders as they stand; `html`: the map, for the names its other pieces have.
+ * `solids`: the map's blocks, cylinders and footprints as iso.js read them ({name, kind, size, ports}: asked before the
+ * map is built, so nothing stands yet); `html`: the map, for the names its other pieces have.
  */
 function floorLinks(html, found, solids) {
   // a name is one block alone when one piece that has a box once the map is drawn has it (boxes.js · alone, asked before the
@@ -505,16 +506,19 @@ function floorLinks(html, found, solids) {
  * compiles a map with this, and keeps them beside the page: for `check`, for the run's log, and for whoever times a
  * thing to a cable.
  *
- * A map is made in this order, each step one function: its icons drawn; its blocks placed (iso.js); its wires laid
- * along the floor between them, in tiles (cable.js · layRoutes) — before the floor and the picture are fitted, so
- * both hold the wires too; its pieces drawn; its callouts; its wires drawn on the slide.
+ * A map is made in this order, each step one function: its icons drawn; the map built (iso.js · isoDrawn, by
+ * footprint-story's map steps: its blocks placed from what its wires join, the wires that lie along the floor laid
+ * between them — before the floor and the picture are fitted, so both hold the wires too — its pieces drawn); its
+ * callouts; its wires drawn on the slide, the cables along the ways the steps laid.
  */
 export function transformed(html, {icons: set = {}, canvas = null, area = null} = {}) {
-  const drawn = icons(html, set), found = wireTags(drawn);
-  let routes = null;
-  const lay = (solids, keep = []) => { routes = layRoutes(floorLinks(drawn, found, solids), solids, keep); return reachOf(routes); };
-  // the laid cables' paths in tiles, for a floor's label to keep clear of (iso.js)
-  const lines = () => (routes ?? []).filter((r) => r?.route.path).map((r) => r.route.path.map(([col, row, high]) => [col, row, high ?? r.lift]));
-  const iso = isoDrawn(drawn, {canvas, area, links: wireLinks(drawn), lay, lines, icons: set});
+  const drawn = icons(html, set), found = wireTags(drawn), names = pieceNames(drawn);
+  // the wires written between pieces, in order: what the map's blocks are placed from, and which of them lie along the floor
+  const joined = found.flatMap(({m}, i) => (wireEndsOf(m[1], names) ? [i] : [])), links = wireLinks(drawn);
+  const floorWires = (solids) => { const all = floorLinks(drawn, found, solids); return joined.map((i) => all[i]); };
+  const iso = isoDrawn(drawn, {canvas, area, links, floorWires, icons: set});
+  // each wire's way as the steps laid it, by the wire it is (null for one written in numbers)
+  const routes = iso.routes ? found.map(() => null) : null;
+  joined.forEach((i, k) => { if (routes) routes[i] = iso.routes[k]; });
   return {...wiresDrawn(callouts(iso.html, {canvas}), {...iso, routes}), tight: iso.tight ?? [], made: iso.made ?? null};
 }
