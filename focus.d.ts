@@ -194,7 +194,8 @@ export interface FocusLook {
 export type FocusState = { readonly __focusState: true } & Record<string, unknown>;
 
 /**
- * The built-in strategies. `zoom`, `fit` and `pan` are the cameras: zoom closes in on what the click is about; fit
+ * The built-in strategies. `zoom`, `fit` and `pan` are the cameras: zoom closes in on what the click is about (options
+ * `share` 0.7, above 0 and 1 at most, and `most` 2.5, from 1 to 100 — refused at build otherwise, as fit's are); fit
  * frames everything shown (options `share` 0.8, `least` 0.25, `most` 2.5), so the view slides to a new piece and pulls
  * back as the picture grows; pan moves to the subject and keeps the size the view had. A camera's option `stage`
  * (data-focus-stage) names the stage it moves, on a map with stages of its own. `apart` (a mover) is the exploded view: its option `apart` — data-focus-apart — is

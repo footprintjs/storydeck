@@ -80,7 +80,18 @@ describe('focus · strategies', () => {
     const [cx, cy] = [1250, 450];   // the subject's centre lands on the area's centre
     expect(stage.move.s * cx + stage.move.x).toBeCloseTo(960, 1);
     expect(stage.move.s * cy + stage.move.y).toBeCloseTo(600, 1);
-    expect(focusStep(null, { ...lit, focus: { strategy: 'zoom', share: 9, most: 2 } }, deck).look.stage.move.s).toBe(2);
+    expect(focusStep(null, { ...lit, focus: { strategy: 'zoom', share: 1, most: 2 } }, deck).look.stage.move.s).toBe(2);
+  });
+
+  it('zoom refuses a share or a most it cannot use, at build, in fit\'s words — never a NaN view (0.30.0)', () => {
+    const zoom = (options) => () => focusStep(null, { ...lit, focus: { strategy: 'zoom', ...options } }, deck);
+    for (const share of ['abc', 0, -0.5, 1.5, 9, 'NaN', 'Infinity']) expect(zoom({ share }), String(share)).toThrow(`focus "zoom": share is how much of the area the subject fills, above 0 and 1 at most (0.7) — not "${share}"`);
+    for (const most of ['x', 0.5, 0, 101, 'Infinity']) expect(zoom({ most }), String(most)).toThrow(`focus "zoom": most is how close the view may go, from 1 (zoom never goes further out) to 100 (2.5) — not "${most}"`);
+    // refused whether or not the click frames anything, as fit is: the mistake is in the deck, not in this click
+    expect(() => FOCUS.zoom.place({ subject: null, area: { x: 0, y: 0, w: 10, h: 10 }, options: { most: 'x' } })).toThrow(/focus "zoom": most is how close/);
+    // the bounds themselves, and numbers written as text (an attribute), are taken
+    for (const options of [{ share: 1 }, { share: '0.5' }, { most: 1 }, { most: 100 }, { most: '3' }, { share: '', most: null }]) expect(zoom(options)().look.stage.move.s, JSON.stringify(options)).toBeGreaterThan(0);
+    expect(zoom({ most: 1 })().look.stage.move.s).toBe(1);
   });
 
   it('left: the context steps aside to the left, smaller; the subject grows into the room on the right', () => {

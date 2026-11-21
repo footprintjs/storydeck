@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.30.0 — a cable's label and a straight wire live in the story library; zoom checks its options
+
+Pages and compiled records are byte for byte as on 0.29.0 but for the version in the page's generator line. Checked on
+`examples/a-request` and on 2,500 generated maps (blocks, cylinders, floors with names, groups, ports, cables with
+labels, straight wires with bends and in lanes, wires to a flat piece, wires through the air, every packet ride
+option) and 150 compiled decks with their pages (`zoom` and `fit` clicks), built before and after — every page, record
+and refusal compared — and 2,000 wires through the air measured; and function for function against 0.29.0's copies
+in footprint-story's property tests. What moved is where the rules are: a film draws the same cables.
+
+- `deck/cable.js` · `labelPlace`, `held`, `cableWalk`, `cablePoint`, `LABEL_PLACES`, `LABEL_LOOKS`, `WALK_MOST` and the
+  numbers `CLEAR`, `CORNER`, `SAMPLE`, `EDGE`, `TIP` → `footprint-story/isometric` (`labelPlace`, `held`, `walkWay`,
+  `LABEL_PLACES`, `CABLE`). These exports are gone from `deck/cable.js`: import them from `footprint-story/isometric`.
+- `deck/boxes.js` · `exitOutline`, `exit` → `footprint-story/isometric` (`exitOutline`, `exitBox`); gone from
+  `deck/boxes.js`.
+- `deck/transforms.js` · the straight wire between two pieces (`wiresBetween`: its lanes, its ends 6 px off each edge,
+  the too-close case) → `lanesOf`, `straightRun`; a wire's bend and the end short of its head (`wireSvg`) →
+  `bentWire`; the head's corners (`headAt`) → `arrowHead`, `headingOf`; a label's plate (`labelBox`) → `labelHalf`;
+  `LANE`, `GAP`, `HEAD` and the label's size → `CABLE`. Reading a wire, the SVG and every sentence of a refusal stay
+  here, word for word.
+- `deck/rides.js` · `curveLength` → `footprint-story/isometric · curveWay(…).length` (gone from `deck/rides.js`);
+  `seenOf` words `footprint-story/motion · seenTerms` as CSS, as before.
+- `deck/iso.js` · `roundOutline` → `footprint-story/isometric · roundOutline`.
+- **Changed on purpose — `zoom` checks its options as `fit` does.** A `share` that is no number, 0 or less, or over 1,
+  or a `most` that is no number, under 1 or over 100, is refused at build in fit's words, naming the option and what
+  to give: `focus "zoom": share is how much of the area the subject fills, above 0 and 1 at most (0.7) — not "abc"`,
+  `focus "zoom": most is how close the view may go, from 1 (zoom never goes further out) to 100 (2.5) — not "x"`.
+  Before, a word gave a view of NaN scale, and a share over 1 or a most past the bounds was taken.
+- `footprint-story` 0.19.0 or later. `package-lock.json` still resolves 0.18.0: resolve it once 0.19.0 is published.
+
 ## 0.29.0 — framing and a part that differs: the rules live in the story library
 
 Pages and compiled records are byte for byte as on 0.28.0 but for the version in the page's generator line. Checked on

@@ -110,7 +110,7 @@ const slides = looks.map(look => `<section class="${slideClass(look)}"><div clas
 ```
 
 Strategies, one of each kind at most: look `grey` (default) · `hide` · `keep`; camera `zoom` (it frames the subject
-where the mover leaves it, so `zoom apart` and `zoom place` work on one click; `zoom left` is refused — a side mover
+where the mover leaves it, so `zoom apart` and `zoom place` work on one click; `data-focus-share` 0.7, above 0 and 1 at most, `-most` 2.5, from 1 to 100 — refused otherwise, as fit's are; `zoom left` is refused — a side mover
 keeps the context in view, which closing in would push off the slide) · `fit` (it frames everything shown, lit and
 greyed, so the view slides to a new piece and pulls back as the picture grows: for a picture larger than the slide;
 `data-focus-share` 0.8, `-least` 0.25, `-most` 2.5; it goes with every mover); mover `left` ·

@@ -149,13 +149,19 @@ export const FOCUS = Object.freeze({
   keep: Object.freeze({name: 'keep', kind: 'look', look: 'keep'}),
   /**
    * The view closes in on the subject — where the click's mover leaves it — so it fills `share` (0.7) of the area,
-   * never closer than `most` (2.5×). A camera, not a mover: it goes with left/right/up/down, place and apart.
+   * never closer than `most` (2.5×), from 1 to 100. A camera, not a mover: it goes with left/right/up/down, place and apart.
+   * Its options are checked as fit's are, in fit's words: a share or a most it cannot use (a word, a NaN, past its
+   * bounds) is refused at build, naming the option and what to give — never a view no screen has.
    */
   // zoom, fit and the side movers size by one rule, footprint-story/layout · frameZoom: the box contained in the room,
   // a share of that, held between two bounds — the rule a film frames a named thing by, written once.
   zoom: Object.freeze({name: 'zoom', kind: 'camera', place({subject, area, options}) {
+    const share = num(options.share, .7), most = num(options.most, 2.5);
+    if (!(share > 0 && share <= 1)) throw new Error(`focus "zoom": share is how much of the area the subject fills, above 0 and 1 at most (0.7) — not "${options.share}"`);
+    // zoom never goes below 1× (it closes in, by its name), so its most is from 1 — and 100 at most, as fit's
+    if (!(most >= 1 && most <= 100)) throw new Error(`focus "zoom": most is how close the view may go, from 1 (zoom never goes further out) to 100 (2.5) — not "${options.most}"`);
     if (!subject) return {};
-    const k = frameZoom([subject.w, subject.h], [area.w, area.h], {share: num(options.share, .7), least: 1, most: num(options.most, 2.5), smallest: 1});
+    const k = frameZoom([subject.w, subject.h], [area.w, area.h], {share, least: 1, most, smallest: 1});
     return {stage: toCentre(subject, k, centre(area))};
   }}),
   /**

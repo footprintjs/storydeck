@@ -16,7 +16,8 @@
 // --sd-way: a cable's floor line, a wire through the air its curve), two loops on one clock — sdRide carries --sd-t
 // by the ride's easing, sdShow carries --sd-show — and is marked data-sd-ride. A wire that asks for none is drawn as
 // it always was (deck.css · sdRun), so its page is byte for byte the same.
-import {hiddenRamps, rideProfile, rideSeconds, showStops, withHold, MOST_EASE} from 'footprint-story/motion';
+import {hiddenRamps, rideProfile, rideSeconds, seenTerms, showStops, withHold, MOST_EASE} from 'footprint-story/motion';
+import {curveWay} from 'footprint-story/isometric';
 
 export const SPEEDS = [0.5, 60];   // seconds a packet takes to run the wire
 const HOLD = {plain: 1, most: 60};   // seconds a packet that rests at the end stays there: unless the wire says, and at most
@@ -92,11 +93,13 @@ export const easing = (stops) => (stops.length === 2 && stops[0][1] === 0 && sto
  * where nothing hides it. `ramps`: footprint-story/motion · hiddenRamps; `pad`: a CSS share more each ramp keeps off its stretch (a
  * packet that keeps its size is a different size on the line at each zoom: its radius over --sd-keep); `leads`:
  * [startShare | null, endShare | null], the shares a lead's copy shows instead (the cable's own is hidden there).
+ * The rule is footprint-story/motion's (seenTerms; a film reads the same terms at a share, seenAt): this words each
+ * term as CSS, its numbers rounded for a page.
  */
 export function seenOf(ramps, pad = '', leads = [null, null]) {
   const t = 'var(--sd-t)', less = pad ? ` - ${pad}` : '';
-  const each = ramps.map(([outFrom, outTo, backFrom, backTo]) => {
-    const terms = [...(outTo > outFrom ? [`(${short(outTo, 5)} - ${t}${less}) * ${short(1 / (outTo - outFrom), 2)}`] : []), ...(backTo > backFrom ? [`(${t} - ${short(backFrom, 5)}${less}) * ${short(1 / (backTo - backFrom), 2)}`] : [])];
+  const each = seenTerms(ramps).map((ramp) => {
+    const terms = ramp.map(({from, to, falling}) => (falling ? `(${short(to, 5)} - ${t}${less}) * ${short(1 / (to - from), 2)}` : `(${t} - ${short(from, 5)}${less}) * ${short(1 / (to - from), 2)}`));
     return terms.length ? `clamp(0, ${terms.length > 1 ? `max(${terms.join(', ')})` : terms[0]}, 1)` : '0';
   });
   // off a lead's stretch: the cable's own packet is 1 minus the lead's copy (leadSeen), so the two never both show
@@ -158,19 +161,13 @@ export function ridersSvg(o, r, {d, seen = r.seen, span = [0, 1], restAt = r.res
 /** What a wire whose packets ride adds to its SVG's tag: the marks RIDE_CSS reads, its easings — and its line as --sd-way, when `way` (a path's d) is given. */
 export const rideMarks = (o, r, way = null) => ({attrs: ` data-sd-ride${o.keep ? ' data-sd-keep' : ''}`, style: `${way === null ? '' : `;--sd-way:path('${way}')`};${r.vars}`});
 
-/** The length of a quadratic curve from `a` to `e` drawn towards `c`, in px: walked in so many straight runs. */
-export function curveLength(a, c, e, runs = 64) {
-  let length = 0, at = a;
-  for (let k = 1; k <= runs; k++) {
-    const t = k / runs, p = [0, 1].map((i) => (1 - t) * (1 - t) * a[i] + 2 * (1 - t) * t * c[i] + t * t * e[i]);
-    length += Math.hypot(p[0] - at[0], p[1] - at[1]); at = p;
-  }
-  return length;
-}
-/** The length of a rounded way's pieces (footprint-story · rounded) from `start`, in px: a corner walked in 12 straight runs, as the kit walks it. */
+/**
+ * The length of a rounded way's pieces (footprint-story · rounded) from `start`, in px: a corner walked in 12 straight
+ * runs, as the kit walks it (footprint-story/isometric · curveWay: a curve's length, the one a film measures too).
+ */
 export function piecesLength(start, pieces) {
   let length = 0, at = start;
-  for (const piece of pieces) { length += piece.corner ? curveLength(at, piece.corner, piece.to, 12) : Math.hypot(piece.to[0] - at[0], piece.to[1] - at[1]); at = piece.to; }
+  for (const piece of pieces) { length += piece.corner ? curveWay(at, piece.corner, piece.to, 12).length : Math.hypot(piece.to[0] - at[0], piece.to[1] - at[1]); at = piece.to; }
   return length;
 }
 

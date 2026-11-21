@@ -1,7 +1,10 @@
 import {describe, it, expect} from 'vitest';
 import {routes, rounded, MOST_ROUTES, NO_ROUTE} from 'footprint-story/isometric';
 import {isoDrawn} from './iso.js';
-import {cables, cablePoint, cableWalk, cableWay, held, labelPlace, readWay, wayNote, LABEL_LOOKS, LABEL_PLACES, WALK_MOST} from './cable.js';
+import {cables, cableWay, readWay, wayNote} from './cable.js';
+// where a label stands, a way walked and points held are footprint-story's since 0.30.0: these pin what the deck gets from it
+import {held, labelPlace, walkWay as cableWalk, CABLE, LABEL_PLACES} from 'footprint-story/isometric';
+const cablePoint = (way, t) => way.at(t), LABEL_LOOKS = CABLE.looks, WALK_MOST = CABLE.walkMost;
 import {transformed} from './transforms.js';
 
 const canvas = [1920, 1080];
