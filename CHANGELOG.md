@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.35.0 — isometric pieces are written from the map's paint list
+
+A block's, a cylinder's and a floor's SVG faces now come from the paint list footprint-story's map steps already make
+(the `style` step: `paints`, `floorPaints`), written by one small painter, instead of strings `deck/iso.js` built
+itself from the grid. A deck and a film now paint the same list. Nothing on a page changes: every example page is the
+same byte for byte, and so is every expected page in the tests.
+
+- **New: `deck/isoPaint.js` · `isoArt(items, box)`** — the deck's one SVG painter. An element per item (`polygon`,
+  `ellipse`, `path`, `lines`), classed by its role (`iso-left`, `iso-top`, `iso-side`, …; the tile lines keep
+  `iso-lines`), numbers to one decimal inside the piece's box. An arc is written `A rx ry 0 0 sweep x y`, with a line
+  to its start only when the pen is somewhere else. The deck hands the steps no colours, so the list carries none and
+  the painter writes none: the deck's CSS colours a piece by its classes, as before. An item that does carry a colour
+  gets it in a style attribute. A kind of item, a role or a colour it cannot write is refused, never dropped.
+- **Changed: `deck/iso.js`** builds no face string and asks the grid for no face. Each piece's box, the middle of
+  its top and its faces come from the built map (`shapes`, `floorShapes`, `paints`, `floorPaints`). Names, floor
+  labels, cables and heads are written as before.
+
 ## 0.34.0 — ask why a map is so, from its own record
 
 A deck with an isometric map now keeps, for each map, a record of how it was built, and `storydeck log` answers from

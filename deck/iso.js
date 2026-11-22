@@ -52,6 +52,7 @@ import {mayHoldFootprint, paintFootprints, readFootprints} from './footprint.js'
 import {decodeEntities, esc} from './html.js';
 import {attrRule, ownAttribute, pieceTags, tagsWith} from '../pieceRules.js';
 import {closeOf} from './callouts.js';
+import {isoArt} from './isoPaint.js';
 
 const KINDS = ['block', 'cylinder', 'floor'];
 /** A tag that may carry the attribute: a cheap look, in any case. Whether it does is ownAttribute's to say (a mention inside another value is not it). */
@@ -79,7 +80,6 @@ export const MOST_FLOOR = 256;
 const FIT = 'fit';
 
 const fixed = (v) => +v.toFixed(1);
-const points = (list, x, y) => list.map((p) => `${fixed(p.x - x)},${fixed(p.y - y)}`).join(' ');
 
 /** Numbers written in an attribute, "3 1" or "2 2 1.4": a list, or null when a word is not a number. */
 function numbersIn(text) {
@@ -213,22 +213,13 @@ export const isoIn = (html) => readIso(html).map(({name, kind}) => ({name, kind}
 const beyondArea = (points, [x0, y0, x1, y1]) => Math.max(0, ...points.flatMap(({x, y}) => [x0 - x, x - x1, y0 - y, y - y1]));
 
 /**
- * What a piece draws on the built map's grid: {box, art, say} — its box on the slide, its faces as SVG inside that box,
- * and the middle of its top (where its words stand; null for a floor). `at`, `size`: where the map put it, in tiles.
+ * What a piece draws, as the map built it: {box, art, say} — its box on the slide (the steps' `shape`), its faces as SVG
+ * inside that box (the steps' paint list, written by isoPaint.js · isoArt) and the middle of its top, where its words
+ * stand (null for a floor). WHY the built map's: the steps already made the faces with the style's shape column, so
+ * the deck paints that list and builds no face of its own — a deck and a film draw one picture.
  */
-function artOf(kind, at, size, grid) {
-  if (kind === 'floor') {
-    const f = grid.floor({cols: size[0], rows: size[1], at}), {x, y} = f.box;
-    const lines = f.lines.map(([x1, y1, x2, y2]) => `M${fixed(x1 - x)} ${fixed(y1 - y)}L${fixed(x2 - x)} ${fixed(y2 - y)}`).join('');
-    return {box: f.box, art: `<polygon class="iso-ground" points="${points(f.outline, x, y)}"/><path class="iso-lines" d="${lines}"/>`, say: null};
-  }
-  if (kind === 'cylinder') {
-    const c = grid.cylinder({at, size}), {x, y} = c.box, t = c.top, b = c.bottom;
-    const side = `M${fixed(t.cx - t.rx - x)} ${fixed(t.cy - y)}L${fixed(b.cx - b.rx - x)} ${fixed(b.cy - y)}A${fixed(b.rx)} ${fixed(b.ry)} 0 0 0 ${fixed(b.cx + b.rx - x)} ${fixed(b.cy - y)}L${fixed(t.cx + t.rx - x)} ${fixed(t.cy - y)}Z`;
-    return {box: c.box, art: `<path class="iso-side" d="${side}"/><ellipse class="iso-top" cx="${fixed(t.cx - x)}" cy="${fixed(t.cy - y)}" rx="${fixed(t.rx)}" ry="${fixed(t.ry)}"/>`, say: c.centre};
-  }
-  const b = grid.block({at, size}), {x, y} = b.box;
-  return {box: b.box, art: `<polygon class="iso-left" points="${points(b.left, x, y)}"/><polygon class="iso-right" points="${points(b.right, x, y)}"/><polygon class="iso-top" points="${points(b.top, x, y)}"/>`, say: b.centre};
+function artOf({box, centre}, paints, solid) {
+  return {box, art: isoArt(paints, box), say: solid ? {x: centre[0], y: centre[1]} : null};
 }
 
 /** What a name-fit note shows of a name: enough to find it. */
@@ -407,8 +398,8 @@ export function isoDrawn(html, {canvas = null, area = null, links = [], floorWir
   const grid = isometric({tile: built.view.tile, origin: built.view.origin, rise: built.view.rise});
   // each piece where the map put it, drawn — its name and its floor's label as the steps fitted them
   const drawnOf = new Map([
-    ...solid.map((p, i) => [p, {...artOf(p.kind, built.at[i], p.size, grid), words: words[i], fit: fitOf(built.names[i], words[i]?.label ?? null), drawn: built.shapes[i], id: ids.blocks[i]}]),
-    ...floors.map((p, i) => [p, {...artOf('floor', built.floorTiles[i].at, built.floorTiles[i].size, grid), label: built.floorLabels[i]}]),
+    ...solid.map((p, i) => [p, {...artOf(built.shapes[i], built.paints[i], true), words: words[i], fit: fitOf(built.names[i], words[i]?.label ?? null), drawn: built.shapes[i], id: ids.blocks[i]}]),
+    ...floors.map((p, i) => [p, {...artOf(built.floorShapes[i], built.floorPaints[i], false), label: built.floorLabels[i]}]),
     ...feet.map((p, i) => [p, {drawn: built.obstacleShapes[i], id: ids.obstacles[i]}]),
   ]);
   // a floor label's icon, from the deck's icons: one it does not have is refused, naming the ones it has
