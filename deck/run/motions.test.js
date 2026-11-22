@@ -40,7 +40,7 @@ describe('a map\'s moves planned again for the record, answered by log --why --m
     expect(kept.motions).toEqual([expect.objectContaining({name: 'map', k: 0, kept: true, record: expect.any(String)})]);
     expect(runText(kept, 1).split('\n')).toContain(`  why a move takes its time: storydeck log --run ${kept.id} --why duration-0 --motion map`);
     const maps = await logTool(dir, {home, run: '1', why: 'maps'});
-    expect(maps.split('\n')[0]).toMatch(/"motion":\{"moves":\[\{"click":2,"piece":"box","do":"fall","model":"ballistic","by":"usual","seconds":0\.47\d*\}.*"carriers":\{"page":"keyframes".*"pptx":"at rest, where each move ends"\}/);
+    expect(maps.split('\n')[0]).toMatch(/"motion":\{"moves":\[\{"click":2,"piece":"box","do":"fall","model":"ballistic","by":"usual","seconds":0\.47\d*\}.*"carriers":\{"page":"keyframes".*"pptx":"at rest, where each move ends, by a driver that can end them/);
   });
 
   it('refuses what it cannot answer, saying what there is', async () => {

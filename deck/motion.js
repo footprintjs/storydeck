@@ -17,7 +17,7 @@ import {MOTION_CSS, motionHtml, motionView} from './motionDraw.js';
  * How each way of showing a deck carries a move — said in the map's record, so whoever reads a PDF or a PowerPoint of
  * the deck knows its moves are shown where they end, never a frame between.
  */
-export const CARRIERS = Object.freeze({page: 'keyframes', video: 'keyframes, stepped at the video\'s frames', print: 'at rest, where each move ends', pptx: 'at rest, where each move ends'});
+export const CARRIERS = Object.freeze({page: 'keyframes', video: 'keyframes, stepped at the video\'s frames', print: 'at rest, where each move ends', pptx: 'at rest, where each move ends, by a driver that can end them (rest(): video.js · deckStageDriver) — the export\'s own record (exportPptx · moves) says how its pictures were taken'});
 
 /**
  * The names each map's clicks move, read cheaply before the map is drawn (the first word of each move): Map(map → Set).

@@ -48,7 +48,12 @@ export function exportPptx(options: {
   log?: (line: string) => void;
   /** how footprintjs is loaded (default: import('footprintjs')) — for a bundler that needs its own import, or a test */
   load?: () => Promise<unknown>;
-}): Promise<{ file: string; slides: number; voiced: number; runtime: number | null; bytes: number; clicks: PlannedSlide[]; narrative: string[] }>;
+}): Promise<{ file: string; slides: number; voiced: number; runtime: number | null; bytes: number; clicks: PlannedSlide[];
+  /** How the pictures show a block that moves by intent (data-move): MOVES_AT_REST with a driver that has rest(), else MOVES_AS_SEEKED (with the fix). */
+  moves: string; narrative: string[] }>;
+/** The two ways an export's pictures show a block's moves: ended by the driver's rest(), or where its seek left them. */
+export const MOVES_AT_REST: string;
+export const MOVES_AS_SEEKED: string;
 
 /** A slide for pptxParts: its title, notes (a paragraph per line), picture (PNG bytes), sound and the seconds it stays (null or absent: the speaker clicks). */
 export interface PptxSlide {

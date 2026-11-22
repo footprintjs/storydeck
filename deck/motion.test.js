@@ -40,7 +40,7 @@ describe('motion · a deck whose blocks move', () => {
     const {motion} = c.maps.map;
     expect(motion.record.map((r) => [r.click, r.piece, r.do, r.model])).toEqual([[2, 'box', 'fall', 'ballistic'], [2, 'crate', 'slide', 'coulomb'], [4, 'box', 'throw', 'ballistic']]);
     expect(motion.carriers).toEqual(CARRIERS);
-    expect(motion.carriers.pptx).toBe('at rest, where each move ends');
+    expect(motion.carriers.pptx).toMatch(/^at rest, where each move ends, by a driver that can end them \(rest\(\).* the export's own record \(exportPptx · moves\) says how/);
     expect(typeof motion.run).toBe('function');
     expect(c.slides[0].html).toContain('<span class="iso-motion" data-sd-mover="0" style="transform:translate(0px, 0px) scale(1, 1)">');
     expect(c.slides[1].html).toMatch(/<span class="iso-motion" data-sd-mover="0" data-sd-move="map-0" style="transform:translate\(0px, [\d.]+px\) scale\(1, 1\)">/);

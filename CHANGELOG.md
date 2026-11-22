@@ -41,7 +41,9 @@ the tests is unchanged.
   order asked again at each keyframe (`isoSpec.js · orderAt`), and a hang's rope is drawn as links. A video steps
   the same keyframes frame by frame. A print shows each click at rest; a PowerPoint too — its export ends the moves
   before it takes the picture (`video.js · deckStageDriver · rest`, an optional port method `exportPptx` calls). The
-  map's record says so (`maps made` · `motion.carriers`).
+  map's record says so (`maps made` · `motion.carriers`), and the export says how its own pictures were taken
+  (`exportPptx(…).moves`, on its record too): a driver without `rest()` shows a move where its seek left it, and the
+  export says so with the fix (give the driver `rest()`), never claiming a rest.
 - **The camera frames where blocks rest:** a click's view fits a moved block where it rests at the click's end.
 - **Record:** the run's `maps made` carries each map's moves (`motion.moves`: click, block, word, model, how it was
   chosen, seconds) for a map whose clicks move a block (none otherwise, so other records are as before), and each such
