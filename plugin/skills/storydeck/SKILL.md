@@ -168,7 +168,7 @@ round it and plug into its `data-ports`; the floor beside it is written in numbe
 `data-keep-clear` on such a piece (a name, a note) keeps cables off the floor under its box where there is a way round;
 where there is none, `check` says which cable runs under it. A
 block's name (its first `<b>`, inside no other element) is fitted to its top face: broken onto two lines, then made
-smaller; rule `name-fit` warns when it still does not fit, and `name-ink` when a name, a `<small>` line or a floor's label stands under 4.5 : 1 on its face, light or dark (footprint-story's `readableInk`; the base look's `bad` tone and every tone's `<small>` line on a light page), naming the ink or the lighter colour that fixes it. `data-break="fill"` on a block puts as many words as fit on
+smaller; rule `name-fit` warns when it still does not fit, and `name-ink` when a name, a `<small>` line or a floor's label stands under 4.5 : 1 on its face, light or dark (footprint-story's `readableInk`; a block's words are black unless `--iso-ink` is set, its `<small>` line that ink at 85 %, so the base look's tones read on both pages), naming the ink or the lighter colour that fixes it. `data-break="fill"` on a block puts as many words as fit on
 the first line ("Logs to S3 / Archive"); `"even"` (the usual) makes the two lines alike; the run's `maps made` records it. A top is as wide across its middle as the block's SHORTER
 side, so a long thin block holds a short name only: shorten the name, or give the block a bigger top (`data-size`). The picture and a fitted floor hold
 the wires too. A floor is ground (`data-ground`): no camera frames it, so `fit` follows the pieces. A floor names its

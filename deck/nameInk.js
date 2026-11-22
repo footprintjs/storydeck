@@ -121,8 +121,11 @@ function varsOf(piece, page) {
   return Object.assign(vars, piece.vars);
 }
 
-/** A word of a piece on `page`: its face and its ink as the screen shows them (#rrggbb), and readableInk's verdict. */
-function wordOn(piece, word, page, vars = varsOf(piece, page)) {
+/**
+ * A word of a piece on `page` (one of pagesOf's): its face as the screen shows it (#rrggbb), and readableInk's verdict
+ * on the ink drawn there ({face, ink, ratio, reads}). Exported for the tests that pin what reads.
+ */
+export function wordOn(piece, word, page, vars = varsOf(piece, page)) {
   const face = over(colour(piece.face ?? WORDS_CSS[piece.kind === 'floor' ? 'ground' : 'top'], vars), page.slide);
   const ink = over(colour(WORDS_CSS[word], vars), face);
   return {face: hexOf(face), ...readableInk(hexOf(face), [hexOf(ink)])};

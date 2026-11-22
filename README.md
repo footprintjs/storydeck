@@ -822,7 +822,7 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   the floor, so a left, top, width or height of its own is refused, with the fix. The nearer block is painted over the
   further by a level each; the map's own order never moves. Write the floor first: it and the wires share a level.
   The floor is ground (see below), so the view follows the pieces. One colour a piece (`--iso-color`): its top is drawn
-  lighter and its sides darker; `--iso-ink`, `--iso-line`, `--iso-line-width` (the faces' outline, 2.5px; a map's
+  lighter and its sides darker; `--iso-ink` (its words and lines: words black, lines `#14181f` unless set), `--iso-line`, `--iso-line-width` (the faces' outline, 2.5px; a map's
   `data-style` that names a width wins over it), `--iso-grid` and `--iso-floor` are the other tokens, and
   class `ok`, `warn` or `bad` colours one. The numbers come from `footprint-story/isometric`, the grid a film can draw
   with too, and so does the map itself: since 0.33.0 the build hands the map's pieces to that package's map steps
@@ -861,13 +861,14 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   top face, or a floor's label on its ground, under 4.5 : 1 on the page light or dark. The build measures the page's
   own CSS (the look's tokens, the tokens `theme.css` sets on `:root` and `:root.dark`, the piece's own style and
   class) with footprint-story's `readableInk`, the rule StoryReel names its blocks by, and names the fix: the ink that
-  reads, or a lighter face. On the base look, the `bad` tone's name and any tone's `<small>` line do not read on a
-  light page:
+  reads, or a lighter face. A block's words are black unless you set `--iso-ink` (its `<small>` line that ink at
+  85 %), so on the base look every tone reads on both pages (the least, `bad` on a light page: name 5.2, `<small>`
+  4.6 : 1). A darker tone of your own is said:
 
   ```
-  warn  click 1 "Map · 1" · name-ink: "server": its name stands 4.4 : 1 on its block's top (#cd5b55, class "bad") on a
-        light page, under the 4.5 : 1 words need to read — write its ink beside it (style="--iso-ink:#000000"), or
-        give the block a lighter colour (--iso-color), or another class than "bad"
+  warn  click 1 "Map · 1" · name-ink: "server": its name stands 2.6 : 1 on its block's top (#7b3f3c, class "bad") on a
+        light page and 2.6 : 1 (#7b3f3c) on a dark one, under the 4.5 : 1 words need to read — write its ink beside it
+        (style="--iso-ink:#ffffff"), or give the block a lighter colour (--iso-color), or another class than "bad"
   ```
 
   It also warns when a cable doubles back on itself (a hairpin): out of a port that faces away from its other end,

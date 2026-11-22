@@ -494,6 +494,15 @@ export function isoDrawn(html, {canvas = null, area = null, links = [], floorWir
 const TONE = 'var(--iso-color, var(--sd-tone, #d9e4f3))';
 const INK = 'var(--iso-ink, #14181f)';
 /**
+ * The ink a block's words are written in: --iso-ink, black by default, and its <small> line that ink at 85 %.
+ * WHY black, and not the lines' #14181f (0.42.0): the base look's status tones colour a block's top as dark as #cd5b55
+ * (bad, light page), where #14181f reads 4.43 : 1 and the <small> line, #14181f at 68 %, about 3 : 1 on every tone,
+ * under the 4.5 : 1 words need (check · name-ink found them). Black at 100 % and 85 % reads 5.22 and 4.64 there, the
+ * least of any tone on either page; the faces, and so the status colours, are untouched. A deck's --iso-ink still
+ * sets the lines and the words alike.
+ */
+const WORDS_INK = 'var(--iso-ink, #000000)';
+/**
  * The colours a map's words stand in and on, as the page's CSS writes them (ISO_CSS, FLOOR_LABEL_CSS): a block's top
  * face and a floor's ground (when the kit gives the face no fill of its own), a block's name and its <small> line, a
  * floor's label. WHY named once: the build measures each name against its face with these same expressions
@@ -501,7 +510,7 @@ const INK = 'var(--iso-ink, #14181f)';
  */
 export const WORDS_CSS = Object.freeze({
   top: `color-mix(in srgb, ${TONE} 80%, #fff)`, ground: 'var(--iso-floor, transparent)',
-  name: INK, small: `color-mix(in srgb, ${INK} 68%, transparent)`, label: 'var(--iso-label, color-mix(in srgb, var(--fg, #14181f) 72%, transparent))',
+  name: WORDS_INK, small: `color-mix(in srgb, ${WORDS_INK} 85%, transparent)`, label: 'var(--iso-label, color-mix(in srgb, var(--fg, #14181f) 72%, transparent))',
 });
 const HOT = 'var(--sd-hot, #ef4444)', HOT_WIDTH = '5px';
 /** A piece with faces: a block or a cylinder (a floor is lines on the ground). */
@@ -520,7 +529,7 @@ export const isoRing = (piece, colour, width = '4px') => `:where(${piece}:is(${S
 /**
  * An isometric piece's look, each rule with no weight and only inside a slide, so a deck's rule wins. One colour a
  * piece (--iso-color): its top a little lighter, its two sides darker by different amounts, as light from the upper
- * left would leave them. Its words are drawn flat on its top face, in --iso-ink (dark by default, as the faces are light).
+ * left would leave them. Its words are drawn flat on its top face, in --iso-ink (black by default, as the faces are light: WORDS_INK).
  */
 /** A floor label's look (floorLabelHtml): the page carries it only when a floor has a label, so every other page is as before. (Its own comment, written into the page, still says floorLabel.js — kept, so a page is byte for byte as before.) */
 export const FLOOR_LABEL_CSS = `/* a floor's label (floorLabel.js): flat on the floor along its front edge, a part of the floor that greys and lights with it */
