@@ -759,6 +759,38 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   the tokens below, a rule of yours on `.iso-top` still wins, and a highlighted floor is still ringed. The run's record says which
   style drew each map (`maps made` · `style`, and `storydeck log --why style --map <map>`).
 
+  **Blocks that move by intent.** A click can move a block: write what happens on its `<step>`, never how — the
+  words are footprint-story's (`footprint-story/human`), and it decides the model, the duration and the curve:
+
+  ```html
+  <step data-in="floor box server crate"><h2>Here</h2></step>
+  <step data-move="box fall; crate slide to 4 4.5"><h2>The box drops, the crate slides</h2></step>
+  <step data-move="box throw to server wrap anticipate"><h2>Up onto the server</h2></step>
+  <step data-move="lamp hang from 3 2 6"><h2>The lamp swings to rest</h2></step>
+  ```
+
+  A move is `<block> <do>`, then any of `to <place>`, `from <place>`, `wrap <wrapper> [option value …]`,
+  `model <name> [option value …]` and `accept <critic> …`; moves on one click are apart with `;`. `do` is `fall`
+  (straight down onto the highest top under it, else the floor), `throw`, `settle`, `reach` (to `to`, a block's name —
+  its top — or tiles `col row [lift]`), `hang` (on a rope from the pin `from`, swinging to rest below it) or `slide`
+  (along the level it rests on, to `to`). A block moves once a click, from where the clicks before left it, and rests
+  where its move ends on every later click. Refused, naming the click, the move and the fix: `roll` (StoryDeck has no
+  ball yet) and `tumble` (a block is drawn only upright), a pen's word, a block a wire joins or a callout points at, a
+  block the click does not show, a block moved from under one resting on it, a move that relies on a block moving on
+  its own click, a way that leaves the slide, and whatever footprint-story refuses (a model's option, a wrapper's). A
+  move whose block passes through another (`deck:contact`, swept between samples) or comes to rest over another
+  block's name (`deck:covers`: the name is hidden from then, decided from the kit's numbers, never a font) is a
+  warning in `check`, as is what footprint-story's critics find (`arc`, `spacing`, `contact`, …), each at its own
+  level with its fix; `accept arc` keeps a finding the move means, as accepted advice. How each way of showing the
+  deck carries a move: the page plays footprint-story's samples as CSS keyframes, 60 a second, on a forward click
+  after its view has arrived (a jump, a step back, reduced motion and motion off land at rest); a video steps the same
+  keyframes frame by frame; a print and a PowerPoint show each click at rest, where its moves end, never a frame in
+  between — the map's record says so (`maps made` · `motion.carriers`). A deck that moves nothing is drawn byte for
+  byte as before. Why a block asks footprint-story for its order while it moves: the paint order is the map steps'
+  own, asked again at each keyframe, so a block landing behind another is drawn behind it.
+  `storydeck log --run <id> --why duration-0 --motion <map>` says why a move takes its time, from footprint-story's own
+  run of the same intents (`model-<i>`: why its model; `findings-<i>`: what its critics found).
+
   Why the build places it: where a block lands, how big it is and which block is painted over which all follow from
   the floor, so a left, top, width or height of its own is refused, with the fix. The nearer block is painted over the
   further by a level each; the map's own order never moves. Write the floor first: it and the wires share a level.

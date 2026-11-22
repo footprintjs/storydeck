@@ -19,6 +19,8 @@ export interface VideoDriver {
   loops?(): Promise<boolean> | boolean;
   /** Every frozen animation to `ms`; with `loop`, the loops to that instead (ms since the video began). */
   seek(ms: number, options?: { loop?: number }): Promise<void>;
+  /** A click's isometric block moves ended (deck/motionDraw.js): a still picture (the PowerPoint's) shows them at rest. */
+  rest?(): Promise<void> | void;
   shot(file: string): Promise<unknown>;
   close(): Promise<unknown> | unknown;
 }

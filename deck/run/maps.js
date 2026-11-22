@@ -36,7 +36,7 @@ const SHOWN = 60;
 const shown = (v) => { const s = JSON.stringify(v) ?? String(v); return s.length > SHOWN ? `${s.slice(0, SHOWN - 1)}…` : s; };
 
 /** Whatever was thrown, in words, on one line: never a throw itself. */
-function thrownText(e) {
+export function thrownText(e) {
   try { return String(e?.message ?? e).replace(/\s+/g, ' ').trim().slice(0, SAID); } catch { return 'something that cannot be said in words was thrown'; }
 }
 
@@ -67,14 +67,14 @@ function readMade(made) {
  * the timer must keep the process alive — unref'd, a promise that never settles (nothing else pending) lets node end
  * before the bound, with the run never settled (StoryReel saw it on CI).
  */
-function within(promise, ms, what) {
+export function within(promise, ms, what) {
   let timer;
   const late = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${what} did not finish within ${ms / 1000} s`)), ms); });
   return Promise.race([promise, late]).finally(() => clearTimeout(timer));
 }
 
 /** Is there a plain file at `file` (never a link)? */
-const isFile = (file) => { try { return lstatSync(file).isFile(); } catch { return false; } };
+export const isFile = (file) => { try { return lstatSync(file).isFile(); } catch { return false; } };
 
 /** A call's limit: the caller's own for it when that is a time (a number over 0), else MAP_FLOW_MS. */
 const limitOf = (limits) => (Number.isFinite(limits?.[MAP_FLOW]) && limits[MAP_FLOW] > 0 ? limits[MAP_FLOW] : MAP_FLOW_MS);

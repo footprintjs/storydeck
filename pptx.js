@@ -120,6 +120,8 @@ async function settledPictures(driver, url, clicks, dir, { maxEntrance, log }) {
     for (const c of clicks) {
       await driver.step(c.n);
       await driver.seek(Math.min(maxEntrance, await driver.freeze()));
+      // a still picture shows a block's moves where they end, never a frame between (motionDraw.js · the carriers)
+      if (typeof driver.rest === 'function') await driver.rest();
       const file = path.join(dir, `c${NUM(c.n)}.png`);
       await driver.shot(file);
       files.push(file);

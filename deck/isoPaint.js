@@ -154,6 +154,9 @@ function itemSvg(it, x, y, styled) {
     case 'ellipse': return `<ellipse ${head} cx="${rel(it.cx, x)}" cy="${rel(it.cy, y)}" rx="${fixed(it.rx)}" ry="${fixed(it.ry)}"/>`;
     case 'lines': return `<path ${head} d="${it.segments.map(([x1, y1, x2, y2]) => `M${rel(x1, x)} ${rel(y1, y)}L${rel(x2, x)} ${rel(y2, y)}`).join('')}"/>`;
     case 'path': return `<path ${head} d="${pathData(it.segments, x, y)}"/>`;
+    // a hand-drawn stroke (footprint-story 0.30's `stroke` item) comes only from the sketch style choices a tool hands
+    // in (sketchyLine, hatchTexture), and a deck's data-style offers none of them: refused by name, never drawn as nothing
+    case 'stroke': throw new Error('isoPaint: a hand-drawn stroke item is painted by a tool that offers the sketch styles (footprint-story/human · sketchyLine, hatchTexture) — a deck\'s data-style offers none, so its paint list has no strokes');
     // a kind of item this painter does not know is refused: drawn as nothing, a piece would lose a face unseen
     default: throw new Error(`isoPaint: a paint item is a polygon, an ellipse, a path or lines — not ${JSON.stringify(it.item)}`);
   }

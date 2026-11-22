@@ -54,7 +54,7 @@ export function deckStyles(compiled, assets) {
   const labelled = (compiled.clicks ?? []).some((c) => c.differs?.shown.length);
   // how a part's pieces arrive and leave (pace.js): only when a part asks
   const paced = (compiled.clicks ?? []).some((c) => c.pace);
-  return [...assets.css, ...look, ...(compiled.callouts ? [CALLOUT_CSS] : []), ...(compiled.iso ? [ISO_CSS] : []), ...(compiled.floorLabels ? [FLOOR_LABEL_CSS] : []), ...(compiled.rides ? [RIDE_CSS] : []), ...(compiled.config.lenses ? [LENS_CSS] : []), ...(loops ? [loops] : []), ...(compiled.explore ? [EXPLORE_CSS] : []), ...(compiled.transitions ? [TRANSITION_CSS] : []), ...(labelled ? [DIFFERS_CSS] : []), ...(paced ? [PACE_CSS] : []), compiled.themeCss ?? ''].join('\n');
+  return [...assets.css, ...look, ...(compiled.callouts ? [CALLOUT_CSS] : []), ...(compiled.iso ? [ISO_CSS] : []), ...(compiled.floorLabels ? [FLOOR_LABEL_CSS] : []), ...(compiled.motionCss ? [compiled.motionCss] : []), ...(compiled.rides ? [RIDE_CSS] : []), ...(compiled.config.lenses ? [LENS_CSS] : []), ...(loops ? [loops] : []), ...(compiled.explore ? [EXPLORE_CSS] : []), ...(compiled.transitions ? [TRANSITION_CSS] : []), ...(labelled ? [DIFFERS_CSS] : []), ...(paced ? [PACE_CSS] : []), compiled.themeCss ?? ''].join('\n');
 }
 
 /**

@@ -8,6 +8,7 @@ import {checkDeck, failure} from '../check.js';
 import {noteProblems} from '../notes.js';
 import {deckRoot} from '../paths.js';
 import {flowMaps} from './maps.js';
+import {flowMotions} from './motions.js';
 
 const count = (problems, level) => problems.filter((p) => p.level === level).length;
 
@@ -63,6 +64,9 @@ export function mapsMade(scope, run) {
     ...(map.ways?.length ? {said: map.ways.map((w) => [w.name, w.way])} : {}), ...(map.tight?.length ? {tight: map.tight.map((t) => t.name)} : {}), ...(map.made.breaks ? {breaks: map.made.breaks} : {}),
     // the style it was drawn in, as the steps read it ({row, options}): only on a map that names one (data-style), so a map that names none records as before
     ...(map.made.style ? {style: map.made.style} : {}),
+    // its blocks' moves (data-move), as footprint-story planned them, and how each way of showing the deck carries them:
+    // only on a map whose clicks move a block, so every other map records as before
+    ...(map.motion ? {motion: {moves: map.motion.record.map((r) => ({click: r.click, piece: r.piece, do: r.do, model: r.model, by: r.by, seconds: r.seconds, ...(r.accepted ? {accepted: r.accepted} : {})})), carriers: map.motion.carriers}} : {}),
   }]);
   if (!made.length) return undefined;   // no isometric map: nothing more runs, and the stage stays as it was
   scope.maps = Object.fromEntries(made);
@@ -79,6 +83,12 @@ async function mapRecords(scope, run) {
   run.mapRuns = await flowMaps(scope, run, built);
   scope.mapFlows = Object.fromEntries(run.mapRuns.runs.map((m) => [m.name, {kept: m.file !== null, ...(m.differs ? {differs: m.differs} : {})}]));
   if (run.mapRuns.skipped) scope.mapsSkipped = run.mapRuns.skipped;
+  // each map whose blocks move: its moves planned again through footprint-story's chart, for `log --why … --motion`
+  const moving = Object.entries(run.loaded.compiled.maps).filter(([, map]) => map.motion).map(([name, map]) => ({name, motion: map.motion}));
+  if (!moving.length) return;
+  run.motionRuns = await flowMotions(scope, run, moving);
+  scope.motionFlows = Object.fromEntries(run.motionRuns.runs.map((m) => [m.name, {kept: m.file !== null, ...(m.differs ? {differs: m.differs} : {})}]));
+  if (run.motionRuns.skipped) scope.motionsSkipped = run.motionRuns.skipped;
 }
 
 /** It does not compile: that one problem is the answer, and the run stops here. */

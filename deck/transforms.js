@@ -512,14 +512,15 @@ function floorLinks(html, found, solids) {
  * between them — before the floor and the picture are fitted, so both hold the wires too — its pieces drawn); its
  * callouts; its wires drawn on the slide, the cables along the ways the steps laid.
  */
-export function transformed(html, {icons: set = {}, canvas = null, area = null} = {}) {
+export function transformed(html, {icons: set = {}, canvas = null, area = null, movers = null} = {}) {
   const drawn = icons(html, set), found = wireTags(drawn), names = pieceNames(drawn);
   // the wires written between pieces, in order: what the map's blocks are placed from, and which of them lie along the floor
   const joined = found.flatMap(({m}, i) => (wireEndsOf(m[1], names) ? [i] : [])), links = wireLinks(drawn);
   const floorWires = (solids) => { const all = floorLinks(drawn, found, solids); return joined.map((i) => all[i]); };
-  const iso = isoDrawn(drawn, {canvas, area, links, floorWires, icons: set});
+  const iso = isoDrawn(drawn, {canvas, area, links, floorWires, icons: set, movers});
   // each wire's way as the steps laid it, by the wire it is (null for one written in numbers)
   const routes = iso.routes ? found.map(() => null) : null;
   joined.forEach((i, k) => { if (routes) routes[i] = iso.routes[k]; });
-  return {...wiresDrawn(callouts(iso.html, {canvas}), {...iso, routes}), tight: iso.tight ?? [], made: iso.made ?? null, ...(iso.built ? {built: iso.built} : {})};
+  // a map whose blocks move (movers) also hands on what the moves are planned on, and what its wires join (motionRead.js)
+  return {...wiresDrawn(callouts(iso.html, {canvas}), {...iso, routes}), tight: iso.tight ?? [], made: iso.made ?? null, ...(iso.built ? {built: iso.built} : {}), ...(iso.motion ? {motion: iso.motion, links: wireLinks(drawn)} : {})};
 }

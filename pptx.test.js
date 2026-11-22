@@ -70,6 +70,13 @@ describe('pptx · a deck as PowerPoint', () => {
     expect(done.clicks[0]).toEqual({ n: 1, title: 'Intro', notes: 'Hello. There.', spoken: 'Hello. There.', clip: { key: 'k1', audio: path.join(dir, 'k1.wav'), duration: 3 }, advance: 3.6 });
   });
 
+  it('shows a click\'s block moves at rest when its driver can end them (rest), after the entrance is seeked, before the picture', async () => {
+    const driver = { ...fakeDriver({ ends: { 1: 700 } }) };
+    driver.rest = vi.fn(async () => driver.log.push('rest'));
+    await exportPptx({ url: 'u', steps: steps().slice(0, 1), out: path.join(dir, 'rest'), driver });
+    expect(driver.log).toEqual(['open u', 'step 1', 'seek 700', 'rest', 'shot c001.png', 'close']);
+  });
+
   it('leaves its record: each stage, and each verdict with what it weighed', async () => {
     const done = await exportPptx({ url: 'u', steps: steps(), out: dir, driver: fakeDriver() });
     expect(done.narrative.filter((l) => l.startsWith('[Condition]'))).toEqual([

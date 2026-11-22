@@ -224,6 +224,9 @@ function artOf({box, centre}, paints, solid, styled) {
   return {box, art: isoArt(paints, box, {styled}), say: solid ? {x: centre[0], y: centre[1]} : null};
 }
 
+/** A block's small line (its first <small>), as plain words: what a name's box under it takes room for (motionPlace · nameBox). */
+const smallOf = (inner) => { const m = /<small\b[^>]*>([\s\S]*?)<\/small\s*>/i.exec(inner); return m ? decodeEntities(m[1].replace(/<[^>]*>/g, '')).replace(/\s+/g, ' ').trim() || null : null; };
+
 /** What a name-fit note shows of a name: enough to find it. */
 const SHOWN = 80;
 /** Where a name may break — the common package's rule: a space, a tab, a line end. */
@@ -292,8 +295,13 @@ function nameFitted(inner, words, fit) {
   return {inner: inner.slice(0, found.from) + name + inner.slice(found.to), tight: fits ? null : label.length > SHOWN ? `${label.slice(0, SHOWN)}…` : label};
 }
 
-/** One piece, drawn: its element placed and sized by the floor, its faces, its words on its top face, a floor's label. */
-function draw(p, html, shape, level, tight) {
+/**
+ * One piece, drawn: its element placed and sized by the floor, its faces, its words on its top face, a floor's label.
+ * `mark`, on a map whose blocks move (motionDraw.js): {index, mover} — every block's words carry its index
+ * (data-sd-say), and a block that moves carries it on its element (data-sd-moving) and has its faces and words in a
+ * wrapper the move transforms (data-sd-mover), so a click's focus, which moves the element, is never replaced by it.
+ */
+function draw(p, html, shape, level, tight, mark = null) {
   const {box, art, say} = shape;
   const placed = [`left:${fixed(box.x)}px`, `top:${fixed(box.y)}px`, `width:${fixed(box.w)}px`, `height:${fixed(box.h)}px`, ...(level === null ? [] : [`z-index:${level}`])];
   const css = [...placed, p.style.trim()].filter(Boolean).join(';');
@@ -303,13 +311,14 @@ function draw(p, html, shape, level, tight) {
   // its name as the steps fitted it to its top face
   const fitted = say && p.inner.trim() ? nameFitted(p.inner, shape.words, shape.fit) : null;
   if (fitted?.tight) tight.push({name: p.name, text: fitted.tight});
-  const words = fitted ? `<span class="iso-say" style="left:${fixed(say.x - box.x)}px;top:${fixed(say.y - box.y)}px">${fitted.inner}</span>` : '';
+  const words = fitted ? `<span class="iso-say"${mark ? ` data-sd-say="${mark.index}"` : ''} style="left:${fixed(say.x - box.x)}px;top:${fixed(say.y - box.y)}px">${fitted.inner}</span>` : '';
   const named = p.label ? floorLabelHtml(p, shape, box, tight) : '';
   // a floor is ground: a camera frames what stands on it, never the floor itself (focus.js) — unless it says otherwise
   // (data-ground="false"), or it is a group's named area (data-iso-group with a data-label): the picture is fitted to hold
   // it, and a view that frames it holds its words. Any other floor, a labelled one too, stays ground (README "Ground").
   const ground = p.kind === 'floor' && !(p.label && p.group !== null) && ownAttribute(at, 'data-ground') === null ? ' data-ground' : '';
-  return `<${p.tag}${at}${ground} data-sd-iso="${p.kind}" style=${p.quote}${css}${p.quote}>${svg}${words}${named}${html.slice(p.close, p.end)}`;
+  const drawn = mark?.mover ? `<span class="iso-motion" data-sd-mover="${mark.index}">${svg}${words}</span>` : `${svg}${words}`;
+  return `<${p.tag}${at}${ground} data-sd-iso="${p.kind}"${mark?.mover ? ` data-sd-moving="${mark.index}"` : ''} style=${p.quote}${css}${p.quote}>${drawn}${named}${html.slice(p.close, p.end)}`;
 }
 
 /**
@@ -362,7 +371,7 @@ export const isoPieces = (html, options) => isoDrawn(html, options).html;
  * the grid chosen, the names fitted, the floor labels placed and the paint order — the same steps a film builds its
  * map with. Here: the HTML read, the deck's own refusals, and the page written from the built map.
  */
-export function isoDrawn(html, {canvas = null, area = null, links = [], floorWires = null, icons = {}} = {}) {
+export function isoDrawn(html, {canvas = null, area = null, links = [], floorWires = null, icons = {}, movers = null} = {}) {
   const shapes = new Map(), solids = [], tight = [], levels = new Map();
   if (!MAYBE.test(html) && !MAYBE_GRID.test(html) && !MAYBE_STYLE.test(html) && !mayHoldFootprint(html)) return {html, shapes, solids, tight};
   // the map's style first (isoStyle.js): its <i> taken out before the grid's is read, so one written beside the grid is
@@ -381,6 +390,10 @@ export function isoDrawn(html, {canvas = null, area = null, links = [], floorWir
   const clear = mayKeepClear(map) ? readKeepClear(map) : [];
   if (clear.length && fit) throw new Error(`${clear[0].where}: the floor kept clear is the floor under the piece where its style puts it, so the floor is written in numbers beside it — data-iso-grid="120 at 960 240", not "fit"`);
   if (found.length + feet.length > MOST_ISO_PIECES) throw new Error(`a map holds at most ${MOST_ISO_PIECES} isometric pieces${feet.length ? ' and footprints together' : ''}, and this one has ${found.length + feet.length}`);
+  // a map whose blocks move spreads its paint levels `stride` apart, a level between two still blocks for each that moves
+  // (motionDraw.js): they must all stay under the callouts' level (ISO_CSS), so such a map holds fewer pieces
+  const stride = movers?.size ? movers.size + 2 : 2, standingCount = found.filter((p) => p.kind !== 'floor').length + feet.length;
+  if (stride * standingCount > 2 * MOST_ISO_PIECES) throw new Error(`a map whose blocks move holds at most ${Math.floor((2 * MOST_ISO_PIECES) / stride)} blocks, cylinders and footprints with ${movers.size} of them moving, and this one has ${standingCount} — move fewer blocks on this map, or tell it in two maps`);
   const solid = found.filter((p) => p.kind !== 'floor'), floors = found.filter((p) => p.kind === 'floor'), standing = [...solid, ...feet];
   const byBuild = checkPlacing(solid, feet, clear);
   // the floor kept clear at each height something stands at, where a cable could run under the words: worked out from
@@ -419,11 +432,13 @@ export function isoDrawn(html, {canvas = null, area = null, links = [], floorWir
   // (which share level 0). The levels are even (2, 4, …): the odd one above a block's is where a cable's lead into a port
   // on its seen side stands (transforms.js · leadSvg), over that block and under the next. A footprint's piece takes its
   // place in that order too.
-  const levelOf = (p) => 2 * (built.order.indexOf(drawnOf.get(p).id) + 1);
+  const levelOf = (p) => stride * (built.order.indexOf(drawnOf.get(p).id) + 1);
+  // a block that moves, by its index among the blocks: its name is its own (a move of a name two pieces share is refused)
+  const markOf = (p) => (movers?.size && p.kind !== 'floor' ? {index: solid.indexOf(p), mover: movers.has(p.name) && solid.filter((o) => o.name === p.name).length === 1} : null);
   let out = '', from = 0;
   for (const p of [...found, ...feet].sort((a, b) => a.start - b.start)) {
     if (p.kind === 'footprint') out += paintFootprints(map.slice(from, p.end), [{...p, start: p.start - from, end: p.end - from}], () => levelOf(p));
-    else out += map.slice(from, p.start) + draw(p, map, drawnOf.get(p), p.kind === 'floor' ? null : levelOf(p), tight);
+    else out += map.slice(from, p.start) + draw(p, map, drawnOf.get(p), p.kind === 'floor' ? null : levelOf(p), tight, markOf(p));
     from = p.end;
   }
   const twice = new Set(standing.map((p) => p.name).filter((name, i, all) => all.indexOf(name) !== i));
@@ -443,7 +458,11 @@ export function isoDrawn(html, {canvas = null, area = null, links = [], floorWir
   // the break rules its writer picked, by block (none written: nothing here, so a map that picks none records as before)
   const breaks = found.filter((p) => p.rule).map((p) => [p.name, p.rule]);
   const made = {placed: built.placed, tile: built.view.tile[0], fitted: built.grid === 'fitted', ...(feet.length ? {footprints: feet.length} : {}), ...(outside > 0.5 ? {outside: Math.round(outside)} : {}), ...(breaks.length ? {breaks} : {}), ...(style ? {style: built.style} : {})};
-  return {html: out + map.slice(from), shapes, solids, tight, levels, made, built: {spec, map: built}, routes, floor: (col, row, lift = 0) => { const point = grid.at(col, row, lift); return [point.x, point.y]; }};
+  // what motionPlan.js plans on, for a map whose blocks move: each block where the map built it, with its words' fit and level
+  const motion = movers?.size ? {grid, view: {tile: [...built.view.tile], origin: [...built.view.origin], rise: built.view.rise}, blocks: solid.map((p, i) => ({name: p.name, kind: p.kind, at: [built.at[i][0], built.at[i][1], built.at[i][2] ?? 0], size: [...p.size],
+    box: built.shapes[i].box, outline: built.shapes[i].outline.map(([x, y]) => [x, y]), say: [...built.shapes[i].centre], fit: drawnOf.get(p).fit, small: smallOf(p.inner), level: levelOf(p),
+    ...(twice.has(p.name) ? {twice: true} : {})})), obstacles: feet.map((f) => ({name: f.name, kind: 'footprint', at: [f.at[0], f.at[1], f.at[2] ?? 0], size: [...f.size], level: levelOf(f)}))} : null;
+  return {html: out + map.slice(from), shapes, solids, tight, levels, made, built: {spec, map: built}, routes, ...(motion ? {motion} : {}), floor: (col, row, lift = 0) => { const point = grid.at(col, row, lift); return [point.x, point.y]; }};
 }
 
 const TONE = 'var(--iso-color, var(--sd-tone, #d9e4f3))';

@@ -11,7 +11,7 @@
 // click as in the room (`loops: false` holds its frame, as before: fewer frames, a faster draft). A click
 // lasts its clip plus `gap`; the first one starts after `lead` (a fade in from black); a click without a clip
 // stays `noclip` seconds. The browser is a port — { open(url), step(n), freeze() → ms the entrances last,
-// loops?() → whether its loops run, seek(ms, {loop?}), shot(file), close() } — and `deckStageDriver` drives storydeck's own <deck-stage> with Playwright
+// loops?() → whether its loops run, seek(ms, {loop?}), rest?() → a click's block moves ended (the PowerPoint's still picture), shot(file), close() } — and `deckStageDriver` drives storydeck's own <deck-stage> with Playwright
 // (pass its `chromium`). ffmpeg runs through `run` (spawnSync's shape), so both can be faked.
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -283,6 +283,17 @@ export function deckStageDriver({ chromium, executablePath, viewport = { width: 
       }, [ms, loop ?? null]);
       await settle();
     },
+    /**
+     * A click's moves at rest: every animation of an isometric block that moves by intent (deck/motionDraw.js:
+     * sdIsoMove-…, sdIsoZ-…, sdIsoRope-…, sdIsoShow) ended, so a still picture (the PowerPoint's) shows where each move
+     * ends, never a frame between. Any other animation is left where seek put it.
+     */
+    rest: () => page.evaluate(() => {
+      for (const a of document.getAnimations()) {
+        if (!/^sdIso(?:Move-|Z-|Rope-|Show$)/.test(a.animationName ?? '')) continue;
+        try { a.finish(); } catch { /* a move always ends: nothing to do for one that cannot */ }
+      }
+    }),
     shot: (file) => page.screenshot({ path: file }),
     /**
      * Click n (1-based) as it settles, measured: jump there (a jump lands at once), finish what still moves, and

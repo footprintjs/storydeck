@@ -81,6 +81,20 @@ export function mapLines({runs = [], skipped = 0} = {}, id = null) {
 }
 
 /**
+ * What the reply says of the maps whose blocks move (run/motions.js): a drift aloud, a record not kept, then how to ask
+ * why a move takes its time. Nothing when no click moves a block.
+ */
+export function motionLines({runs = []} = {}, id = null) {
+  if (!runs.length) return [];
+  const asked = runs.find((m) => m.file && mapArg(m.name));
+  return [
+    ...runs.filter((m) => m.differs).map((m) => `drift · moves ${m.name}: footprint-story's intent decider did not plan the moves the page draws — ${m.differs} (the page draws the deck's; report it to footprint-story)`),
+    ...(id ? runs.filter((m) => !m.file).map((m) => `moves ${m.name}: their record was not kept, so log --why cannot answer for them`) : []),
+    ...(id && asked ? [`moves: ${runs.map((m) => m.name).join(', ')} — why a move takes its time: storydeck log --run ${id} --why duration-0 --motion ${mapArg(asked.name)} (model-<i>: why its model; findings-<i>: what its critics found)`] : []),
+  ];
+}
+
+/**
  * A run as its reply. `all` lists every problem; `more` names how to ask for that, and `measure` how to ask for a
  * measure in a browser, in the caller's words (a flag, or a tool's argument); `cwd` is what file names are shown against.
  */
@@ -92,6 +106,7 @@ export function replyText(r, {all = false, more = '--all', measure = '--layout',
     r.written ? writtenLine(r.written, r.ms, cwd) : null,
     standingLine(r),
     ...mapLines(r.maps, r.id ?? null),
+    ...motionLines(r.motions, r.id ?? null),
     r.layoutNote ?? null,
     r.unkept ? `this run was not kept for storydeck log: ${r.unkept}` : null,
   ].filter((line) => line !== null).join('\n');

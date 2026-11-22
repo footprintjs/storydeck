@@ -74,12 +74,15 @@ export const buildTool = (dir, options = {}) => runTool(dir, {...options, write:
  * that left one unanswered. `why`: a value of that run, walked back from its record; with `map`, from that isometric
  * map's own record (run/why.js).
  */
-export function logTool(dir, {home = storydeckHome(), run, all = false, measure, why: value, map} = {}) {
+export function logTool(dir, {home = storydeckHome(), run, all = false, measure, why: value, map, motion} = {}) {
   const {dir: folder, why} = runsFolder(home, deckRoot(dir));
   if (!folder) throw new Error(`this deck's runs are not kept: ${why}`);
   const runs = keptRuns(folder);
   const asked = value !== undefined && value !== null && value !== false, mapAsked = map !== undefined && map !== null;
+  const motionAsked = motion !== undefined && motion !== null;
   if (mapAsked && !asked) throw new Error('--map picks the record --why reads: ask with --why (storydeck log --run 1 --why at --map map)');
+  if (motionAsked && !asked) throw new Error('--motion picks the record --why reads: ask with --why (storydeck log --run 1 --why duration-0 --motion map)');
+  if (motionAsked && mapAsked) throw new Error('--why reads one record: a map\'s (--map) or its moves\' (--motion), not both');
   if (run === undefined || run === null || run === '') {
     if (asked) throw new Error('--why reads one run: give its number (storydeck log --run 1 --why verdict)');
     return listText(runs, callCounts(folder), {kept: RUNS_KEPT, measure});
@@ -91,7 +94,7 @@ export function logTool(dir, {home = storydeckHome(), run, all = false, measure,
   if (!Number.isInteger(n) || n < 1 || n > runs.length) throw new Error(`--run is a run's number in the list, 1 (the newest) to ${runs.length}, not ${run}`);
   // why a value of that run is what it is, walked back from a record: a promise of the text (run/why.js) — asked by
   // its id, every line names the run by its id
-  if (asked) return whyText(runs[n - 1], byId >= 0 ? runs[n - 1].id : n, typeof value === 'string' ? value : '', {all, map: mapAsked ? String(map) : null});
+  if (asked) return whyText(runs[n - 1], byId >= 0 ? runs[n - 1].id : n, typeof value === 'string' ? value : '', {all, map: mapAsked ? String(map) : null, motion: motionAsked ? String(motion) : null});
   return runText(runs[n - 1], n, {all, measure});
 }
 

@@ -15,6 +15,8 @@
 //   wire-way       a wire between two blocks that does not lie well on the floor: it passes behind a block, lies on another, doubles back on itself (a hairpin), or is drawn straight — and why
 //   name-fit       a block's name that does not fit its top face (or a floor's label its front edge) even on two lines at the least size
 //   map-fit        a map of groups whose fitted picture runs past the slide even at the least tile
+//   motion         what a critic found in a block's move (data-move): footprint-story's (jerk, arc, spacing, contact, …) and the
+//                  deck's own (deck:contact, deck:covers), at the critic's own level — a note is advice, one the move accepts is said as accepted
 import {wordCount} from './parse.js';
 import {expandNames} from '../focus.js';
 import {LOOP_NAMES} from './loops.js';
@@ -197,6 +199,21 @@ function mapsFit(compiled) {
   });
 }
 
+/** The levels a move's finding is told at: a critic's warn is a fix, a note advice, and one its move accepts is advice it chose. */
+const MOTION_LEVEL = {warn: 'warn', note: 'info', accepted: 'info'};
+
+/**
+ * What the critics found in each map's moves (motion.js · motionKept: footprint-story's findings and the deck's own), each
+ * at its click, naming the move (data-move[i] and its block), the critic and the fix. WHY at the critic's own level: a
+ * warn (a body through the floor, a block through another) is something to fix, so a check never reads clean over it.
+ */
+function motionFound(compiled) {
+  return Object.values(compiled.maps).flatMap(({motion}) => (motion?.findings ?? []).map((f) => {
+    const click = compiled.clicks.find((c) => c.n === f.click), move = f.who.slice(f.who.indexOf('data-move'));
+    return problem(MOTION_LEVEL[f.level], 'motion', click, `${move} · ${f.critic}${f.level === 'accepted' ? ' (accepted)' : ''}: ${f.what} — ${f.fix}`);
+  }));
+}
+
 /** Every problem of a compiled deck: [{level: 'error' | 'warn' | 'info', rule, click, label, message}]. */
 export function checkDeck(compiled) {
   const out = [];
@@ -206,7 +223,7 @@ export function checkDeck(compiled) {
     out.push(...noChange(c, compiled.clicks[i - 1]));
     out.push(...farView(c));
   });
-  out.push(...neverShown(compiled), ...missingNotes(compiled), ...unstyledThemes(compiled), ...unsetLoops(compiled), ...unsaidDiffers(compiled), ...aloneCallouts(compiled), ...acrossStages(compiled), ...wireWaysSaid(compiled), ...namesTight(compiled), ...mapsFit(compiled));
+  out.push(...neverShown(compiled), ...missingNotes(compiled), ...unstyledThemes(compiled), ...unsetLoops(compiled), ...unsaidDiffers(compiled), ...aloneCallouts(compiled), ...acrossStages(compiled), ...wireWaysSaid(compiled), ...namesTight(compiled), ...mapsFit(compiled), ...motionFound(compiled));
   return out;
 }
 
