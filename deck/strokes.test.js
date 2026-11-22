@@ -1,17 +1,21 @@
 // Hand-drawn strokes on a map (0.39.0): footprint-story's `stroke` paint item (human/strokes) drawn by the deck's one
-// painter (isoPaint.js) as the ring footprint-story gives (strokeOutline), filled in its ink; the whole stroke, at rest,
-// its time not played (the map's record says so); and a still of footprint-story's two hand-drawn style choices
-// (human:sketchy, human:hatch) on a block, a cylinder and a floor, pinned byte for byte.
+// painter (isoPaint.js) as the capped ring footprint-story gives (strokeOutline(points, {cap})), filled in its ink by the
+// non-zero rule; the whole stroke, at rest, its time not played (the map's record says so); a map that names
+// footprint-story's hand-drawn style (`human:sketchy`, `human:hatch`) built, drawn and recorded through the page; and a
+// still of that page, pinned byte for byte.
 //
 // The still is made again, after a change that means to move it, with:  STORYDECK_WRITE_STILLS=1 npx vitest run deck/strokes.test.js
 import {describe, it, expect} from 'vitest';
 import {readFileSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
-import {isometric, isoStyle, paintPiece} from 'footprint-story/isometric';
-import {sketchyLine, hatchTexture, strokeOutline} from 'footprint-story/human';
+import {strokeOutline, CAP_STEPS} from 'footprint-story/human';
 import {isoArt, strokesDrawn, PAGE_LINE, STROKE_TIMING} from './isoPaint.js';
-import {ISO_CSS} from './iso.js';
+import {isoDrawn, ISO_CSS} from './iso.js';
+import {compileDeck} from './compile.js';
+import {sourceOf} from './test/helpers.js';
 import {mapsMade} from './run/stages.js';
+import {flowMaps} from './run/maps.js';
+import {engine} from './run/engine.js';
 
 const ink = (over = {}) => ({colour: null, alpha: 1, width: 4, join: 'round', cap: 'round', ...over});
 const stroke = (points, over = {}) => ({item: 'stroke', role: 'ink', of: 'p', points, fill: null, stroke: ink(over)});
@@ -19,23 +23,40 @@ const stroke = (points, over = {}) => ({item: 'stroke', role: 'ink', of: 'p', po
 const written = (svg) => [...svg.match(/ d="([^"]*)"/)[1].matchAll(/[ML](-?[\d.]+) (-?[\d.]+)/g)].map((m) => [+m[1], +m[2]]);
 
 describe('strokes · a hand-drawn line drawn as footprint-story\'s ring round it', () => {
-  it('the ring is footprint-story\'s strokeOutline, to 1e-6, written in the box to one decimal', () => {
+  it('the ring is footprint-story\'s strokeOutline with the item\'s own cap, to 1e-6, written in the box to one decimal', () => {
     // a right angle, its middle twice as wide: each point moved half its width along the normal of the chord through
     // its neighbours — worked by hand, so the geometry the painter fills is pinned, not only passed on
-    const points = [[0, 0, 2, 0], [10, 0, 4, 0.5], [10, 10, 2, 1]], r = Math.SQRT1_2 * 2;
-    const ring = [[0, -1], [10 + r, -r], [11, 10], [9, 10], [10 - r, r], [0, 1]];
-    const outline = strokeOutline(points);
-    expect(outline).toHaveLength(ring.length);
-    outline.forEach(([x, y], i) => { expect(Math.abs(x - ring[i][0])).toBeLessThan(1e-6); expect(Math.abs(y - ring[i][1])).toBeLessThan(1e-6); });
-    expect(isoArt([stroke(points)], {x: 0, y: 0})).toBe(`<path class="iso-ink" stroke="none" style="fill:${PAGE_LINE}" d="M0 -1L11.4 -1.4L11 10L9 10L8.6 1.4L0 1Z"/>`);
+    const points = [[0, 0, 2, 0], [10, 0, 4, 0.5], [10, 10, 2, 1]], r = Math.SQRT1_2 * 2, near = 1e-6;
+    const close = (got, want) => { expect(got).toHaveLength(want.length); got.forEach(([x, y], i) => { expect(Math.abs(x - want[i][0])).toBeLessThan(near); expect(Math.abs(y - want[i][1])).toBeLessThan(near); }); };
+    const sides = [[0, -1], [10 + r, -r], [11, 10], [9, 10], [10 - r, r], [0, 1]];
+    // butt: the sides alone, flat across each end
+    close(strokeOutline(points, {cap: 'butt'}), sides);
+    expect(isoArt([stroke(points, {cap: 'butt'})], {x: 0, y: 0})).toBe(`<path class="iso-ink" stroke="none" style="fill:${PAGE_LINE};fill-rule:nonzero" d="M0 -1L11.4 -1.4L11 10L9 10L8.6 1.4L0 1Z"/>`);
+    // square: half the end's width out past each end, square — the far end runs down (0, 1), the near end back (-1, 0)
+    close(strokeOutline(points, {cap: 'square'}), [...sides.slice(0, 3), [11, 11], [9, 11], ...sides.slice(3), [-1, 1], [-1, -1]]);
+    // round: a half circle round each end point, CAP_STEPS segments, every point on the circle of the end's half width
+    // and out past the end the way the stroke runs, at equal turns from one side to the other
+    const round = strokeOutline(points, {cap: 'round'}), m = CAP_STEPS - 1;
+    expect(round).toHaveLength(sides.length + 2 * m);
+    close([...round.slice(0, 3), ...round.slice(3 + m, 6 + m)], sides);
+    const capAt = (cap, [px, py], [hx, hy], from) => cap.forEach(([x, y], k) => {
+      expect(Math.abs(Math.hypot(x - px, y - py) - 1)).toBeLessThan(near);
+      expect((x - px) * hx + (y - py) * hy).toBeGreaterThan(0);
+      expect(Math.abs(Math.acos(Math.max(-1, Math.min(1, (x - px) * from[0] + (y - py) * from[1]))) - (Math.PI * (k + 1)) / CAP_STEPS)).toBeLessThan(near);
+    });
+    capAt(round.slice(3, 3 + m), [10, 10], [0, 1], [1, 0]);
+    capAt(round.slice(6 + m), [0, 0], [-1, 0], [0, 1]);
+    expect(stroke(points).stroke.cap).toBe('round');
+    expect(written(isoArt([stroke(points)], {x: 0, y: 0}))).toHaveLength(round.length);
     // in a box: every point of the ring, minus the box's corner, within the half-tenth it is written to
     const box = {x: 3.25, y: -7.5}, got = written(isoArt([stroke(points)], box));
-    got.forEach(([x, y], i) => { expect(Math.abs(x - (outline[i][0] - box.x))).toBeLessThanOrEqual(0.05 + 1e-6); expect(Math.abs(y - (outline[i][1] - box.y))).toBeLessThanOrEqual(0.05 + 1e-6); });
+    got.forEach(([x, y], i) => { expect(Math.abs(x - (round[i][0] - box.x))).toBeLessThanOrEqual(0.05 + near); expect(Math.abs(y - (round[i][1] - box.y))).toBeLessThanOrEqual(0.05 + near); });
   });
 
-  it('draws the whole stroke, whatever its times: two points of the ring for each of its points', () => {
+  it('draws the whole stroke, whatever its times: two points of the ring for each of its points, and its two caps', () => {
     const points = Array.from({length: 40}, (_, i) => [i * 3, Math.sin(i / 4) * 10, 1 + (i % 5) / 2, i * 0.01]);
-    expect(written(isoArt([stroke(points)], {x: 0, y: 0}))).toHaveLength(80);
+    expect(written(isoArt([stroke(points)], {x: 0, y: 0}))).toHaveLength(80 + 2 * (CAP_STEPS - 1));
+    expect(written(isoArt([stroke(points, {cap: 'butt'})], {x: 0, y: 0}))).toHaveLength(80);
     // the same line at other times is the same picture: a page is drawn at rest
     const later = points.map(([x, y, w, t]) => [x, y, w, t * 7 + 3]);
     expect(isoArt([stroke(later)], {x: 0, y: 0})).toBe(isoArt([stroke(points)], {x: 0, y: 0}));
@@ -44,9 +65,9 @@ describe('strokes · a hand-drawn line drawn as footprint-story\'s ring round it
   it('is filled in its ink: its own colour and alpha, else the page\'s line colour — the one .iso-art outlines a face with', () => {
     const line = [[0, 0, 1, 0], [10, 0, 1, 1]];
     expect(ISO_CSS).toContain(`stroke: ${PAGE_LINE}; stroke-width: var(--iso-line-width, 2.5px);`);
-    expect(isoArt([stroke(line, {colour: '#112233'})], {x: 0, y: 0})).toContain(' stroke="none" style="fill:#112233" d=');
-    expect(isoArt([stroke(line, {colour: '#112233', alpha: 0.4})], {x: 0, y: 0})).toContain(' style="fill:#112233;fill-opacity:0.4" d=');
-    expect(isoArt([stroke(line, {alpha: 0.4})], {x: 0, y: 0})).toContain(` style="fill:${PAGE_LINE};fill-opacity:0.4" d=`);
+    expect(isoArt([stroke(line, {colour: '#112233'})], {x: 0, y: 0})).toContain(' stroke="none" style="fill:#112233;fill-rule:nonzero" d=');
+    expect(isoArt([stroke(line, {colour: '#112233', alpha: 0.4})], {x: 0, y: 0})).toContain(' style="fill:#112233;fill-opacity:0.4;fill-rule:nonzero" d=');
+    expect(isoArt([stroke(line, {alpha: 0.4})], {x: 0, y: 0})).toContain(` style="fill:${PAGE_LINE};fill-opacity:0.4;fill-rule:nonzero" d=`);
     expect(isoArt([{...stroke(line), role: 'hatch'}], {x: 0, y: 0})).toMatch(/^<path class="iso-hatch" /);
   });
 
@@ -81,41 +102,61 @@ describe('strokes · the map\'s record says their time is not played', () => {
   });
 });
 
-/** footprint-story's two hand-drawn choices on a floor, a block and a cylinder, painted as a styled map's pieces are. */
-function sketchyMap() {
-  const grid = isometric({tile: 120, origin: [960, 240]}), colours = {ink: '#1f2430'};
-  const style = isoStyle({line: 'human:sketchy', texture: 'human:hatch'}, {choices: [sketchyLine, hatchTexture]});
-  const pieces = [{name: 'floor', kind: 'floor', at: [0, 0], size: [6, 4]}, {name: 'server', kind: 'block', at: [1, 1], size: [2, 2, 1]}, {name: 'db', kind: 'cylinder', at: [4, 1], size: [1.5, 1.5, 1.2]}];
-  return pieces.map((piece) => ({piece, ...paintPiece(style, piece, grid, colours)}));
-}
-const one = (v) => +v.toFixed(1);
+const canvas = [1920, 1080];
+/** A map drawn by hand, as its writer writes it: footprint-story's sketched line and hatch on a floor, a block and a cylinder. No names: the still holds no words, so no font of the host's. */
+const SKETCHY = `<i data-iso-grid="120 at 960 240"></i><i data-style="line: human:sketchy; texture: human:hatch"></i>
+<div data-k="floor" data-iso="floor" data-size="8 5"></div>
+<div data-k="server" data-iso="block" data-at="1 1" data-size="2 2 1.4"></div>
+<div data-k="db" data-iso="cylinder" data-at="5 1" data-size="1.6 1.6 1.2"></div>`;
+const paths = (html) => html.match(/<path class="iso-(?:ink|hatch)" stroke="none"[^>]*>/g) ?? [];
 
-describe('strokes · a still of human:sketchy + human:hatch', () => {
-  it('every stroke is drawn, the faces keep their fills and lose their ink line, and the page is the still byte for byte', () => {
-    const painted = sketchyMap(), all = painted.flatMap((p) => p.items).filter((it) => it.item === 'stroke');
+describe('strokes · a map drawn by hand (data-style="line: human:sketchy; texture: human:hatch")', () => {
+  it('is built by the steps with the deck\'s hand-drawn choices, and every stroke they made is drawn as its ring', () => {
+    const {html, built, made} = isoDrawn(SKETCHY, {canvas});
+    expect(built.spec.style).toEqual({line: 'human:sketchy', texture: 'human:hatch'});
+    expect(built.map.style.row).toMatchObject({line: 'human:sketchy', texture: 'human:hatch'});
+    const lists = [...built.map.paints, ...built.map.floorPaints], all = lists.flat().filter((it) => it.item === 'stroke');
     expect(all.length).toBeGreaterThan(20);
     expect(new Set(all.map((it) => it.role))).toEqual(new Set(['ink', 'hatch']));
-    const drawn = painted.map(({items, box}) => ({box, art: isoArt(items, box, {styled: true})}));
-    // one path a stroke, its ring footprint-story's, and each face with no outline of its own
-    for (const [k, {items, box}] of painted.entries()) {
-      const paths = drawn[k].art.match(/<path class="iso-(?:ink|hatch)" stroke="none"[^>]*>/g) ?? [];
-      const strokes = items.filter((it) => it.item === 'stroke');
-      expect(paths).toHaveLength(strokes.length);
-      strokes.forEach((it, i) => {
-        const ring = strokeOutline(it.points), got = written(paths[i]);
-        expect(got).toHaveLength(ring.length);
-        got.forEach(([x, y], j) => { expect(Math.abs(x - (ring[j][0] - box.x))).toBeLessThanOrEqual(0.05 + 1e-6); expect(Math.abs(y - (ring[j][1] - box.y))).toBeLessThanOrEqual(0.05 + 1e-6); });
-      });
-      for (const face of drawn[k].art.match(/<(?:polygon|ellipse|path) class="iso-(?:top|left|right|side)"[^>]*>/g) ?? []) expect(face).toContain(' stroke="none"');
-    }
-    expect(drawn[0].art).toContain('<path class="iso-lines"');   // a floor keeps its tile lines
-    expect(strokesDrawn(painted.map((p) => p.items))).toEqual({strokes: all.length, timing: STROKE_TIMING});
-    // the still: the page's own CSS, each piece placed by its box, no words (so no font of the host's)
-    const pieces = painted.map(({piece}, k) => {
-      const {box, art} = drawn[k];
-      return `<div data-sd-iso="${piece.kind}" style="left:${one(box.x)}px;top:${one(box.y)}px;width:${one(box.w)}px;height:${one(box.h)}px"><svg class="iso-art" viewBox="0 0 ${one(box.w)} ${one(box.h)}" aria-hidden="true">${art}</svg></div>`;
-    });
-    const still = `<!doctype html>\n<meta charset="utf-8">\n<title>human:sketchy + human:hatch — StoryDeck's painter</title>\n<style>${ISO_CSS}</style>\n<section data-label="still" style="position:relative;width:1920px;height:720px;background:#fff">\n${pieces.join('\n')}\n</section>\n`;
+    expect(made.strokes).toEqual({strokes: all.length, timing: STROKE_TIMING});
+    // one path a stroke, in paint order, each footprint-story's capped ring in its piece's box
+    const drawn = paths(html), boxes = [...built.map.shapes, ...built.map.floorShapes].map((s) => s.box);
+    expect(drawn).toHaveLength(all.length);
+    let k = 0;
+    lists.forEach((items, i) => items.filter((it) => it.item === 'stroke').forEach((it) => {
+      const ring = strokeOutline(it.points, {cap: it.stroke.cap}), got = written(drawn[k++]), box = boxes[i];
+      expect(got).toHaveLength(ring.length);
+      got.forEach(([x, y], j) => { expect(Math.abs(x - (ring[j][0] - box.x))).toBeLessThanOrEqual(0.05 + 1e-6); expect(Math.abs(y - (ring[j][1] - box.y))).toBeLessThanOrEqual(0.05 + 1e-6); });
+    }));
+    // the faces keep their fills and lose their ink line; the floor keeps its tile lines
+    for (const face of html.match(/<(?:polygon|ellipse|path) class="iso-(?:top|left|right|side)"[^>]*>/g)) expect(face).toContain(' stroke="none"');
+    expect(html).toContain('<path class="iso-lines"');
+  });
+
+  it('a deck that writes it compiles, its record says the strokes are drawn whole, and the run\'s map flow builds the same map', async () => {
+    const deck = compileDeck(sourceOf({clicks: '<section data-label="S" data-map="m"><step data-in="*"><h2>A</h2></step></section>', maps: {m: SKETCHY}}));
+    const {made, built} = deck.maps.m;
+    expect(made.strokes.timing).toBe(STROKE_TIMING);
+    expect(paths(JSON.stringify(deck.slides).replaceAll('\\"', '"'))).toHaveLength(made.strokes.strokes);
+    // the run's own map flow, handed the deck's choices: the very map the page draws, its record kept
+    const eng = await engine();
+    const {runs} = await flowMaps({$call: (target, fn) => fn()}, {engine: eng, options: {}, mapRecord: () => null}, [{name: 'm', built}]);
+    expect(runs).toHaveLength(1);
+    expect(runs[0]).not.toHaveProperty('differs');
+    const scope = {};
+    await mapsMade(scope, {loaded: {compiled: {maps: {m: {made}}}}, options: {}, mapRecord: () => null});
+    expect(scope.maps.m.strokes).toEqual(made.strokes);
+  });
+
+  it('a page with no hand-drawn style draws no stroke and records none', () => {
+    const plain = isoDrawn(SKETCHY.replace(/<i data-style="[^"]*"><\/i>/, ''), {canvas});
+    expect(paths(plain.html)).toHaveLength(0);
+    expect(plain.made).not.toHaveProperty('strokes');
+  });
+
+  it('the page, as a still: the page\'s own CSS and the map as the page writes it, byte for byte', () => {
+    const {html} = isoDrawn(SKETCHY, {canvas});
+    const still = `<!doctype html>\n<meta charset="utf-8">\n<title>human:sketchy + human:hatch — a StoryDeck map drawn by hand</title>\n<style>${ISO_CSS}</style>\n<section data-label="still" style="position:relative;width:1920px;height:1080px;background:#fff">\n${html}\n</section>\n`;
     const file = path.join(process.cwd(), 'deck/test/sketchy-still.html');
     if (process.env.STORYDECK_WRITE_STILLS === '1') writeFileSync(file, still);
     expect(still).toBe(readFileSync(file, 'utf8'));

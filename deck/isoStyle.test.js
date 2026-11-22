@@ -111,6 +111,8 @@ describe('isoStyle · a map takes a style (data-style)', () => {
     // the columns and choices are the kit's (a new one in the kit is a new case here)
     expect(ISO_STYLE_COLUMNS).toEqual(['shape', 'shading', 'line', 'palette', 'texture', 'effects']);
     expect(ISO_STYLE_CHOICES.line).toEqual(['ink', 'none']);
+    // and footprint-story's hand-drawn ones, which the deck hands its steps (isoSpec.js · DECK_CHOICES)
+    expect(parseStyle('line: human:sketchy width 3; texture: human:hatch spacing 10', w)).toEqual({line: {name: 'human:sketchy', width: 3}, texture: {name: 'human:hatch', spacing: 10}});
   });
 
   it('refuses, naming the map and the fix in the deck\'s words: an unknown column, an unknown choice with the ones there are, a bad option', () => {
@@ -118,10 +120,13 @@ describe('isoStyle · a map takes a style (data-style)', () => {
     expect(refused('lines: none')).toThrow('map "m": data-style="lines: none": a style\'s columns are shape, shading, line, palette, texture, effects — not "lines"');
     expect(refused('line: dotted')).toThrow('map "m": data-style="line: dotted": the line has no choice "dotted" — there are "ink", "none"');
     expect(refused('effects: glow')).toThrow('data-style="effects: glow": the effects has no choice "glow" — there are none yet');
-    // footprint-story's hand-drawn choices are handed in, and its map steps take none yet: said so, never as a typo
-    expect(refused('line: human:sketchy')).toThrow('map "m": data-style="line: human:sketchy": the line "human:sketchy" is a choice a tool hands in, and footprint-story\'s map steps take none handed in yet — there are "ink", "none"');
-    expect(refused('texture: human:hatch spacing 10')).toThrow('the texture "human:hatch" is a choice a tool hands in, and footprint-story\'s map steps take none handed in yet — there are "none"');
-    expect(refused('effects: human:glow')).toThrow('the effects "human:glow" is a choice a tool hands in, and footprint-story\'s map steps take none handed in yet — there are none yet');
+    // the hand-drawn choices the deck hands in are named among the ones there are, and their options checked by the kit
+    expect(refused('line: human:scribble')).toThrow('map "m": data-style="line: human:scribble": the line has no choice "human:scribble" — there are "ink", "none", "human:sketchy"');
+    expect(refused('texture: crosses')).toThrow('the texture has no choice "crosses" — there are "none", "human:hatch"');
+    expect(refused('effects: human:glow')).toThrow('the effects has no choice "human:glow" — there are none yet');
+    expect(refused('line: human:sketchy width 30')).toThrow('data-style="line: human:sketchy width 30": the line "human:sketchy" takes a width from 0.5 to 20 — not 30');
+    expect(refused('texture: human:hatch spacing 1')).toThrow('data-style="texture: human:hatch spacing 1": the texture "human:hatch" takes a spacing from 3 to 200 — not 1');
+    expect(refused('line: human:sketchy colour red')).toThrow('the line "human:sketchy" takes width, tremor, overshoot, speed — not "colour"');
     expect(refused('line: ink width 30')).toThrow('data-style="line: ink width 30": the line "ink" takes a width from 0.5 to 20 px — not 30');
     expect(refused('line: ink width')).toThrow('data-style="line: ink width": an option of the line "ink" is its name and its value, "width 5" — not "width"');
     expect(refused('line: ink colour red')).toThrow('data-style="line: ink colour red": the line "ink" takes width — not "colour"');

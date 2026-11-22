@@ -33,8 +33,10 @@
 // line of changing width, never worked out here: numbers in footprint-story, drawing in StoryDeck. Its ink is the
 // stroke's colour, or the page's line colour (PAGE_LINE, the colour .iso-art outlines a face with) when it carries none,
 // as its fill; it takes no outline of its own (stroke="none"), which would thicken every point by the page's line.
-// Its ends are as strokeOutline gives them, flat: the kit leaves a round cap (a disc of the end's width) to the painter,
-// and the one geometry has no cap yet — so none is drawn here (each end of a sketch is tapered to 30% of its width).
+// Its ends are capped by the same ring (strokeOutline(points, {cap: stroke.cap}), footprint-story 0.33.0): a round, butt
+// or square end is geometry, so it is the kit's, never a disc drawn here. The ring can cross itself at a round cap on a
+// short, sharply turning stroke, so it is filled by the non-zero rule — written in its style attribute (fill-rule:nonzero),
+// which a page's rule with no weight cannot override, so no even-odd rule cuts a hole where it crosses.
 //
 // WHY the whole stroke, and its time unplayed: a deck page is drawn at rest, whole — a stroke's `t` (when the pen is
 // at each point) is a film's to play (StoryReel), and the map's record says so (strokesDrawn, STROKE_TIMING).
@@ -169,7 +171,8 @@ export const PAGE_LINE = 'var(--iso-line, var(--iso-ink, #14181f))';
 export const STROKE_TIMING = 'drawn whole, at rest: a page does not play a stroke\'s timing (StoryReel plays it)';
 
 /**
- * A hand-drawn stroke as one SVG path: footprint-story's ring round it (strokeOutline), filled in its ink. Each point
+ * A hand-drawn stroke as one SVG path: footprint-story's ring round it, its ends capped as its stroke says
+ * (strokeOutline), filled in its ink by the non-zero rule. Each point
  * is checked before the ring is asked for — [x, y, width, t], finite, its width from 0 to the stroke's — so a point
  * that skipped the kit's check never bends the ring or writes a stray word; a stroke with no ink, or a fill, is
  * refused (it would be drawn as nothing, or as a face).
@@ -183,8 +186,8 @@ function strokeSvg(it, x, y) {
     p.forEach(num);
     if (!(p[2] >= 0 && p[2] <= it.stroke.width + 1e-9)) throw new Error(`isoPaint: a hand-drawn stroke's point is as wide as 0 to its stroke's ${stroke.width} px — not ${p[2]}`);
   }
-  const ring = strokeOutline(it.points);
-  const ink = [`fill:${stroke.colour == null ? PAGE_LINE : hex(stroke.colour)}`, ...(stroke.alpha === 1 ? [] : [`fill-opacity:${stroke.alpha}`])];
+  const ring = strokeOutline(it.points, {cap: stroke.cap});
+  const ink = [`fill:${stroke.colour == null ? PAGE_LINE : hex(stroke.colour)}`, ...(stroke.alpha === 1 ? [] : [`fill-opacity:${stroke.alpha}`]), 'fill-rule:nonzero'];
   return `<path class="${roleClass(it.role)}" stroke="none" style="${ink.join(';')}" d="${ring.map(([px, py], i) => `${i ? 'L' : 'M'}${rel(px, x)} ${rel(py, y)}`).join('')}Z"/>`;
 }
 

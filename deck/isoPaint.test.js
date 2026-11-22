@@ -14,9 +14,10 @@ const art = (item, box = {x: 0, y: 0}) => isoArt([{of: 'p', ...usual(item.role),
 describe('isoPaint · a paint list written as SVG', () => {
   it('writes every kind of item the kit has, classed by its role, in the box, to one decimal', () => {
     expect(PAINT_ITEMS).toEqual(['polygon', 'ellipse', 'path', 'lines', 'stroke']);   // a new kind in the kit is a new case here
-    // a hand-drawn stroke (footprint-story 0.30): footprint-story's ring round it, filled in the page's line colour
-    expect(art({item: 'stroke', role: 'hatch', points: [[10, 20, 2, 0], [20, 20, 2, 0.1]], fill: null, stroke: {colour: null, alpha: 1, width: 2, join: 'round', cap: 'round'}}, {x: 10, y: 20}))
-      .toBe(`<path class="iso-hatch" stroke="none" style="fill:${PAGE_LINE}" d="M0 -1L10 -1L10 1L0 1Z"/>`);
+    // a hand-drawn stroke (footprint-story 0.30): footprint-story's ring round it, its ends as its cap says (butt: flat),
+    // filled in the page's line colour by the non-zero rule (strokes.test.js has the rest)
+    expect(art({item: 'stroke', role: 'hatch', points: [[10, 20, 2, 0], [20, 20, 2, 0.1]], fill: null, stroke: {colour: null, alpha: 1, width: 2, join: 'round', cap: 'butt'}}, {x: 10, y: 20}))
+      .toBe(`<path class="iso-hatch" stroke="none" style="fill:${PAGE_LINE};fill-rule:nonzero" d="M0 -1L10 -1L10 1L0 1Z"/>`);
     const box = {x: 10, y: 20};
     expect(art({item: 'polygon', role: 'left', points: [[10, 20], [130.04, 80.06], [10.25, 140]]}, box)).toBe('<polygon class="iso-left" points="0,0 120,60.1 0.3,120"/>');
     expect(art({item: 'ellipse', role: 'top', cx: 77.94, cy: 53.9, rx: 67.94, ry: 33.95}, box)).toBe('<ellipse class="iso-top" cx="67.9" cy="33.9" rx="67.9" ry="34"/>');

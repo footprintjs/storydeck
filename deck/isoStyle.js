@@ -21,11 +21,21 @@
 // build fits one) still names its style. One a map, refused anywhere else with the fix.
 //
 // The choices are the kit's, never listed here: a column, a choice or an option it does not have is refused in the
-// deck's words, naming the ones there are (the kit's ISO_STYLE_COLUMNS, ISO_STYLE_CHOICES, and isoStyle's own check of
-// an option's value). A map with no data-style hands no style, and its page is byte for byte as before.
+// deck's words, naming the ones there are (the kit's ISO_STYLE_COLUMNS, ISO_STYLE_CHOICES and the hand-drawn choices the
+// deck hands in, isoSpec.js · DECK_CHOICES, and isoStyle's own check of an option's value).
+//
+//   <i data-style="line: human:sketchy; texture: human:hatch"></i>   drawn by hand: sketched edges, hatched sides (0.39.0) A map with no data-style hands no style, and its page is byte for byte as before.
 import {isoStyle, ISO_STYLE_COLUMNS, ISO_STYLE_CHOICES} from 'footprint-story/isometric';
 import {ownAttribute, tagsWith} from '../pieceRules.js';
 import {decodeEntities} from './html.js';
+import {DECK_CHOICES} from './isoSpec.js';
+
+/**
+ * The choices a map may name, by column: the kit's own, then those the deck hands its steps (isoSpec.js ·
+ * DECK_CHOICES: footprint-story's hand-drawn `human:sketchy` line and `human:hatch` texture, since 0.39.0) — so a name
+ * the steps would build is never refused here, and one they would not is refused naming every one they take.
+ */
+const CHOICES = Object.fromEntries(ISO_STYLE_COLUMNS.map((column) => [column, [...ISO_STYLE_CHOICES[column], ...DECK_CHOICES.filter((c) => c.column === column).map((c) => c.name)]]));
 
 /** A tag that may carry the attribute: a cheap look, in any case. Whether it does is ownAttribute's to say. */
 export const MAYBE_STYLE = /data-style(?![\w-])/i;
@@ -42,12 +52,8 @@ const cut = (words) => { const text = words.replace(/\s+/g, ' '); return [...tex
 /** A choice and its options as written ("ink width 5"): {name, ...options}, or the name alone when it takes none. */
 function readChoice(words, column, where) {
   const [name, ...rest] = words.trim().split(/\s+/);
-  if (!name) throw new Error(`${where}: the ${column} names its choice — "${column}: ${ISO_STYLE_CHOICES[column][0] ?? 'name'}"`);
-  const there = ISO_STYLE_CHOICES[column];
-  // a name with a prefix ("human:sketchy") is a choice a tool hands in (footprint-story/isometric · isoStyle's
-  // `choices`), and footprint-story's map steps (buildIsoMap), which build every deck map, take none handed in yet: said
-  // plainly, so the writer knows it is not a typo — the painter draws its strokes (isoPaint.js) once the steps take one
-  if (!there.includes(name) && /^[a-z][a-z0-9-]*:/.test(name)) throw new Error(`${where}: the ${column} "${cut(name)}" is a choice a tool hands in, and footprint-story's map steps take none handed in yet — there are ${there.length ? quoted(there) : 'none yet'}`);
+  if (!name) throw new Error(`${where}: the ${column} names its choice — "${column}: ${CHOICES[column][0] ?? 'name'}"`);
+  const there = CHOICES[column];
   if (!there.includes(name)) throw new Error(`${where}: the ${column} has no choice "${cut(name)}" — ${there.length ? `there are ${quoted(there)}` : 'there are none yet'}`);
   if (rest.length % 2) throw new Error(`${where}: an option of the ${column} "${name}" is its name and its value, "width 5" — not "${cut(rest.join(' '))}"`);
   // with no prototype, so an option named __proto__ is an option like any other (the kit then refuses it by name)
@@ -81,9 +87,9 @@ export function parseStyle(text, where) {
     row[column] = column === 'effects' ? m[2].split(',').map((one) => readChoice(one, column, where)) : readChoice(m[2], column, where);
   }
   try {
-    isoStyle(row);
+    isoStyle(row, {choices: DECK_CHOICES});
   } catch (e) {
-    throw new Error(`${where}: ${String(e.message).replace(/^isometric: /, '').replace(/^the style's /, 'the ')}`, {cause: e});
+    throw new Error(`${where}: ${String(e.message).replace(/^(?:isometric|human): /, '').replace(/^the style's /, 'the ')}`, {cause: e});
   }
   return row;
 }
