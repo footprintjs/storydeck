@@ -19,9 +19,9 @@
 :where(section[data-label] .iso-lines) { fill: none; stroke: var(--iso-grid, color-mix(in srgb, var(--fg, #14181f) 16%, transparent)); stroke-width: 1.5px; }
 :where(section[data-label] .iso-say) {
   position: absolute; translate: -50% -50%; display: grid; justify-items: center; gap: 2px; text-align: center; white-space: nowrap;
-  font: 700 26px/1.15 var(--sans, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif); color: var(--iso-ink, #14181f);
+  font: 700 26px/1.15 var(--sans, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif); color: var(--iso-ink, #000000);
 }
-:where(section[data-label] .iso-say small) { font-size: 18px; font-weight: 500; color: color-mix(in srgb, var(--iso-ink, #14181f) 68%, transparent); }
+:where(section[data-label] .iso-say small) { font-size: 18px; font-weight: 500; color: color-mix(in srgb, var(--iso-ink, #000000) 85%, transparent); }
 :where(section[data-label] .iso-say svg.ic) { width: 40px; height: 40px; color: var(--iso-ink, #14181f); }
 /* a callout is words about the picture: over every block, whose levels end at 512 (a lead into a port at one more) */
 :where(section[data-label] [data-sd-callout]) { z-index: 514; }

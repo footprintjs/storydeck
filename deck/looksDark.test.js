@@ -6,7 +6,9 @@
 // plate, and the highlight ring round a block and along a floor. Each must read; the five looks and the combinations a
 // review found lost are pinned to the tenth. (0.41.0: the sketchy look joins them; every colour is measured as the
 // screen holds it, a byte a channel, by footprint-story's contrastRatio — a line-art floor label reads 6.6 and 8 : 1,
-// where 0.40.0's unrounded mixes said 6.5 and 8.1.)
+// where 0.40.0's unrounded mixes said 6.5 and 8.1. 0.42.0: a name's ink is black unless the page sets one, so a name on a
+// light face reads 17.2 and, on white paper, 21 : 1 where #14181f read 14.6 and 17.8; on a dark paper page it is the
+// page's ink, as before.)
 // @vitest-environment node
 import {describe, it, expect} from 'vitest';
 import {buildIsoMap} from 'footprint-story/isometric';
@@ -92,15 +94,15 @@ describe('looks on a dark page · every combination reads, in both themes', () =
     const said = (c) => Object.entries(c).map(([k, v]) => `${k} ${v}`).join(', ');
     const got = Object.fromEntries([...LOOKS, ...FOUND].map((style) => { const {light, dark} = both(style); return [style, {light: said(light), dark: said(dark)}]; }));
     expect(got).toEqual({
-      'look: outlined': {light: 'name 14.6, label 6.3, line 14.6, edge 16.6, cable 15.4, ring 3.5, floorRing 3.5', dark: 'name 14.6, label 8.6, line 14.6, edge 16, cable 16, ring 5, floorRing 5'},
-      'look: line-art': {light: 'name 17.8, label 6.6, line 17.8, edge 16.6, cable 15.4, ring 3.5, floorRing 3.8', dark: 'name 14.5, label 8, line 14.5, edge 16, cable 16, ring 5, floorRing 4.5'},
-      'look: paper-grain': {light: 'name 14.6, label 6.3, line 14.6, cable 15.4, ring 3.5, floorRing 3.5', dark: 'name 14.6, label 8.6, line 14.6, cable 16, ring 5, floorRing 5'},
-      'look: sketchy': {light: 'name 17.8, label 6.6, line 17.8, cable 15.4, ring 3.5, floorRing 3.8', dark: 'name 14.5, label 8, line 14.5, cable 16, ring 5, floorRing 4.5'},
-      'look: duotone': {light: 'name 14.6, label 6.3, line 10.8, cable 15.4, ring 3.5, floorRing 3.5', dark: 'name 14.6, label 8.6, line 10.8, cable 16, ring 5, floorRing 5'},
-      'look: line-art; palette: duotone': {light: 'name 17.8, label 6.6, line 13.2, edge 12.3, cable 15.4, ring 3.5, floorRing 3.8', dark: 'name 14.5, label 8, line 14.5, edge 16, cable 16, ring 5, floorRing 4.5'},
-      'look: duotone; shading: paper': {light: 'name 17.8, label 6.6, line 13.2, cable 15.4, ring 3.5, floorRing 3.8', dark: 'name 14.5, label 8, line 14.5, cable 16, ring 5, floorRing 4.5'},
-      'shading: paper; palette: duotone': {light: 'name 17.8, label 6.6, line 13.2, cable 15.4, ring 3.5, floorRing 3.8', dark: 'name 14.5, label 8, line 14.5, cable 16, ring 5, floorRing 4.5'},
-      'look: outlined; palette: duotone': {light: 'name 14.6, label 6.3, line 10.8, edge 12.3, cable 15.4, ring 3.5, floorRing 3.5', dark: 'name 14.6, label 8.6, line 10.8, edge 16, cable 16, ring 5, floorRing 5'},
+      'look: outlined': {light: 'name 17.2, label 6.3, line 14.6, edge 16.6, cable 15.4, ring 3.5, floorRing 3.5', dark: 'name 17.2, label 8.6, line 14.6, edge 16, cable 16, ring 5, floorRing 5'},
+      'look: line-art': {light: 'name 21, label 6.6, line 17.8, edge 16.6, cable 15.4, ring 3.5, floorRing 3.8', dark: 'name 14.5, label 8, line 14.5, edge 16, cable 16, ring 5, floorRing 4.5'},
+      'look: paper-grain': {light: 'name 17.2, label 6.3, line 14.6, cable 15.4, ring 3.5, floorRing 3.5', dark: 'name 17.2, label 8.6, line 14.6, cable 16, ring 5, floorRing 5'},
+      'look: sketchy': {light: 'name 21, label 6.6, line 17.8, cable 15.4, ring 3.5, floorRing 3.8', dark: 'name 14.5, label 8, line 14.5, cable 16, ring 5, floorRing 4.5'},
+      'look: duotone': {light: 'name 17.2, label 6.3, line 10.8, cable 15.4, ring 3.5, floorRing 3.5', dark: 'name 17.2, label 8.6, line 10.8, cable 16, ring 5, floorRing 5'},
+      'look: line-art; palette: duotone': {light: 'name 21, label 6.6, line 13.2, edge 12.3, cable 15.4, ring 3.5, floorRing 3.8', dark: 'name 14.5, label 8, line 14.5, edge 16, cable 16, ring 5, floorRing 4.5'},
+      'look: duotone; shading: paper': {light: 'name 21, label 6.6, line 13.2, cable 15.4, ring 3.5, floorRing 3.8', dark: 'name 14.5, label 8, line 14.5, cable 16, ring 5, floorRing 4.5'},
+      'shading: paper; palette: duotone': {light: 'name 21, label 6.6, line 13.2, cable 15.4, ring 3.5, floorRing 3.8', dark: 'name 14.5, label 8, line 14.5, cable 16, ring 5, floorRing 4.5'},
+      'look: outlined; palette: duotone': {light: 'name 17.2, label 6.3, line 10.8, edge 12.3, cable 15.4, ring 3.5, floorRing 3.5', dark: 'name 17.2, label 8.6, line 10.8, edge 16, cable 16, ring 5, floorRing 5'},
     });
   });
 

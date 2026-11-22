@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.42.0 — a block's words read on every tone of the base look
+
+0.41.0's `name-ink` check found the base look's own words too faint: on a light page a `bad` block's name stood
+4.43 : 1 on its top, and the `<small>` line under any tone's name about 3 : 1 (`ok` 3.09, `warn` 3.05, `bad` 2.98),
+under the 4.5 : 1 small words need. Every deck on the base look shipped them. Now a block's words are written darker;
+its faces, and so the status colours, are as they were.
+
+- **What changed** (`deck/iso.js` · `WORDS_INK`, `WORDS_CSS`): a block's name and its `<small>` line take `--iso-ink`
+  as before, and when a deck sets none, black.
+  - the name's ink: `#14181f` → `#000000`;
+  - the `<small>` line: `#14181f` at 68 % → `#000000` at 85 % (on the light `bad` top `#cd5b55` it shows `#4f2d30` →
+    `#1f0e0d`).
+  - Lines, icons and a floor's label are untouched (`#14181f`, the page's `--fg`), and so is a deck's own `--iso-ink`,
+    which still sets lines and words alike. A dark paper page (a look's paper on `:root.dark`) still writes them in the
+    page's ink.
+- **Ratios, before → after** (footprint-story's `contrastRatio`, each top face as drawn; name / `<small>`):
+
+  | tone | light page face | light | dark page face | dark |
+  |---|---|---|---|---|
+  | none | `#e1e9f5` | 14.55 → 17.18 / 5.60 → 12.86 | `#e1e9f5` | the same |
+  | `ok` | `#489565` | 4.88 → 5.76 / 3.09 → 5.07 | `#7bdda1` | 10.76 → 12.70 / 4.86 → 10.11 |
+  | `warn` | `#a57d33` | 4.73 → 5.58 / 3.05 → 4.90 | `#f5c57b` | 11.15 → 13.16 / 4.99 → 10.41 |
+  | `bad` | `#cd5b55` | 4.43 → 5.22 / 2.98 → 4.64 | `#ffa59d` | 9.42 → 11.12 / 4.58 → 9.01 |
+
+  The status faces did not move, so they stay as far apart as before (ΔE76 on the top face, over footprint-story's
+  floor of 10): `ok` / `warn` 50.5 light, 55.2 dark; `ok` / `bad` 80.4, 74.6; `warn` / `bad` 41.8, 35.5 (the
+  nearest); the untoned face at least 43.9 from any tone.
+- **Why the ink and not the tone.** The light tones (`--sd-ok` `#1a7a3e`, `--sd-warn` `#8f5c00`, `--sd-bad` `#c0322b`)
+  are also the ink of an area's and a group's heading and a box's edge on the light page, so a lighter tone would make
+  those headings faint instead. Black is the darkest ink there is: no top as dark as `#cd5b55` reads with a lighter one.
+- **Pages that change**, by these two CSS lines alone (`.iso-say` and `.iso-say small` in the isometric stylesheet):
+  every page, and every `deck-data.json`, that carries the isometric stylesheet, i.e. every deck with a map. Checked:
+  the 48 test pages (six looks × no tone and the three tones × with and without the base look) and the example deck
+  `examples/a-request` differ from 0.41.0's in those two lines and nothing else. The six stills
+  (`deck/test/look-*-still.html`, `deck/test/sketchy-still.html`) were made again for them. A page with no map is byte
+  for byte as before.
+- **Pins that moved, for the colour alone**: `deck/looksDark.test.js` · a name on a light face reads 17.2 (was 14.6),
+  on white paper on a light page 21 (was 17.8); a dark paper page is as before. `deck/nameInk.test.js` · a dark face of
+  a deck's own (`#5c5c5c`) now reads 3.1 (was 2.6), still a finding with `#ffffff` as its fix.
+- Tests: `deck/nameInk.test.js` · the 48 test pages read clean (`inksFound` and `check`'s `name-ink` both empty); each
+  tone × theme, name and `<small>` line, `reads: true` by `readableInk`, every ratio pinned, and the status faces over
+  ΔE76 10 apart on each page; a theme's own dark tone (`--sd-bad: #5a0f0b`) is still a warn naming `#ffffff`, and a
+  mid tone (`#a8231d`) still a finding no ink fixes. The example deck still checks clean (`deck/examples.test.js`).
+  The 4.5 : 1 line and the check are unchanged.
+
 ## 0.41.0 — a name's ink, by footprint-story's rule; the look `sketchy`
 
 footprint-story is now `^0.38.0`. Every page that drew before draws byte for byte as before: the 48 pages a test

@@ -5,8 +5,8 @@
 import {describe, it, expect} from 'vitest';
 import {readdirSync, readFileSync} from 'node:fs';
 import path from 'node:path';
-import {readableInk, contrastRatio} from 'footprint-story/isometric';
-import {colour, hexOf, inkMessage, inksFound, over, pagesOf, rootTokens, ruleOf} from './nameInk.js';
+import {readableInk, contrastRatio, deltaE76} from 'footprint-story/isometric';
+import {colour, hexOf, inkMessage, inksFound, over, pagesOf, rootTokens, ruleOf, wordOn} from './nameInk.js';
 import {WORDS_CSS, ISO_CSS, FLOOR_LABEL_CSS} from './iso.js';
 import {compileDeck} from './compile.js';
 import {checkDeck} from './check.js';
@@ -21,6 +21,17 @@ ${block}
 <div data-k="db" data-iso="cylinder" data-at="5 1" data-size="1.6 1.6 1.2"><b>Database</b></div>`;
 const CLICKS = '<section data-label="S" data-map="m"><step data-in="*"><h2>A</h2><aside class="notes">Said.</aside></step></section>';
 const deckOf = (map, {look = true, theme = ''} = {}) => compileDeck(sourceOf({deck: {title: 'T', ...(look ? {look: 'base'} : {})}, clicks: CLICKS, maps: {m: map}, theme}));
+/**
+ * What the base look's own tones draw, light and dark (0.42.0): each top face, its name's and <small> line's ratio. The
+ * faces are 0.41.0's; the ratios were, in #14181f and #14181f at 68 %: light none 14.55 / 5.60, ok 4.88 / 3.09, warn
+ * 4.73 / 3.05, bad 4.43 / 2.98; dark ok 10.76 / 4.86, warn 11.15 / 4.99, bad 9.42 / 4.58 (none as light).
+ */
+const TONES_READ = {
+  'none light': '#e1e9f5 name 17.18 small 12.86', 'none dark': '#e1e9f5 name 17.18 small 12.86',
+  'ok light': '#489565 name 5.76 small 5.07', 'ok dark': '#7bdda1 name 12.70 small 10.11',
+  'warn light': '#a57d33 name 5.58 small 4.90', 'warn dark': '#f5c57b name 13.16 small 10.41',
+  'bad light': '#cd5b55 name 5.22 small 4.64', 'bad dark': '#ffa59d name 11.12 small 9.01',
+};
 const inkProblems = (deck) => checkDeck(deck).filter((p) => p.rule === 'name-ink');
 
 describe('nameInk · what the build reads', () => {
@@ -73,39 +84,67 @@ describe('nameInk · what the build reads', () => {
 });
 
 describe('nameInk · every look reads, and a name that does not is a finding', () => {
-  it('reads clean: every look on the base look\'s pages, a map with no look, and a deck with no look of its own', () => {
+  it('reads clean: the 48 test pages — every look and a map with no look, no tone and each of the base look\'s three, with and without the base look', () => {
     for (const style of [null, 'look: outlined', 'look: line-art', 'look: paper-grain', 'look: duotone', 'look: sketchy']) {
-      for (const look of [true, false]) expect(inksFound(deckOf(MAP(BLOCK(), {style}), {look})), `${style} ${look}`).toEqual([]);
+      for (const tone of ['', ' class="ok"', ' class="warn"', ' class="bad"']) {
+        for (const look of [true, false]) {
+          const deck = deckOf(MAP(BLOCK(tone), {style}), {look});
+          expect(inksFound(deck), `${style}${tone} ${look}`).toEqual([]);
+          expect(inkProblems(deck), `${style}${tone} ${look}`).toEqual([]);
+        }
+      }
     }
   });
 
-  it('the base look\'s "bad" block: its name 4.4 : 1 on a light page — a warn with the ink that reads, at the click that shows it', () => {
-    const deck = deckOf(MAP(BLOCK(' class="bad"', false)));
-    const [found] = inksFound(deck);
-    expect(found).toEqual({map: 'm', name: 'server', kind: 'block', word: 'name', tone: 'bad', on: [{page: 'light', ratio: 4.4, face: '#cd5b55'}], fix: {variable: '--iso-ink', ink: '#000000'}});
-    // it is readableInk's own verdict on the face as drawn
-    expect(readableInk('#cd5b55', ['#14181f'])).toMatchObject({ink: '#14181f', reads: false});
-    expect(contrastRatio('#14181f', '#cd5b55')).toBeCloseTo(4.43, 2);
-    expect(inkProblems(deck)).toEqual([{level: 'warn', rule: 'name-ink', click: 1, label: 'S · 1', message: '"server": its name stands 4.4 : 1 on its block\'s top (#cd5b55, class "bad") on a light page, under the 4.5 : 1 words need to read — write its ink beside it (style="--iso-ink:#000000"), or give the block a lighter colour (--iso-color), or another class than "bad"'}]);
-    // the fix it names clears it
-    expect(inksFound(deckOf(MAP(BLOCK(' class="bad" style="--iso-ink:#000000"', false))))).toEqual([]);
+  it('the base look\'s own tones read (0.42.0): every tone × theme, a block\'s name and its <small> line, reads: true, and the status faces stay apart', () => {
+    // 0.41.0 found a "bad" name at 4.4 : 1 and every tone's <small> line at about 3 : 1 on a light page. The words' ink
+    // is black now (iso.js · WORDS_INK), the <small> line that ink at 85 %; the faces, and so the status colours, did not move.
+    const pages = pagesOf({config: {look: 'base'}, themeCss: ''});
+    const got = {};
+    for (const tone of ['none', 'ok', 'warn', 'bad']) {
+      const piece = deckOf(MAP(BLOCK(tone === 'none' ? '' : ` class="${tone}"`))).maps.m.faces[1];
+      for (const page of ['light', 'dark']) {
+        const [name, small] = ['name', 'small'].map((word) => wordOn(piece, word, pages[page]));
+        expect([name, small], `${tone} ${page}`).toEqual([expect.objectContaining({reads: true}), expect.objectContaining({reads: true})]);
+        expect(readableInk(name.face, [name.ink])).toEqual({ink: name.ink, ratio: name.ratio, reads: true});
+        got[`${tone} ${page}`] = `${name.face} name ${name.ratio.toFixed(2)} small ${small.ratio.toFixed(2)}`;
+      }
+    }
+    expect(got).toEqual(TONES_READ);
+    // apart at a glance: the floor footprint-story keeps between status faces (ΔE76 over 10), on each page
+    for (const page of ['light', 'dark']) {
+      const face = (tone) => got[`${tone} ${page}`].slice(0, 7);
+      for (const [x, y] of [['ok', 'warn'], ['ok', 'bad'], ['warn', 'bad'], ['none', 'ok'], ['none', 'warn'], ['none', 'bad']]) expect(deltaE76(face(x), face(y)), `${page} ${x}/${y}`).toBeGreaterThan(10);
+    }
+    expect(deltaE76('#f5c57b', '#ffa59d')).toBeCloseTo(35.5, 1);   // the nearest pair, warn and bad on a dark page (41.8 on a light one)
   });
 
-  it('a <small> line on any of the look\'s tones stands about 3 : 1 on a light page: said, and no ink fixes it, only a lighter face', () => {
-    const found = (cls) => inksFound(deckOf(MAP(BLOCK(` class="${cls}"`)))).map(({word, on, fix}) => [word, on.map((o) => `${o.page} ${o.ratio}`).join(', '), fix]);
-    expect(found('ok')).toEqual([['small', 'light 3', null]]);
-    expect(found('warn')).toEqual([['small', 'light 3', null]]);
-    expect(found('bad')).toEqual([['name', 'light 4.4', null], ['small', 'light 2.9', null]]);
+  it('a theme\'s own dark tone: a "bad" block\'s name 2.6 : 1 on both pages — a warn with the ink that reads, at the click that shows it', () => {
+    const theme = ':root { --sd-bad: #5a0f0b; }';
+    const deck = deckOf(MAP(BLOCK(' class="bad"', false)), {theme});
+    const [found] = inksFound(deck);
+    expect(found).toEqual({map: 'm', name: 'server', kind: 'block', word: 'name', tone: 'bad', on: [{page: 'light', ratio: 2.6, face: '#7b3f3c'}, {page: 'dark', ratio: 2.6, face: '#7b3f3c'}], fix: {variable: '--iso-ink', ink: '#ffffff'}});
+    // it is readableInk's own verdict on the face as drawn
+    expect(readableInk('#7b3f3c', ['#000000'])).toMatchObject({ink: '#000000', reads: false});
+    expect(contrastRatio('#000000', '#7b3f3c')).toBeCloseTo(2.62, 2);
+    expect(inkProblems(deck)).toEqual([{level: 'warn', rule: 'name-ink', click: 1, label: 'S · 1', message: '"server": its name stands 2.6 : 1 on its block\'s top (#7b3f3c, class "bad") on a light page and 2.6 : 1 (#7b3f3c) on a dark one, under the 4.5 : 1 words need to read — write its ink beside it (style="--iso-ink:#ffffff"), or give the block a lighter colour (--iso-color), or another class than "bad"'}]);
+    // the fix it names clears it
+    expect(inksFound(deckOf(MAP(BLOCK(' class="bad" style="--iso-ink:#ffffff"', false)), {theme}))).toEqual([]);
+  });
+
+  it('a theme\'s own mid tone: its name and <small> line read in neither ink: said, and no ink fixes it, only a lighter face', () => {
+    const found = (theme) => inksFound(deckOf(MAP(BLOCK(' class="bad"')), {theme})).map(({word, on, fix}) => [word, on.map((o) => `${o.page} ${o.ratio}`).join(', '), fix]);
+    expect(found(':root { --sd-bad: #a8231d; }')).toEqual([['name', 'light 4.2, dark 4.2', null], ['small', 'light 3.8, dark 3.8', null]]);
     // with no look the classes colour nothing: the usual face, and the words read
-    expect(inksFound(deckOf(MAP(BLOCK(' class="bad"')), {look: false}))).toEqual([]);
+    expect(inksFound(deckOf(MAP(BLOCK(' class="bad"')), {look: false, theme: ':root { --sd-bad: #a8231d; }'}))).toEqual([]);
     // a theme.css that lightens the tone clears it
-    expect(inksFound(deckOf(MAP(BLOCK(' class="bad"')), {theme: ':root { --sd-bad: #f4c7c3; }'}))).toEqual([]);
+    expect(found(':root { --sd-bad: #f4c7c3; }')).toEqual([]);
   });
 
   it('a dark colour of the deck\'s own: on both pages, with the light ink as its fix; a floor\'s dark ground the same, by --iso-label', () => {
     const [name] = inksFound(deckOf(MAP(BLOCK(' style="--iso-color:#333333"', false))));
     expect(name).toMatchObject({word: 'name', on: [{page: 'light', face: '#5c5c5c'}, {page: 'dark', face: '#5c5c5c'}], fix: {variable: '--iso-ink', ink: '#ffffff'}});
-    expect(inkMessage(name)).toBe('"server": its name stands 2.6 : 1 on its block\'s top (#5c5c5c) on a light page and 2.6 : 1 (#5c5c5c) on a dark one, under the 4.5 : 1 words need to read — write its ink beside it (style="--iso-ink:#ffffff"), or give the block a lighter colour (--iso-color)');
+    expect(inkMessage(name)).toBe('"server": its name stands 3.1 : 1 on its block\'s top (#5c5c5c) on a light page and 3.1 : 1 (#5c5c5c) on a dark one, under the 4.5 : 1 words need to read — write its ink beside it (style="--iso-ink:#ffffff"), or give the block a lighter colour (--iso-color)');
     const [label] = inksFound(deckOf(MAP(BLOCK('', false), {floor: ' style="--iso-floor:#15202b"'})));
     expect(label).toMatchObject({name: 'floor', kind: 'floor', word: 'label', fix: {variable: '--iso-label', ink: '#ffffff'}});
     // on the dark page the label takes the page's light ink, and reads: said for the light page alone
