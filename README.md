@@ -787,7 +787,10 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   keyframes frame by frame; a print and a PowerPoint show each click at rest, where its moves end, never a frame in
   between — the map's record says so (`maps made` · `motion.carriers`). A deck that moves nothing is drawn byte for
   byte as before. Why a block asks footprint-story for its order while it moves: the paint order is the map steps'
-  own, asked again at each keyframe, so a block landing behind another is drawn behind it.
+  own sort (`footprint-story/isometric` · `orderAt`), asked again at each keyframe, so a block landing behind another
+  is drawn behind it. Every place rule a move is checked by — where it lands, what it passes through, what is off the
+  slide, which name a resting block hides — is `footprint-story/isometric`'s, the one copy StoryReel reads too; the
+  deck keeps the drawing, the `deck:` prefix on its critics and its own words.
   `storydeck log --run <id> --why duration-0 --motion <map>` says why a move takes its time, from footprint-story's own
   run of the same intents (`model-<i>`: why its model; `findings-<i>`: what its critics found).
 
