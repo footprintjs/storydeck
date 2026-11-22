@@ -2,60 +2,29 @@
 // (look-base.css, light and dark), deck.css, ISO_CSS, FLOOR_LABEL_CSS and LOOK_CSS as the page carries them, and the
 // slide's HTML as written (its inline styles, its classes). A test asks it how a map's words and lines stand against
 // what lies under them, in either theme — the contrast a reader sees — without a browser. Its numbers were checked
-// against Chromium's computed styles on built pages (0.40.0, the CHANGELOG says how).
+// against Chromium's computed styles on built pages (0.40.0, the CHANGELOG says how). Since 0.41.0 the colours are
+// read by the build's own reader (nameInk.js) and the ratio is footprint-story's (contrastRatio), on each colour as the
+// screen holds it, a byte a channel.
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
+import {contrastRatio} from 'footprint-story/isometric';
 import {ISO_CSS, FLOOR_LABEL_CSS, LOOK_CSS} from '../iso.js';
 import {inlineStrokes} from '../isoPaint.js';
+import {colour, hexOf, over, rootTokens, ruleOf} from '../nameInk.js';
+
+// the page's CSS read as a browser reads its colours: the build's own reader (nameInk.js), so a test and the check agree
+export {colour, over, ruleOf};
 
 const read = (file) => readFileSync(path.join(process.cwd(), file), 'utf8');
 
-/** The base look's tokens, light and dark, as look-base.css writes them on :root and :root.dark. */
+/** The base look's tokens, light and dark, as look-base.css writes them on :root and :root.dark (the build's reader, nameInk.js · rootTokens). */
 export function tokens() {
-  const css = read('look-base.css');
-  const block = (sel) => Object.fromEntries([...new RegExp(`:where\\(${sel.replace('.', '\\.')}\\) \\{([^}]*)\\}`).exec(css)[1].matchAll(/(--[\w-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
-  const light = block(':root');
-  return {light, dark: {...light, ...block(':root.dark')}};
+  const {light, dark} = rootTokens(read('look-base.css'));
+  return {light, dark: {...light, ...dark}};
 }
-/** The declarations of the rule `selector` opens in a stylesheet: {property: value}. */
-export const ruleOf = (css, selector) => {
-  const at = css.indexOf(selector);
-  if (at < 0) throw new Error(`no rule "${selector}"`);
-  return Object.fromEntries([...css.slice(at).match(/\{([^}]*)\}/)[1].matchAll(/([\w-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
-};
-/** The top-level arguments of a CSS function: "a, b(c, d), e" → ['a', 'b(c, d)', 'e']. */
-function args(text) {
-  const out = [];
-  let depth = 0, from = 0;
-  for (let i = 0; i < text.length; i += 1) {
-    if (text[i] === '(') depth += 1; else if (text[i] === ')') depth -= 1; else if (text[i] === ',' && !depth) { out.push(text.slice(from, i).trim()); from = i + 1; }
-  }
-  return [...out, text.slice(from).trim()];
-}
-/** A CSS colour the page's rules write — #hex, transparent, var(), color-mix(in srgb, …) — as [r, g, b, a] (0–255, alpha 0–1). */
-export function colour(expr, vars) {
-  expr = expr.trim();
-  if (expr === 'transparent') return [0, 0, 0, 0];
-  if (/^#[0-9a-f]{3}$/i.test(expr)) return [...expr.slice(1)].map((c) => parseInt(c + c, 16)).concat(1);
-  if (/^#[0-9a-f]{6}$/i.test(expr)) return [1, 3, 5].map((i) => parseInt(expr.slice(i, i + 2), 16)).concat(1);
-  const fn = /^([\w-]+)\(([^]*)\)$/.exec(expr);
-  if (fn?.[1] === 'var') { const [name, fallback] = args(fn[2]); return Object.hasOwn(vars, name) ? colour(vars[name], vars) : colour(fallback, vars); }
-  if (fn?.[1] === 'color-mix') {
-    const [space, a, b] = args(fn[2]);
-    if (space !== 'in srgb') throw new Error(`a mix in "${space}"`);
-    const part = (p) => { const m = /^(.*?)\s+(\d+(?:\.\d+)?)%$/.exec(p); return m ? [colour(m[1], vars), Number(m[2]) / 100] : [colour(p, vars), null]; };
-    const [[ca, pa], [cb, pb]] = [part(a), part(b)], wa = pa ?? 1 - pb, wb = pb ?? 1 - pa;
-    // premultiplied, as CSS mixes: a share of transparent is a share of alpha
-    const alpha = ca[3] * wa + cb[3] * wb;
-    return [0, 1, 2].map((i) => (alpha ? (ca[i] * ca[3] * wa + cb[i] * cb[3] * wb) / alpha : 0)).concat(alpha);
-  }
-  throw new Error(`no colour "${expr}"`);
-}
-/** `fg` laid over `bg` (its alpha blended), as the page shows it. */
-export const over = (fg, bg) => [0, 1, 2].map((i) => fg[i] * fg[3] + bg[i] * (1 - fg[3])).concat(1);
-const lum = (c) => { const [r, g, b] = c.slice(0, 3).map((v) => { const s = v / 255; return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
-/** WCAG 2's contrast ratio of two opaque colours. */
-export const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)]; return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+/** WCAG 2's contrast ratio of two opaque colours, as footprint-story measures it (isometric · contrastRatio: the rule
+ * the build's name-ink check reads too, nameInk.js), on the colours as the screen holds them (#rrggbb). */
+export const ratio = (a, b) => contrastRatio(hexOf(a), hexOf(b));
 const round = (v) => Math.round(v * 10) / 10;
 /** A property of a tag's style attribute ("stroke" is not "stroke-width"), or undefined. */
 const inline = (tag, prop) => new RegExp(`style="(?:[^"]*;)?${prop}:([^;"]+)`).exec(tag ?? '')?.[1];

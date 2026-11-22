@@ -1,5 +1,6 @@
 // @vitest-environment node
 import {afterEach, describe, it, expect} from 'vitest';
+import {contrastRatio} from 'footprint-story/isometric';
 import {LOOKS, readConfig} from './config.js';
 import {pageAssets} from './assets.js';
 import {compileDeck} from './compile.js';
@@ -25,15 +26,8 @@ const tokensOf = (selector) => Object.fromEntries([...rules(BASE).find((r) => r.
 const LIGHT = tokensOf(':where(:root)');
 const DARK = {...LIGHT, ...tokensOf(':where(:root.dark)')};
 
-/** WCAG contrast of two #rrggbb colours. */
-function contrast(a, b) {
-  const lum = (hex) => {
-    const [r, g, c] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4));
-    return .2126 * r + .7152 * g + .0722 * c;
-  };
-  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
-  return (hi + .05) / (lo + .05);
-}
+/** WCAG contrast of two #rrggbb colours: footprint-story's (isometric · contrastRatio), the one rule both tools read. */
+const contrast = contrastRatio;
 
 describe('deck.json "look"', () => {
   it('is null unless a deck asks, and a look the library has is read back', () => {

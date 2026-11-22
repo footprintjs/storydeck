@@ -124,7 +124,7 @@ describe('isoPaint · a paint list written as SVG', () => {
 
   it('is the only writer of a face: deck/iso.js paints the built map\'s list and builds no face string, nor asks the grid for one', () => {
     const iso = readFileSync(path.join(process.cwd(), 'deck/iso.js'), 'utf8');
-    expect(iso).toMatch(/import \{isoArt, paperOf, strokesDrawn\} from '\.\/isoPaint\.js';/);
+    expect(iso).toMatch(/import \{faceFill, isoArt, paperOf, strokesDrawn\} from '\.\/isoPaint\.js';/);
     expect(iso).toContain('isoArt(paints, box, {styled, strokes, paper})');
     expect(iso).not.toMatch(/<(polygon|ellipse|path)\b/);
     expect(iso).not.toMatch(/class="iso-(left|right|top|side|ground|lines)"/);
