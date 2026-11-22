@@ -36,7 +36,8 @@
 }
 
 /* a map drawn in a look, on a dark page (deck/iso.js · LOOK_CSS): the page's paper and ink */
-:where(:root.dark section[data-label] [data-sd-paper]) { --iso-paper: var(--bg-elev, #ffffff); --iso-ink: var(--fg, #14181f); }
+:where(:root.dark section[data-label] [data-sd-paper]) { --iso-paper: var(--bg-elev, #ffffff); --iso-ink: var(--fg, #14181f); --sd-ink: var(--fg, #14181f); }
+:where(:root.dark section[data-label] [data-sd-iso]) { --sd-contour: var(--fg, #14181f); }
 :where(:root.dark section[data-label] .iso-contour) { stroke: var(--fg, #14181f); }</style>
 
 <section data-label="still" style="position:relative;width:1920px;height:1080px;background:#fff">

@@ -421,7 +421,7 @@ export function isoDrawn(html, {canvas = null, area = null, links = [], floorWir
   // the map's hand-drawn strokes, drawn once for the page (isoPaint.js · isoArt `strokes`): each click of the map draws a <use>
   const defs = new Map();
   // a paper map's fills in its paper are the page's paper, which a dark page sets (isoPaint.js · paperOf, LOOK_CSS)
-  const paper = paperOf(built.style);
+  const paper = paperOf(built.style, [...built.paints, ...built.floorPaints]);
   const drawnOf = new Map([
     ...solid.map((p, i) => [p, {...artOf(built.shapes[i], built.paints[i], true, style !== null, defs, paper), words: words[i], fit: fitOf(built.names[i], words[i]?.label ?? null), drawn: built.shapes[i], id: ids.blocks[i]}]),
     ...floors.map((p, i) => [p, {...artOf(built.floorShapes[i], built.floorPaints[i], false, style !== null, defs, paper), label: built.floorLabels[i]}]),
@@ -518,14 +518,17 @@ export const PAPER_DARK = 'on a dark page its paper is the page\'s (--bg-elev) a
  *     their paper fills (isoPaint.js · pagePaper) and the page's ink (--fg) for their lines and names: light ink on the
  *     page's dark paper, as dark ink on white paper in a light page. With the light paper on a dark page a floor's
  *     label (the page's --fg) stood about 1.1 : 1 on the white floor;
- *   - a contour (the look outlined, line-art) is drawn in the page's ink: in the map's dark ink, a dark page's
- *     silhouette is lost against it.
+ *   - a paper map's lines that carry a colour of their own (a duotone's ink) take the page's ink too (--sd-ink:
+ *     isoPaint.js · inkOf writes them var(--sd-ink, <ink>)), so a combination themes as the look does;
+ *   - a contour (the look outlined, line-art) is drawn in the page's ink, whether it carries a colour (--sd-contour)
+ *     or takes the map's: in the map's dark ink, a dark page's silhouette is lost against it.
  * Each fallback is the page's own (deck.css: --bg-elev #ffffff, --fg #14181f), so a deck with no dark tokens draws its
  * dark page as its light one. Rules with no weight, so theme.css still has the last word. The page carries them only
  * when a map paints a paper or a contour (compile.js · looks), so every other page is as before.
  */
 export const LOOK_CSS = `/* a map drawn in a look, on a dark page (deck/iso.js · LOOK_CSS): the page's paper and ink */
-:where(:root.dark section[data-label] [data-sd-paper]) { --iso-paper: var(--bg-elev, #ffffff); --iso-ink: var(--fg, #14181f); }
+:where(:root.dark section[data-label] [data-sd-paper]) { --iso-paper: var(--bg-elev, #ffffff); --iso-ink: var(--fg, #14181f); --sd-ink: var(--fg, #14181f); }
+:where(:root.dark section[data-label] [data-sd-iso]) { --sd-contour: var(--fg, #14181f); }
 :where(:root.dark section[data-label] .iso-contour) { stroke: var(--fg, #14181f); }`;
 
 export const ISO_CSS = `/* isometric pieces: blocks on a floor seen from a corner (deck/iso.js) */

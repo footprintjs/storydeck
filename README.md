@@ -773,9 +773,12 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   naming the four; so is a look whose every part the row writes itself, since it would draw nothing. On a deck map,
   duotone leaves each face's colour to the page (the theme, `ok` / `warn` / `bad`), as footprint-story does for a map
   with no colours of its own. A page is light or dark when it is viewed (T, the saved choice, else the system), so a
-  paper map (line-art) takes the page's own paper (`--bg-elev`) and ink (`--fg`) on a dark page, and a contour takes
-  the page's ink. Names and floor labels then stand at 4.5 : 1 or more in both themes. Before this, a line-art floor
-  label stood at about 1.1 : 1 on a dark page. A grain's marks are drawn once a page, like strokes are: a 64-block
+  paper map (line-art, or `shading: paper` in any row) takes the page's own paper (`--bg-elev`) and ink (`--fg`) on a
+  dark page, the colours of its lines too (a duotone's ink), and a contour takes the page's ink on any map. Every
+  combination of the look columns then keeps names, floor labels and cable labels at 4.5 : 1 or more in both themes.
+  Before this, a line-art floor label stood at about 1.1 : 1 on a dark page. PowerPoint and video exports are always
+  the light theme: the export browser starts the page with no saved choice and no colour scheme, and a deck has no
+  theme chosen at build time. A grain's marks are drawn once a page, like strokes are: a 64-block
   grain map at a 96 px tile went from 246 KB a click to 43 KB. The stroke budget counts their bytes. The run's record
   names the look (`storydeck log --why style --map <map>` · `"look"`).
 

@@ -2,18 +2,17 @@
 // paper-grain, duotone (footprint-story/isometric · ISO_LOOKS). Each is read in the deck's words, built by the kit's
 // steps with the human door's choices (HUMAN_STYLE_CHOICES), drawn, recorded by name, and kept readable on a dark page:
 // a paper map takes the page's paper and ink there (iso.js · LOOK_CSS), measured here against the page's own CSS. A
-// grain's marks are drawn once a page, as 0.39.0's strokes are. Each look has a still, pinned byte for byte, made again
+// grain's marks are drawn once a page, as 0.39.0's strokes are. (A dark page's contrast, for every look and
+// combination: looksDark.test.js.) Each look has a still, pinned byte for byte, made again
 // after a change that means to move it with:  STORYDECK_WRITE_STILLS=1 npx vitest run deck/looks.test.js
 // @vitest-environment node
 import {afterEach, describe, it, expect} from 'vitest';
 import {readFileSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
-import {ISO_LOOKS, buildIsoMap} from 'footprint-story/isometric';
-import {HUMAN_STYLE_CHOICES} from 'footprint-story/human';
-import {isoDrawn, ISO_CSS, FLOOR_LABEL_CSS, LOOK_CSS, PAPER_DARK} from './iso.js';
+import {ISO_LOOKS} from 'footprint-story/isometric';
+import {isoDrawn, ISO_CSS, LOOK_CSS, PAPER_DARK} from './iso.js';
 import {parseStyle} from './isoStyle.js';
 import {inlineStrokes, strokesSvg, PAPER, paperOf} from './isoPaint.js';
-import {DECK} from './isoSpec.js';
 import {compileDeck} from './compile.js';
 import {checkDeck} from './check.js';
 import {deckPage} from './page.js';
@@ -93,7 +92,9 @@ describe('looks · each drawn on a page', () => {
     expect(deck.maps.m.made.paper).toBe(PAPER_DARK);
     expect(deck.looks).toBe(true);
     // a paper of the writer's own is the light page's paper, as the kit reads it
-    expect(paperOf(isoDrawn(MAP('look: line-art; shading: paper colour #FAF6EE'), {canvas}).built.map.style)).toBe('#faf6ee');
+    const own = isoDrawn(MAP('look: line-art; shading: paper colour #FAF6EE'), {canvas}).built.map;
+    expect(paperOf(own.style, [...own.paints, ...own.floorPaints])).toBe('#faf6ee');
+    expect(paperOf(own.style)).toBe('#faf6ee');
   });
 
   it('paper-grain: today\'s look with a grain over every face, its marks drawn once a page', () => {
@@ -117,126 +118,6 @@ describe('looks · each drawn on a page', () => {
     for (const face of html.match(/<(?:polygon|ellipse|path) class="iso-(?:top|left|right|side)"[^>]*>/g)) expect(face).toMatch(/ style="stroke:#22304a;stroke-width:2.5px;/);
     expect(html).not.toMatch(/fill:#/);
     expect(deck.looks).toBeUndefined();
-  });
-});
-
-// ─── a dark page: the label's contrast, measured from the page's own CSS ──────────────────────────────────────────
-/** The base look's tokens, light and dark, as look-base.css writes them on :root and :root.dark. */
-function tokens() {
-  const css = readFileSync(path.join(process.cwd(), 'look-base.css'), 'utf8');
-  const block = (sel) => Object.fromEntries([...new RegExp(`:where\\(${sel.replace('.', '\\.')}\\) \\{([^}]*)\\}`).exec(css)[1].matchAll(/(--[\w-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
-  const light = block(':root');
-  return {light, dark: {...light, ...block(':root.dark')}};
-}
-/** The declarations of the rule `selector` opens in a stylesheet: {property: value}. */
-const ruleOf = (css, selector) => Object.fromEntries([...css.slice(css.indexOf(selector)).match(/\{([^}]*)\}/)[1].matchAll(/([\w-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
-/** The top-level arguments of a CSS function: "a, b(c, d), e" → ['a', 'b(c, d)', 'e']. */
-function args(text) {
-  const out = [];
-  let depth = 0, from = 0;
-  for (let i = 0; i < text.length; i += 1) {
-    if (text[i] === '(') depth += 1; else if (text[i] === ')') depth -= 1; else if (text[i] === ',' && !depth) { out.push(text.slice(from, i).trim()); from = i + 1; }
-  }
-  return [...out, text.slice(from).trim()];
-}
-/** A CSS colour the page's rules write — #hex, transparent, var(), color-mix(in srgb, …) — as [r, g, b, a] (0–255, alpha 0–1). */
-function colour(expr, vars) {
-  expr = expr.trim();
-  if (expr === 'transparent') return [0, 0, 0, 0];
-  if (/^#[0-9a-f]{3}$/i.test(expr)) return [...expr.slice(1)].map((c) => parseInt(c + c, 16)).concat(1);
-  if (/^#[0-9a-f]{6}$/i.test(expr)) return [1, 3, 5].map((i) => parseInt(expr.slice(i, i + 2), 16)).concat(1);
-  const fn = /^([\w-]+)\(([^]*)\)$/.exec(expr);
-  if (fn?.[1] === 'var') { const [name, fallback] = args(fn[2]); return Object.hasOwn(vars, name) ? colour(vars[name], vars) : colour(fallback, vars); }
-  if (fn?.[1] === 'color-mix') {
-    const [space, a, b] = args(fn[2]);
-    expect(space).toBe('in srgb');
-    const part = (p) => { const m = /^(.*?)\s+(\d+(?:\.\d+)?)%$/.exec(p); return m ? [colour(m[1], vars), Number(m[2]) / 100] : [colour(p, vars), null]; };
-    const [[ca, pa], [cb, pb]] = [part(a), part(b)], wa = pa ?? 1 - pb, wb = pb ?? 1 - pa;
-    // premultiplied, as CSS mixes: a share of transparent is a share of alpha
-    const alpha = ca[3] * wa + cb[3] * wb;
-    return [0, 1, 2].map((i) => (alpha ? (ca[i] * ca[3] * wa + cb[i] * cb[3] * wb) / alpha : 0)).concat(alpha);
-  }
-  throw new Error(`no colour "${expr}"`);
-}
-/** `fg` laid over `bg` (its alpha blended), as the page shows it. */
-const over = (fg, bg) => [0, 1, 2].map((i) => fg[i] * fg[3] + bg[i] * (1 - fg[3])).concat(1);
-const lum = (c) => { const [r, g, b] = c.slice(0, 3).map((v) => { const s = v / 255; return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
-/** WCAG 2's contrast ratio of two opaque colours. */
-const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)]; return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
-
-/**
- * A map's words against what they stand on, as a page in `mode` draws them: {name, label, line} — a block's name on its
- * top face, the floor's label on its ground, a face's outline on its top face — from the page's own CSS (ISO_CSS,
- * FLOOR_LABEL_CSS, LOOK_CSS when the page carries it) and the slide as written. `withLook` false: as if the page had
- * no LOOK_CSS — what a dark page drew before it.
- */
-function contrasts(deck, mode, withLook = true) {
-  const html = deck.slides[0].html, page = tokens()[mode];
-  const piece = (kind) => new RegExp(`<div [^>]*data-sd-iso="${kind}"[^>]*>`).exec(html)[0];
-  const varsOf = (kind) => {
-    const vars = {...page};
-    // the look's rules set custom properties on a paper map's pieces, on a dark page
-    if (withLook && mode === 'dark' && deck.looks && piece(kind).includes(' data-sd-paper')) Object.assign(vars, ruleOf(LOOK_CSS, '[data-sd-paper])'));
-    return vars;
-  };
-  const fillOf = (tag, rule, vars) => colour(/style="fill:([^;"]*)/.exec(tag)?.[1] ?? ruleOf(ISO_CSS, rule).fill, vars);
-  const slide = colour(ruleOf(readFileSync(path.join(process.cwd(), 'deck.css'), 'utf8'), ':where(html, body)').background, page);
-  const block = varsOf('block'), floor = varsOf('floor');
-  const top = over(fillOf(/<polygon class="iso-top"[^>]*>/.exec(html)[0], '.iso-top)', block), slide);
-  const ground = over(fillOf(/<polygon class="iso-ground"[^>]*>/.exec(html)[0], '.iso-ground)', floor), slide);
-  const name = over(colour(ruleOf(ISO_CSS, '.iso-say) {').color, block), top);
-  const label = over(colour(ruleOf(FLOOR_LABEL_CSS, '.iso-floor-label)').color, floor), ground);
-  const stroke = /<polygon class="iso-top"[^>]*style="[^"]*stroke:(#[0-9a-f]{6})/.exec(html)?.[1];
-  const line = over(stroke ? colour(stroke, block) : colour(ruleOf(ISO_CSS, '.iso-art) {').stroke, block), top);
-  const round = (v) => Math.round(v * 10) / 10;
-  // a contour's outside band lies on the slide: the piece's silhouette against the page
-  const contour = html.includes('class="iso-contour"') ? over(colour(withLook && mode === 'dark' ? ruleOf(LOOK_CSS, '.iso-contour)').stroke : ruleOf(ISO_CSS, '.iso-art) {').stroke, block), slide) : null;
-  return {name: round(ratio(name, top)), label: round(ratio(label, ground)), line: round(ratio(line, top)), ...(contour ? {edge: round(ratio(contour, slide))} : {})};
-}
-
-describe('looks · on a dark page the words keep their contrast (the page\'s theme is chosen when it is viewed)', () => {
-  it('LOOK_CSS: a paper map takes the page\'s paper and ink under :root.dark, a contour the page\'s ink — with the page\'s own fallbacks', () => {
-    expect(LOOK_CSS).toContain(':where(:root.dark section[data-label] [data-sd-paper]) { --iso-paper: var(--bg-elev, #ffffff); --iso-ink: var(--fg, #14181f); }');
-    expect(LOOK_CSS).toContain(':where(:root.dark section[data-label] .iso-contour) { stroke: var(--fg, #14181f); }');
-    const page = (style) => deckPage(deckOf(style), pageAssets());
-    expect(page('look: line-art')).toContain(LOOK_CSS);
-    expect(page('look: outlined')).toContain(LOOK_CSS);
-    expect(page('look: duotone')).not.toContain(LOOK_CSS);
-    expect(page(null)).not.toContain('data-sd-paper');
-    expect(page(null)).not.toContain(LOOK_CSS);
-  });
-
-  it('every look, light and dark: a block\'s name and the floor\'s label at 4.5 : 1 or more, a face\'s line at 3 : 1 or more (pinned, measured)', () => {
-    const got = Object.fromEntries(LOOKS.map((look) => { const deck = deckOf(`look: ${look}`); return [look, {light: contrasts(deck, 'light'), dark: contrasts(deck, 'dark')}]; }));
-    for (const [look, modes] of Object.entries(got)) {
-      for (const [mode, c] of Object.entries(modes)) {
-        expect(c.name, `${look} ${mode} name`).toBeGreaterThanOrEqual(4.5);
-        expect(c.label, `${look} ${mode} label`).toBeGreaterThanOrEqual(4.5);
-        expect(c.line, `${look} ${mode} line`).toBeGreaterThanOrEqual(3);
-        if ('edge' in c) expect(c.edge, `${look} ${mode} edge`).toBeGreaterThanOrEqual(3);
-      }
-    }
-    expect(got).toEqual({
-      outlined: {light: {name: 14.6, label: 6.3, line: 14.6, edge: 16.6}, dark: {name: 14.6, label: 8.6, line: 14.6, edge: 16}},
-      'line-art': {light: {name: 17.8, label: 6.5, line: 17.8, edge: 16.6}, dark: {name: 14.5, label: 8.1, line: 14.5, edge: 16}},
-      'paper-grain': {light: {name: 14.6, label: 6.3, line: 14.6}, dark: {name: 14.6, label: 8.6, line: 14.6}},
-      duotone: {light: {name: 14.6, label: 6.3, line: 10.8}, dark: {name: 14.6, label: 8.6, line: 10.8}},
-    });
-  });
-
-  it('why: with no LOOK_CSS on a dark page, line-art\'s floor label stood about 1.1 : 1 on the white floor, and a contour was lost against the page', () => {
-    expect(contrasts(deckOf('look: line-art'), 'dark', false)).toEqual({name: 17.8, label: 1.1, line: 17.8, edge: 1});
-    expect(contrasts(deckOf('look: outlined'), 'dark', false).edge).toBe(1);
-  });
-
-  it('why the duotone keeps its inks on a dark page: its faces are the page\'s, light on both, and the page\'s light ink on them would drop the lines to about 1 : 1', () => {
-    const {dark} = tokens(), d = deckOf('look: duotone');
-    // the duotone handed the dark page's paper and ink, as the kit would take them
-    const spec = {...d.maps.m.built.spec, style: {palette: {name: 'duotone', paper: dark['--bg-elev'], ink: dark['--fg']}}};
-    const top = buildIsoMap(spec, DECK, {choices: HUMAN_STYLE_CHOICES}).paints[0].find((it) => it.role === 'top');
-    expect(top.fill.colour).toBeNull();   // a face the page colours is left to it: no paper reaches it
-    const face = over(colour(ruleOf(ISO_CSS, '.iso-top)').fill, dark), colour(dark['--bg'], dark));
-    expect(Math.round(ratio(colour(top.stroke.colour, dark), face) * 10) / 10).toBe(1);
   });
 });
 

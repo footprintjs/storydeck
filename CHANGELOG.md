@@ -25,15 +25,26 @@ a look draws the same page; the record keeps its name. Every page that names no 
   the compile, the run's map flow and the style check all use the kit's list. A refusal for an unknown choice names
   the new ones too (`"ink", "none", "contour", "human:sketchy"`).
 - **A dark page** (`iso.js` · `LOOK_CSS`): a page is light or dark when it is VIEWED (T, the saved choice, else the
-  system), so no build can hand the kit the dark page's colours. They are resolved in CSS instead. A fill in a paper
-  map's paper (`isoPaint.js` · `paperOf`: the look line-art, or `shading: paper`) is written `var(--iso-paper,
-  #ffffff)`, and its pieces carry `data-sd-paper`. Under `:root.dark` those pieces take the page's paper (`--bg-elev`)
-  and ink (`--fg`) for their faces, lines and names, and a contour takes the page's ink. The fallbacks are the page's
-  own (deck.css), so a deck with no dark tokens draws its dark page as its light one. Measured from the page's CSS on
-  the base look's dark theme, a line-art floor label went from 1.1 : 1 to 8.1 : 1, and a contour from 1.0 : 1 to 16 : 1.
-  In both themes, every look's names and floor labels stand at 6.3 : 1 or more, and its lines at 10.8 : 1 or more
-  (pinned in `deck/looks.test.js`). The page carries `LOOK_CSS` only when a map paints a paper or a contour. The map's
-  record says so (`made.paper`, `maps made` · `paper`).
+  system), so no build can hand the kit the dark page's colours. They reach the map by one route instead, the page's
+  variables, with the kit's colour as each one's fallback (`isoPaint.js` · `pagePaper`, `inkOf`). On a paper map (the
+  look line-art, or `shading: paper` in any row), the fills come out in one colour, the paper (`paperOf`), written
+  `var(--iso-paper, #ffffff)`. Any colour a line carries there (a duotone's ink) is written `var(--sd-ink, …)`, and the
+  pieces carry `data-sd-paper`. A contour's colour, on any map, is written `var(--sd-contour, …)`. Under `:root.dark`,
+  `LOOK_CSS` sets these to the page's paper (`--bg-elev`) and ink (`--fg`), so a combination themes as its look does:
+  `look: line-art; palette: duotone`, `look: duotone; shading: paper` and `look: outlined; palette: duotone` included.
+  The fallbacks are the page's own (deck.css), so a deck with no dark tokens draws its dark page as its light one. A
+  paper map whose faces would come out in more than one colour is refused, naming the fix; no row the kit has today
+  does that. The page carries `LOOK_CSS` only when a map paints a paper or a contour. The map's record says so
+  (`made.paper`, `maps made` · `paper`).
+- **Measured, every combination, both themes** (`deck/looksDark.test.js`, from the built page's own CSS through
+  `deck/test/pageColours.js`): all 24 rows the look columns make (shading × line × palette × texture, less the
+  textures the kit refuses beside a duotone), the four looks and the combinations a review found. Block names, floor
+  labels and cable labels stand at 4.5 : 1 or more. A block's edge, a contour against the page, and the highlight ring
+  round a block and along a floor stand at 3 : 1 or more. The rings render on every look: nothing inline on a floor's
+  ground or a piece's art outranks the ring's rule. Chromium's computed styles on the same built pages agree with every
+  pinned number, for all 48 rows (24 combinations in two themes). On the base look's dark theme a line-art floor label
+  went from 1.1 : 1 to 8.1 : 1 and a contour from 1.0 : 1 to 16 : 1. The look's lines on a dark line-art duotone went
+  from 1.3 : 1 to 14.5 : 1.
 - **The duotone keeps its own inks on a dark page.** A deck colours its pieces by class and theme, so the duotone
   leaves each face's colour to the page, as footprint-story does for a map with no colours. Those faces are light in
   both themes. Handed the dark page's light ink, the lines would stand at about 1 : 1 on them (pinned). Known limit:
@@ -46,11 +57,11 @@ a look draws the same page; the record keeps its name. Every page that names no 
 - **The budget covers marks** (`isoRules.js`, our numbers, unchanged): a map's record counts its marks
   (`made.strokes.marks`), and the 2 MB note and 16 MB refusal count strokes and marks together. A mark is held by its
   bytes alone; it has no timing. A map past the note is told the grain's fix (`texture: human:grain spacing 32`).
-- **Exports:** PowerPoint, video and print take the page as the browser draws it, so they carry each look as the page
-  shows it.
+- **Exports are the light theme.** PowerPoint and video take each slide from a browser that `deckStageDriver` opens with
+  no colour scheme and no saved choice. So the page starts light, and every export carries the light theme. StoryDeck
+  has no theme chosen at build time to set it from. Print uses the viewer's page as it is, light or dark.
 - Tests: `deck/looks.test.js` covers the reader, named and written-out looks drawing the same page, a page test for each
-  look, the contrast of names, floor labels, lines and contours in light and dark for each look (from the page's own
-  CSS and the base look's tokens), the 64-block grain sizes and note, `deck-data.json`, and `log --why style --map`
+  look, a clean check, the 64-block grain sizes and note, `deck-data.json`, and `log --why style --map`
   naming the look. Each look has a still (`deck/test/look-<name>-still.html`), pinned byte for byte.
 
 ## 0.39.0 — maps drawn by hand
