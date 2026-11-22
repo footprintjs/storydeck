@@ -80,6 +80,23 @@ describe('isoPaint · a paint list written as SVG', () => {
     expect(() => roleClass(undefined)).toThrow(/not undefined/);
     expect(() => art({item: 'polygon', role: 'top', points: [[0, 0], [1, 0], [0, 1]], fill: {mix: null, colour: 'red;x:y'}})).toThrow(/colour is "#rrggbb"/);
     expect(() => art({item: 'path', role: 'side', segments: [['move', 0, 0], ['curve', 1, 1]]})).toThrow(/move, line, arc or close — not "curve"/);
+    // a list that skipped the kit's check: every word and number of a stroke, and every coordinate, refused before it is written
+    const stroke = {colour: '#000000', alpha: 1, width: 2, join: 'round', cap: 'butt'}, tri = [[0, 0], [1, 0], [0, 1]];
+    const stroked = (s) => art({item: 'polygon', role: 'top', points: tri, stroke: {...stroke, ...s}});
+    expect(stroked({})).toContain('stroke-linejoin:round;stroke-linecap:butt');
+    expect(() => stroked({join: 'round"/><x'})).toThrow(/join is round, miter, bevel — not "round\\"\/><x"/);
+    expect(() => stroked({cap: 'flat'})).toThrow(/cap is butt, round, square/);
+    for (const alpha of [-0.1, 1.1, NaN, '0.5']) expect(() => stroked({alpha})).toThrow(/alpha is from 0 to 1/);
+    for (const width of [-1, 1001, Infinity, '2px']) expect(() => stroked({width})).toThrow(/width is from 0 to 1000/);
+    expect(stroked({alpha: 0, width: 1000})).toContain('stroke-width:1000px;stroke-linejoin:round;stroke-linecap:butt;stroke-opacity:0');
+    for (const bad of [NaN, Infinity, -Infinity, '1"/><x', null]) {
+      expect(() => art({item: 'polygon', role: 'top', points: [[0, 0], [bad, 0], [0, 1]]})).toThrow(/numbers are finite/);
+      expect(() => art({item: 'ellipse', role: 'top', cx: 0, cy: 0, rx: bad, ry: 1})).toThrow(/numbers are finite/);
+      expect(() => art({item: 'lines', role: 'grid', segments: [[0, 0, 1, bad]]})).toThrow(/numbers are finite/);
+      expect(() => art({item: 'path', role: 'side', segments: [['move', 0, 0], ['arc', 1, 1, 1, 1, bad, 0, true]]})).toThrow(/numbers are finite/);
+      expect(() => art({item: 'polygon', role: 'top', points: tri}, {x: bad, y: 0})).toThrow(/numbers are finite/);
+    }
+    expect(() => art({item: 'path', role: 'side', segments: [['move', 0, 0], ['arc', 1, 1, 1, 1, 1, 0, 'yes']]})).toThrow(/which way it turns, true or false — not "yes"/);
   });
 
   it('is the only writer of a face: deck/iso.js paints the built map\'s list and builds no face string, nor asks the grid for one', () => {

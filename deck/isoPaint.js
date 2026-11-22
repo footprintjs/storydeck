@@ -20,7 +20,30 @@ const ROLE = /^[a-z][a-z0-9-]{0,31}$/;
 /** A colour, as the kit gives it: #rrggbb, lower case. Written into a style attribute, so nothing else is let through. */
 const HEX = /^#[0-9a-f]{6}$/;
 
-const fixed = (v) => +v.toFixed(1);
+/** The stroke joins and caps the kit has (paint.js · checkStroke): each written into a style attribute as a word. */
+const JOINS = ['round', 'miter', 'bevel'], CAPS = ['butt', 'round', 'square'];
+
+/**
+ * A number as written: one decimal. WHY it refuses: every number of an item reaches the page through here, so a list
+ * that skipped the kit's check (paint.js · checkPaint) cannot write NaN, Infinity or a word into an attribute.
+ */
+function num(v) {
+  if (typeof v !== 'number' || !Number.isFinite(v)) throw new Error(`isoPaint: a paint item's numbers are finite — not ${JSON.stringify(v) ?? String(v)}`);
+  return v;
+}
+const fixed = (v) => +num(v).toFixed(1);
+/** A point of the frame as written in the box: checked before it is subtracted, so null or a word never passes as 0. */
+const rel = (v, corner) => fixed(num(v) - num(corner));
+/** A number from `least` to `most`, or a refusal naming what it is. */
+function within(v, least, most, what) {
+  if (typeof v !== 'number' || !(v >= least && v <= most)) throw new Error(`isoPaint: a stroke's ${what} is from ${least} to ${most} — not ${JSON.stringify(v) ?? String(v)}`);
+  return v;
+}
+/** A word from a fixed list, or a refusal naming the list. */
+function oneOf(v, list, what) {
+  if (!list.includes(v)) throw new Error(`isoPaint: a stroke's ${what} is ${list.join(', ')} — not ${JSON.stringify(v)}`);
+  return v;
+}
 
 /** The class an item is written with: `iso-<role>`, the tile lines `iso-lines`. */
 export function roleClass(role) {
@@ -33,8 +56,10 @@ function colours({fill, stroke}) {
   const said = [];
   if (fill?.colour != null) said.push(`fill:${hex(fill.colour)}`);
   if (stroke?.colour != null) {
-    said.push(`stroke:${hex(stroke.colour)}`, `stroke-width:${fixed(stroke.width)}px`, `stroke-linejoin:${stroke.join}`, `stroke-linecap:${stroke.cap}`);
-    if (stroke.alpha !== 1) said.push(`stroke-opacity:${stroke.alpha}`);
+    // each value checked before it is written: a word or a number past its range is refused, never dropped
+    const width = fixed(within(stroke.width, 0, 1000, 'width')), alpha = within(stroke.alpha, 0, 1, 'alpha');
+    said.push(`stroke:${hex(stroke.colour)}`, `stroke-width:${width}px`, `stroke-linejoin:${oneOf(stroke.join, JOINS, 'join')}`, `stroke-linecap:${oneOf(stroke.cap, CAPS, 'cap')}`);
+    if (alpha !== 1) said.push(`stroke-opacity:${alpha}`);
   }
   return said.length ? ` style="${said.join(';')}"` : '';
 }
@@ -48,10 +73,12 @@ const hex = (c) => { if (!HEX.test(c)) throw new Error(`isoPaint: a paint item's
  */
 function pathData(segments, x, y) {
   let pen = null, start = null, d = '';
-  const at = (px, py) => `${fixed(px - x)} ${fixed(py - y)}`;
+  const at = (px, py) => `${rel(px, x)} ${rel(py, y)}`;
   for (const [op, ...a] of segments) {
     if (op === 'move') { pen = start = at(a[0], a[1]); d += `M${pen}`; } else if (op === 'line') { pen = at(a[0], a[1]); d += `L${pen}`; } else if (op === 'arc') {
-      const [cx, cy, rx, ry, from, to, anticlockwise] = a, begin = at(cx + rx * Math.cos(from), cy + ry * Math.sin(from));
+      const [cx, cy, rx, ry, from, to] = a.slice(0, 6).map(num), anticlockwise = a[6];
+      if (typeof anticlockwise !== 'boolean') throw new Error(`isoPaint: an arc says which way it turns, true or false — not ${JSON.stringify(anticlockwise)}`);
+      const begin = at(cx + rx * Math.cos(from), cy + ry * Math.sin(from));
       if (begin !== pen) d += `${pen === null ? 'M' : 'L'}${begin}`;
       pen = at(cx + rx * Math.cos(to), cy + ry * Math.sin(to));
       d += `A${fixed(rx)} ${fixed(ry)} 0 0 ${anticlockwise ? 0 : 1} ${pen}`;
@@ -64,9 +91,9 @@ function pathData(segments, x, y) {
 function itemSvg(it, x, y) {
   const head = `class="${roleClass(it.role)}"${colours(it)}`;
   switch (it.item) {
-    case 'polygon': return `<polygon ${head} points="${it.points.map(([px, py]) => `${fixed(px - x)},${fixed(py - y)}`).join(' ')}"/>`;
-    case 'ellipse': return `<ellipse ${head} cx="${fixed(it.cx - x)}" cy="${fixed(it.cy - y)}" rx="${fixed(it.rx)}" ry="${fixed(it.ry)}"/>`;
-    case 'lines': return `<path ${head} d="${it.segments.map(([x1, y1, x2, y2]) => `M${fixed(x1 - x)} ${fixed(y1 - y)}L${fixed(x2 - x)} ${fixed(y2 - y)}`).join('')}"/>`;
+    case 'polygon': return `<polygon ${head} points="${it.points.map(([px, py]) => `${rel(px, x)},${rel(py, y)}`).join(' ')}"/>`;
+    case 'ellipse': return `<ellipse ${head} cx="${rel(it.cx, x)}" cy="${rel(it.cy, y)}" rx="${fixed(it.rx)}" ry="${fixed(it.ry)}"/>`;
+    case 'lines': return `<path ${head} d="${it.segments.map(([x1, y1, x2, y2]) => `M${rel(x1, x)} ${rel(y1, y)}L${rel(x2, x)} ${rel(y2, y)}`).join('')}"/>`;
     case 'path': return `<path ${head} d="${pathData(it.segments, x, y)}"/>`;
     // a kind of item this painter does not know is refused: drawn as nothing, a piece would lose a face unseen
     default: throw new Error(`isoPaint: a paint item is a polygon, an ellipse, a path or lines — not ${JSON.stringify(it.item)}`);
