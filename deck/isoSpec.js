@@ -177,6 +177,26 @@ export function builtMap({blocks = [], floors = [], obstacles = [], keep = [], l
 }
 
 /**
+ * The paint order of things that stand where a moment of a move puts them (motionDraw.js, motionPlan.js): `things`
+ * [{kind, at, size}] — a footprint as an obstacle, every other a block — on the grid `view` ({tile, origin, rise}, the
+ * built map's). Gives their indices, the furthest first. WHY the steps again and not the grid's own sort: the order a
+ * map is painted in is the steps' `order` step (a deck asks no grid for it — isoSpec.test.js), so a block that moves is
+ * ordered among the others by the very rule that ordered them when the map was built. Each is named by its place in
+ * the list, so a name two pieces share cannot mislead it.
+ */
+export function orderAt(things, view) {
+  const blocks = [], obstacles = [], index = new Map();
+  things.forEach((t, i) => {
+    const name = `p${i}`, piece = {name, kind: t.kind === 'footprint' ? undefined : t.kind, at: [...t.at], size: [...t.size], who: `"${name}"`};
+    index.set(name, i);
+    (t.kind === 'footprint' ? obstacles : blocks).push(piece);
+  });
+  const {map, ids} = builtMap({blocks, obstacles, grid: {tile: [...view.tile], origin: [...view.origin], ...(view.rise === undefined ? {} : {rise: view.rise})}});
+  const nameOf = new Map([...blocks.map((b, i) => [ids.blocks[i], b.name]), ...obstacles.map((o, i) => [ids.obstacles[i], o.name])]);
+  return map.order.map((id) => index.get(nameOf.get(id)));
+}
+
+/**
  * The wires of some pieces that already stand, laid along the floor by the steps: what cable.js · cables lays for a
  * caller that hands no ways (the build hands its own: iso.js · isoDrawn). `links`: one entry a wire, [from, to] by
  * piece name (or {name, port}), or null; `solids`: every block, cylinder and footprint, {name, kind, at, size, ports}

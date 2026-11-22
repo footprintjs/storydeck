@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { clipKey } from 'footprint-story/voice';
 import { narrationText } from './narration.js';
 import { solidPng } from './pptxParts.js';
-import { exportPptx, checkPptx, pptxParts, zip, unzip } from './pptx.js';
+import { exportPptx, checkPptx, pptxParts, zip, unzip, MOVES_AT_REST, MOVES_AS_SEEKED } from './pptx.js';
 
 // the read-back, passed through as it is — unless a test makes it disagree with the plan
 const readBack = vi.hoisted(() => ({ edit: null }));
@@ -66,8 +66,27 @@ describe('pptx · a deck as PowerPoint', () => {
     ]);
     const media = unzip(readFileSync(done.file)).filter((e) => e.name.startsWith('ppt/media/media'));
     expect(media.map((e) => [e.name, Buffer.compare(e.data, toneFor(e.name === 'ppt/media/media1.wav' ? 'k1' : 'k2'))])).toEqual([['ppt/media/media1.wav', 0], ['ppt/media/media2.wav', 0]]);
-    expect(lines).toEqual(['picture: click 1', 'picture: click 2', 'picture: click 3', expect.stringMatching(/^zip: \d+ bytes$/), `pptx: ${done.file}`]);
+    // a driver with no rest(): the export says its pictures show a block's moves where seek left them, with the fix
+    expect(lines).toEqual([`pictures: moves shown ${MOVES_AS_SEEKED}`, 'picture: click 1', 'picture: click 2', 'picture: click 3', expect.stringMatching(/^zip: \d+ bytes$/), `pptx: ${done.file}`]);
     expect(done.clicks[0]).toEqual({ n: 1, title: 'Intro', notes: 'Hello. There.', spoken: 'Hello. There.', clip: { key: 'k1', audio: path.join(dir, 'k1.wav'), duration: 3 }, advance: 3.6 });
+  });
+
+  it('shows a click\'s block moves at rest when its driver can end them (rest), after the entrance is seeked, before the picture', async () => {
+    const driver = { ...fakeDriver({ ends: { 1: 700 } }) };
+    driver.rest = vi.fn(async () => driver.log.push('rest'));
+    const done = await exportPptx({ url: 'u', steps: steps().slice(0, 1), out: path.join(dir, 'rest'), driver });
+    expect(driver.log).toEqual(['open u', 'step 1', 'seek 700', 'rest', 'shot c001.png', 'close']);
+    expect(done.moves).toBe(MOVES_AT_REST);
+  });
+
+  it('says, with the fix, that a driver without rest() shows a block\'s moves where its seek left them — never claims a rest', async () => {
+    const driver = fakeDriver({ ends: { 1: 99999 } }), lines = [];
+    const done = await exportPptx({ url: 'u', steps: steps().slice(0, 1), out: path.join(dir, 'seeked'), driver, log: (l) => lines.push(l) });
+    expect(driver.log).toEqual(['open u', 'step 1', 'seek 4000', 'shot c001.png', 'close']);
+    expect(done.moves).toBe(MOVES_AS_SEEKED);
+    expect(done.moves).toMatch(/where the driver's seek left them — .* give the driver rest\(\)/);
+    expect(lines[0]).toBe(`pictures: moves shown ${MOVES_AS_SEEKED}`);
+    expect(done.narrative.join('\n')).toContain("where the driver's seek left them");
   });
 
   it('leaves its record: each stage, and each verdict with what it weighed', async () => {
@@ -77,7 +96,8 @@ describe('pptx · a deck as PowerPoint', () => {
       '[Condition]: No rules matched, fell back to default "Every click has a 16:9 PNG": WriteParts.',
       '[Condition]: No rules matched, fell back to default "The package reads back whole": Deliver.',
     ]);
-    expect(done.narrative).toEqual(expect.arrayContaining(['Step 2: Write runtime = 9.3', 'Step 3: Write broken = 0', 'Step 3: Write unpictured = 0']));
+    expect(done.narrative).toEqual(expect.arrayContaining(['Step 2: Write runtime = 9.3', 'Step 3: Write broken = 0', 'Step 5: Write unpictured = 0']));
+    expect(done.narrative.some((l) => l.startsWith('Step 1: Write moves = "where the driver\'s seek left them'))).toBe(true);
     expect(done.narrative.filter((l) => l.startsWith('Stage ')).length).toBe(11);
   });
 

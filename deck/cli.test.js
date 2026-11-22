@@ -21,6 +21,9 @@ describe('parseArgs', () => {
     expect(parseArgs(['review', 'talk', '--click', '3', '--all'])).toEqual({command: 'review', dir: 'talk', given: true, flags: {click: '3', all: true}});
     expect(parseArgs(['build', '--out=site/x.html'])).toEqual({command: 'build', dir: '.', given: false, flags: {out: 'site/x.html'}});
     expect(parseArgs(['check', '-h']).flags.help).toBe(true);
+    // --motion picks the record of a map's moves for --why, as --map picks a map's
+    expect(parseArgs(['log', '--run', '1', '--why', 'duration-0', '--motion', 'map']).flags).toEqual({run: '1', why: 'duration-0', motion: 'map'});
+    expect(USAGE).toContain('--why duration-0 --motion <map>: why a block\'s move takes its time');
   });
 
   it('refuses an unknown flag, a missing value and two folders', () => {

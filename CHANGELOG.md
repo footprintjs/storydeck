@@ -1,5 +1,63 @@
 # Changelog
 
+## 0.37.0 — blocks on a map move by intent
+
+A click can now move an isometric block. The author writes what happens on the `<step>` — never a number for how —
+and footprint-story (now `^0.31.0`) decides the model, the duration from a law and the curve; StoryDeck writes its
+samples into the page as keyframes. The deck's twin of StoryReel 0.43–0.44's `motion`: the same words, refusals and
+guards. A deck that moves nothing is drawn byte for byte as before: every example page and every expected page in
+the tests is unchanged.
+
+```html
+<step data-in="floor box server crate"><h2>Here</h2></step>
+<step data-move="box fall; crate slide to 4 4.5"><h2>The box drops, the crate slides</h2></step>
+<step data-move="box throw to server wrap anticipate"><h2>Up onto the server</h2></step>
+<step data-move="lamp hang from 3 2 6"><h2>The lamp swings to rest</h2></step>
+```
+
+- **What a block can do** (`deck/motionRead.js`): `fall` (onto the highest top under it, else the floor), `throw`,
+  `settle` and `reach` (to `to`: a block's name — the middle of its top — or tiles `col row [lift]`), `hang` (on a rope
+  from the pin `from`, swinging to rest below it; the block's last move) and `slide` (along the level it rests on, to
+  `to`, planned side on, ending exactly there). `wrap` takes footprint-story's wrappers and `model` its models, each
+  with options by name and value (`model coulomb kinetic 0.4`); `accept arc` keeps a critic's finding the move means.
+  Plain words in an attribute, not JSON, as every map attribute. A block moves once a click and rests where its move
+  ends on every later click.
+- **Refused, naming the click, the move and the fix:** `roll` (StoryDeck has no ball yet) and `tumble` (a block is
+  drawn only upright, and a turn the page cannot show truly is said, never faked), `draw`/`write`/`sketch` (a pen's),
+  a floor, a footprint, a piece that is no isometric block, a name two blocks share, a block a wire joins or a callout
+  points at (they would not follow it), a block the click does not show, a block moved from under one resting on its
+  top, a move that relies on a block moving on its own click, a move after a hang, tiles or a way off the slide, a
+  missing or unwanted `to`/`from`, a slide from the air, to another level or off its top, an accepted critic its move
+  is not checked by, more than 64 moves on a map, and whatever footprint-story refuses, in the move's name.
+- **The critics reach the check at their own level** (rule `motion`), naming the move and the fix: footprint-story's
+  (`arc`, `spacing`, `contact`, …; a note is told as info) and the deck's own — `deck:contact`, a block that passes
+  through another, swept between samples so a thin block is never skipped, and `deck:covers`, a block come to rest
+  over another's name: the name is hidden only at rest (shown while the block moves), decided from the kit's numbers,
+  never a font's width. A finding of an accepted critic is told as accepted advice.
+- **How each way of showing a deck carries a move** (`deck/motionDraw.js`): the page plays footprint-story's own
+  samples as CSS keyframes, 60 a second, to a millionth of a px, on a forward click once its view has arrived — a
+  jump, a step back, reduced motion and motion off land at rest; a moving block's faces and words sit in a wrapper
+  (`.iso-motion`) so a click's focus, which moves the piece, is never replaced; its paint level is the map steps' own
+  order asked again at each keyframe (`isoSpec.js · orderAt`), and a hang's rope is drawn as links. A video steps
+  the same keyframes frame by frame. A print shows each click at rest; a PowerPoint too — its export ends the moves
+  before it takes the picture (`video.js · deckStageDriver · rest`, an optional port method `exportPptx` calls). The
+  map's record says so (`maps made` · `motion.carriers`), and the export says how its own pictures were taken
+  (`exportPptx(…).moves`, on its record too): a driver without `rest()` shows a move where its seek left it, and the
+  export says so with the fix (give the driver `rest()`), never claiming a rest.
+- **The camera frames where blocks rest:** a click's view fits a moved block where it rests at the click's end.
+- **Record:** the run's `maps made` carries each map's moves (`motion.moves`: click, block, word, model, how it was
+  chosen, seconds) for a map whose clicks move a block (none otherwise, so other records are as before), and each such
+  map's moves are planned again through footprint-story's chart (`runHumanFlow`), their record kept beside the run's:
+  `storydeck log --run <id> --why duration-0 --motion <map>` says why a move takes its time (`model-<i>`, `findings-<i>`
+  too); the reply offers the call, and a plan that parts from the page's is said. `--motion` on the command line and
+  the MCP `log` tool.
+- **footprint-story `^0.31.0`:** its paint list has a `stroke` item (hand-drawn strokes, from sketch style choices a
+  deck does not offer); `isoPaint.js` refuses one by name rather than drawing nothing.
+- A map whose blocks move spreads its paint levels apart (one level between two still blocks for each that moves), so
+  it holds fewer pieces (128 with two moving); past that it is refused with the fix.
+- The few number rules StoryReel's kit holds too — a foot, the landing under a block, the swept pass-through, the
+  rider rule, a name's box — live in one small file (`deck/motionPlace.js`), kept minimal, to move into footprint-story.
+
 ## 0.36.0 — a map takes a style
 
 An isometric map can now name its look: `<i data-style="line: ink width 5"></i>` in `map.html` draws every face with

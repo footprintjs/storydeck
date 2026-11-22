@@ -50,6 +50,7 @@ npx footprint-storydeck check my-talk           # the same reply with nothing wr
 npx footprint-storydeck log my-talk --run 1     # how the last run was made: each stage's time, each browser call, every decision and what it read
 npx footprint-storydeck log my-talk --run 1 --why verdict   # where one value came from (verdict, errors, warnings, …): read from the run's record, nothing run again
 npx footprint-storydeck log my-talk --run <id> --why at --map map   # why an isometric map is so (at: where the blocks stand, view: the grid, names): from that map's own record; a build's reply offers this call
+npx footprint-storydeck log my-talk --run <id> --why duration-0 --motion map   # why a block's move takes its time (model-0: why its model; findings-0: its critics), from footprint-story's own run of the moves
 npx footprint-storydeck narrate my-talk         # voiced or not, per click (--kit <folder> voices what is missing; then build --voice)
 npx footprint-storydeck dev my-talk             # for the person: a save reloads on the same click and replays it
 npx footprint-storydeck feedback my-talk        # the notes the person left in the dev page — read these first
@@ -146,7 +147,12 @@ width and depth) and `data-iso="floor" data-size="16 9"` (the tile lines; write 
 tiles (a third number lifts it), `data-size` "wide deep high". The build places, sizes and levels each one, so give it no
 left/top/width/height; `<i data-iso-grid="150 at 1500 150"></i>` sets the tile's width and the floor's far corner.
 Colour one with `style="--iso-color:#bcd6f3"`. A map's look: `<i data-style="line: ink width 5"></i>` (or `"line: none"`; footprint-story's style columns as "column: choice option value", apart with ";"). It is a piece like any other: clicks, `fit`, routes, wires and callouts
-all work on it. A wire between two blocks is laid along the floor: along the tile lines, round any block in its way,
+all work on it. A click can MOVE a block by intent — write what happens, never numbers: `<step data-move="box fall; crate slide to 4 4.5">`,
+`"ball throw to server wrap anticipate"`, `"lamp hang from 3 2 6"`, `"box settle to db model spring accept arc"` (do: fall, throw, settle,
+reach, hang, slide; roll and tumble are refused). footprint-story picks the model, the duration and the curve; the block rests where its
+move ends on later clicks. A block a wire joins or a callout points at cannot move. `check` names a block that passes through another
+(`deck:contact`), lands over a name (`deck:covers`) or what footprint-story's critics find (rule `motion`); fix it, or `accept <critic>`
+when it is meant. A print or a PowerPoint shows each click's moves at rest. A wire between two blocks is laid along the floor: along the tile lines, round any block in its way,
 from a foot that is seen to a foot that is seen; a request and its answer lie in two lanes. You write only what is
 joined to what. Its `data-label` is written on the cable, so keep it short. After an edit, read `check` or `build`:
 rule `wire-way` says in words when a wire passes behind a block (move that block, or the two it joins), lies on

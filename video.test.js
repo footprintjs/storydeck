@@ -290,6 +290,22 @@ describe('video · the deck-stage driver, looping', () => {
   });
 });
 
+describe('video · the deck-stage driver, a still at rest', () => {
+  it('ends only the animations of blocks that move by intent, so a still picture shows each move where it ends', async () => {
+    const anim = (animationName, fails = false) => ({ animationName, finish: vi.fn(() => { if (fails) throw new Error('InvalidStateError'); }) });
+    const all = [anim('sdIsoMove-map-0'), anim('sdIsoZ-map-0'), anim('sdIsoRope-map-1-2'), anim('sdIsoShow'), anim('sdIsoShowcase'), anim('sdArrive'), {}, anim('sdIsoMove-map-3', true)];
+    const doc = { querySelector: () => ({ shadowRoot: { append: vi.fn() } }), getAnimations: () => all, createElement: () => ({}) };
+    const page = { goto: vi.fn(), waitForFunction: vi.fn(), addStyleTag: vi.fn(), evaluate: vi.fn(async (fn, arg) => {
+      const saved = globalThis.document; globalThis.document = doc;
+      try { return await fn(arg); } finally { globalThis.document = saved; }
+    }) };
+    const driver = deckStageDriver({ chromium: { launch: async () => ({ newPage: async () => page, close: vi.fn() }) }, hide: [] });
+    await driver.open('u');
+    await driver.rest();
+    expect(all.map((a) => a.finish?.mock.calls.length ?? null)).toEqual([1, 1, 1, 1, 0, 0, null, 1]);
+  });
+});
+
 describe('video · the deck-stage driver', () => {
   /** Playwright's chromium, faked: page.evaluate runs the page function against a stand-in document. */
   function fakeChromium() {

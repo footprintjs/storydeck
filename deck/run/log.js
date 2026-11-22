@@ -24,7 +24,7 @@ export const COUNTED = Object.freeze(['outline', 'review', 'feedback', 'check', 
 
 const NOFOLLOW = constants.O_NOFOLLOW ?? 0, NONBLOCK = constants.O_NONBLOCK ?? 0;
 const RUN = /^(\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-\d{3}Z)-(check|build)\.([0-9a-f]{6})\.json$/;
-const RUN_FILE = /^\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-\d{3}Z-(check|build)\.[0-9a-f]{6}\.(json|record\.jsonl|map-\d{1,2}\.record\.jsonl)$/;
+const RUN_FILE = /^\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-\d{3}Z-(check|build)\.[0-9a-f]{6}\.(json|record\.jsonl|(?:map|motion)-\d{1,2}\.record\.jsonl)$/;
 const CALLS = 'calls.json';
 const VERDICTS = ['clean', 'fix', 'broken', 'failed'];
 
@@ -51,6 +51,8 @@ export function runsFolder(home, root) {
 export const MAPS_KEPT = 32, NAMES_KEPT = 200;
 /** A key a map's run wrote, as it is kept and listed: a plain name. */
 export const KEY = /^[A-Za-z_]\w{0,39}$/;
+/** A key a map's moves' run wrote (motions.js): footprint-story's per-move keys carry the move's number (duration-0). */
+export const MOTION_KEY = /^[A-Za-z_][\w-]{0,39}$/;
 /** A map's name as a run keeps it: the deck's own (source.js · mapFile: letters, digits, - and _), never other text. */
 export const MAP_NAME = /^[\w-]{1,100}$/;
 
@@ -60,14 +62,16 @@ export const MAP_NAME = /^[\w-]{1,100}$/;
  * from the deck's words.
  */
 export const mapRecordOf = (files, k) => path.join(path.dirname(files.file), `${files.id}.map-${k}.record.jsonl`);
+/** A map's moves' record file (run/motions.js), beside its run's: `<run id>.motion-<k>.record.jsonl`, named as a map's is. */
+export const motionRecordOf = (files, k) => path.join(path.dirname(files.file), `${files.id}.motion-${k}.record.jsonl`);
 
 /**
  * The maps a run built again, as it keeps them: {name, k, kept, control, keys, differs?} each, bounded (maps.js ·
  * flowMaps). `k` is the map's place in the run's list, which names its record file: one whose name is not a map's is
  * dropped without moving the others.
  */
-const keptMaps = (runs) => (Array.isArray(runs) ? runs : []).slice(0, MAPS_KEPT).map((m, k) => [plain(m), k]).filter(([m]) => MAP_NAME.test(m.name))
-  .map(([m, k]) => ({name: m.name, k, kept: m.file !== undefined ? Boolean(m.file) : m.kept === true, control: controlKept(m.control), keys: (Array.isArray(m.keys) ? m.keys : []).filter((k) => KEY.test(k)).slice(0, 60), ...(typeof m.differs === 'string' ? {differs: text(m.differs.replace(/\s+/g, ' '))} : {})}));
+const keptMaps = (runs, key = KEY, most = 60) => (Array.isArray(runs) ? runs : []).slice(0, MAPS_KEPT).map((m, k) => [plain(m), k]).filter(([m]) => MAP_NAME.test(m.name))
+  .map(([m, k]) => ({name: m.name, k, kept: m.file !== undefined ? Boolean(m.file) : m.kept === true, control: controlKept(m.control), keys: (Array.isArray(m.keys) ? m.keys : []).filter((k) => key.test(k)).slice(0, most), ...(typeof m.differs === 'string' ? {differs: text(m.differs.replace(/\s+/g, ' '))} : {})}));
 /** The deck's other maps, by name: those with no isometric piece. */
 const keptNames = (names) => (Array.isArray(names) ? names : []).filter((n) => MAP_NAME.test(n)).slice(0, NAMES_KEPT);
 
@@ -160,6 +164,8 @@ function readRun(data) {
     control: controlKept(d.control),
     // a run kept before 0.34.0 has no `maps`: it kept no map records, which is not "no map" (run/why.js says which)
     ...(Array.isArray(d.maps) ? {maps: keptMaps(d.maps), flat: keptNames(d.flat), mapsSkipped: whole(d.mapsSkipped)} : {}),
+    // a run of a deck whose blocks move (0.37.0 on) says which maps' moves it planned again
+    ...(Array.isArray(d.motions) ? {motions: keptMaps(d.motions, MOTION_KEY, 200)} : {}),
   };
 }
 
@@ -192,7 +198,11 @@ function runNamed(dir, name) {
     const record = mapRecordOf({id, file}, m.k);
     return {...m, ...(m.kept && plainFile(record) ? {record} : {})};
   });
-  return {id, record: path.join(dir, `${id}.record.jsonl`), ...run, ...(maps ? {maps} : {})};
+  const motions = run.motions?.map((m) => {
+    const record = motionRecordOf({id, file}, m.k);
+    return {...m, ...(m.kept && plainFile(record) ? {record} : {})};
+  });
+  return {id, record: path.join(dir, `${id}.record.jsonl`), ...run, ...(maps ? {maps} : {}), ...(motions ? {motions} : {})};
 }
 
 /** The kept runs of a folder, newest first. */
@@ -217,7 +227,7 @@ function writeNew(file, body) {
 function dropOld(dir) {
   let names;
   try { names = readdirSync(dir).filter((n) => RUN_FILE.test(n)); } catch { return; }
-  const idOf = (name) => name.replace(/\.(json|record\.jsonl|map-\d{1,2}\.record\.jsonl)$/, '');
+  const idOf = (name) => name.replace(/\.(json|record\.jsonl|(?:map|motion)-\d{1,2}\.record\.jsonl)$/, '');
   const old = new Set([...new Set(names.map(idOf))].sort().slice(0, -RUNS_KEPT));   // a record whose summary was never written goes in its turn too
   for (const name of names) if (old.has(idOf(name))) rmSync(path.join(dir, name), {force: true});
 }
@@ -242,7 +252,9 @@ export function keepRun(dir, files, run, at = new Date()) {
     stages: (run.stages ?? []).slice(0, 64).map((st) => ({stage: text(st.stage, 80), ms: whole(st.ms)})), calls: run.calls ?? {},
     failure: run.failure ? text(run.failure, 2000) : null, engine: (run.engine ?? []).slice(0, 20).map((w) => text(w)), control: controlKept(run.control),
     // every run from 0.34.0 says which maps it built again, even none, so one kept before is told apart
-    maps: keptMaps(run.maps?.runs), flat: keptNames(run.flat), ...(run.maps?.skipped ? {mapsSkipped: whole(run.maps.skipped)} : {}), lines: keptLines(run.lines ?? [])};
+    maps: keptMaps(run.maps?.runs), flat: keptNames(run.flat), ...(run.maps?.skipped ? {mapsSkipped: whole(run.maps.skipped)} : {}),
+    // only a deck whose blocks move keeps its moves' runs (run/motions.js): every other run is kept as before
+    ...(run.motions?.runs?.length ? {motions: keptMaps(run.motions.runs, MOTION_KEY, 200)} : {}), lines: keptLines(run.lines ?? [])};
   let out = JSON.stringify(body);
   // text in another script is three bytes a character: a run in words that would not fit goes, and the counts stay
   if (Buffer.byteLength(out) > MOST.bytes) out = JSON.stringify({...body, lines: [], keys: keys.slice(0, 50), layout: stand.layout.slice(0, 50), cut: true});

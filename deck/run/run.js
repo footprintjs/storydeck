@@ -7,7 +7,7 @@ import {storydeckHome} from '../noteKey.js';
 import {deckRoot} from '../paths.js';
 import {runWiring} from './chart.js';
 import {buildChart, engine, mermaidOf, runChart} from './engine.js';
-import {keepRun, mapRecordOf, runFiles, runsFolder} from './log.js';
+import {keepRun, mapRecordOf, motionRecordOf, runFiles, runsFolder} from './log.js';
 import {clickOfCall, measureWiring} from './measure.js';
 
 const firstLine = (error) => String(error?.message ?? error).split('\n')[0];
@@ -58,6 +58,7 @@ export async function runDeck(dir, {write = false, layout = false, out, voice = 
   const place = kept ? placeFor(home, dir, kind, at) : {why: null};
   // each isometric map's own record, beside this run's (maps.js): named by the map's place in the list, never its words
   run.mapRecord = (k) => (place.files ? mapRecordOf(place.files, k) : null);
+  run.motionRecord = (k) => (place.files ? motionRecordOf(place.files, k) : null);
   let taken = null, failure = null;
   try {
     taken = await runChart(eng, buildChart(eng, runWiring(run), said), {record: place.files?.record});
@@ -68,12 +69,12 @@ export async function runDeck(dir, {write = false, layout = false, out, voice = 
   const state = taken?.state ?? {}, found = state.problems ?? [], measured = state.layoutProblems ?? [];   // by the rules, and by the browser
   const result = {kind, verdict: failure ? 'failed' : state.verdict, problems: [...found, ...measured], errors: state.errors ?? 0, warnings: state.warnings ?? 0,
     infos: state.infos ?? 0, clicks: state.clicks ?? 0, measured: state.measured === true, layoutNote: state.layoutNote ?? null, written: state.written ?? null,
-    ms: Math.round(performance.now() - t0), maps: run.mapRuns ?? {runs: [], skipped: 0}};   // the time in all, as whoever ran it waited for it
+    ms: Math.round(performance.now() - t0), maps: run.mapRuns ?? {runs: [], skipped: 0}, ...(run.motionRuns ? {motions: run.motionRuns} : {})};   // the time in all, as whoever ran it waited for it
   const stand = keep(place, {...result, problems: found, layoutProblems: measured, written: Boolean(result.written), stages: taken?.stages ?? [],
     calls: callsKept(taken?.calls ?? {}), lines: taken?.lines ?? [], control: taken?.control ?? {}, engine: said, failure: failure ? firstLine(failure) : null,
     flat: flatMaps(run)}, at);
   // a run not kept keeps no map record either
-  if (stand.unkept !== undefined || !place.files) for (const m of result.maps.runs) if (m.file) rmSync(m.file, {force: true});
+  if (stand.unkept !== undefined || !place.files) for (const m of [...result.maps.runs, ...(result.motions?.runs ?? [])]) if (m.file) rmSync(m.file, {force: true});
   if (failure) throw failure;
   return {...result, ...stand, ...(place.files && stand.unkept === undefined ? {id: place.files.id} : {})};
 }

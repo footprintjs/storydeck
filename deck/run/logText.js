@@ -49,6 +49,14 @@ function mapsText(run, n) {
     ...(asked ? [`  why a block stands where it does: storydeck log --run ${run.id ?? n} --why at --map ${mapArg(asked.name)}`] : [])];
 }
 
+/** The maps whose moves a run planned again (run/motions.js), and how to ask why a move takes its time. */
+function motionsText(run, n) {
+  if (!run.motions?.length) return [];
+  const asked = run.motions.find((m) => m.record && mapArg(m.name));
+  return [`moves: ${run.motions.map((m) => `${m.name}${m.record ? '' : ' (no record kept)'}${m.differs ? ' (drift: its motion flow parted from the page\'s moves)' : ''}`).join(', ')}`,
+    ...(asked ? [`  why a move takes its time: storydeck log --run ${run.id ?? n} --why duration-0 --motion ${mapArg(asked.name)}`] : [])];
+}
+
 /** One run in full. */
 export function runText(run, n, {all = false, measure} = {}) {
   const shown = all ? run.lines : run.lines.slice(0, LINES_SHOWN), rest = run.lines.length - shown.length;
@@ -57,6 +65,7 @@ export function runText(run, n, {all = false, measure} = {}) {
     ...(Object.keys(run.calls).length ? ['calls:', ...Object.entries(run.calls).map(([target, c]) => callText(target, c))] : []),
     ...(run.engine.length ? ['the engine warned:', ...run.engine.map((w) => `  ${w}`)] : []),
     ...mapsText(run, n),
+    ...motionsText(run, n),
     shown.length ? 'the run in words:' : null, ...shown,
     rest > 0 ? `… and ${rest} more lines: --all shows every one` : null,
     `the record itself: ${run.record} (one JSON line an entry: footprintjs/sinks · readRecordFile reads it)`].filter((line) => line !== null).join('\n');

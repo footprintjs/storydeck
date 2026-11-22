@@ -125,11 +125,15 @@ export interface CompiledDeck {
   readonly explore: { readonly slides: readonly (string | null)[]; readonly targets: Readonly<Record<string, Readonly<Record<string, number>>>> } | null;
   /** The parts' entrances as the page plays them: each distinct change sampled once (kinds), and its key per slide — or null when no part has one. */
   readonly transitions: { readonly kinds: Readonly<Record<string, unknown>>; readonly enter: readonly (string | null)[] } | null;
-  readonly maps: Readonly<Record<string, { readonly pieces: readonly FocusPiece[]; readonly callouts?: readonly DeckCallout[]; /** What the build knows of a wire's way along the floor, for check (rule wire-way): absent when every wire lies well. */ readonly ways?: readonly { readonly name: string; readonly from: string; readonly to: string; readonly way: string }[]; /** Each cable laid along the floor: its corners and its drawn line's length in slide px, the stretches a block hides (px along it), what it passes behind, crosses and shares. */ readonly cables?: readonly { readonly name: string; readonly from: string; readonly to: string; /** The port at each end (null for a foot), on a cable that plugs into one. */ readonly ports?: readonly [string | null, string | null]; readonly points: readonly (readonly [number, number])[]; readonly length: number; readonly unseen: readonly (readonly [number, number])[]; readonly behind: readonly string[]; readonly crosses: number; readonly shared: number; readonly bends: number }[]; /** Names that do not fit their block's top face (rule name-fit). */ readonly tight?: readonly { readonly name: string; readonly text: string }[]; /** How an isometric map was made: who placed its blocks, the tile's width in px, whether the picture was fitted, how many pieces stand on the floor by a footprint (absent when none), how many px a fitted map of groups runs past the slide's area (absent when it fits). */ readonly made?: { readonly placed: 'build' | 'hand'; readonly tile: number; readonly fitted: boolean; readonly footprints?: number; readonly outside?: number }; /** The very spec the map's steps were handed and the map they built, both frozen: what the run's map flow is handed again (absent with no isometric piece). */ readonly built?: { readonly spec: unknown; readonly map: unknown } }>>;
+  readonly maps: Readonly<Record<string, { readonly pieces: readonly FocusPiece[]; readonly callouts?: readonly DeckCallout[]; /** What the build knows of a wire's way along the floor, for check (rule wire-way): absent when every wire lies well. */ readonly ways?: readonly { readonly name: string; readonly from: string; readonly to: string; readonly way: string }[]; /** Each cable laid along the floor: its corners and its drawn line's length in slide px, the stretches a block hides (px along it), what it passes behind, crosses and shares. */ readonly cables?: readonly { readonly name: string; readonly from: string; readonly to: string; /** The port at each end (null for a foot), on a cable that plugs into one. */ readonly ports?: readonly [string | null, string | null]; readonly points: readonly (readonly [number, number])[]; readonly length: number; readonly unseen: readonly (readonly [number, number])[]; readonly behind: readonly string[]; readonly crosses: number; readonly shared: number; readonly bends: number }[]; /** Names that do not fit their block's top face (rule name-fit). */ readonly tight?: readonly { readonly name: string; readonly text: string }[]; /** How an isometric map was made: who placed its blocks, the tile's width in px, whether the picture was fitted, how many pieces stand on the floor by a footprint (absent when none), how many px a fitted map of groups runs past the slide's area (absent when it fits). */ readonly made?: { readonly placed: 'build' | 'hand'; readonly tile: number; readonly fitted: boolean; readonly footprints?: number; readonly outside?: number }; /** The very spec the map's steps were handed and the map they built, both frozen: what the run's map flow is handed again (absent with no isometric piece). */ readonly built?: { readonly spec: unknown; readonly map: unknown };
+    /** Its blocks' moves (a click's data-move), only on a map whose clicks move one: each move as footprint-story planned it, what the critics found (rule motion), how each way of showing a deck carries a move, and the run that plans the same intents as a chart for `storydeck log --why duration-0 --motion <map>`. */
+    readonly motion?: DeckMotion }>>;
   /** Present when the deck has a callout: the page then carries a callout's stylesheet. */
   readonly callouts?: true;
   /** Present when a wire's packets ride their own way (data-ride, data-rest, data-keep-size, data-trail, data-behind, a data-speed in px): the page then carries their stylesheet. */
   readonly rides?: true;
+  /** The keyframes of the blocks that move and the rules that play them (deck/motionDraw.js): only a deck whose clicks move one. */
+  readonly motionCss?: string;
 }
 /** The deck's clicks planned (each map's state carried click to click) and drawn as <deck-stage> slides. */
 export function compileDeck(source: Pick<DeckSource, 'config' | 'parts' | 'maps'> & Partial<DeckSource>, options?: { dev?: boolean }): CompiledDeck;
@@ -202,6 +206,8 @@ export interface DeckRun {
    * map's run wrote, `differs` where its map parted from the page's; `skipped` the maps past the most a run builds
    */
   maps: { runs: { name: string; file: string | null; control: unknown; keys: string[]; differs?: string }[]; skipped: number };
+  /** each map whose blocks move (data-move), its moves planned again through footprint-story's intent decider, its record kept for `storydeck log --why duration-0 --motion <map>`: absent when no click moves a block */
+  motions?: { runs: { name: string; file: string | null; control: unknown; keys: string[]; differs?: string }[]; skipped: number };
   /** the run's id when it was kept: what `storydeck log --run <id>` names it by (its number moves, its id never) */
   id?: string;
 }
@@ -260,3 +266,15 @@ export function runCli(argv: readonly string[], io?: {
   /** `dev`: the server once it listens, with stop(). */
   onStart?: (server: DeckServer & { stop(): Promise<number | void> }) => void;
 }): Promise<number>;
+
+/** A map's blocks moved by intent (`<step data-move="box fall; ball throw to server">`), as the compiled deck keeps it. */
+export interface DeckMotion {
+  readonly moves: number;
+  /** Each move: its click, the move as written, its block and word, footprint-story's model, how it was chosen and why, its seconds, its wrappers, the critics it accepts. */
+  readonly record: readonly { readonly click: number; readonly who: string; readonly piece: string; readonly do: 'fall' | 'throw' | 'hang' | 'settle' | 'reach' | 'slide'; readonly seconds: number; readonly model: string; readonly by: 'named' | 'usual'; readonly reason: string; readonly wrappers: readonly string[]; readonly accepted?: readonly string[] }[];
+  /** What footprint-story's critics and the deck's own (deck:contact, deck:covers) found: level 'accepted' when the move accepts that critic. */
+  readonly findings: readonly { readonly click: number; readonly who: string; readonly critic: string; readonly level: 'warn' | 'note' | 'accepted'; readonly what: string; readonly fix: string }[];
+  /** How each way of showing the deck carries a move: the page and a video as keyframes, a print and a PowerPoint at rest. */
+  readonly carriers: { readonly page: string; readonly video: string; readonly print: string; readonly pptx: string };
+  run(options?: { sink?: unknown; recorders?: readonly unknown[] }): Promise<{ readonly snapshot: unknown; readonly differs: string | null }>;
+}

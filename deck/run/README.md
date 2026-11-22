@@ -94,12 +94,13 @@ stopped["stopped"]
 | `chart.js` | the run's wiring, as data: which stage follows which, and where the adapter is mounted |
 | `stages.js` | what each stage does: read and compile once, check the rules, put on the record how each isometric map was made (`maps made`: who placed its blocks, the tile, its cables, what the build could not do — so the log answers "why is that wire straight" without the page being looked at), read the notes, write the page, count, give the verdict |
 | `maps.js` | each isometric map built again by footprint-story's map flow, at `maps made`, with its own record (`flowMaps`); a map flow whose map is not the page's is said (`differs`) |
+| `motions.js` | each map whose blocks move (`data-move`): its moves planned again through footprint-story's intent decider as a chart (`runHumanFlow`), at `maps made`, with its own record (`flowMotions`); a plan that is not the page's is said (`differs`) |
 | `measure.js` | the browser, as an adapter: find one, open the page offline, measure every click, say what it found or why it could not |
 | `engine.js` | the one module that calls footprintjs: builds a chart from wiring, runs it with the recorders, hands back what they hold |
 | `run.js` | `runDeck`: build the chart, run it, keep the run, hand back what a reply is made of |
 | `reply.js` | the reply, as text: verdict, problems, what was written, what changed |
 | `log.js` · `logText.js` | the runs of a deck, kept with the person, and `storydeck log` as text |
-| `why.js` | `storydeck log --why <key> [--map <map>]` as text: walked back from the run's record, or from one map's |
+| `why.js` | `storydeck log --why <key> [--map <map> \| --motion <map>]` as text: walked back from the run's record, from one map's, or from the record of one map's moves (`--why duration-0 --motion map`) |
 
 ## Laws
 

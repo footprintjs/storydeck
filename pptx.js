@@ -120,6 +120,8 @@ async function settledPictures(driver, url, clicks, dir, { maxEntrance, log }) {
     for (const c of clicks) {
       await driver.step(c.n);
       await driver.seek(Math.min(maxEntrance, await driver.freeze()));
+      // a still picture shows a block's moves where they end, never a frame between (motionDraw.js · the carriers)
+      if (typeof driver.rest === 'function') await driver.rest();
       const file = path.join(dir, `c${NUM(c.n)}.png`);
       await driver.shot(file);
       files.push(file);
@@ -188,7 +190,18 @@ function timeStage(scope) {
   scope.runtime = clicks.some((c) => c.clip) ? Math.round(clicks.reduce((s, c) => s + c.advance, 0) * 1000) / 1000 : null;
 }
 
+/**
+ * How the pictures show a block that moves by intent (deck/motionDraw.js), said in the export's record and its result:
+ * at rest only when the driver can end the moves (rest()); a driver without one leaves each where its seek put it, and
+ * the record says that, with the fix, rather than claim a rest the picture may not show.
+ */
+export const MOVES_AT_REST = 'at rest, where each move ends (the driver\'s rest())';
+export const MOVES_AS_SEEKED = 'where the driver\'s seek left them — a block that moves (data-move) may be shown mid-move: give the driver rest() (video.js · deckStageDriver has one)';
+
 async function shootStage(scope, ctx) {
+  // said before the pictures are taken: the record names how they were taken even when one fails
+  scope.moves = typeof ctx.driver.rest === 'function' ? MOVES_AT_REST : MOVES_AS_SEEKED;
+  if (scope.moves === MOVES_AS_SEEKED) ctx.log(`pictures: moves shown ${MOVES_AS_SEEKED}`);
   const clicks = scope.$getValue('clicks'), files = await settledPictures(ctx.driver, ctx.url, clicks, ctx.pictures, ctx);
   const { pictures, problems } = weighPictures(clicks, files);
   scope.pictures = pictures;
@@ -308,6 +321,6 @@ export async function exportPptx({ url, steps, deck, voice, out, name = 'deck', 
   } finally {
     if (own) rmSync(dir, { recursive: true, force: true });
   }
-  const { clicks, voiced, runtime, package: pkg } = executor.getSnapshot().sharedState;
-  return { file, slides: clicks.length, voiced, runtime, bytes: pkg.bytes, clicks, narrative: narrativeOf(executor) };
+  const { clicks, voiced, runtime, package: pkg, moves } = executor.getSnapshot().sharedState;
+  return { file, slides: clicks.length, voiced, runtime, bytes: pkg.bytes, clicks, moves, narrative: narrativeOf(executor) };
 }

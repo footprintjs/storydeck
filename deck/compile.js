@@ -18,6 +18,7 @@ import {esc, stripComments} from './html.js';
 import {readAttributes, tagsWith} from '../pieceRules.js';
 import {differsHtml, refuseEnglishWords} from './differs.js';
 import {paceAttrs} from './pace.js';
+import {checkMovesShown, motionCss, motionKept, moverNames, piecesAt, planDeckMotions, slideHtmlAt} from './motion.js';
 
 /**
  * In the dev page only: each piece keeps the number the build gave it (data-sd-at, beside the data-sd-i drawFocus
@@ -55,18 +56,18 @@ function refuseOwnNumbers(where, html) {
 }
 
 /** A map ready to plan on: its HTML with the helpers applied and its pieces read (`dev`: numbered for the dev page). */
-function prepareMap(name, html, icons, {canvas, area}, dev) {
+function prepareMap(name, html, icons, {canvas, area}, dev, movers = null) {
   refuseOwnNumbers(`map "${name}"`, html);
-  let drawn, ways, cables, tight, made, built, rides;
+  let drawn, ways, cables, tight, made, built, rides, motion, links;
   try {
-    ({html: drawn, ways, cables, tight, made, built, rides} = transformed(stripComments(html), {icons, canvas, area}));
+    ({html: drawn, ways, cables, tight, made, built, rides, motion, links} = transformed(stripComments(html), {icons, canvas, area, ...(movers ? {movers} : {})}));
   } catch (e) {
     throw new Error(`map "${name}": ${e.message}`, {cause: e});
   }
   const {html: out, pieces} = readPieces(drawn);
   if (!pieces.length) throw new Error(`map "${name}" has no pieces — a piece is an element with data-k="name" and an inline left/top (width/height)`);
   // the loops the deck writes: its own text and its icons' (a wire's packets are its wire's, not loops of their own)
-  return {name, html: dev ? numberForDev(out, pieces) : out, pieces, loops: loopsIn(drawIcons(stripComments(html), icons), `map "${name}"`), callouts: calloutsIn(stripComments(html)), ways, cables, tight, made, built, iso: isoIn(stripComments(html)).length > 0, rides: Boolean(rides), state: null};
+  return {name, html: dev ? numberForDev(out, pieces) : out, pieces, loops: loopsIn(drawIcons(stripComments(html), icons), `map "${name}"`), callouts: calloutsIn(stripComments(html)), ways, cables, tight, made, built, iso: isoIn(stripComments(html)).length > 0, rides: Boolean(rides), state: null, ...(motion ? {motion, links, ci: 0} : {})};
 }
 
 /** A map's loops a click shows: on a piece it does not keep out (gone), or on no piece. */
@@ -97,13 +98,15 @@ function planClicks(parts, maps, {area, canvas, icons}) {
       let step, r;
       try {
         step = readStep(s.attrs);
-        r = focusStep(map.state, {...step, fresh: k === 0 && lastMap !== map}, {pieces: map.pieces, area, canvas: {w: canvas[0], h: canvas[1]}});
+        // a map whose blocks move is framed where they rest at the end of this click (motion.js · piecesAt)
+        r = focusStep(map.state, {...step, fresh: k === 0 && lastMap !== map}, {pieces: piecesAt(map, map.ci ?? 0), area, canvas: {w: canvas[0], h: canvas[1]}});
+        checkMovesShown(map, map.ci ?? 0, r.look, `"${part.label}" click ${k + 1}`);
       } catch (e) {
         throw new Error(`"${part.label}" click ${k + 1}: ${e.message}`, {cause: e});
       }
       map.state = r.state;
       lastMap = map;
-      clicks.push({label: `${part.label} · ${k + 1}`, part, kind: 'map', map, step, look: r.look, enter: k === 0 ? enter : null, loops: shownLoops(map, r.look), headline: s.headline, notes: s.notes, stepIndex: k, steps: part.steps.length});
+      clicks.push({label: `${part.label} · ${k + 1}`, part, kind: 'map', map, step, look: r.look, enter: k === 0 ? enter : null, loops: shownLoops(map, r.look), headline: s.headline, notes: s.notes, stepIndex: k, steps: part.steps.length, ...(map.motion ? {ci: map.ci++} : {})});
     });
   }
   const seen = new Set();
@@ -126,7 +129,7 @@ function drawClick(c, i, total, {footer, area, canvas}) {
   if (c.kind === 'plain') return `${open} class="slide plain">${head(c.part.kicker, '')}${differsHtml(c.part.differs)}${c.inner}${foot(footer, i + 1, total)}</section>`;
   const arrives = slideStyle(c.look);   // when the view of this click has arrived, for the deck's own animations (focus.css · --sd-arrive-at)
   return `${open} class="slide on-map ${slideClass(c.look)}"${arrives ? ` style="${arrives}"` : ''}>${head(c.part.kicker, c.headline)}${differsHtml(c.part.differs)}`
-    + `<div class="map map-${c.map.name}">${wrapStage(drawFocus(c.map.html, c.look), c.look)}</div>`
+    + `<div class="map map-${c.map.name}">${wrapStage(drawFocus(c.ci === undefined ? c.map.html : slideHtmlAt(c.map, c.ci), c.look), c.look)}</div>`
     + `${focusOverlay(c.look, {area, canvas: {w: canvas[0], h: canvas[1]}})}${foot(footer, i + 1, total)}</section>`;
 }
 
@@ -154,8 +157,11 @@ function checkPost(post, labels) {
  */
 export function compileDeck(source, {dev = false} = {}) {
   const {config, parts, icons = {}} = source;
-  const maps = Object.fromEntries(Object.entries(source.maps ?? {}).map(([name, html]) => [name, prepareMap(name, html, icons, config, dev)]));
+  // the blocks each map's clicks move (data-move), known before the map is drawn: none, and the map is drawn as before
+  const movers = moverNames(parts);
+  const maps = Object.fromEntries(Object.entries(source.maps ?? {}).map(([name, html]) => [name, prepareMap(name, html, icons, config, dev, movers.get(name) ?? null)]));
   for (const part of parts) if (part.map && !maps[part.map]) throw new Error(`"${part.label}" is told on map "${part.map}", which the deck does not have`);
+  if (movers.size) planDeckMotions(parts, maps, {canvas: config.canvas});
   for (const part of parts) refuseEnglishWords(part.differs, config.lang, `"${part.label}"`);
   const opts = {area: [...config.area], canvas: config.canvas, icons, footer: config.footer};
   const planned = planClicks(parts, maps, opts);
@@ -175,12 +181,14 @@ export function compileDeck(source, {dev = false} = {}) {
   // whether the page needs a callout's stylesheet: a map or a plain slide that has one, shown or not
   const hasCallouts = Object.values(maps).some((m) => m.callouts.length) || parts.some((p) => !p.map && calloutsIn(p.body).length);
   return {config, title: config.title, themeCss: source.themeCss ?? '', slides, clicks, loops, explore: config.explore ? exploreTargets(planned) : null,
-    transitions: transitionTable(planned.map((c) => c.enter), config.canvas), maps: Object.fromEntries(Object.values(maps).map((m) => [m.name, {pieces: m.pieces, ...(m.callouts.length ? {callouts: m.callouts} : {}), ...(m.ways.length ? {ways: m.ways} : {}), ...(m.cables.length ? {cables: m.cables} : {}), ...(m.tight.length ? {tight: m.tight} : {}), ...(m.made ? {made: m.made} : {}), ...(m.built ? {built: m.built} : {})}])),
+    transitions: transitionTable(planned.map((c) => c.enter), config.canvas), maps: Object.fromEntries(Object.values(maps).map((m) => [m.name, {pieces: m.pieces, ...(m.callouts.length ? {callouts: m.callouts} : {}), ...(m.ways.length ? {ways: m.ways} : {}), ...(m.cables.length ? {cables: m.cables} : {}), ...(m.tight.length ? {tight: m.tight} : {}), ...(m.made ? {made: m.made} : {}), ...(m.built ? {built: m.built} : {}), ...motionKept(m)}])),
     ...(hasCallouts ? {callouts: true} : {}),
     // whether the page needs the isometric pieces' stylesheet: a map or a plain slide that has one (iso.js)
     ...(Object.values(maps).some((m) => m.iso) || parts.some((p) => !p.map && isoIn(p.body).length) ? {iso: true} : {}),
     // whether the page needs the stylesheet of packets that ride their own way: a wire on a map or a plain slide that asks (transforms.js · RIDE_CSS)
     ...(Object.values(maps).some((m) => m.rides) || planned.some((c) => c.rides) ? {rides: true} : {}),
+    // the keyframes of the blocks that move, and the rules that play them (motion.js): only a deck whose clicks move one
+    ...(motionCss(maps) ? {motionCss: motionCss(maps)} : {}),
     // whether the page needs a floor label's stylesheet: a slide that draws one (iso.js · FLOOR_LABEL_CSS)
     ...(slides.some((sl) => sl.html.includes('class="iso-floor-label"')) ? {floorLabels: true} : {})};
 }
