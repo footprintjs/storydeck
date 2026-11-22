@@ -36,6 +36,7 @@
 //
 // It looks as ISO_CSS says, which the page carries only when a deck has one. Every rule has no weight, so theme.css has
 // the last word: --iso-color (a piece's colour: its top is lighter, its sides darker), --iso-ink, --iso-line,
+// --iso-line-width (the faces' outline, 2.5px; a map's data-style that names a width wins over it: isoPaint.js),
 // --iso-grid, --iso-floor. Class ok, warn or bad from the base look colours one.
 //
 // A piece is what it draws, not the box it is placed by. The box of a block seen from a corner has four empty corners,
@@ -219,8 +220,8 @@ const beyondArea = (points, [x0, y0, x1, y1]) => Math.max(0, ...points.flatMap((
  * stand (null for a floor). WHY the built map's: the steps already made the faces with the style's shape column, so
  * the deck paints that list and builds no face of its own — a deck and a film draw one picture.
  */
-function artOf({box, centre}, paints, solid) {
-  return {box, art: isoArt(paints, box), say: solid ? {x: centre[0], y: centre[1]} : null};
+function artOf({box, centre}, paints, solid, styled) {
+  return {box, art: isoArt(paints, box, {styled}), say: solid ? {x: centre[0], y: centre[1]} : null};
 }
 
 /** What a name-fit note shows of a name: enough to find it. */
@@ -404,8 +405,8 @@ export function isoDrawn(html, {canvas = null, area = null, links = [], floorWir
   const grid = isometric({tile: built.view.tile, origin: built.view.origin, rise: built.view.rise});
   // each piece where the map put it, drawn — its name and its floor's label as the steps fitted them
   const drawnOf = new Map([
-    ...solid.map((p, i) => [p, {...artOf(built.shapes[i], built.paints[i], true), words: words[i], fit: fitOf(built.names[i], words[i]?.label ?? null), drawn: built.shapes[i], id: ids.blocks[i]}]),
-    ...floors.map((p, i) => [p, {...artOf(built.floorShapes[i], built.floorPaints[i], false), label: built.floorLabels[i]}]),
+    ...solid.map((p, i) => [p, {...artOf(built.shapes[i], built.paints[i], true, style !== null), words: words[i], fit: fitOf(built.names[i], words[i]?.label ?? null), drawn: built.shapes[i], id: ids.blocks[i]}]),
+    ...floors.map((p, i) => [p, {...artOf(built.floorShapes[i], built.floorPaints[i], false, style !== null), label: built.floorLabels[i]}]),
     ...feet.map((p, i) => [p, {drawn: built.obstacleShapes[i], id: ids.obstacles[i]}]),
   ]);
   // a floor label's icon, from the deck's icons: one it does not have is refused, naming the ones it has

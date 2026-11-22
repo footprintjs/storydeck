@@ -36,7 +36,8 @@ const WRITTEN = '<i data-style="line: ink width 5"></i>';
 const SHOWN = 80;
 
 const quoted = (list) => list.map((n) => `"${n}"`).join(', ');
-const cut = (text) => ([...text].length > SHOWN ? `${[...text].slice(0, SHOWN).join('')}…` : text);
+/** Words as a refusal shows them: on one line (a run of spaces, tabs or line ends one space), then cut. */
+const cut = (words) => { const text = words.replace(/\s+/g, ' '); return [...text].length > SHOWN ? `${[...text].slice(0, SHOWN).join('')}…` : text; };
 
 /** A choice and its options as written ("ink width 5"): {name, ...options}, or the name alone when it takes none. */
 function readChoice(words, column, where) {
@@ -50,7 +51,9 @@ function readChoice(words, column, where) {
   for (let i = 0; i < rest.length; i += 2) {
     const [key, value] = [rest[i], rest[i + 1]];
     if (Object.hasOwn(options, key)) throw new Error(`${where}: the ${column} "${name}" says its ${key} twice — keep one`);
-    options[key] = NUMBER.test(value) ? Number(value) : value === 'true' ? true : value === 'false' ? false : value;
+    // a number too long to be one (400 digits reads as Infinity) stays the word it was, so the refusal says what was written
+    const number = NUMBER.test(value) ? Number(value) : NaN;
+    options[key] = Number.isFinite(number) ? number : value === 'true' ? true : value === 'false' ? false : value;
   }
   return rest.length ? {...options, name} : name;
 }
@@ -91,6 +94,8 @@ export function readStyle(html) {
   for (const t of tagsWith(html, MAYBE_STYLE)) {
     const run = t.before + t.m[0] + t.after, own = ownAttribute(run, 'data-style');
     if (own === null) continue;   // the words inside another attribute's value: not a style
+    // an <I>: the case is the fault, said plainly (a map's elements are written in lower case, as data-iso-grid's <i> is)
+    if (t.tag !== 'i' && t.tag.toLowerCase() === 'i') throw new Error(`data-style: a map's style is set on an <i> in lower case — not <${t.tag}>: ${WRITTEN}`);
     if (own === undefined || own.bare || own.twice || t.tag !== 'i' || !html.startsWith('</i>', t.end)) throw new Error(`data-style: a map's style is set on an empty <i> of its own, in lower case and with quotes — ${WRITTEN}${t.tag === 'i' ? '' : ` (it styles the whole map, so it is never on a piece's <${t.tag}>)`}`);
     const rest = (own.before + own.after).trim();
     if (rest) throw new Error(`data-style: the style's <i> carries nothing else (it is not a piece, and is taken out of the map) — write ${WRITTEN} and put "${cut(rest)}" ${/data-iso-grid/i.test(rest) ? 'on an <i> of its own' : 'on a piece'}`);

@@ -28,13 +28,17 @@ const ground = (html) => html.match(/<polygon class="iso-ground"[^>]*>/g);
 const lines = (html) => html.match(/<path class="iso-lines"[^>]*>/g);
 
 describe('isoStyle · a map takes a style (data-style)', () => {
-  it('a map with no data-style is drawn byte for byte as before, and one that writes the usual look is too', () => {
+  it('a map with no data-style is drawn byte for byte as before; one that names the usual look writes its strokes out', () => {
+    // every stroke attribute the painter writes on a map that names a style, taken off again
+    const bare = (html) => html.replace(/ stroke(?:-width|-linejoin|-linecap)="[^"]*"/g, '');
     for (const map of [MAP, BUILT]) {
       const plain = isoDrawn(map, {canvas});
-      // the usual look named in full: the same page, the same spec bar the style named, the same map
+      // the usual look named in full: the same map built, its strokes written out (so --iso-line-width cannot stand in
+      // for the 2.5 it names), and nothing else changed
       const usual = isoDrawn(styled('shape: box; shading: tones; line: ink width 2.5; palette: theme; texture: none', map), {canvas});
-      expect(usual.html).toBe(plain.html);
       expect(usual.built.map.paints).toEqual(plain.built.map.paints);
+      for (const face of faces(usual.html)) expect(face).toMatch(/^<\w+ class="iso-\w+" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="butt" /);
+      expect(bare(usual.html)).toBe(plain.html);
       // with none, the spec hands no style and `made` records none: the record of a map with none is as before
       expect(plain.built.spec).not.toHaveProperty('style');
       expect(plain.made).not.toHaveProperty('style');
@@ -49,20 +53,32 @@ describe('isoStyle · a map takes a style (data-style)', () => {
     for (const map of [MAP, BUILT]) {
       const plain = isoPieces(map, {canvas}), out = isoPieces(styled('line: ink width 5', map), {canvas});
       expect(faces(out).length).toBeGreaterThan(0);
-      for (const face of faces(out)) expect(face).toMatch(/^<\w+ class="iso-\w+" stroke-width="5" /);
-      expect(out.replaceAll(' stroke-width="5"', '')).toBe(plain);
-      // the floor keeps the page's: its ground no stroke of its own, its tile lines the CSS's
+      for (const face of faces(out)) expect(face).toMatch(/^<\w+ class="iso-\w+" stroke-width="5" stroke-linejoin="round" stroke-linecap="butt" /);
+      // the tile lines' stroke written out too (their 16% stays in the page's colour: no opacity written over it)
+      for (const l of lines(out) ?? []) expect(l).toMatch(/^<path class="iso-lines" stroke-width="1.5" stroke-linejoin="miter" stroke-linecap="butt" d="/);
+      const stroked = / stroke-width="5" stroke-linejoin="round" stroke-linecap="butt"| stroke-width="1.5" stroke-linejoin="miter" stroke-linecap="butt"/g;
+      expect(out.replace(stroked, '')).toBe(plain);
+      expect(out).not.toContain('stroke-opacity');
+      // the floor keeps the page's: its ground no stroke of its own
       for (const g of ground(out)) expect(g).not.toMatch(/stroke/);
-      for (const l of lines(out) ?? []) expect(l).not.toMatch(/stroke/);
     }
+  });
+
+  it('a width the style names is written whatever it is: 2.5 and 2.6 alike, so the page\'s --iso-line-width never stands in', () => {
+    for (const width of ['2.5', '2.6', '0.5', '20']) {
+      for (const face of faces(isoPieces(styled(`line: ink width ${width}`), {canvas}))) expect(face).toContain(` stroke-width="${width}" `);
+    }
+    // a map with no style writes no width: the token (README: --iso-line-width) still sets its outline
+    expect(ISO_CSS).toContain('stroke-width: var(--iso-line-width, 2.5px)');
+    expect(isoPieces(MAP, {canvas})).not.toContain('stroke-width=');
   });
 
   it('a no-outline map writes no stroke on its faces (stroke="none" over the CSS\'s ink), and its floor keeps its tile lines', () => {
     const plain = isoPieces(MAP, {canvas}), out = isoPieces(styled('line: none'), {canvas});
     for (const face of faces(out)) expect(face).toMatch(/^<\w+ class="iso-\w+" stroke="none" /);
-    expect(out.replaceAll(' stroke="none"', '')).toBe(plain);
+    expect(out.replaceAll(' stroke="none"', '').replace(' stroke-width="1.5" stroke-linejoin="miter" stroke-linecap="butt"', '')).toBe(plain);
     expect(lines(out)).toHaveLength(1);
-    expect(lines(out)[0]).not.toMatch(/stroke/);
+    expect(lines(out)[0]).not.toMatch(/stroke="none"/);
   });
 
   it('keeps the floor\'s focus ring working: nothing on .iso-ground for the ring\'s rule to lose to, and the rule still there', () => {
@@ -112,6 +128,13 @@ describe('isoStyle · a map takes a style (data-style)', () => {
     expect(refused('line: ink; line: none')).toThrow('data-style="line: ink; line: none": the line is written twice — keep one');
     expect(refused('ink 5')).toThrow('each column is written "column: choice", apart with ";" — not "ink 5"');
     expect(refused('line:')).toThrow('the line names its choice — "line: ink"');
+    // a line end written as an entity: the refusal stays on one line
+    expect(refused('&#10;line:&#9;dotted')).toThrow('map "m": data-style=" line: dotted": the line has no choice "dotted" — there are "ink", "none"');
+    try { refused('&#10;line: dotted')(); } catch (e) { expect(e.message).not.toMatch(/\n/); }
+    // a number too long to be one (it reads as Infinity) is said as written, never as Infinity
+    const long = () => refused(`line: ink width ${'9'.repeat(400)}`)();
+    expect(long).toThrow(/: the line's width is a number, a word or true\/false — not "9{60}…"$/);
+    expect(long).not.toThrow(/Infinity/);
     expect(refused(' ; ')).toThrow('a style names at least one column, "column: choice" — <i data-style="line: ink width 5"></i>, or take it out for today\'s look');
   });
 
@@ -122,6 +145,7 @@ describe('isoStyle · a map takes a style (data-style)', () => {
     expect(() => isoPieces(`${MAP}<i data-style="line: none">x</i>`, {canvas})).toThrow('set on an empty <i> of its own');
     expect(() => isoPieces(`${MAP}<i data-style=line></i>`, {canvas})).toThrow('set on an empty <i> of its own');
     expect(() => isoPieces(`${MAP}<span data-style="line: none"></i>`, {canvas})).toThrow('never on a piece\'s <span>');
+    expect(() => isoPieces(`${MAP}<I data-style="line: none"></I>`, {canvas})).toThrow('data-style: a map\'s style is set on an <i> in lower case — not <I>: <i data-style="line: ink width 5"></i>');
     expect(() => isoPieces(`${MAP}<i data-style="line: none" data-style="line: ink"></i>`, {canvas})).toThrow('set on an empty <i> of its own');
     expect(() => isoPieces(`${styled('line: none')}<i data-style="line: ink"></i>`, {canvas})).toThrow('data-style: a map has one style, and this one sets 2 — keep one');
     expect(() => isoPieces('<div data-k="a" class="box" style="left:0px;top:0px;width:10px;height:10px">a</div><i data-style="line: none"></i>', {canvas})).toThrow('data-style: a map\'s style paints its isometric pieces (data-iso), and this map has none — take the style out, or add a block');

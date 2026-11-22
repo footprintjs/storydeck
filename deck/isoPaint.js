@@ -14,14 +14,18 @@
 //
 // WHY a stroke's width, join, cap and alpha are written apart from its colour (0.36.0): a style says them with no
 // colour (a map's data-style, isoStyle.js: "line: ink width 5" draws 5 px, "line: none" draws no outline), and the
-// page's CSS would draw its own 2.5 px ink over a list that said otherwise. So what an item says of its stroke that the
-// page does not already draw for its role (PAGE_STROKES: the usual style's own list, the look ISO_CSS is written to) is
-// written as presentation attributes — stroke-width="5", stroke="none". A presentation attribute is the weakest author
-// style: it beats what an item inherits from .iso-art (the 2.5 px), and any CSS rule that names the item still wins over
-// it — theme.css's, a state's, and the floor's focus ring (iso.js · isoRing sets stroke and stroke-width on .iso-ground)
-// — so it fights none of the deck's CSS colours. What the page already draws is written as nothing, so a map in the usual
-// look (every map with no data-style) is byte for byte as before. (The tile lines' 1.5 px is a CSS rule on .iso-lines,
-// which wins over an attribute: every line choice the kit has keeps it.)
+// page's CSS would draw its own 2.5 px ink (or a theme's --iso-line-width) over a list that said otherwise. So a map
+// that names a style (`styled`) has every stroke value its style gives written out, as presentation attributes —
+// stroke-width="5" stroke-linejoin="round" stroke-linecap="butt", or stroke="none" — so "width 2.5" and "width 2.6"
+// both draw what they say, and a theme's --iso-line-width never stands in for a width the map named. A map that names
+// none writes only what differs from what the page already draws for its role (PAGE_STROKES: the usual style's own
+// list, the look ISO_CSS is written to) — nothing, for every list the kit makes — so it is byte for byte as before and
+// --iso-line-width still sets its lines. Alpha is the one value always compared to the role's: the page's colour for a
+// role already carries it (the tile lines' 16% is in --iso-grid), so writing it again would draw it twice.
+// A presentation attribute is the weakest author style: it beats what an item inherits from .iso-art, and loses to any
+// CSS rule that names the element — theme.css's, a state's, and the floor's focus ring (iso.js · isoRing sets stroke and
+// stroke-width on .iso-ground) — so it fights none of the deck's CSS colours. (The tile lines' 1.5 px is a CSS rule on
+// .iso-lines, which wins over an attribute: every line choice the kit has keeps it.)
 //
 // Numbers are written to one decimal, as every isometric page has been (0.1 px, no trailing zeros), and from the
 // piece's box: a point of the frame minus the box's corner.
@@ -102,18 +106,19 @@ function colours({fill}, stroke) {
 }
 
 /**
- * What a stroke with no colour of its own says that the page does not already draw for its role (PAGE_STROKES), as
- * presentation attributes: '' when it says nothing more. No stroke where the page draws one is stroke="none"; a stroke
- * with a colour says all of it in its style attribute (colours), so nothing is written here.
+ * A stroke with no colour of its own, as presentation attributes: on a map that names a style (`styled`) its width,
+ * join and cap all written; on one that names none only what differs from what the page draws for its role
+ * (PAGE_STROKES); its alpha only where it differs from the role's, either way. No stroke where the page draws one is
+ * stroke="none". A stroke with a colour says all of it in its style attribute (colours), so nothing is written here.
  */
-function strokeApart(role, stroke) {
+function strokeApart(role, stroke, styled) {
   if (stroke?.colour != null) return '';
   const page = Object.hasOwn(PAGE_STROKES, role) ? PAGE_STROKES[role] : PAGE_STROKES.top;
   if (stroke === null) return page === null ? '' : ' stroke="none"';
   const said = [];
-  if (stroke.width !== page?.width) said.push(` stroke-width="${stroke.width}"`);
-  if (stroke.join !== page?.join) said.push(` stroke-linejoin="${stroke.join}"`);
-  if (stroke.cap !== page?.cap) said.push(` stroke-linecap="${stroke.cap}"`);
+  if (styled || stroke.width !== page?.width) said.push(` stroke-width="${stroke.width}"`);
+  if (styled || stroke.join !== page?.join) said.push(` stroke-linejoin="${stroke.join}"`);
+  if (styled || stroke.cap !== page?.cap) said.push(` stroke-linecap="${stroke.cap}"`);
   if (stroke.alpha !== (page?.alpha ?? 1)) said.push(` stroke-opacity="${stroke.alpha}"`);
   return said.join('');
 }
@@ -142,8 +147,8 @@ function pathData(segments, x, y) {
 }
 
 /** One paint item as one SVG element, placed in the box whose corner is (x, y). */
-function itemSvg(it, x, y) {
-  const stroke = strokeOf(it.stroke), head = `class="${roleClass(it.role)}"${strokeApart(it.role, stroke)}${colours(it, stroke)}`;
+function itemSvg(it, x, y, styled) {
+  const stroke = strokeOf(it.stroke), head = `class="${roleClass(it.role)}"${strokeApart(it.role, stroke, styled)}${colours(it, stroke)}`;
   switch (it.item) {
     case 'polygon': return `<polygon ${head} points="${it.points.map(([px, py]) => `${rel(px, x)},${rel(py, y)}`).join(' ')}"/>`;
     case 'ellipse': return `<ellipse ${head} cx="${rel(it.cx, x)}" cy="${rel(it.cy, y)}" rx="${fixed(it.rx)}" ry="${fixed(it.ry)}"/>`;
@@ -155,4 +160,8 @@ function itemSvg(it, x, y) {
 }
 
 /** A piece's paint list as the SVG inside its box ({x, y}: the box's corner on the slide), in paint order. */
-export const isoArt = (items, {x, y}) => items.map((it) => itemSvg(it, x, y)).join('');
+/**
+ * `styled`: the map names a style (data-style), so every stroke value its style gives is written out (strokeApart);
+ * left out, only what the page does not already draw.
+ */
+export const isoArt = (items, {x, y}, {styled = false} = {}) => items.map((it) => itemSvg(it, x, y, styled)).join('');

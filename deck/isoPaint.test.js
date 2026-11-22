@@ -80,6 +80,14 @@ describe('isoPaint · a paint list written as SVG', () => {
     expect(art({item: 'polygon', role: 'left', points: tri, stroke: {...ink, join: 'miter', alpha: 0.5}})).toBe('<polygon class="iso-left" stroke-linejoin="miter" stroke-opacity="0.5" points="0,0 1,0 0,1"/>');
     expect(art({item: 'lines', role: 'grid', segments: [], stroke: null})).toBe('<path class="iso-lines" stroke="none" d=""/>');
     expect(art({item: 'polygon', role: 'ground', points: tri, stroke: null})).toBe('<polygon class="iso-ground" points="0,0 1,0 0,1"/>');
+    // on a map that names a style, every stroke value written out — the alpha only where it is not the role's (the
+    // page's colour carries it); no stroke stays stroke="none" where the page draws one, nothing on the ground
+    const styledArt = (item) => isoArt([{of: 'p', ...usual(item.role), ...item}], {x: 0, y: 0}, {styled: true});
+    expect(styledArt({item: 'polygon', role: 'top', points: tri})).toBe('<polygon class="iso-top" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="butt" points="0,0 1,0 0,1"/>');
+    expect(styledArt({item: 'lines', role: 'grid', segments: []})).toBe('<path class="iso-lines" stroke-width="1.5" stroke-linejoin="miter" stroke-linecap="butt" d=""/>');
+    expect(styledArt({item: 'polygon', role: 'top', points: tri, stroke: {...ink, alpha: 0.5}})).toContain(' stroke-linecap="butt" stroke-opacity="0.5" ');
+    expect(styledArt({item: 'polygon', role: 'top', points: tri, stroke: null})).toBe('<polygon class="iso-top" stroke="none" points="0,0 1,0 0,1"/>');
+    expect(styledArt({item: 'polygon', role: 'ground', points: tri})).toBe('<polygon class="iso-ground" points="0,0 1,0 0,1"/>');
     expect(() => art({item: 'polygon', role: 'top', points: tri, stroke: 'none'})).toThrow(/stroke is \{colour, alpha, width, join, cap\}, or null — not "none"/);
     expect(() => art({item: 'polygon', role: 'top', points: tri, stroke: {...ink, width: '2px'}})).toThrow(/width is from 0 to 1000/);
     expect(art({item: 'polygon', role: 'top', points: [[0, 0], [1, 0], [0, 1]], fill: {mix: ['#ffffff', 0.2], colour: '#abcdef'}, stroke: {colour: null, alpha: 1, width: 5, join: 'round', cap: 'round'}})).toBe('<polygon class="iso-top" stroke-width="5" stroke-linecap="round" style="fill:#abcdef" points="0,0 1,0 0,1"/>');
@@ -113,7 +121,7 @@ describe('isoPaint · a paint list written as SVG', () => {
   it('is the only writer of a face: deck/iso.js paints the built map\'s list and builds no face string, nor asks the grid for one', () => {
     const iso = readFileSync(path.join(process.cwd(), 'deck/iso.js'), 'utf8');
     expect(iso).toMatch(/import \{isoArt\} from '\.\/isoPaint\.js';/);
-    expect(iso).toContain('isoArt(paints, box)');
+    expect(iso).toContain('isoArt(paints, box, {styled})');
     expect(iso).not.toMatch(/<(polygon|ellipse|path)\b/);
     expect(iso).not.toMatch(/class="iso-(left|right|top|side|ground|lines)"/);
     expect(iso).not.toMatch(/grid\.(block|cylinder|floor)\(/);
