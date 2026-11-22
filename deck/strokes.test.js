@@ -9,7 +9,7 @@ import {describe, it, expect} from 'vitest';
 import {readFileSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import {strokeOutline, CAP_STEPS} from 'footprint-story/human';
-import {isoArt, strokesDrawn, PAGE_LINE, STROKE_TIMING} from './isoPaint.js';
+import {isoArt, strokesDrawn, strokesSvg, inlineStrokes, PAGE_LINE, STROKE_TIMING} from './isoPaint.js';
 import {isoDrawn, ISO_CSS} from './iso.js';
 import {compileDeck} from './compile.js';
 import {sourceOf} from './test/helpers.js';
@@ -92,13 +92,14 @@ describe('strokes · the map\'s record says their time is not played', () => {
   it('counts the strokes a map draws and says a page draws them whole; a map with none says nothing', () => {
     expect(STROKE_TIMING).toBe('drawn whole, at rest: a page does not play a stroke\'s timing (StoryReel plays it)');
     expect(strokesDrawn([[{item: 'polygon'}], []])).toBeNull();
-    expect(strokesDrawn([[{item: 'polygon'}, {item: 'stroke'}], [{item: 'stroke'}]])).toEqual({strokes: 2, timing: STROKE_TIMING});
+    expect(strokesDrawn([[{item: 'polygon'}, {item: 'stroke'}], [{item: 'stroke'}]])).toEqual({strokes: 2, bytes: 0, timing: STROKE_TIMING});
+    expect(strokesDrawn([[{item: 'stroke'}]], new Map([['a', '<g id="a">12</g>'], ['b', 'xy']]))).toEqual({strokes: 1, bytes: 18, timing: STROKE_TIMING});
   });
 
   it('the run\'s "maps made" keeps it beside the style', async () => {
-    const scope = {}, made = {placed: 'hand', tile: 120, strokes: {strokes: 3, timing: STROKE_TIMING}};
+    const scope = {}, made = {placed: 'hand', tile: 120, strokes: {strokes: 3, bytes: 900, timing: STROKE_TIMING}};
     await mapsMade(scope, {loaded: {compiled: {maps: {m: {made}}}}, options: {}, mapRecord: () => null});
-    expect(scope.maps).toEqual({m: {placed: 'hand', tile: 120, cables: 0, strokes: {strokes: 3, timing: STROKE_TIMING}}});
+    expect(scope.maps).toEqual({m: {placed: 'hand', tile: 120, cables: 0, strokes: {strokes: 3, bytes: 900, timing: STROKE_TIMING}}});
   });
 });
 
@@ -112,13 +113,16 @@ const paths = (html) => html.match(/<path class="iso-(?:ink|hatch)" stroke="none
 
 describe('strokes · a map drawn by hand (data-style="line: human:sketchy; texture: human:hatch")', () => {
   it('is built by the steps with the deck\'s hand-drawn choices, and every stroke they made is drawn as its ring', () => {
-    const {html, built, made} = isoDrawn(SKETCHY, {canvas});
+    const {html: page, built, made, strokeDefs} = isoDrawn(SKETCHY, {canvas});
+    // the strokes are drawn once for the page and used in place (strokes-once.test.js): written back, they are the strokes
+    expect(paths(page)).toHaveLength(0);
+    const html = inlineStrokes(page, strokeDefs);
     expect(built.spec.style).toEqual({line: 'human:sketchy', texture: 'human:hatch'});
     expect(built.map.style.row).toMatchObject({line: 'human:sketchy', texture: 'human:hatch'});
     const lists = [...built.map.paints, ...built.map.floorPaints], all = lists.flat().filter((it) => it.item === 'stroke');
     expect(all.length).toBeGreaterThan(20);
     expect(new Set(all.map((it) => it.role))).toEqual(new Set(['ink', 'hatch']));
-    expect(made.strokes).toEqual({strokes: all.length, timing: STROKE_TIMING});
+    expect(made.strokes).toEqual({strokes: all.length, bytes: Object.values(strokeDefs).join('').length, timing: STROKE_TIMING});
     // one path a stroke, in paint order, each footprint-story's capped ring in its piece's box
     const drawn = paths(html), boxes = [...built.map.shapes, ...built.map.floorShapes].map((s) => s.box);
     expect(drawn).toHaveLength(all.length);
@@ -137,7 +141,8 @@ describe('strokes · a map drawn by hand (data-style="line: human:sketchy; textu
     const deck = compileDeck(sourceOf({clicks: '<section data-label="S" data-map="m"><step data-in="*"><h2>A</h2></step></section>', maps: {m: SKETCHY}}));
     const {made, built} = deck.maps.m;
     expect(made.strokes.timing).toBe(STROKE_TIMING);
-    expect(paths(JSON.stringify(deck.slides).replaceAll('\\"', '"'))).toHaveLength(made.strokes.strokes);
+    // every click draws them by a <use>; the page holds them once
+    for (const slide of deck.slides) expect(paths(inlineStrokes(slide.html, deck.strokeDefs))).toHaveLength(made.strokes.strokes);
     // the run's own map flow, handed the deck's choices: the very map the page draws, its record kept
     const eng = await engine();
     const {runs} = await flowMaps({$call: (target, fn) => fn()}, {engine: eng, options: {}, mapRecord: () => null}, [{name: 'm', built}]);
@@ -155,8 +160,8 @@ describe('strokes · a map drawn by hand (data-style="line: human:sketchy; textu
   });
 
   it('the page, as a still: the page\'s own CSS and the map as the page writes it, byte for byte', () => {
-    const {html} = isoDrawn(SKETCHY, {canvas});
-    const still = `<!doctype html>\n<meta charset="utf-8">\n<title>human:sketchy + human:hatch — a StoryDeck map drawn by hand</title>\n<style>${ISO_CSS}</style>\n<section data-label="still" style="position:relative;width:1920px;height:1080px;background:#fff">\n${html}\n</section>\n`;
+    const {html, strokeDefs} = isoDrawn(SKETCHY, {canvas});
+    const still = `<!doctype html>\n<meta charset="utf-8">\n<title>human:sketchy + human:hatch — a StoryDeck map drawn by hand</title>\n<style>${ISO_CSS}</style>\n${strokesSvg(strokeDefs)}\n<section data-label="still" style="position:relative;width:1920px;height:1080px;background:#fff">\n${html}\n</section>\n`;
     const file = path.join(process.cwd(), 'deck/test/sketchy-still.html');
     if (process.env.STORYDECK_WRITE_STILLS === '1') writeFileSync(file, still);
     expect(still).toBe(readFileSync(file, 'utf8'));

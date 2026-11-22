@@ -192,17 +192,18 @@ function strokeSvg(it, x, y) {
 }
 
 /**
- * What a map's record says of its hand-drawn strokes: {strokes, timing} — how many its pieces' lists draw, and that
- * their time is not played (STROKE_TIMING) — or null when they draw none, so a map with none records as before.
+ * What a map's record says of its hand-drawn strokes: {strokes, bytes, timing} — how many its pieces' lists draw, the
+ * bytes the page carries them in (`defs`, isoArt's `strokes`: once for the whole page; ASCII, so a letter is a byte),
+ * and that their time is not played (STROKE_TIMING) — or null when they draw none, so a map with none records as before.
+ * Their points are not kept here: they are the steps' (built again from the map's spec and the deck's choices).
  */
-export function strokesDrawn(lists) {
+export function strokesDrawn(lists, defs = new Map()) {
   const strokes = lists.reduce((n, items) => n + items.filter((it) => it.item === 'stroke').length, 0);
-  return strokes ? {strokes, timing: STROKE_TIMING} : null;
+  return strokes ? {strokes, bytes: [...defs.values()].reduce((n, g) => n + g.length, 0), timing: STROKE_TIMING} : null;
 }
 
-/** One paint item as one SVG element, placed in the box whose corner is (x, y). */
+/** One paint item but a stroke (isoArt writes strokes itself, a run at a time) as one SVG element, placed in the box whose corner is (x, y). */
 function itemSvg(it, x, y, styled) {
-  if (it.item === 'stroke') return strokeSvg(it, x, y);
   const stroke = strokeOf(it.stroke), head = `class="${roleClass(it.role)}"${strokeApart(it.role, stroke, styled)}${colours(it, stroke)}`;
   switch (it.item) {
     case 'polygon': return `<polygon ${head} points="${it.points.map(([px, py]) => `${rel(px, x)},${rel(py, y)}`).join(' ')}"/>`;
@@ -214,9 +215,61 @@ function itemSvg(it, x, y, styled) {
   }
 }
 
-/** A piece's paint list as the SVG inside its box ({x, y}: the box's corner on the slide), in paint order. */
 /**
+ * A name for a run of strokes, from what it draws: FNV-1a over its markup, two 32-bit lanes (16 hex digits). WHY from
+ * the markup, not a counter: the same strokes are the same def wherever they are drawn (a map's every click, two maps
+ * alike), and a page's name for them never depends on the order the maps were built in.
+ */
+export function strokesId(markup) {
+  let a = 0x811c9dc5, b = 0x01000193 ^ markup.length;
+  for (let i = 0; i < markup.length; i += 1) {
+    const c = markup.charCodeAt(i);
+    a = Math.imul(a ^ c, 0x01000193) >>> 0;
+    b = Math.imul(b ^ c, 0x0100019d) >>> 0;
+  }
+  return `sd-st-${a.toString(16).padStart(8, '0')}${b.toString(16).padStart(8, '0')}`;
+}
+
+/**
+ * A piece's paint list as the SVG inside its box ({x, y}: the box's corner on the slide), in paint order.
  * `styled`: the map names a style (data-style), so every stroke value its style gives is written out (strokeApart);
  * left out, only what the page does not already draw.
+ * `strokes`: a Map the map's hand-drawn strokes are kept in, drawn ONCE for the whole page (id → `<g id>` of paths):
+ * each run of strokes in a row is written there and drawn here as one `<use href="#id"/>`, in its place in the paint
+ * order. WHY: a map is written again on every click of its part, and a hatched map's strokes are most of its bytes
+ * (64 hatched blocks: 1.6 MB a click) — drawn once, a click carries a few bytes for each run. Left out, the strokes are
+ * written in place, as one list's own SVG (a test, a caller with no page).
  */
-export const isoArt = (items, {x, y}, {styled = false} = {}) => items.map((it) => itemSvg(it, x, y, styled)).join('');
+export function isoArt(items, {x, y}, {styled = false, strokes = null} = {}) {
+  let out = '', run = '';
+  const flush = () => {
+    if (!run) return;
+    if (strokes) { const id = strokesId(run); strokes.set(id, `<g id="${id}">${run}</g>`); out += `<use href="#${id}"/>`; } else out += run;
+    run = '';
+  };
+  for (const it of items) {
+    if (it.item === 'stroke') { run += strokeSvg(it, x, y); continue; }
+    flush();
+    out += itemSvg(it, x, y, styled);
+  }
+  flush();
+  return out;
+}
+
+/** The hidden SVG a page draws its maps' strokes in, once (isoArt's `strokes`, as {id: `<g id>`}); '' when there are none. */
+export const strokesSvg = (defs) => {
+  const all = Object.values(defs ?? {});
+  return all.length ? `<svg data-sd-strokes aria-hidden="true" width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden"><defs>${all.join('')}</defs></svg>` : '';
+};
+
+/**
+ * A slide's HTML with each drawn-once stroke run written back in place (`defs`: {id: `<g id>`}): for HTML shown away from
+ * the page that holds the defs — the Read and Scroll lenses' deck-data.json, whose sections are each shown alone. An id
+ * the defs do not hold is refused: a stroke would vanish unseen.
+ */
+export function inlineStrokes(html, defs) {
+  return html.replace(/<use href="#(sd-st-[0-9a-f]{16})"\/>/g, (_, id) => {
+    if (!Object.hasOwn(defs ?? {}, id)) throw new Error(`isoPaint: a slide draws strokes "${id}", which the page's strokes do not hold`);
+    return defs[id].replace(/^<g id="[^"]*">/, '').replace(/<\/g>$/, '');
+  });
+}

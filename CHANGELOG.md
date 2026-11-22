@@ -28,15 +28,30 @@ page that names no hand-drawn style is byte for byte as before.
   it can cross itself at a round cap. Its ink is its colour, or the page's line colour
   (`var(--iso-line, var(--iso-ink, #14181f))`, the colour a face's outline uses) when it has none. It has
   `stroke="none"`, so the page's 2.5 px outline does not make it thicker.
+- **Drawn once a map, not once a click:** a map's HTML is written again on every click of its part, and a hatched
+  map's strokes are most of its bytes. So the page holds each run of strokes once, in a hidden
+  `<svg data-sd-strokes>` before the stage (one `<g id>` a run, named by what it draws), and every click draws it with
+  a `<use href="#…"/>`, in its place in the paint order. For 64 hatched blocks told in five clicks, a click went from
+  1.6 MB to 33 KB (the same map unstyled is 28 KB), and the page from 8.4 MB to 1.9 MB. `deck-data.json` (the Read
+  and Scroll lenses) writes the strokes back into each section, since a section is shown on its own. A page with no
+  strokes has no such `<svg>` and is byte for byte as before.
+- **A stated budget** (`isoRules.js`, our numbers): `storydeck check` notes a map past 2000 strokes or 2 MB of them
+  (rule `strokes`, at its first click, with the fix: a wider hatch spacing), and the build refuses a map past 20000
+  strokes or 16 MB, naming the fix. The 64-block case is noted (2112 strokes).
+- **The records:** StoryDeck's own record of a map (`made.strokes`, `maps made` · `strokes`) keeps how many strokes it
+  draws, their bytes and the timing note, never a point. The run's map-flow record (`storydeck log --map`) is
+  footprint-story's (`runMapFlow`'s commit log) and still keeps every stroke's points: 3.9 MB for the 64-block case.
+  footprint-story will trim it; StoryDeck does not edit another package's record.
 - **The time:** a deck page is drawn at rest, so the whole stroke is drawn and its times are not played. A map that
   draws strokes says so in its record (`made.strokes` and the run's `maps made` · `strokes`: how many, and "drawn
   whole, at rest: a page does not play a stroke's timing (StoryReel plays it)"). A map with none records as before.
   Revealing a stroke click by click (footprint-story's `strokeAt`) is left for later.
 - **Exports:** PowerPoint and video take a PNG of each settled slide from the browser, and print uses the browser's
-  page, so all three carry a stroke as the SVG draws it: whole and still.
+  page. The strokes `<svg>` is in that page, so all three carry a stroke as the SVG draws it: whole and still.
 - Tests: the ring with each cap (round, butt, square) is checked against a hand-worked one to 1e-6. A hand-drawn map
   is built, drawn, compiled and built again by the run's map flow, which gives the same map. A still of that page
-  (`deck/test/sketchy-still.html`, with no words, so no font of the host's) is pinned byte for byte.
+  (`deck/test/sketchy-still.html`, with no words, so no font of the host's) is pinned byte for byte. The 64-block
+  case's sizes, the note and the refusal are pinned (`deck/strokes-once.test.js`).
 
 ## 0.38.0 — the motion place rules, one copy
 

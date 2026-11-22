@@ -58,16 +58,16 @@ function refuseOwnNumbers(where, html) {
 /** A map ready to plan on: its HTML with the helpers applied and its pieces read (`dev`: numbered for the dev page). */
 function prepareMap(name, html, icons, {canvas, area}, dev, movers = null) {
   refuseOwnNumbers(`map "${name}"`, html);
-  let drawn, ways, cables, tight, made, built, rides, motion, links;
+  let drawn, ways, cables, tight, made, built, rides, motion, links, strokeDefs;
   try {
-    ({html: drawn, ways, cables, tight, made, built, rides, motion, links} = transformed(stripComments(html), {icons, canvas, area, ...(movers ? {movers} : {})}));
+    ({html: drawn, ways, cables, tight, made, built, rides, motion, links, strokeDefs} = transformed(stripComments(html), {icons, canvas, area, ...(movers ? {movers} : {})}));
   } catch (e) {
     throw new Error(`map "${name}": ${e.message}`, {cause: e});
   }
   const {html: out, pieces} = readPieces(drawn);
   if (!pieces.length) throw new Error(`map "${name}" has no pieces — a piece is an element with data-k="name" and an inline left/top (width/height)`);
   // the loops the deck writes: its own text and its icons' (a wire's packets are its wire's, not loops of their own)
-  return {name, html: dev ? numberForDev(out, pieces) : out, pieces, loops: loopsIn(drawIcons(stripComments(html), icons), `map "${name}"`), callouts: calloutsIn(stripComments(html)), ways, cables, tight, made, built, iso: isoIn(stripComments(html)).length > 0, rides: Boolean(rides), state: null, ...(motion ? {motion, links, ci: 0} : {})};
+  return {name, html: dev ? numberForDev(out, pieces) : out, pieces, loops: loopsIn(drawIcons(stripComments(html), icons), `map "${name}"`), callouts: calloutsIn(stripComments(html)), ways, cables, tight, made, built, iso: isoIn(stripComments(html)).length > 0, rides: Boolean(rides), state: null, ...(strokeDefs ? {strokeDefs} : {}), ...(motion ? {motion, links, ci: 0} : {})};
 }
 
 /** A map's loops a click shows: on a piece it does not keep out (gone), or on no piece. */
@@ -150,7 +150,8 @@ function checkPost(post, labels) {
  * there is to say of a wire; cables: each cable laid, its points and length; tight: names that do not fit their block;
  * made: placed by the build or by hand, the tile — for check, the run's log, and whoever times a thing to a cable;
  * built: {spec, map}, the very spec the map's steps were handed and the map they built, frozen — for the run's map flow, run/maps.js), callouts?: true when it has any,
- * iso?: true when it has an isometric piece, floorLabels?: true when a floor has a label, rides?: true when a wire's packets ride their own way (data-ride …)}.
+ * iso?: true when it has an isometric piece, floorLabels?: true when a floor has a label, rides?: true when a wire's packets ride their own way (data-ride …),
+ * strokeDefs?: {id: `<g id>`} — the maps' hand-drawn strokes, which the page draws once and each click's slide draws with a <use>}.
  * `dev` numbers each map's pieces in the slides (data-sd-at), for the dev page's edits.
  * A slide's notes are what notesData carries ({slide, step, steps, now, earlier}). Throws, naming the part and the
  * click, when a click cannot be planned.
@@ -189,6 +190,8 @@ export function compileDeck(source, {dev = false} = {}) {
     ...(Object.values(maps).some((m) => m.rides) || planned.some((c) => c.rides) ? {rides: true} : {}),
     // the keyframes of the blocks that move, and the rules that play them (motion.js): only a deck whose clicks move one
     ...(motionCss(maps) ? {motionCss: motionCss(maps)} : {}),
+    // the maps' hand-drawn strokes, drawn once for the page (isoPaint.js · isoArt `strokes`, by id): only a deck whose maps draw some
+    ...(Object.values(maps).some((m) => m.strokeDefs) ? {strokeDefs: Object.assign({}, ...Object.values(maps).map((m) => m.strokeDefs ?? {}))} : {}),
     // whether the page needs a floor label's stylesheet: a slide that draws one (iso.js · FLOOR_LABEL_CSS)
     ...(slides.some((sl) => sl.html.includes('class="iso-floor-label"')) ? {floorLabels: true} : {})};
 }

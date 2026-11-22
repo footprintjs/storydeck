@@ -79,3 +79,22 @@ export function areaOf(solid, {fitted, canvas, area}) {
   if (!fine) throw new Error(`a fitted picture goes into the slide's area, [x0, y0, x1, y1] in slide px with x1 past x0 and y1 past y0 (deck.json "area") — not ${Array.isArray(into) ? `[${into.map(String).join(', ')}]` : JSON.stringify(into)}`);
   return into;
 }
+
+/**
+ * How many hand-drawn strokes one map may draw, as the page carries them (once, isoPaint.js · isoArt `strokes`): past
+ * STROKES_NOTE a build note says so (check.js · strokes), past STROKES_MOST the map is refused, naming the fix. Ours:
+ * a hatched block of 2 × 2 × 1 tiles at a 60 px tile draws about 33 strokes in 25 KB, so the note comes at about 60
+ * such blocks (a page that opens in a moment on a laptop, and prints), and the refusal at about ten times that — a
+ * page past 16 MB of strokes is slow to open, to step through and to print, and every lens copies its slides.
+ */
+export const STROKES_NOTE = Object.freeze({strokes: 2000, bytes: 2_000_000});
+export const STROKES_MOST = Object.freeze({strokes: 20_000, bytes: 16_000_000});
+
+/** A size in MB as a deck says it: one decimal. */
+export const mb = (bytes) => `${(bytes / 1e6).toFixed(1)} MB`;
+
+/** A map whose strokes ({strokes, bytes}, isoPaint.js · strokesDrawn) pass STROKES_MOST: refused, naming the fix. */
+export function refuseStrokes({strokes, bytes}) {
+  if (strokes <= STROKES_MOST.strokes && bytes <= STROKES_MOST.bytes) return;
+  throw new Error(`data-style: this map draws ${strokes} hand-drawn strokes in ${mb(bytes)} of the page, past the ${STROKES_MOST.strokes} strokes or ${mb(STROKES_MOST.bytes)} one map may (ours) — give the hatch a wider spacing ("texture: human:hatch spacing 16"), take the texture out, or tell it in two maps`);
+}
