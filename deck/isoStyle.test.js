@@ -110,19 +110,19 @@ describe('isoStyle · a map takes a style (data-style)', () => {
     expect(readStyle('<b>x</b>')).toEqual({html: '<b>x</b>', style: null});
     // the columns and choices are the kit's (a new one in the kit is a new case here)
     expect(ISO_STYLE_COLUMNS).toEqual(['shape', 'shading', 'line', 'palette', 'texture', 'effects']);
-    expect(ISO_STYLE_CHOICES.line).toEqual(['ink', 'none']);
-    // and footprint-story's hand-drawn ones, which the deck hands its steps (isoSpec.js · DECK_CHOICES)
+    expect(ISO_STYLE_CHOICES.line).toEqual(['ink', 'none', 'contour']);
+    // and footprint-story's hand-drawn ones, which the deck hands its steps (footprint-story/human · HUMAN_STYLE_CHOICES)
     expect(parseStyle('line: human:sketchy width 3; texture: human:hatch spacing 10', w)).toEqual({line: {name: 'human:sketchy', width: 3}, texture: {name: 'human:hatch', spacing: 10}});
   });
 
   it('refuses, naming the map and the fix in the deck\'s words: an unknown column, an unknown choice with the ones there are, a bad option', () => {
     const refused = (style, map = MAP) => () => compileDeck(sourceOf({clicks: '<section data-label="S" data-map="m"><step data-in="you"><h2>A</h2></step></section>', maps: {m: styled(style, map)}}));
-    expect(refused('lines: none')).toThrow('map "m": data-style="lines: none": a style\'s columns are shape, shading, line, palette, texture, effects — not "lines"');
-    expect(refused('line: dotted')).toThrow('map "m": data-style="line: dotted": the line has no choice "dotted" — there are "ink", "none"');
+    expect(refused('lines: none')).toThrow('map "m": data-style="lines: none": a style\'s columns are look, shape, shading, line, palette, texture, effects — not "lines"');
+    expect(refused('line: dotted')).toThrow('map "m": data-style="line: dotted": the line has no choice "dotted" — there are "ink", "none", "contour"');
     expect(refused('effects: glow')).toThrow('data-style="effects: glow": the effects has no choice "glow" — there are none yet');
     // the hand-drawn choices the deck hands in are named among the ones there are, and their options checked by the kit
-    expect(refused('line: human:scribble')).toThrow('map "m": data-style="line: human:scribble": the line has no choice "human:scribble" — there are "ink", "none", "human:sketchy"');
-    expect(refused('texture: crosses')).toThrow('the texture has no choice "crosses" — there are "none", "human:hatch"');
+    expect(refused('line: human:scribble')).toThrow('map "m": data-style="line: human:scribble": the line has no choice "human:scribble" — there are "ink", "none", "contour", "human:sketchy"');
+    expect(refused('texture: crosses')).toThrow('the texture has no choice "crosses" — there are "none", "human:hatch", "human:grain"');
     expect(refused('effects: human:glow')).toThrow('the effects has no choice "human:glow" — there are none yet');
     expect(refused('line: human:sketchy width 30')).toThrow('data-style="line: human:sketchy width 30": the line "human:sketchy" takes a width from 0.5 to 20 — not 30');
     expect(refused('texture: human:hatch spacing 1')).toThrow('data-style="texture: human:hatch spacing 1": the texture "human:hatch" takes a spacing from 3 to 200 — not 1');
@@ -138,7 +138,7 @@ describe('isoStyle · a map takes a style (data-style)', () => {
     expect(refused('ink 5')).toThrow('each column is written "column: choice", apart with ";" — not "ink 5"');
     expect(refused('line:')).toThrow('the line names its choice — "line: ink"');
     // a line end written as an entity: the refusal stays on one line
-    expect(refused('&#10;line:&#9;dotted')).toThrow('map "m": data-style=" line: dotted": the line has no choice "dotted" — there are "ink", "none"');
+    expect(refused('&#10;line:&#9;dotted')).toThrow('map "m": data-style=" line: dotted": the line has no choice "dotted" — there are "ink", "none", "contour"');
     try { refused('&#10;line: dotted')(); } catch (e) { expect(e.message).not.toMatch(/\n/); }
     // a number too long to be one (it reads as Infinity) is said as written, never as Infinity
     const long = () => refused(`line: ink width ${'9'.repeat(400)}`)();

@@ -21,18 +21,16 @@
 // A refusal of the steps names the piece by the deck's own words (`who`: the piece as iso.js names it), so it needs no
 // rewording; two the deck said in its own words before are said so still (deckWords).
 import {buildIsoMap, ISO_MAP_LIMITS, ISO_MAP_POLICIES, MOST_ROUTES, NO_ROUTE} from 'footprint-story/isometric';
-import {hatchTexture, sketchyLine} from 'footprint-story/human';
+// The style choices handed to the steps beside the kit's own are the human door's whole list (footprint-story/human ·
+// HUMAN_STYLE_CHOICES: `human:sketchy`, `human:hatch`, `human:grain`; 0.40.0 — 0.39.0 kept a list of its own here,
+// DECK_CHOICES). WHY its list: one list, so the deck takes the next choice the kit ships with no change — the painter
+// draws every item kind the kit has (isoPaint.js refuses a kind it does not know by name, never draws it as nothing).
+// The same list goes to the compile's steps (builtMap), the run's map flow (run/maps.js) and the style's check
+// (isoStyle.js), so all three know one set of names.
+import {HUMAN_STYLE_CHOICES} from 'footprint-story/human';
 
 /** The deck's numbers for its maps: the kit's policy, pinned against StoryDeck 0.32.0's own map code. */
 export const DECK = ISO_MAP_POLICIES.deck;
-/**
- * The style choices the deck hands footprint-story's map steps beside its own: the hand-drawn line and hatch
- * (footprint-story/human · `human:sketchy`, `human:hatch`). WHY handed in, and only these: they paint `stroke` items,
- * and a tool hands a choice in once its painter draws what it makes (isoPaint.js draws strokes since 0.39.0). The
- * same list goes to the compile's steps (builtMap), the run's map flow (run/maps.js) and the style's check
- * (isoStyle.js), so all three know one set of names.
- */
-export const DECK_CHOICES = Object.freeze([sketchyLine, hatchTexture]);
 /** The grid a map that places its own blocks and writes none is drawn on: a tile 120 px, its far corner mid-slide, 240 px down. */
 export const usualGrid = (canvas) => ({tile: 120, origin: [(canvas ?? [1920, 1080])[0] / 2, 240]});
 /** The map, as a refusal of the steps names it. */
@@ -166,7 +164,7 @@ export function builtMap({blocks = [], floors = [], obstacles = [], keep = [], l
     ...(style ? {style} : {}),
   }));
   let map;
-  try { map = buildIsoMap(spec, DECK, {choices: DECK_CHOICES}); } catch (e) {
+  try { map = buildIsoMap(spec, DECK, {choices: HUMAN_STYLE_CHOICES}); } catch (e) {
     const pieces = [...blocks, ...floors, ...obstacles];
     throw deckWords(e, names.flatMap((made, i) => (made === pieces[i].name ? [] : [[made, pieces[i].name]])));
   }

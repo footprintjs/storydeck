@@ -1,5 +1,69 @@
 # Changelog
 
+## 0.40.0 — maps in footprint-story's looks
+
+A map can now name one of footprint-story's looks (now `^0.35.0`). A look is a style row under a name, written as a
+column of its own on the map's `data-style`:
+
+```html
+<i data-style="look: line-art"></i>
+<div data-k="floor" data-iso="floor" data-size="8 5" data-label="Production"></div>
+<div data-k="server" data-iso="block" data-at="1 1" data-size="2 2 1.4"><b>Server</b></div>
+```
+
+`look: outlined` draws a bold contour round each piece over today's tones. `look: line-art` draws paper faces and ink
+lines. `look: paper-grain` lays a fine, faint grain over every face. `look: duotone` prints every line in one ink. A
+column beside the look replaces that part of it, whole (`look: line-art; texture: human:hatch`). Named or written out,
+a look draws the same page; the record keeps its name. Every page that names no look is byte for byte as before.
+
+- **The reader** (`isoStyle.js` · `readLook`): `look` takes one of the kit's names (`ISO_LOOKS`) and no options. Refused,
+  naming the fix: a look that is not one (`there are "outlined", "line-art", "paper-grain", "duotone"`), options on a
+  look, a look written twice. The kit's own refusals come in the deck's words: a look the row overrides whole ("the
+  look draws nothing"), the grain beside a duotone, line-art with `line: none`.
+- **One list of hand-drawn choices:** the deck now hands its steps footprint-story's `HUMAN_STYLE_CHOICES`
+  (`human:sketchy`, `human:hatch`, `human:grain`), not a list of its own. **Removed:** `isoSpec.js` · `DECK_CHOICES`;
+  the compile, the run's map flow and the style check all use the kit's list. A refusal for an unknown choice names
+  the new ones too (`"ink", "none", "contour", "human:sketchy"`).
+- **A dark page** (`iso.js` · `LOOK_CSS`): a page is light or dark when it is VIEWED (T, the saved choice, else the
+  system), so no build can hand the kit the dark page's colours. They reach the map by one route instead, the page's
+  variables, with the kit's colour as each one's fallback (`isoPaint.js` · `pagePaper`, `inkOf`). On a paper map (the
+  look line-art, or `shading: paper` in any row), the fills come out in one colour, the paper (`paperOf`), written
+  `var(--iso-paper, #ffffff)`. Any colour a line carries there (a duotone's ink) is written `var(--sd-ink, …)`, and the
+  pieces carry `data-sd-paper`. A contour's colour, on any map, is written `var(--sd-contour, …)`. Under `:root.dark`,
+  `LOOK_CSS` sets these to the page's paper (`--bg-elev`) and ink (`--fg`), so a combination themes as its look does:
+  `look: line-art; palette: duotone`, `look: duotone; shading: paper` and `look: outlined; palette: duotone` included.
+  The fallbacks are the page's own (deck.css), so a deck with no dark tokens draws its dark page as its light one. A
+  paper map whose faces would come out in more than one colour is refused, naming the fix; no row the kit has today
+  does that. The page carries `LOOK_CSS` only when a map paints a paper or a contour. The map's record says so
+  (`made.paper`, `maps made` · `paper`).
+- **Measured, every combination, both themes** (`deck/looksDark.test.js`, from the built page's own CSS through
+  `deck/test/pageColours.js`): all 24 rows the look columns make (shading × line × palette × texture, less the
+  textures the kit refuses beside a duotone), the four looks and the combinations a review found. Block names, floor
+  labels and cable labels stand at 4.5 : 1 or more. A block's edge, a contour against the page, and the highlight ring
+  round a block and along a floor stand at 3 : 1 or more. The rings render on every look: nothing inline on a floor's
+  ground or a piece's art outranks the ring's rule. Chromium's computed styles on the same built pages agree with every
+  pinned number, for all 48 rows (24 combinations in two themes). On the base look's dark theme a line-art floor label
+  went from 1.1 : 1 to 8.1 : 1 and a contour from 1.0 : 1 to 16 : 1. The look's lines on a dark line-art duotone went
+  from 1.3 : 1 to 14.5 : 1.
+- **The duotone keeps its own inks on a dark page.** A deck colours its pieces by class and theme, so the duotone
+  leaves each face's colour to the page, as footprint-story does for a map with no colours. Those faces are light in
+  both themes. Handed the dark page's light ink, the lines would stand at about 1 : 1 on them (pinned). Known limit:
+  its floor's tile lines are the ink at 16%, faint on a dark page.
+- **A grain's marks are drawn once a page** (`isoPaint.js` · `DRAWN_ONCE`), as 0.39.0's strokes are: every `lines`
+  item but the floor's tile lines goes into the hidden `<svg data-sd-strokes>`, and each click draws it with a
+  `<use>`. For 64 grained blocks at a 96 px tile, told in five clicks, a click went from 246 KB to 43 KB; the same map
+  unstyled is 28 KB. `deck-data.json` writes the marks back in each section. A map with no texture keeps its tile
+  lines in place and is byte for byte as before.
+- **The budget covers marks** (`isoRules.js`, our numbers, unchanged): a map's record counts its marks
+  (`made.strokes.marks`), and the 2 MB note and 16 MB refusal count strokes and marks together. A mark is held by its
+  bytes alone; it has no timing. A map past the note is told the grain's fix (`texture: human:grain spacing 32`).
+- **Exports are the light theme.** PowerPoint and video take each slide from a browser that `deckStageDriver` opens with
+  no colour scheme and no saved choice. So the page starts light, and every export carries the light theme. StoryDeck
+  has no theme chosen at build time to set it from. Print uses the viewer's page as it is, light or dark.
+- Tests: `deck/looks.test.js` covers the reader, named and written-out looks drawing the same page, a page test for each
+  look, a clean check, the 64-block grain sizes and note, `deck-data.json`, and `log --why style --map`
+  naming the look. Each look has a still (`deck/test/look-<name>-still.html`), pinned byte for byte.
+
 ## 0.39.0 — maps drawn by hand
 
 A map can now be drawn by hand. footprint-story's sketched line and hatch (now `^0.33.1`) are style choices like any

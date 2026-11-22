@@ -11,7 +11,7 @@ import {loopCss} from './loops.js';
 import {DIFFERS_CSS} from './differs.js';
 import {PACE_CSS} from './pace.js';
 import {CALLOUT_CSS} from './callouts.js';
-import {FLOOR_LABEL_CSS, ISO_CSS} from './iso.js';
+import {FLOOR_LABEL_CSS, ISO_CSS, LOOK_CSS} from './iso.js';
 import {strokesSvg} from './isoPaint.js';
 import {RIDE_CSS} from './rides.js';
 import {LENS_CSS, LENS_FIRST, lensHtml, lensRuntime} from './lenses.js';
@@ -55,7 +55,7 @@ export function deckStyles(compiled, assets) {
   const labelled = (compiled.clicks ?? []).some((c) => c.differs?.shown.length);
   // how a part's pieces arrive and leave (pace.js): only when a part asks
   const paced = (compiled.clicks ?? []).some((c) => c.pace);
-  return [...assets.css, ...look, ...(compiled.callouts ? [CALLOUT_CSS] : []), ...(compiled.iso ? [ISO_CSS] : []), ...(compiled.floorLabels ? [FLOOR_LABEL_CSS] : []), ...(compiled.motionCss ? [compiled.motionCss] : []), ...(compiled.rides ? [RIDE_CSS] : []), ...(compiled.config.lenses ? [LENS_CSS] : []), ...(loops ? [loops] : []), ...(compiled.explore ? [EXPLORE_CSS] : []), ...(compiled.transitions ? [TRANSITION_CSS] : []), ...(labelled ? [DIFFERS_CSS] : []), ...(paced ? [PACE_CSS] : []), compiled.themeCss ?? ''].join('\n');
+  return [...assets.css, ...look, ...(compiled.callouts ? [CALLOUT_CSS] : []), ...(compiled.iso ? [ISO_CSS] : []), ...(compiled.floorLabels ? [FLOOR_LABEL_CSS] : []), ...(compiled.looks ? [LOOK_CSS] : []), ...(compiled.motionCss ? [compiled.motionCss] : []), ...(compiled.rides ? [RIDE_CSS] : []), ...(compiled.config.lenses ? [LENS_CSS] : []), ...(loops ? [loops] : []), ...(compiled.explore ? [EXPLORE_CSS] : []), ...(compiled.transitions ? [TRANSITION_CSS] : []), ...(labelled ? [DIFFERS_CSS] : []), ...(paced ? [PACE_CSS] : []), compiled.themeCss ?? ''].join('\n');
 }
 
 /**

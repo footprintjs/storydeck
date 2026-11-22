@@ -41,6 +41,24 @@
 // WHY the whole stroke, and its time unplayed: a deck page is drawn at rest, whole — a stroke's `t` (when the pen is
 // at each point) is a film's to play (StoryReel), and the map's record says so (strokesDrawn, STROKE_TIMING).
 //
+// WHY a texture's marks are drawn once too (0.40.0): a `lines` item a texture lays (footprint-story's `human:grain`,
+// role `grain` / `grain-thinned`: one item a face, thousands of 1 to 3 px marks) is written again on every click of its
+// part, as a stroke was — a 64-block grain map carried 0.33 MB a click. So every item but a face drawn once a page goes
+// the strokes' way (DRAWN_ONCE): a stroke, or `lines` that are not the floor's tile lines. The tile lines (`grid`) stay
+// in place — every map has them, they are a few hundred bytes a floor, and a page that draws no texture is byte for
+// byte as before. A mark's colour is the map's ink when it carries none: the page's, which a `<use>` hands down to it.
+//
+// WHY a paper fill is written as the page's paper (0.40.0): a paper shading (footprint-story's `shading: paper`, the
+// look `line-art`) fills every face and the floor's ground with the paper's colour, and a page's theme is chosen when
+// it is VIEWED (T switches light and dark; with no choice saved, the system decides) — the build cannot know it. So a
+// fill whose colour is the map's paper is written `fill:var(--iso-paper, <the paper>)`: in a light page the paper as
+// the kit gave it, and on a dark one the page's own (iso.js · LOOK_CSS sets --iso-paper to the page's --bg-elev, and
+// the ink of the map's lines and names to its --fg), so its names keep their contrast in both. A colour a look gives a
+// line takes the same route (inkOf): on a paper map every line's colour (a duotone's ink) is the paper's ink,
+// var(--sd-ink, …), and a contour's colour, which lies on the page round the piece, is var(--sd-contour, …) on any map —
+// an inline colour would beat every rule of the page's, and a dark page would lose the lines (a line-art map in a
+// duotone: its navy lines stood 1.3 : 1 on the dark paper).
+//
 // Numbers are written to one decimal, as every isometric page has been (0.1 px, no trailing zeros), and from the
 // piece's box: a point of the frame minus the box's corner.
 
@@ -69,6 +87,45 @@ export const PAGE_STROKES = (() => {
   }
   return Object.freeze(out);
 })();
+
+/**
+ * The colour a paper shading (`shading`, as a row writes it) fills a face with, as the kit gives it (lower-case
+ * #rrggbb): read off the kit's own list for a block — its top face's fill — so neither the paper's default nor how a
+ * colour is read is written here.
+ */
+const paperFill = (shading) => paintPiece(isoStyle({shading}), {name: 'b', kind: 'block', at: [0, 0], size: [2, 2, 1]}, isometric()).items.find((it) => it.role === 'top').fill.colour;
+/** The paper a paper shading fills with when its style names no colour (the kit's: #ffffff). */
+export const PAPER = paperFill('paper');
+/** The page's paper, as a fill: the paper the map was built with when the page sets none (a light page), the page's own on a dark one (iso.js · LOOK_CSS). */
+export const pagePaper = (colour) => `var(--iso-paper, ${colour})`;
+
+/**
+ * The paper a map's faces are drawn in ({row, options}, the built map's `style`; `lists`, its pieces' paint lists): the
+ * colour every fill comes out in on a paper map — the paper shading's, after any palette (a duotone tints the paper by
+ * how dark it is: the paper again, or the one tint every face shares) — or null when the map has no paper shading.
+ * WHY read off the drawn fills: that is the colour a dark page must replace, whatever made it. WHY asked of the row
+ * first: a fill with a colour is the paper only on a paper map — on another a colour is the palette's, and stays as
+ * given. A paper map whose fills come out in more than one colour could not take the page's one paper: refused, by name.
+ */
+export function paperOf(style, lists = []) {
+  if (style?.row?.shading !== 'paper') return null;
+  const drawn = [...new Set(lists.flat().map((it) => it.fill?.colour).filter((c) => c != null))];
+  if (drawn.length > 1) throw new Error(`data-style: this paper map's faces come out in ${drawn.length} colours (${drawn.slice(0, 4).join(', ')}), and a dark page gives a paper map its one paper — write the shading "tones", or take out what colours the paper`);
+  if (drawn.length) return drawn[0];
+  const colour = style.options?.shading?.colour;
+  return colour === undefined ? PAPER : paperFill({name: 'paper', colour});
+}
+
+/**
+ * A line's colour as written, by the one route a look's colours take to a dark page (iso.js · LOOK_CSS): a contour's
+ * colour, which lies on the page round the piece, is `var(--sd-contour, <colour>)`; on a paper map (`paper` not null)
+ * every other line's colour is the paper's ink, `var(--sd-ink, <colour>)`, which a dark page sets with its paper; any
+ * other colour is written as it is. A light page sets neither, so each draws the colour the kit gave.
+ */
+function inkOf(colour, role, paper) {
+  if (role === 'contour') return `var(--sd-contour, ${hex(colour)})`;
+  return paper === null ? hex(colour) : `var(--sd-ink, ${hex(colour)})`;
+}
 
 /**
  * A number as written: one decimal. WHY it refuses: every number of an item reaches the page through here, so a list
@@ -109,12 +166,15 @@ function strokeOf(stroke) {
   return {colour: stroke.colour, alpha: within(stroke.alpha, 0, 1, 'alpha'), width: fixed(within(stroke.width, 0, 1000, 'width')), join: oneOf(stroke.join, JOINS, 'join'), cap: oneOf(stroke.cap, CAPS, 'cap')};
 }
 
-/** What an item's own colours say, as a style attribute: '' when it carries none (the page's CSS colours it by role). */
-function colours({fill}, stroke) {
+/**
+ * What an item's own colours say, as a style attribute: '' when it carries none (the page's CSS colours it by role). A
+ * fill in the map's `paper` (paperOf) is the page's paper (pagePaper); a line's colour goes the look's route (inkOf).
+ */
+function colours({fill, role}, stroke, paper) {
   const said = [];
-  if (fill?.colour != null) said.push(`fill:${hex(fill.colour)}`);
+  if (fill?.colour != null) said.push(`fill:${fill.colour === paper ? pagePaper(hex(fill.colour)) : hex(fill.colour)}`);
   if (stroke?.colour != null) {
-    said.push(`stroke:${hex(stroke.colour)}`, `stroke-width:${stroke.width}px`, `stroke-linejoin:${stroke.join}`, `stroke-linecap:${stroke.cap}`);
+    said.push(`stroke:${inkOf(stroke.colour, role, paper)}`, `stroke-width:${stroke.width}px`, `stroke-linejoin:${stroke.join}`, `stroke-linecap:${stroke.cap}`);
     if (stroke.alpha !== 1) said.push(`stroke-opacity:${stroke.alpha}`);
   }
   return said.length ? ` style="${said.join(';')}"` : '';
@@ -177,7 +237,7 @@ export const STROKE_TIMING = 'drawn whole, at rest: a page does not play a strok
  * that skipped the kit's check never bends the ring or writes a stray word; a stroke with no ink, or a fill, is
  * refused (it would be drawn as nothing, or as a face).
  */
-function strokeSvg(it, x, y) {
+function strokeSvg(it, x, y, paper = null) {
   const stroke = strokeOf(it.stroke);
   if (stroke === null || it.fill != null) throw new Error('isoPaint: a hand-drawn stroke\'s fill is null and its stroke names its colour, alpha and cap');
   if (!Array.isArray(it.points) || it.points.length < 2) throw new Error(`isoPaint: a hand-drawn stroke has at least 2 points — not ${JSON.stringify(it.points?.length ?? it.points)}`);
@@ -187,24 +247,37 @@ function strokeSvg(it, x, y) {
     if (!(p[2] >= 0 && p[2] <= it.stroke.width + 1e-9)) throw new Error(`isoPaint: a hand-drawn stroke's point is as wide as 0 to its stroke's ${stroke.width} px — not ${p[2]}`);
   }
   const ring = strokeOutline(it.points, {cap: stroke.cap});
-  const ink = [`fill:${stroke.colour == null ? PAGE_LINE : hex(stroke.colour)}`, ...(stroke.alpha === 1 ? [] : [`fill-opacity:${stroke.alpha}`]), 'fill-rule:nonzero'];
+  const ink = [`fill:${stroke.colour == null ? PAGE_LINE : inkOf(stroke.colour, it.role, paper)}`, ...(stroke.alpha === 1 ? [] : [`fill-opacity:${stroke.alpha}`]), 'fill-rule:nonzero'];
   return `<path class="${roleClass(it.role)}" stroke="none" style="${ink.join(';')}" d="${ring.map(([px, py], i) => `${i ? 'L' : 'M'}${rel(px, x)} ${rel(py, y)}`).join('')}Z"/>`;
 }
 
 /**
- * What a map's record says of its hand-drawn strokes: {strokes, bytes, timing} — how many its pieces' lists draw, the
- * bytes the page carries them in (`defs`, isoArt's `strokes`: once for the whole page; ASCII, so a letter is a byte),
- * and that their time is not played (STROKE_TIMING) — or null when they draw none, so a map with none records as before.
- * Their points are not kept here: they are the steps' (built again from the map's spec and the deck's choices).
+ * An item drawn once a page (isoArt's `strokes`): a hand-drawn stroke, or a texture's marks — `lines` that are not the
+ * floor's tile lines (`grid`, which every map has and which stay in place, so a page with no texture is as before).
+ */
+export const DRAWN_ONCE = (it) => it.item === 'stroke' || (it.item === 'lines' && it.role !== 'grid');
+
+/**
+ * What a map's record says of what it draws once a page: {strokes, marks?, bytes, timing?} — how many hand-drawn
+ * strokes its pieces' lists draw, how many marks a texture lays (each segment of a DRAWN_ONCE `lines` item: a grain's
+ * flecks; only when there are some), the bytes the page carries them in (`defs`, isoArt's `strokes`: once for the
+ * whole page; ASCII, so a letter is a byte), and that a stroke's time is not played (STROKE_TIMING; only when there are
+ * strokes) — or null when they draw none, so a map with none records as before. Their points are not kept here: they
+ * are the steps' (built again from the map's spec and the deck's choices).
  */
 export function strokesDrawn(lists, defs = new Map()) {
-  const strokes = lists.reduce((n, items) => n + items.filter((it) => it.item === 'stroke').length, 0);
-  return strokes ? {strokes, bytes: [...defs.values()].reduce((n, g) => n + g.length, 0), timing: STROKE_TIMING} : null;
+  let strokes = 0, marks = 0;
+  for (const it of lists.flat()) {
+    if (it.item === 'stroke') strokes += 1;
+    else if (DRAWN_ONCE(it)) marks += it.segments.length;
+  }
+  if (!strokes && !marks) return null;
+  return {strokes, ...(marks ? {marks} : {}), bytes: [...defs.values()].reduce((n, g) => n + g.length, 0), ...(strokes ? {timing: STROKE_TIMING} : {})};
 }
 
-/** One paint item but a stroke (isoArt writes strokes itself, a run at a time) as one SVG element, placed in the box whose corner is (x, y). */
-function itemSvg(it, x, y, styled) {
-  const stroke = strokeOf(it.stroke), head = `class="${roleClass(it.role)}"${strokeApart(it.role, stroke, styled)}${colours(it, stroke)}`;
+/** One paint item but a stroke (strokeSvg writes those) as one SVG element, placed in the box whose corner is (x, y). */
+function itemSvg(it, x, y, styled, paper = null) {
+  const stroke = strokeOf(it.stroke), head = `class="${roleClass(it.role)}"${strokeApart(it.role, stroke, styled)}${colours(it, stroke, paper)}`;
   switch (it.item) {
     case 'polygon': return `<polygon ${head} points="${it.points.map(([px, py]) => `${rel(px, x)},${rel(py, y)}`).join(' ')}"/>`;
     case 'ellipse': return `<ellipse ${head} cx="${rel(it.cx, x)}" cy="${rel(it.cy, y)}" rx="${fixed(it.rx)}" ry="${fixed(it.ry)}"/>`;
@@ -234,13 +307,16 @@ export function strokesId(markup) {
  * A piece's paint list as the SVG inside its box ({x, y}: the box's corner on the slide), in paint order.
  * `styled`: the map names a style (data-style), so every stroke value its style gives is written out (strokeApart);
  * left out, only what the page does not already draw.
- * `strokes`: a Map the map's hand-drawn strokes are kept in, drawn ONCE for the whole page (id → `<g id>` of paths):
- * each run of strokes in a row is written there and drawn here as one `<use href="#id"/>`, in its place in the paint
- * order. WHY: a map is written again on every click of its part, and a hatched map's strokes are most of its bytes
- * (64 hatched blocks: 1.6 MB a click) — drawn once, a click carries a few bytes for each run. Left out, the strokes are
- * written in place, as one list's own SVG (a test, a caller with no page).
+ * `strokes`: a Map the map's hand-drawn strokes and texture marks (DRAWN_ONCE) are kept in, drawn ONCE for the whole
+ * page (id → `<g id>`): each run of them in a row is written there and drawn here as one `<use href="#id"/>`, in its
+ * place in the paint order. WHY: a map is written again on every click of its part, and a hatched or grained map's
+ * strokes and marks are most of its bytes (64 hatched blocks: 1.6 MB a click; 64 grained: 0.33 MB) — drawn once, a
+ * click carries a few bytes for each run. Left out, they are written in place, as one list's own SVG (a test, a
+ * caller with no page).
+ * `paper`: the map's paper (paperOf), or null — a fill in it is written as the page's paper (pagePaper), and a line's
+ * colour as the paper's ink (inkOf).
  */
-export function isoArt(items, {x, y}, {styled = false, strokes = null} = {}) {
+export function isoArt(items, {x, y}, {styled = false, strokes = null, paper = null} = {}) {
   let out = '', run = '';
   const flush = () => {
     if (!run) return;
@@ -248,9 +324,9 @@ export function isoArt(items, {x, y}, {styled = false, strokes = null} = {}) {
     run = '';
   };
   for (const it of items) {
-    if (it.item === 'stroke') { run += strokeSvg(it, x, y); continue; }
+    if (DRAWN_ONCE(it)) { run += it.item === 'stroke' ? strokeSvg(it, x, y, paper) : itemSvg(it, x, y, styled, paper); continue; }
     flush();
-    out += itemSvg(it, x, y, styled);
+    out += itemSvg(it, x, y, styled, paper);
   }
   flush();
   return out;

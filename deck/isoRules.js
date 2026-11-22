@@ -81,11 +81,14 @@ export function areaOf(solid, {fitted, canvas, area}) {
 }
 
 /**
- * How many hand-drawn strokes one map may draw, as the page carries them (once, isoPaint.js · isoArt `strokes`): past
- * STROKES_NOTE a build note says so (check.js · strokes), past STROKES_MOST the map is refused, naming the fix. Ours:
- * a hatched block of 2 × 2 × 1 tiles at a 60 px tile draws about 33 strokes in 25 KB, so the note comes at about 60
- * such blocks (a page that opens in a moment on a laptop, and prints), and the refusal at about ten times that — a
- * page past 16 MB of strokes is slow to open, to step through and to print, and every lens copies its slides.
+ * How much one map may draw once a page (isoPaint.js · isoArt `strokes`: its hand-drawn strokes, and since 0.40.0 a
+ * texture's marks, a grain's flecks): past STROKES_NOTE a build note says so (check.js · strokes), past STROKES_MOST
+ * the map is refused, naming the fix. Ours: a hatched block of 2 × 2 × 1 tiles at a 60 px tile draws about 33 strokes
+ * in 25 KB, so the note comes at about 60 such blocks (a page that opens in a moment on a laptop, and prints), and the
+ * refusal at about ten times that — a page past 16 MB of strokes is slow to open, to step through and to print, and
+ * every lens copies its slides. A mark is held by the bytes alone: it is a short line of about 25 bytes, never timed,
+ * so it costs what its bytes cost (a 64-block grain map: about 13,000 marks in 0.33 MB, under the note) — the bytes
+ * count strokes and marks together, as the page carries them.
  */
 export const STROKES_NOTE = Object.freeze({strokes: 2000, bytes: 2_000_000});
 export const STROKES_MOST = Object.freeze({strokes: 20_000, bytes: 16_000_000});
@@ -93,8 +96,17 @@ export const STROKES_MOST = Object.freeze({strokes: 20_000, bytes: 16_000_000});
 /** A size in MB as a deck says it: one decimal. */
 export const mb = (bytes) => `${(bytes / 1e6).toFixed(1)} MB`;
 
-/** A map whose strokes ({strokes, bytes}, isoPaint.js · strokesDrawn) pass STROKES_MOST: refused, naming the fix. */
-export function refuseStrokes({strokes, bytes}) {
+/** What a map draws once a page, in words ({strokes, marks?}, isoPaint.js · strokesDrawn): "2112 hand-drawn strokes", "13118 texture marks", or both. */
+export const drawnWords = ({strokes, marks = 0}) => [...(strokes ? [`${strokes} hand-drawn strokes`] : []), ...(marks ? [`${marks} texture marks`] : [])].join(' and ');
+/** What draws fewer of them, as a note says it: a wider hatch, a wider grain — `{give: true}` as a refusal says it ("give the hatch a wider spacing"). */
+export function drawnFix({strokes, marks = 0}, {give = false} = {}) {
+  const fix = (texture, spacing) => (give ? `the ${texture} a wider spacing` : `a wider ${texture} spacing`) + ` ("texture: human:${texture} spacing ${spacing}")`;
+  return [...(strokes ? [fix('hatch', 16)] : []), ...(marks ? [fix('grain', 32)] : [])].join(' or ');
+}
+
+/** A map whose strokes and marks ({strokes, marks?, bytes}, isoPaint.js · strokesDrawn) pass STROKES_MOST: refused, naming the fix. */
+export function refuseStrokes(drawn) {
+  const {strokes, bytes} = drawn;
   if (strokes <= STROKES_MOST.strokes && bytes <= STROKES_MOST.bytes) return;
-  throw new Error(`data-style: this map draws ${strokes} hand-drawn strokes in ${mb(bytes)} of the page, past the ${STROKES_MOST.strokes} strokes or ${mb(STROKES_MOST.bytes)} one map may (ours) — give the hatch a wider spacing ("texture: human:hatch spacing 16"), take the texture out, or tell it in two maps`);
+  throw new Error(`data-style: this map draws ${drawnWords(drawn)} in ${mb(bytes)} of the page, past the ${STROKES_MOST.strokes} strokes or ${mb(STROKES_MOST.bytes)} one map may (ours) — give ${drawnFix(drawn, {give: true})}, take the texture out, or tell it in two maps`);
 }

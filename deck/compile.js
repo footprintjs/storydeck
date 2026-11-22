@@ -150,7 +150,7 @@ function checkPost(post, labels) {
  * there is to say of a wire; cables: each cable laid, its points and length; tight: names that do not fit their block;
  * made: placed by the build or by hand, the tile — for check, the run's log, and whoever times a thing to a cable;
  * built: {spec, map}, the very spec the map's steps were handed and the map they built, frozen — for the run's map flow, run/maps.js), callouts?: true when it has any,
- * iso?: true when it has an isometric piece, floorLabels?: true when a floor has a label, rides?: true when a wire's packets ride their own way (data-ride …),
+ * iso?: true when it has an isometric piece, floorLabels?: true when a floor has a label, looks?: true when a map paints a paper or a contour (iso.js · LOOK_CSS), rides?: true when a wire's packets ride their own way (data-ride …),
  * strokeDefs?: {id: `<g id>`} — the maps' hand-drawn strokes, which the page draws once and each click's slide draws with a <use>}.
  * `dev` numbers each map's pieces in the slides (data-sd-at), for the dev page's edits.
  * A slide's notes are what notesData carries ({slide, step, steps, now, earlier}). Throws, naming the part and the
@@ -193,5 +193,7 @@ export function compileDeck(source, {dev = false} = {}) {
     // the maps' hand-drawn strokes, drawn once for the page (isoPaint.js · isoArt `strokes`, by id): only a deck whose maps draw some
     ...(Object.values(maps).some((m) => m.strokeDefs) ? {strokeDefs: Object.assign({}, ...Object.values(maps).map((m) => m.strokeDefs ?? {}))} : {}),
     // whether the page needs a floor label's stylesheet: a slide that draws one (iso.js · FLOOR_LABEL_CSS)
-    ...(slides.some((sl) => sl.html.includes('class="iso-floor-label"')) ? {floorLabels: true} : {})};
+    ...(slides.some((sl) => sl.html.includes('class="iso-floor-label"')) ? {floorLabels: true} : {}),
+    // whether the page needs a look's rules for a dark page: a slide that draws a paper map or a contour (iso.js · LOOK_CSS)
+    ...(slides.some((sl) => sl.html.includes(' data-sd-paper') || sl.html.includes('class="iso-contour"')) ? {looks: true} : {})};
 }

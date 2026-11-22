@@ -1,0 +1,48 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>look: line-art — a StoryDeck map in footprint-story's look</title>
+<style>/* isometric pieces: blocks on a floor seen from a corner (deck/iso.js) */
+:where(section[data-label] [data-sd-iso]) { position: absolute; box-sizing: border-box; --sd-hot-width: 0px; --iso-turn: var(--sd-turn, 0s); }
+/* what it draws takes the pointer: its faces and its words, never the empty corners of its box. Only on the slide
+   shown (deck-stage's [data-deck-active]): a slide that takes no pointer stays that way — "auto" written on a face
+   would bring it back there — and a piece shown anywhere else (a Read lens) is left as it was */
+:where(section[data-label][data-deck-active] [data-sd-iso]) { pointer-events: none; }
+:where(section[data-label][data-deck-active] [data-sd-iso] :is(.iso-art > *, .iso-say)) { pointer-events: auto; }
+:where(section[data-label] .iso-art) {
+  position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none;
+  stroke: var(--iso-line, var(--iso-ink, #14181f)); stroke-width: var(--iso-line-width, 2.5px); stroke-linejoin: round;
+}
+:where(section[data-label] .iso-top) { fill: color-mix(in srgb, var(--iso-color, var(--sd-tone, #d9e4f3)) 80%, #fff); }
+:where(section[data-label] .iso-left) { fill: color-mix(in srgb, var(--iso-color, var(--sd-tone, #d9e4f3)) 94%, #000); }
+:where(section[data-label] :is(.iso-right, .iso-side)) { fill: color-mix(in srgb, var(--iso-color, var(--sd-tone, #d9e4f3)) 82%, #000); }
+:where(section[data-label] .iso-ground) { fill: var(--iso-floor, transparent); stroke: none; }
+:where(section[data-label] .iso-lines) { fill: none; stroke: var(--iso-grid, color-mix(in srgb, var(--fg, #14181f) 16%, transparent)); stroke-width: 1.5px; }
+:where(section[data-label] .iso-say) {
+  position: absolute; translate: -50% -50%; display: grid; justify-items: center; gap: 2px; text-align: center; white-space: nowrap;
+  font: 700 26px/1.15 var(--sans, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif); color: var(--iso-ink, #14181f);
+}
+:where(section[data-label] .iso-say small) { font-size: 18px; font-weight: 500; color: color-mix(in srgb, var(--iso-ink, #14181f) 68%, transparent); }
+:where(section[data-label] .iso-say svg.ic) { width: 40px; height: 40px; color: var(--iso-ink, #14181f); }
+/* a callout is words about the picture: over every block, whose levels end at 512 (a lead into a port at one more) */
+:where(section[data-label] [data-sd-callout]) { z-index: 514; }
+/* its highlight (data-hot) rings what it draws; the box's own ring is off (--sd-hot-width: 0, read by focus.css) */
+:where(section[data-label] .sd-hot:is([data-sd-iso="block"], [data-sd-iso="cylinder"]) .iso-art) { filter: drop-shadow(5px 0 0 var(--sd-hot, #ef4444)) drop-shadow(-5px 0 0 var(--sd-hot, #ef4444)) drop-shadow(0 5px 0 var(--sd-hot, #ef4444)) drop-shadow(0 -5px 0 var(--sd-hot, #ef4444)); }
+:where(section[data-label] .sd-hot[data-sd-iso="floor"] .iso-ground) { stroke: var(--sd-hot, #ef4444); stroke-width: 5px; }
+/* on a forward click the ring comes when a box's does: .3s after the piece's moment (--sd-turn: 0 off a route, its turn
+   on one, later under a new blur). That moment is not inherited, so the piece hands it to its faces as --iso-turn */
+@keyframes sdIsoRing { from { filter: drop-shadow(5px 0 0 transparent) drop-shadow(-5px 0 0 transparent) drop-shadow(0 5px 0 transparent) drop-shadow(0 -5px 0 transparent); } }
+@media screen and (prefers-reduced-motion: no-preference) {
+  :where(section[data-label][data-deck-active]:not([data-sd-instant]):not([data-deck-static]) .sd-hot-in:is([data-sd-iso="block"], [data-sd-iso="cylinder"]) .iso-art) { animation: sdIsoRing .6s ease calc(.3s + var(--iso-turn, 0s)) both; }
+}
+
+/* a map drawn in a look, on a dark page (deck/iso.js · LOOK_CSS): the page's paper and ink */
+:where(:root.dark section[data-label] [data-sd-paper]) { --iso-paper: var(--bg-elev, #ffffff); --iso-ink: var(--fg, #14181f); --sd-ink: var(--fg, #14181f); }
+:where(:root.dark section[data-label] [data-sd-iso]) { --sd-contour: var(--fg, #14181f); }
+:where(:root.dark section[data-label] .iso-contour) { stroke: var(--fg, #14181f); }</style>
+
+<section data-label="still" style="position:relative;width:1920px;height:1080px;background:#fff">
+
+<div data-k="floor" data-size="8 5" class="iso" data-ground data-sd-iso="floor" data-sd-paper style="left:660px;top:240px;width:780px;height:390px"><svg class="iso-art" viewBox="0 0 780 390" aria-hidden="true"><polygon class="iso-ground" style="fill:var(--iso-paper, #ffffff)" points="300,0 780,240 480,390 0,150"/><path class="iso-lines" stroke-width="1.5" stroke-linejoin="miter" stroke-linecap="butt" d="M300 0L0 150M360 30L60 180M420 60L120 210M480 90L180 240M540 120L240 270M600 150L300 300M660 180L360 330M720 210L420 360M780 240L480 390M300 0L780 240M240 30L720 270M180 60L660 300M120 90L600 330M60 120L540 360M0 150L480 390"/></svg></div>
+<div data-k="server" data-at="1 1" data-size="2 2 1.4" class="iso" data-sd-iso="block" data-sd-paper style="left:840px;top:197.1px;width:240px;height:222.9px;z-index:2"><svg class="iso-art" viewBox="0 0 240 222.9" aria-hidden="true"><polygon class="iso-contour" stroke-width="4.8" stroke-linejoin="round" stroke-linecap="round" points="0,60 120,120 120,222.9 0,162.9"/><polygon class="iso-contour" stroke-width="4.8" stroke-linejoin="round" stroke-linecap="round" points="120,120 240,60 240,162.9 120,222.9"/><polygon class="iso-contour" stroke-width="4.8" stroke-linejoin="round" stroke-linecap="round" points="120,0 240,60 120,120 0,60"/><polygon class="iso-left" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round" style="fill:var(--iso-paper, #ffffff)" points="0,60 120,120 120,222.9 0,162.9"/><polygon class="iso-right" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round" style="fill:var(--iso-paper, #ffffff)" points="120,120 240,60 240,162.9 120,222.9"/><polygon class="iso-top" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round" style="fill:var(--iso-paper, #ffffff)" points="120,0 240,60 120,120 0,60"/></svg></div>
+<div data-k="db" data-at="5 1" data-size="1.6 1.6 1.2" class="iso" data-sd-iso="cylinder" data-sd-paper style="left:1132.1px;top:345.9px;width:135.8px;height:156.1px;z-index:4"><svg class="iso-art" viewBox="0 0 135.8 156.1" aria-hidden="true"><path class="iso-contour" stroke-width="4.8" stroke-linejoin="round" stroke-linecap="round" d="M0 33.9L0 122.1A67.9 33.9 0 0 0 135.8 122.1L135.8 33.9Z"/><ellipse class="iso-contour" stroke-width="4.8" stroke-linejoin="round" stroke-linecap="round" cx="67.9" cy="33.9" rx="67.9" ry="33.9"/><path class="iso-side" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round" style="fill:var(--iso-paper, #ffffff)" d="M0 33.9L0 122.1A67.9 33.9 0 0 0 135.8 122.1L135.8 33.9Z"/><ellipse class="iso-top" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round" style="fill:var(--iso-paper, #ffffff)" cx="67.9" cy="33.9" rx="67.9" ry="33.9"/></svg></div>
+</section>
