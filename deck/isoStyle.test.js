@@ -118,6 +118,10 @@ describe('isoStyle · a map takes a style (data-style)', () => {
     expect(refused('lines: none')).toThrow('map "m": data-style="lines: none": a style\'s columns are shape, shading, line, palette, texture, effects — not "lines"');
     expect(refused('line: dotted')).toThrow('map "m": data-style="line: dotted": the line has no choice "dotted" — there are "ink", "none"');
     expect(refused('effects: glow')).toThrow('data-style="effects: glow": the effects has no choice "glow" — there are none yet');
+    // footprint-story's hand-drawn choices are handed in, and its map steps take none yet: said so, never as a typo
+    expect(refused('line: human:sketchy')).toThrow('map "m": data-style="line: human:sketchy": the line "human:sketchy" is a choice a tool hands in, and footprint-story\'s map steps take none handed in yet — there are "ink", "none"');
+    expect(refused('texture: human:hatch spacing 10')).toThrow('the texture "human:hatch" is a choice a tool hands in, and footprint-story\'s map steps take none handed in yet — there are "none"');
+    expect(refused('effects: human:glow')).toThrow('the effects "human:glow" is a choice a tool hands in, and footprint-story\'s map steps take none handed in yet — there are none yet');
     expect(refused('line: ink width 30')).toThrow('data-style="line: ink width 30": the line "ink" takes a width from 0.5 to 20 px — not 30');
     expect(refused('line: ink width')).toThrow('data-style="line: ink width": an option of the line "ink" is its name and its value, "width 5" — not "width"');
     expect(refused('line: ink colour red')).toThrow('data-style="line: ink colour red": the line "ink" takes width — not "colour"');

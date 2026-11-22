@@ -758,6 +758,10 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   the token still sets its outline. An SVG attribute loses to any CSS rule that names the element, so the colours stay
   the tokens below, a rule of yours on `.iso-top` still wins, and a highlighted floor is still ringed. The run's record says which
   style drew each map (`maps made` · `style`, and `storydeck log --why style --map <map>`).
+  footprint-story's hand-drawn choices (`human:sketchy`, `human:hatch`) are handed in by a tool, and its map steps take
+  none handed in yet, so a map that names one is refused with that reason. The painter already draws what they make:
+  each `stroke` is filled as the ring footprint-story gives (`strokeOutline`), whole and at rest. A page does not play
+  a stroke's time; StoryReel does, and the map's record says so (`maps made` · `strokes`).
 
   **Blocks that move by intent.** A click can move a block: write what happens on its `<step>`, never how — the
   words are footprint-story's (`footprint-story/human`), and it decides the model, the duration and the curve:

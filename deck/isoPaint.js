@@ -27,10 +27,23 @@
 // stroke-width on .iso-ground) — so it fights none of the deck's CSS colours. (The tile lines' 1.5 px is a CSS rule on
 // .iso-lines, which wins over an attribute: every line choice the kit has keeps it.)
 //
+// WHY a hand-drawn stroke is drawn as a filled ring (0.39.0): a `stroke` item (footprint-story/human · strokes) lays a
+// width per point, and an SVG line has one width. So the painter fills the ring round it, as the kit says a painter
+// that cannot vary a line's width does — that ring is footprint-story's `strokeOutline(points)`, the one geometry of a
+// line of changing width, never worked out here: numbers in footprint-story, drawing in StoryDeck. Its ink is the
+// stroke's colour, or the page's line colour (PAGE_LINE, the colour .iso-art outlines a face with) when it carries none,
+// as its fill; it takes no outline of its own (stroke="none"), which would thicken every point by the page's line.
+// Its ends are as strokeOutline gives them, flat: the kit leaves a round cap (a disc of the end's width) to the painter,
+// and the one geometry has no cap yet — so none is drawn here (each end of a sketch is tapered to 30% of its width).
+//
+// WHY the whole stroke, and its time unplayed: a deck page is drawn at rest, whole — a stroke's `t` (when the pen is
+// at each point) is a film's to play (StoryReel), and the map's record says so (strokesDrawn, STROKE_TIMING).
+//
 // Numbers are written to one decimal, as every isometric page has been (0.1 px, no trailing zeros), and from the
 // piece's box: a point of the frame minus the box's corner.
 
 import {isometric, isoStyle, paintPiece} from 'footprint-story/isometric';
+import {strokeOutline} from 'footprint-story/human';
 
 /** A role, as the kit checks it (paint.js · checkPaint): written into a class, so nothing else is let through. */
 const ROLE = /^[a-z][a-z0-9-]{0,31}$/;
@@ -146,19 +159,55 @@ function pathData(segments, x, y) {
   return d;
 }
 
+/**
+ * The colour the page outlines a face with, as ISO_CSS writes it on .iso-art (iso.js; a test pins the two equal): the
+ * ink of a hand-drawn stroke that carries no colour of its own, written in its style attribute because a stroke is
+ * drawn as a fill, and no rule of the page's fills by the line's colour.
+ */
+export const PAGE_LINE = 'var(--iso-line, var(--iso-ink, #14181f))';
+/** What a map's record says of the strokes it draws: their time is not played on a page. */
+export const STROKE_TIMING = 'drawn whole, at rest: a page does not play a stroke\'s timing (StoryReel plays it)';
+
+/**
+ * A hand-drawn stroke as one SVG path: footprint-story's ring round it (strokeOutline), filled in its ink. Each point
+ * is checked before the ring is asked for — [x, y, width, t], finite, its width from 0 to the stroke's — so a point
+ * that skipped the kit's check never bends the ring or writes a stray word; a stroke with no ink, or a fill, is
+ * refused (it would be drawn as nothing, or as a face).
+ */
+function strokeSvg(it, x, y) {
+  const stroke = strokeOf(it.stroke);
+  if (stroke === null || it.fill != null) throw new Error('isoPaint: a hand-drawn stroke\'s fill is null and its stroke names its colour, alpha and cap');
+  if (!Array.isArray(it.points) || it.points.length < 2) throw new Error(`isoPaint: a hand-drawn stroke has at least 2 points — not ${JSON.stringify(it.points?.length ?? it.points)}`);
+  for (const p of it.points) {
+    if (!Array.isArray(p) || p.length !== 4) throw new Error(`isoPaint: a hand-drawn stroke's point is [x, y, width, t] — not ${JSON.stringify(p)}`);
+    p.forEach(num);
+    if (!(p[2] >= 0 && p[2] <= it.stroke.width + 1e-9)) throw new Error(`isoPaint: a hand-drawn stroke's point is as wide as 0 to its stroke's ${stroke.width} px — not ${p[2]}`);
+  }
+  const ring = strokeOutline(it.points);
+  const ink = [`fill:${stroke.colour == null ? PAGE_LINE : hex(stroke.colour)}`, ...(stroke.alpha === 1 ? [] : [`fill-opacity:${stroke.alpha}`])];
+  return `<path class="${roleClass(it.role)}" stroke="none" style="${ink.join(';')}" d="${ring.map(([px, py], i) => `${i ? 'L' : 'M'}${rel(px, x)} ${rel(py, y)}`).join('')}Z"/>`;
+}
+
+/**
+ * What a map's record says of its hand-drawn strokes: {strokes, timing} — how many its pieces' lists draw, and that
+ * their time is not played (STROKE_TIMING) — or null when they draw none, so a map with none records as before.
+ */
+export function strokesDrawn(lists) {
+  const strokes = lists.reduce((n, items) => n + items.filter((it) => it.item === 'stroke').length, 0);
+  return strokes ? {strokes, timing: STROKE_TIMING} : null;
+}
+
 /** One paint item as one SVG element, placed in the box whose corner is (x, y). */
 function itemSvg(it, x, y, styled) {
+  if (it.item === 'stroke') return strokeSvg(it, x, y);
   const stroke = strokeOf(it.stroke), head = `class="${roleClass(it.role)}"${strokeApart(it.role, stroke, styled)}${colours(it, stroke)}`;
   switch (it.item) {
     case 'polygon': return `<polygon ${head} points="${it.points.map(([px, py]) => `${rel(px, x)},${rel(py, y)}`).join(' ')}"/>`;
     case 'ellipse': return `<ellipse ${head} cx="${rel(it.cx, x)}" cy="${rel(it.cy, y)}" rx="${fixed(it.rx)}" ry="${fixed(it.ry)}"/>`;
     case 'lines': return `<path ${head} d="${it.segments.map(([x1, y1, x2, y2]) => `M${rel(x1, x)} ${rel(y1, y)}L${rel(x2, x)} ${rel(y2, y)}`).join('')}"/>`;
     case 'path': return `<path ${head} d="${pathData(it.segments, x, y)}"/>`;
-    // a hand-drawn stroke (footprint-story 0.30's `stroke` item) comes only from the sketch style choices a tool hands
-    // in (sketchyLine, hatchTexture), and a deck's data-style offers none of them: refused by name, never drawn as nothing
-    case 'stroke': throw new Error('isoPaint: a hand-drawn stroke item is painted by a tool that offers the sketch styles (footprint-story/human · sketchyLine, hatchTexture) — a deck\'s data-style offers none, so its paint list has no strokes');
     // a kind of item this painter does not know is refused: drawn as nothing, a piece would lose a face unseen
-    default: throw new Error(`isoPaint: a paint item is a polygon, an ellipse, a path or lines — not ${JSON.stringify(it.item)}`);
+    default: throw new Error(`isoPaint: a paint item is a polygon, an ellipse, a path, lines or a stroke — not ${JSON.stringify(it.item)}`);
   }
 }
 

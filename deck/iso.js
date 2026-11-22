@@ -53,7 +53,7 @@ import {mayHoldFootprint, paintFootprints, readFootprints} from './footprint.js'
 import {decodeEntities, esc} from './html.js';
 import {attrRule, ownAttribute, pieceTags, tagsWith} from '../pieceRules.js';
 import {closeOf} from './callouts.js';
-import {isoArt} from './isoPaint.js';
+import {isoArt, strokesDrawn} from './isoPaint.js';
 import {MAYBE_STYLE, readStyle} from './isoStyle.js';
 
 const KINDS = ['block', 'cylinder', 'floor'];
@@ -457,7 +457,10 @@ export function isoDrawn(html, {canvas = null, area = null, links = [], floorWir
   const outside = fitted && areas.length ? beyondArea(areas.map(([c, r]) => grid.at(c, r)), area ?? [0, 0, ...(canvas ?? [1920, 1080])]) : 0;
   // the break rules its writer picked, by block (none written: nothing here, so a map that picks none records as before)
   const breaks = found.filter((p) => p.rule).map((p) => [p.name, p.rule]);
-  const made = {placed: built.placed, tile: built.view.tile[0], fitted: built.grid === 'fitted', ...(feet.length ? {footprints: feet.length} : {}), ...(outside > 0.5 ? {outside: Math.round(outside)} : {}), ...(breaks.length ? {breaks} : {}), ...(style ? {style: built.style} : {})};
+  // the hand-drawn strokes its pieces draw, and that a page does not play their time (isoPaint.js · strokesDrawn): only
+  // on a map whose style draws some, so every other map records as before
+  const strokes = strokesDrawn([...built.paints, ...built.floorPaints]);
+  const made = {placed: built.placed, tile: built.view.tile[0], fitted: built.grid === 'fitted', ...(feet.length ? {footprints: feet.length} : {}), ...(outside > 0.5 ? {outside: Math.round(outside)} : {}), ...(breaks.length ? {breaks} : {}), ...(style ? {style: built.style} : {}), ...(strokes ? {strokes} : {})};
   // what motionPlan.js plans on, for a map whose blocks move: each block where the map built it, with its words' fit and level
   const motion = movers?.size ? {grid, view: {tile: [...built.view.tile], origin: [...built.view.origin], rise: built.view.rise}, blocks: solid.map((p, i) => ({name: p.name, kind: p.kind, at: [built.at[i][0], built.at[i][1], built.at[i][2] ?? 0], size: [...p.size],
     box: built.shapes[i].box, outline: built.shapes[i].outline.map(([x, y]) => [x, y]), say: [...built.shapes[i].centre], fit: drawnOf.get(p).fit, small: smallOf(p.inner), level: levelOf(p),

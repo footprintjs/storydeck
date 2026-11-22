@@ -44,6 +44,10 @@ function readChoice(words, column, where) {
   const [name, ...rest] = words.trim().split(/\s+/);
   if (!name) throw new Error(`${where}: the ${column} names its choice — "${column}: ${ISO_STYLE_CHOICES[column][0] ?? 'name'}"`);
   const there = ISO_STYLE_CHOICES[column];
+  // a name with a prefix ("human:sketchy") is a choice a tool hands in (footprint-story/isometric · isoStyle's
+  // `choices`), and footprint-story's map steps (buildIsoMap), which build every deck map, take none handed in yet: said
+  // plainly, so the writer knows it is not a typo — the painter draws its strokes (isoPaint.js) once the steps take one
+  if (!there.includes(name) && /^[a-z][a-z0-9-]*:/.test(name)) throw new Error(`${where}: the ${column} "${cut(name)}" is a choice a tool hands in, and footprint-story's map steps take none handed in yet — there are ${there.length ? quoted(there) : 'none yet'}`);
   if (!there.includes(name)) throw new Error(`${where}: the ${column} has no choice "${cut(name)}" — ${there.length ? `there are ${quoted(there)}` : 'there are none yet'}`);
   if (rest.length % 2) throw new Error(`${where}: an option of the ${column} "${name}" is its name and its value, "width 5" — not "${cut(rest.join(' '))}"`);
   // with no prototype, so an option named __proto__ is an option like any other (the kit then refuses it by name)

@@ -5,7 +5,7 @@ import {describe, it, expect} from 'vitest';
 import {readFileSync} from 'node:fs';
 import path from 'node:path';
 import {isometric, isoStyle, paintPiece, PAINT_ITEMS} from 'footprint-story/isometric';
-import {isoArt, roleClass, PAGE_STROKES} from './isoPaint.js';
+import {isoArt, roleClass, PAGE_STROKES, PAGE_LINE} from './isoPaint.js';
 
 /** An item that says of its stroke only what the page already draws for its role (PAGE_STROKES): no colour, no fill. */
 const usual = (role) => ({fill: null, stroke: PAGE_STROKES[role] ? {colour: null, ...PAGE_STROKES[role]} : null});
@@ -14,8 +14,9 @@ const art = (item, box = {x: 0, y: 0}) => isoArt([{of: 'p', ...usual(item.role),
 describe('isoPaint · a paint list written as SVG', () => {
   it('writes every kind of item the kit has, classed by its role, in the box, to one decimal', () => {
     expect(PAINT_ITEMS).toEqual(['polygon', 'ellipse', 'path', 'lines', 'stroke']);   // a new kind in the kit is a new case here
-    // a hand-drawn stroke (footprint-story 0.30) comes only from sketch styles a deck does not offer: refused by name, never drawn as nothing
-    expect(() => art({item: 'stroke', role: 'hatch', points: [[0, 0, 2, 0], [10, 0, 2, 0.1]]})).toThrow(/a hand-drawn stroke item is painted by a tool that offers the sketch styles .* a deck's data-style offers none/);
+    // a hand-drawn stroke (footprint-story 0.30): footprint-story's ring round it, filled in the page's line colour
+    expect(art({item: 'stroke', role: 'hatch', points: [[10, 20, 2, 0], [20, 20, 2, 0.1]], fill: null, stroke: {colour: null, alpha: 1, width: 2, join: 'round', cap: 'round'}}, {x: 10, y: 20}))
+      .toBe(`<path class="iso-hatch" stroke="none" style="fill:${PAGE_LINE}" d="M0 -1L10 -1L10 1L0 1Z"/>`);
     const box = {x: 10, y: 20};
     expect(art({item: 'polygon', role: 'left', points: [[10, 20], [130.04, 80.06], [10.25, 140]]}, box)).toBe('<polygon class="iso-left" points="0,0 120,60.1 0.3,120"/>');
     expect(art({item: 'ellipse', role: 'top', cx: 77.94, cy: 53.9, rx: 67.94, ry: 33.95}, box)).toBe('<ellipse class="iso-top" cx="67.9" cy="33.9" rx="67.9" ry="34"/>');
@@ -96,7 +97,7 @@ describe('isoPaint · a paint list written as SVG', () => {
   });
 
   it('refuses what it cannot write rather than drop a face or write a stray word into the page', () => {
-    expect(() => art({item: 'circle', role: 'top'})).toThrow(/a polygon, an ellipse, a path or lines — not "circle"/);
+    expect(() => art({item: 'circle', role: 'top'})).toThrow(/a polygon, an ellipse, a path, lines or a stroke — not "circle"/);
     expect(() => art({item: 'polygon', role: 'top" onload="x', points: [[0, 0], [1, 0], [0, 1]]})).toThrow(/role is a short lower-case name/);
     expect(() => roleClass(undefined)).toThrow(/not undefined/);
     expect(() => art({item: 'polygon', role: 'top', points: [[0, 0], [1, 0], [0, 1]], fill: {mix: null, colour: 'red;x:y'}})).toThrow(/colour is "#rrggbb"/);
@@ -122,7 +123,7 @@ describe('isoPaint · a paint list written as SVG', () => {
 
   it('is the only writer of a face: deck/iso.js paints the built map\'s list and builds no face string, nor asks the grid for one', () => {
     const iso = readFileSync(path.join(process.cwd(), 'deck/iso.js'), 'utf8');
-    expect(iso).toMatch(/import \{isoArt\} from '\.\/isoPaint\.js';/);
+    expect(iso).toMatch(/import \{isoArt, strokesDrawn\} from '\.\/isoPaint\.js';/);
     expect(iso).toContain('isoArt(paints, box, {styled})');
     expect(iso).not.toMatch(/<(polygon|ellipse|path)\b/);
     expect(iso).not.toMatch(/class="iso-(left|right|top|side|ground|lines)"/);

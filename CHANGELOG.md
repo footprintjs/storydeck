@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.39.0 — the painter draws hand-drawn strokes
+
+StoryDeck's SVG painter (`deck/isoPaint.js` · `isoArt`) now draws footprint-story's `stroke` paint item, which it
+refused by name before. A stroke is a hand-drawn line with a width and a time at each point. The painter fills the
+ring round it that footprint-story gives (`strokeOutline`, `footprint-story/human`, now `^0.32.1`): StoryDeck holds no
+geometry of its own for it. Every page without strokes is byte for byte as before.
+
+```js
+import {isoStyle, paintPiece, isometric} from 'footprint-story/isometric';
+import {sketchyLine, hatchTexture} from 'footprint-story/human';
+import {isoArt} from './deck/isoPaint.js';   // inside StoryDeck: the build's painter (not a package export)
+
+const style = isoStyle({line: 'human:sketchy', texture: 'human:hatch'}, {choices: [sketchyLine, hatchTexture]});
+const {items, box} = paintPiece(style, {name: 'server', kind: 'block', at: [1, 1], size: [2, 2, 1]}, isometric({tile: 120, origin: [960, 240]}));
+isoArt(items, box, {styled: true});
+// the three faces filled, with no ink outline; then one <path class="iso-ink" stroke="none" style="fill:…" d="…Z"/>
+// for each hand-drawn edge, and one <path class="iso-hatch" …/> for each hatch line
+```
+
+- **How it is drawn:** each stroke is one `<path>`, filled in its colour (`fill-opacity` for its alpha), or the
+  page's line colour (`var(--iso-line, var(--iso-ink, #14181f))`, the colour a face's outline uses) when it has
+  none. It has `stroke="none"`, so the page's 2.5 px outline does not make it thicker. Its ends are flat, as
+  `strokeOutline` gives them. footprint-story leaves a round cap to the painter, and its geometry has no cap yet, so
+  none is drawn. Each end of a sketch is already tapered to 30% of its width.
+- **The time:** a deck page is drawn at rest, so the whole stroke is drawn and its times are not played. A map that
+  draws strokes says so in its record (`made.strokes` and the run's `maps made` · `strokes`: how many, and "drawn
+  whole, at rest: a page does not play a stroke's timing (StoryReel plays it)"). A map with none records as before.
+  Revealing a stroke click by click is left for later.
+- **Exports:** PowerPoint and video take a PNG of each settled slide from the browser, and print uses the browser's
+  page, so all three carry a stroke as the SVG draws it: whole and still.
+- **What a map can name today:** footprint-story's map steps (`buildIsoMap`, which builds every deck map) do not
+  yet take choices a tool hands in. So `data-style="line: human:sketchy"` is still refused, now in plain words: "the
+  line "human:sketchy" is a choice a tool hands in, and footprint-story's map steps take none handed in yet". The
+  painter is ready for the day the steps take one.
+- Tests: the ring is checked against a hand-worked one to 1e-6. Each stroke of a `human:sketchy` + `human:hatch`
+  block, cylinder and floor is drawn as footprint-story's ring. A still of that map (`deck/test/sketchy-still.html`,
+  with no words, so no font of the host's) is pinned byte for byte.
+
 ## 0.38.0 — the motion place rules, one copy
 
 Nothing an author sees changes: every page, keyframe, finding and refusal is the same as 0.37.0's.
