@@ -766,6 +766,18 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   strokes once (a hidden `<svg data-sd-strokes>`), and each click draws them with a `<use>`. So a hatched map costs
   its strokes once, not once a click. `storydeck check` notes a map past 2000 strokes or 2 MB of them, and the build
   refuses one past 20000 strokes or 16 MB (our numbers), naming the fix: a wider hatch spacing.
+  A map can name one of footprint-story's **looks**, a style row under a name: `<i data-style="look: line-art"></i>`.
+  `outlined` draws a bold contour round each piece over today's tones; `line-art` draws paper faces and ink lines;
+  `paper-grain` lays a fine, faint grain over every face; `duotone` prints every line in one ink. A column written
+  beside a look replaces that part of it (`look: line-art; texture: human:hatch`). A look that is not one is refused,
+  naming the four; so is a look whose every part the row writes itself, since it would draw nothing. On a deck map,
+  duotone leaves each face's colour to the page (the theme, `ok` / `warn` / `bad`), as footprint-story does for a map
+  with no colours of its own. A page is light or dark when it is viewed (T, the saved choice, else the system), so a
+  paper map (line-art) takes the page's own paper (`--bg-elev`) and ink (`--fg`) on a dark page, and a contour takes
+  the page's ink. Names and floor labels then stand at 4.5 : 1 or more in both themes. Before this, a line-art floor
+  label stood at about 1.1 : 1 on a dark page. A grain's marks are drawn once a page, like strokes are: a 64-block
+  grain map at a 96 px tile went from 246 KB a click to 43 KB. The stroke budget counts their bytes. The run's record
+  names the look (`storydeck log --why style --map <map>` · `"look"`).
 
   **Blocks that move by intent.** A click can move a block: write what happens on its `<step>`, never how — the
   words are footprint-story's (`footprint-story/human`), and it decides the model, the duration and the curve:

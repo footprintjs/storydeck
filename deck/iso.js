@@ -53,7 +53,7 @@ import {mayHoldFootprint, paintFootprints, readFootprints} from './footprint.js'
 import {decodeEntities, esc} from './html.js';
 import {attrRule, ownAttribute, pieceTags, tagsWith} from '../pieceRules.js';
 import {closeOf} from './callouts.js';
-import {isoArt, strokesDrawn} from './isoPaint.js';
+import {isoArt, paperOf, strokesDrawn} from './isoPaint.js';
 import {MAYBE_STYLE, readStyle} from './isoStyle.js';
 
 const KINDS = ['block', 'cylinder', 'floor'];
@@ -220,8 +220,8 @@ const beyondArea = (points, [x0, y0, x1, y1]) => Math.max(0, ...points.flatMap((
  * stand (null for a floor). WHY the built map's: the steps already made the faces with the style's shape column, so
  * the deck paints that list and builds no face of its own — a deck and a film draw one picture.
  */
-function artOf({box, centre}, paints, solid, styled, strokes) {
-  return {box, art: isoArt(paints, box, {styled, strokes}), say: solid ? {x: centre[0], y: centre[1]} : null};
+function artOf({box, centre}, paints, solid, styled, strokes, paper) {
+  return {box, art: isoArt(paints, box, {styled, strokes, paper}), say: solid ? {x: centre[0], y: centre[1]} : null, ...(paper ? {paper: true} : {})};
 }
 
 /** A block's small line (its first <small>), as plain words: what a name's box under it takes room for (footprint-story/isometric · nameBox). */
@@ -318,7 +318,8 @@ function draw(p, html, shape, level, tight, mark = null) {
   // it, and a view that frames it holds its words. Any other floor, a labelled one too, stays ground (README "Ground").
   const ground = p.kind === 'floor' && !(p.label && p.group !== null) && ownAttribute(at, 'data-ground') === null ? ' data-ground' : '';
   const drawn = mark?.mover ? `<span class="iso-motion" data-sd-mover="${mark.index}">${svg}${words}</span>` : `${svg}${words}`;
-  return `<${p.tag}${at}${ground} data-sd-iso="${p.kind}"${mark?.mover ? ` data-sd-moving="${mark.index}"` : ''} style=${p.quote}${css}${p.quote}>${drawn}${named}${html.slice(p.close, p.end)}`;
+  // a piece of a paper map (isoPaint.js · paperOf) is marked, so a dark page gives it its own paper and ink (LOOK_CSS)
+  return `<${p.tag}${at}${ground} data-sd-iso="${p.kind}"${shape.paper ? ' data-sd-paper' : ''}${mark?.mover ? ` data-sd-moving="${mark.index}"` : ''} style=${p.quote}${css}${p.quote}>${drawn}${named}${html.slice(p.close, p.end)}`;
 }
 
 /**
@@ -419,9 +420,11 @@ export function isoDrawn(html, {canvas = null, area = null, links = [], floorWir
   // each piece where the map put it, drawn — its name and its floor's label as the steps fitted them
   // the map's hand-drawn strokes, drawn once for the page (isoPaint.js · isoArt `strokes`): each click of the map draws a <use>
   const defs = new Map();
+  // a paper map's fills in its paper are the page's paper, which a dark page sets (isoPaint.js · paperOf, LOOK_CSS)
+  const paper = paperOf(built.style);
   const drawnOf = new Map([
-    ...solid.map((p, i) => [p, {...artOf(built.shapes[i], built.paints[i], true, style !== null, defs), words: words[i], fit: fitOf(built.names[i], words[i]?.label ?? null), drawn: built.shapes[i], id: ids.blocks[i]}]),
-    ...floors.map((p, i) => [p, {...artOf(built.floorShapes[i], built.floorPaints[i], false, style !== null, defs), label: built.floorLabels[i]}]),
+    ...solid.map((p, i) => [p, {...artOf(built.shapes[i], built.paints[i], true, style !== null, defs, paper), words: words[i], fit: fitOf(built.names[i], words[i]?.label ?? null), drawn: built.shapes[i], id: ids.blocks[i]}]),
+    ...floors.map((p, i) => [p, {...artOf(built.floorShapes[i], built.floorPaints[i], false, style !== null, defs, paper), label: built.floorLabels[i]}]),
     ...feet.map((p, i) => [p, {drawn: built.obstacleShapes[i], id: ids.obstacles[i]}]),
   ]);
   // a floor label's icon, from the deck's icons: one it does not have is refused, naming the ones it has
@@ -464,7 +467,7 @@ export function isoDrawn(html, {canvas = null, area = null, links = [], floorWir
   const strokes = strokesDrawn([...built.paints, ...built.floorPaints], defs);
   // the page carries them once, but a map may still draw too many for a page: noted past STROKES_NOTE (check.js), refused past STROKES_MOST
   if (strokes) refuseStrokes(strokes);
-  const made = {placed: built.placed, tile: built.view.tile[0], fitted: built.grid === 'fitted', ...(feet.length ? {footprints: feet.length} : {}), ...(outside > 0.5 ? {outside: Math.round(outside)} : {}), ...(breaks.length ? {breaks} : {}), ...(style ? {style: built.style} : {}), ...(strokes ? {strokes} : {})};
+  const made = {placed: built.placed, tile: built.view.tile[0], fitted: built.grid === 'fitted', ...(feet.length ? {footprints: feet.length} : {}), ...(outside > 0.5 ? {outside: Math.round(outside)} : {}), ...(breaks.length ? {breaks} : {}), ...(style ? {style: built.style} : {}), ...(strokes ? {strokes} : {}), ...(paper ? {paper: PAPER_DARK} : {})};
   // what motionPlan.js plans on, for a map whose blocks move: each block where the map built it, with its words' fit and level
   const motion = movers?.size ? {grid, view: {tile: [...built.view.tile], origin: [...built.view.origin], rise: built.view.rise}, blocks: solid.map((p, i) => ({name: p.name, kind: p.kind, at: [built.at[i][0], built.at[i][1], built.at[i][2] ?? 0], size: [...p.size],
     box: built.shapes[i].box, outline: built.shapes[i].outline.map(([x, y]) => [x, y]), say: [...built.shapes[i].centre], fit: drawnOf.get(p).fit, small: smallOf(p.inner), level: levelOf(p),
@@ -501,6 +504,29 @@ export const FLOOR_LABEL_CSS = `/* a floor's label (floorLabel.js): flat on the 
   color: var(--iso-label, color-mix(in srgb, var(--fg, #14181f) 72%, transparent));
 }
 :where(section[data-label] .iso-floor-icon) { width: 1.15em; height: 1.15em; vertical-align: -0.2em; margin-right: .35em; color: currentColor; }`;
+
+/**
+ * What a paper map's record says of its paper (`made.paper`): the kit's record holds the paper it was built with, and a
+ * dark page draws the page's own — so the record says so, never silently.
+ */
+export const PAPER_DARK = 'on a dark page its paper is the page\'s (--bg-elev) and its lines and names the page\'s ink (--fg)';
+/**
+ * A map drawn in a look, on a dark page (0.40.0). WHY here and at view time: a page is light or dark as it is VIEWED (T,
+ * the saved choice, else the system: page.js · themeRuntime), so no build can hand the kit the dark page's colours.
+ * The page's own tokens decide, in CSS, under :root.dark:
+ *   - a paper map's pieces (data-sd-paper: the look line-art, or shading paper) take the page's paper (--bg-elev) for
+ *     their paper fills (isoPaint.js · pagePaper) and the page's ink (--fg) for their lines and names: light ink on the
+ *     page's dark paper, as dark ink on white paper in a light page. With the light paper on a dark page a floor's
+ *     label (the page's --fg) stood about 1.1 : 1 on the white floor;
+ *   - a contour (the look outlined, line-art) is drawn in the page's ink: in the map's dark ink, a dark page's
+ *     silhouette is lost against it.
+ * Each fallback is the page's own (deck.css: --bg-elev #ffffff, --fg #14181f), so a deck with no dark tokens draws its
+ * dark page as its light one. Rules with no weight, so theme.css still has the last word. The page carries them only
+ * when a map paints a paper or a contour (compile.js · looks), so every other page is as before.
+ */
+export const LOOK_CSS = `/* a map drawn in a look, on a dark page (deck/iso.js · LOOK_CSS): the page's paper and ink */
+:where(:root.dark section[data-label] [data-sd-paper]) { --iso-paper: var(--bg-elev, #ffffff); --iso-ink: var(--fg, #14181f); }
+:where(:root.dark section[data-label] .iso-contour) { stroke: var(--fg, #14181f); }`;
 
 export const ISO_CSS = `/* isometric pieces: blocks on a floor seen from a corner (deck/iso.js) */
 :where(section[data-label] [data-sd-iso]) { position: absolute; box-sizing: border-box; --sd-hot-width: 0px; --iso-turn: var(--sd-turn, 0s); }

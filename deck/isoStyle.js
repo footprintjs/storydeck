@@ -21,21 +21,32 @@
 // build fits one) still names its style. One a map, refused anywhere else with the fix.
 //
 // The choices are the kit's, never listed here: a column, a choice or an option it does not have is refused in the
-// deck's words, naming the ones there are (the kit's ISO_STYLE_COLUMNS, ISO_STYLE_CHOICES and the hand-drawn choices the
-// deck hands in, isoSpec.js · DECK_CHOICES, and isoStyle's own check of an option's value).
+// deck's words, naming the ones there are (the kit's ISO_STYLE_COLUMNS, ISO_STYLE_CHOICES and the human door's
+// HUMAN_STYLE_CHOICES, which the deck hands its steps, and isoStyle's own check of an option's value).
 //
-//   <i data-style="line: human:sketchy; texture: human:hatch"></i>   drawn by hand: sketched edges, hatched sides (0.39.0) A map with no data-style hands no style, and its page is byte for byte as before.
-import {isoStyle, ISO_STYLE_COLUMNS, ISO_STYLE_CHOICES} from 'footprint-story/isometric';
+//   <i data-style="line: human:sketchy; texture: human:hatch"></i>   drawn by hand: sketched edges, hatched sides (0.39.0)
+//   <i data-style="look: line-art"></i>                              a named look: footprint-story's ISO_LOOKS (0.40.0)
+//
+// A LOOK is a row under a name (footprint-story/isometric · ISO_LOOKS: outlined, line-art, paper-grain, duotone),
+// written as a column of its own, "look: <name>", with no options: a column written beside it replaces the look's
+// entry, whole ("look: line-art; texture: human:hatch"), as the kit says. The record keeps its name (`style.look`).
+//
+// A map with no data-style hands no style, and its page is byte for byte as before.
+import {isoStyle, ISO_LOOKS, ISO_STYLE_COLUMNS, ISO_STYLE_CHOICES} from 'footprint-story/isometric';
+import {HUMAN_STYLE_CHOICES} from 'footprint-story/human';
 import {ownAttribute, tagsWith} from '../pieceRules.js';
 import {decodeEntities} from './html.js';
-import {DECK_CHOICES} from './isoSpec.js';
 
 /**
- * The choices a map may name, by column: the kit's own, then those the deck hands its steps (isoSpec.js ·
- * DECK_CHOICES: footprint-story's hand-drawn `human:sketchy` line and `human:hatch` texture, since 0.39.0) — so a name
- * the steps would build is never refused here, and one they would not is refused naming every one they take.
+ * The choices a map may name, by column: the kit's own, then the human door's (HUMAN_STYLE_CHOICES: `human:sketchy`,
+ * `human:hatch`, `human:grain` — every one it ships, the list the deck hands its steps, isoSpec.js) — so a name the
+ * steps would build is never refused here, and one they would not is refused naming every one they take.
  */
-const CHOICES = Object.fromEntries(ISO_STYLE_COLUMNS.map((column) => [column, [...ISO_STYLE_CHOICES[column], ...DECK_CHOICES.filter((c) => c.column === column).map((c) => c.name)]]));
+const CHOICES = Object.fromEntries(ISO_STYLE_COLUMNS.map((column) => [column, [...ISO_STYLE_CHOICES[column], ...HUMAN_STYLE_CHOICES.filter((c) => c.column === column).map((c) => c.name)]]));
+/** The looks a map may name: the kit's (ISO_LOOKS), never listed here. */
+const LOOKS = Object.keys(ISO_LOOKS);
+/** A style's columns as a refusal names them: the look, then the kit's. */
+const COLUMNS = ['look', ...ISO_STYLE_COLUMNS];
 
 /** A tag that may carry the attribute: a cheap look, in any case. Whether it does is ownAttribute's to say. */
 export const MAYBE_STYLE = /data-style(?![\w-])/i;
@@ -68,6 +79,15 @@ function readChoice(words, column, where) {
   return rest.length ? {...options, name} : name;
 }
 
+/** A look as written ("line-art"): one of the kit's names, with no options — a column beside it changes it. */
+function readLook(words, where) {
+  const [name, ...rest] = words.trim().split(/\s+/);
+  if (!name) throw new Error(`${where}: the look names one — "look: ${LOOKS[0]}"`);
+  if (!LOOKS.includes(name)) throw new Error(`${where}: there is no look "${cut(name)}" — there are ${quoted(LOOKS)}`);
+  if (rest.length) throw new Error(`${where}: the look "${name}" takes no options — not "${cut(rest.join(' '))}"; to change a part of it, write that column beside it ("look: ${name}; line: ink width 3")`);
+  return name;
+}
+
 /**
  * A style's words as the kit's row ({line: {name: 'ink', width: 5}}), checked in the deck's words: the form, a column
  * it has not, a column twice, a choice it has not. What a value of an option may be is the kit's check (isoStyle), its
@@ -81,13 +101,14 @@ export function parseStyle(text, where) {
     const m = /^([^:\s]+)\s*:([^]*)$/.exec(part);
     if (!m) throw new Error(`${where}: each column is written "column: choice", apart with ";" — not "${cut(part)}"`);
     const column = m[1];
-    if (!ISO_STYLE_COLUMNS.includes(column)) throw new Error(`${where}: a style's columns are ${ISO_STYLE_COLUMNS.join(', ')} — not "${cut(column)}"`);
+    if (!COLUMNS.includes(column)) throw new Error(`${where}: a style's columns are ${COLUMNS.join(', ')} — not "${cut(column)}"`);
     if (Object.hasOwn(row, column)) throw new Error(`${where}: the ${column} is written twice — keep one`);
+    if (column === 'look') { row.look = readLook(m[2], where); continue; }
     // effects is a list: each its own choice, apart with ","
     row[column] = column === 'effects' ? m[2].split(',').map((one) => readChoice(one, column, where)) : readChoice(m[2], column, where);
   }
   try {
-    isoStyle(row, {choices: DECK_CHOICES});
+    isoStyle(row, {choices: HUMAN_STYLE_CHOICES});
   } catch (e) {
     throw new Error(`${where}: ${String(e.message).replace(/^(?:isometric|human): /, '').replace(/^the style's /, 'the ')}`, {cause: e});
   }
