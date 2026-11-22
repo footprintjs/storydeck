@@ -6,6 +6,7 @@ import {deckPage, deckStyles} from './page.js';
 import {pageAssets} from './assets.js';
 import {deckRoot, writeInside} from './paths.js';
 import {clipTags} from './narrate.js';
+import {inlineStrokes} from './isoPaint.js';
 
 /**
  * A deck folder read and compiled: {source, compiled}. Throws, naming the file, part and click, when it cannot be.
@@ -42,7 +43,7 @@ export function writeDeck(dir, {compiled, html, voice: carried}, {out} = {}) {
   if (compiled.config.deckData) {
     data = path.join(root, compiled.config.deckData);
     const deckCss = deckStyles(compiled, pageAssets());
-    writeInside(root, data, JSON.stringify({deckCss, sections: compiled.slides.map(({label, html: h}) => ({label, html: h}))}, null, 1));
+    writeInside(root, data, JSON.stringify({deckCss, sections: compiled.slides.map(({label, html: h}) => ({label, html: compiled.strokeDefs ? inlineStrokes(h, compiled.strokeDefs) : h}))}, null, 1));
   }
   return {file, bytes: Buffer.byteLength(html), slides: compiled.slides.length, clicks: compiled.clicks.length, data, ...(carried && {voice: carried})};
 }

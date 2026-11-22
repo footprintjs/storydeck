@@ -54,7 +54,8 @@ export function checkRules(scope, run) {
  * these blocks" and "why is that wire straight" without the page being looked at: {map: {placed: 'build' | 'hand',
  * tile, cables, footprints?: how many pieces stand on the floor by a footprint, said: [[wire, note], …], tight: [names],
  * breaks?: [[block, rule], …] — the break rule each block's writer picked for its name (data-break), style?: {row,
- * options} — the style choices it was drawn in, when it names some (data-style)}}.
+ * options} — the style choices it was drawn in, when it names some (data-style), strokes?: {strokes, timing} — the
+ * hand-drawn strokes it draws and that their time is not played on a page}}.
  * A deck with no such map writes nothing, and runs nothing more. One that has one also builds each map again with the
  * map flow, for its own record (mapRecords).
  */
@@ -64,6 +65,9 @@ export function mapsMade(scope, run) {
     ...(map.ways?.length ? {said: map.ways.map((w) => [w.name, w.way])} : {}), ...(map.tight?.length ? {tight: map.tight.map((t) => t.name)} : {}), ...(map.made.breaks ? {breaks: map.made.breaks} : {}),
     // the style it was drawn in, as the steps read it ({row, options}): only on a map that names one (data-style), so a map that names none records as before
     ...(map.made.style ? {style: map.made.style} : {}),
+    // its hand-drawn strokes, counted, and that the page draws them whole without playing their time (isoPaint.js ·
+    // strokesDrawn): only on a map whose style draws some
+    ...(map.made.strokes ? {strokes: map.made.strokes} : {}),
     // its blocks' moves (data-move), as footprint-story planned them, and how each way of showing the deck carries them:
     // only on a map whose clicks move a block, so every other map records as before
     ...(map.motion ? {motion: {moves: map.motion.record.map((r) => ({click: r.click, piece: r.piece, do: r.do, model: r.model, by: r.by, seconds: r.seconds, ...(r.accepted ? {accepted: r.accepted} : {})})), carriers: map.motion.carriers}} : {}),

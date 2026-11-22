@@ -8,7 +8,7 @@
 // through a real run of the same steps, nothing run again when it is asked.
 //
 // The map flow is handed the very spec buildIsoMap was handed (compile.js keeps it, frozen, as the map's `built`), with
-// the deck's policy (isoSpec.js · DECK): never one made again here. Its map must equal the one the page draws; a
+// the deck's policy and its handed-in style choices (isoSpec.js · DECK, DECK_CHOICES): never one made again here. Its map must equal the one the page draws; a
 // difference is said aloud (`differs`), first in every answer for that map, and counts in no verdict — the page draws
 // the deck's map, so it is no fault of the deck's, but it is never silent.
 //
@@ -18,7 +18,7 @@
 // failed run. A record that cannot be written never costs the run.
 import {lstatSync, rmSync} from 'node:fs';
 import {isDeepStrictEqual} from 'node:util';
-import {DECK} from '../isoSpec.js';
+import {DECK, DECK_CHOICES} from '../isoSpec.js';
 import {KEY} from './log.js';
 
 /** The most maps one run builds again: past it the rest are counted, and the reply says so. */
@@ -92,7 +92,7 @@ async function flowOne(scope, run, {name, built}, file, ms) {
   const control = eng.controlDepRecorder();
   let made;
   try {
-    made = readMade(await scope.$call(MAP_FLOW, async () => (await flowOf())(built.spec, DECK, {...(sink ? {sink} : {}), recorders: [control]}), {attempts: 1, timeoutMs: ms}));
+    made = readMade(await scope.$call(MAP_FLOW, async () => (await flowOf())(built.spec, DECK, {choices: DECK_CHOICES, ...(sink ? {sink} : {}), recorders: [control]}), {attempts: 1, timeoutMs: ms}));
   } catch (e) {
     made = {failed: e?.name === 'AttemptTimeoutError' ? `it did not finish within ${ms / 1000} s` : thrownText(e)};
   }

@@ -44,7 +44,7 @@
 // pointer, and a ring round it (a highlight, explore's hover) follows its faces — isoRing, for whoever rings a piece.
 import {isometric, ISO_MAP_LIMITS, MOST_FLOOR_LABEL, MOST_KEEP} from 'footprint-story/isometric';
 import {builtMap, usualGrid, DECK} from './isoSpec.js';
-import {areaOf, checkFloors, checkPlacing} from './isoRules.js';
+import {areaOf, checkFloors, checkPlacing, refuseStrokes} from './isoRules.js';
 import {BREAK_RULES} from 'footprint-story/layout';
 import {portsWritten} from './portsWritten.js';
 import {groupWritten} from './groups.js';
@@ -53,7 +53,7 @@ import {mayHoldFootprint, paintFootprints, readFootprints} from './footprint.js'
 import {decodeEntities, esc} from './html.js';
 import {attrRule, ownAttribute, pieceTags, tagsWith} from '../pieceRules.js';
 import {closeOf} from './callouts.js';
-import {isoArt} from './isoPaint.js';
+import {isoArt, strokesDrawn} from './isoPaint.js';
 import {MAYBE_STYLE, readStyle} from './isoStyle.js';
 
 const KINDS = ['block', 'cylinder', 'floor'];
@@ -220,8 +220,8 @@ const beyondArea = (points, [x0, y0, x1, y1]) => Math.max(0, ...points.flatMap((
  * stand (null for a floor). WHY the built map's: the steps already made the faces with the style's shape column, so
  * the deck paints that list and builds no face of its own — a deck and a film draw one picture.
  */
-function artOf({box, centre}, paints, solid, styled) {
-  return {box, art: isoArt(paints, box, {styled}), say: solid ? {x: centre[0], y: centre[1]} : null};
+function artOf({box, centre}, paints, solid, styled, strokes) {
+  return {box, art: isoArt(paints, box, {styled, strokes}), say: solid ? {x: centre[0], y: centre[1]} : null};
 }
 
 /** A block's small line (its first <small>), as plain words: what a name's box under it takes room for (footprint-story/isometric · nameBox). */
@@ -417,9 +417,11 @@ export function isoDrawn(html, {canvas = null, area = null, links = [], floorWir
   });
   const grid = isometric({tile: built.view.tile, origin: built.view.origin, rise: built.view.rise});
   // each piece where the map put it, drawn — its name and its floor's label as the steps fitted them
+  // the map's hand-drawn strokes, drawn once for the page (isoPaint.js · isoArt `strokes`): each click of the map draws a <use>
+  const defs = new Map();
   const drawnOf = new Map([
-    ...solid.map((p, i) => [p, {...artOf(built.shapes[i], built.paints[i], true, style !== null), words: words[i], fit: fitOf(built.names[i], words[i]?.label ?? null), drawn: built.shapes[i], id: ids.blocks[i]}]),
-    ...floors.map((p, i) => [p, {...artOf(built.floorShapes[i], built.floorPaints[i], false, style !== null), label: built.floorLabels[i]}]),
+    ...solid.map((p, i) => [p, {...artOf(built.shapes[i], built.paints[i], true, style !== null, defs), words: words[i], fit: fitOf(built.names[i], words[i]?.label ?? null), drawn: built.shapes[i], id: ids.blocks[i]}]),
+    ...floors.map((p, i) => [p, {...artOf(built.floorShapes[i], built.floorPaints[i], false, style !== null, defs), label: built.floorLabels[i]}]),
     ...feet.map((p, i) => [p, {drawn: built.obstacleShapes[i], id: ids.obstacles[i]}]),
   ]);
   // a floor label's icon, from the deck's icons: one it does not have is refused, naming the ones it has
@@ -457,12 +459,17 @@ export function isoDrawn(html, {canvas = null, area = null, links = [], floorWir
   const outside = fitted && areas.length ? beyondArea(areas.map(([c, r]) => grid.at(c, r)), area ?? [0, 0, ...(canvas ?? [1920, 1080])]) : 0;
   // the break rules its writer picked, by block (none written: nothing here, so a map that picks none records as before)
   const breaks = found.filter((p) => p.rule).map((p) => [p.name, p.rule]);
-  const made = {placed: built.placed, tile: built.view.tile[0], fitted: built.grid === 'fitted', ...(feet.length ? {footprints: feet.length} : {}), ...(outside > 0.5 ? {outside: Math.round(outside)} : {}), ...(breaks.length ? {breaks} : {}), ...(style ? {style: built.style} : {})};
+  // the hand-drawn strokes its pieces draw, and that a page does not play their time (isoPaint.js · strokesDrawn): only
+  // on a map whose style draws some, so every other map records as before
+  const strokes = strokesDrawn([...built.paints, ...built.floorPaints], defs);
+  // the page carries them once, but a map may still draw too many for a page: noted past STROKES_NOTE (check.js), refused past STROKES_MOST
+  if (strokes) refuseStrokes(strokes);
+  const made = {placed: built.placed, tile: built.view.tile[0], fitted: built.grid === 'fitted', ...(feet.length ? {footprints: feet.length} : {}), ...(outside > 0.5 ? {outside: Math.round(outside)} : {}), ...(breaks.length ? {breaks} : {}), ...(style ? {style: built.style} : {}), ...(strokes ? {strokes} : {})};
   // what motionPlan.js plans on, for a map whose blocks move: each block where the map built it, with its words' fit and level
   const motion = movers?.size ? {grid, view: {tile: [...built.view.tile], origin: [...built.view.origin], rise: built.view.rise}, blocks: solid.map((p, i) => ({name: p.name, kind: p.kind, at: [built.at[i][0], built.at[i][1], built.at[i][2] ?? 0], size: [...p.size],
     box: built.shapes[i].box, outline: built.shapes[i].outline.map(([x, y]) => [x, y]), say: [...built.shapes[i].centre], fit: drawnOf.get(p).fit, small: smallOf(p.inner), level: levelOf(p),
     ...(twice.has(p.name) ? {twice: true} : {})})), obstacles: feet.map((f) => ({name: f.name, kind: 'footprint', at: [f.at[0], f.at[1], f.at[2] ?? 0], size: [...f.size], level: levelOf(f)}))} : null;
-  return {html: out + map.slice(from), shapes, solids, tight, levels, made, built: {spec, map: built}, routes, ...(motion ? {motion} : {}), floor: (col, row, lift = 0) => { const point = grid.at(col, row, lift); return [point.x, point.y]; }};
+  return {html: out + map.slice(from), shapes, solids, tight, levels, made, built: {spec, map: built}, routes, ...(defs.size ? {strokeDefs: Object.fromEntries(defs)} : {}), ...(motion ? {motion} : {}), floor: (col, row, lift = 0) => { const point = grid.at(col, row, lift); return [point.x, point.y]; }};
 }
 
 const TONE = 'var(--iso-color, var(--sd-tone, #d9e4f3))';

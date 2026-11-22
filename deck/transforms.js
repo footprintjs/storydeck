@@ -522,5 +522,5 @@ export function transformed(html, {icons: set = {}, canvas = null, area = null, 
   const routes = iso.routes ? found.map(() => null) : null;
   joined.forEach((i, k) => { if (routes) routes[i] = iso.routes[k]; });
   // a map whose blocks move (movers) also hands on what the moves are planned on, and what its wires join (motionRead.js)
-  return {...wiresDrawn(callouts(iso.html, {canvas}), {...iso, routes}), tight: iso.tight ?? [], made: iso.made ?? null, ...(iso.built ? {built: iso.built} : {}), ...(iso.motion ? {motion: iso.motion, links: wireLinks(drawn)} : {})};
+  return {...wiresDrawn(callouts(iso.html, {canvas}), {...iso, routes}), tight: iso.tight ?? [], made: iso.made ?? null, ...(iso.built ? {built: iso.built} : {}), ...(iso.strokeDefs ? {strokeDefs: iso.strokeDefs} : {}), ...(iso.motion ? {motion: iso.motion, links: wireLinks(drawn)} : {})};
 }

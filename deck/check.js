@@ -15,6 +15,7 @@
 //   wire-way       a wire between two blocks that does not lie well on the floor: it passes behind a block, lies on another, doubles back on itself (a hairpin), or is drawn straight — and why
 //   name-fit       a block's name that does not fit its top face (or a floor's label its front edge) even on two lines at the least size
 //   map-fit        a map of groups whose fitted picture runs past the slide even at the least tile
+//   strokes        a map whose hand-drawn strokes (data-style "human:sketchy", "human:hatch") pass the note's size (isoRules.js · STROKES_NOTE)
 //   motion         what a critic found in a block's move (data-move): footprint-story's (jerk, arc, spacing, contact, …) and the
 //                  deck's own (deck:contact, deck:covers), at the critic's own level — a note is advice, one the move accepts is said as accepted
 import {wordCount} from './parse.js';
@@ -23,6 +24,7 @@ import {LOOP_NAMES} from './loops.js';
 import {saidInNotes} from './differs.js';
 import {showsPiece} from './callouts.js';
 import {readWay} from './cable.js';
+import {mb, STROKES_NOTE} from './isoRules.js';
 
 const names = (pieces, idx) => [...new Set(idx.map((i) => pieces[i].keys[0]))];
 const problem = (level, rule, click, message) => ({level, rule, click: click?.n ?? null, label: click?.label ?? null, message});
@@ -199,6 +201,18 @@ function mapsFit(compiled) {
   });
 }
 
+/**
+ * A map whose hand-drawn strokes pass the note's size (isoRules.js · STROKES_NOTE; past STROKES_MOST it is refused at
+ * build): said at its first click, with how many and how many bytes the page carries them in (once), and the fix.
+ */
+function strokesSaid(compiled) {
+  return Object.entries(compiled.maps).flatMap(([map, {made}]) => {
+    const first = compiled.clicks.find((c) => c.map === map), s = made?.strokes;
+    if (!first || !s || (s.strokes <= STROKES_NOTE.strokes && s.bytes <= STROKES_NOTE.bytes)) return [];
+    return [problem('info', 'strokes', first, `map "${map}": it draws ${s.strokes} hand-drawn strokes in ${mb(s.bytes)} of the page (drawn once, every click reuses them), past the ${STROKES_NOTE.strokes} strokes or ${mb(STROKES_NOTE.bytes)} a map is noted at (ours) — the page opens and prints slower; a wider hatch spacing ("texture: human:hatch spacing 16") draws fewer`)];
+  });
+}
+
 /** The levels a move's finding is told at: a critic's warn is a fix, a note advice, and one its move accepts is advice it chose. */
 const MOTION_LEVEL = {warn: 'warn', note: 'info', accepted: 'info'};
 
@@ -223,7 +237,7 @@ export function checkDeck(compiled) {
     out.push(...noChange(c, compiled.clicks[i - 1]));
     out.push(...farView(c));
   });
-  out.push(...neverShown(compiled), ...missingNotes(compiled), ...unstyledThemes(compiled), ...unsetLoops(compiled), ...unsaidDiffers(compiled), ...aloneCallouts(compiled), ...acrossStages(compiled), ...wireWaysSaid(compiled), ...namesTight(compiled), ...mapsFit(compiled), ...motionFound(compiled));
+  out.push(...neverShown(compiled), ...missingNotes(compiled), ...unstyledThemes(compiled), ...unsetLoops(compiled), ...unsaidDiffers(compiled), ...aloneCallouts(compiled), ...acrossStages(compiled), ...wireWaysSaid(compiled), ...namesTight(compiled), ...mapsFit(compiled), ...strokesSaid(compiled), ...motionFound(compiled));
   return out;
 }
 

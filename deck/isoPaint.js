@@ -27,10 +27,25 @@
 // stroke-width on .iso-ground) — so it fights none of the deck's CSS colours. (The tile lines' 1.5 px is a CSS rule on
 // .iso-lines, which wins over an attribute: every line choice the kit has keeps it.)
 //
+// WHY a hand-drawn stroke is drawn as a filled ring (0.39.0): a `stroke` item (footprint-story/human · strokes) lays a
+// width per point, and an SVG line has one width. So the painter fills the ring round it, as the kit says a painter
+// that cannot vary a line's width does — that ring is footprint-story's `strokeOutline(points)`, the one geometry of a
+// line of changing width, never worked out here: numbers in footprint-story, drawing in StoryDeck. Its ink is the
+// stroke's colour, or the page's line colour (PAGE_LINE, the colour .iso-art outlines a face with) when it carries none,
+// as its fill; it takes no outline of its own (stroke="none"), which would thicken every point by the page's line.
+// Its ends are capped by the same ring (strokeOutline(points, {cap: stroke.cap}), footprint-story 0.33.0): a round, butt
+// or square end is geometry, so it is the kit's, never a disc drawn here. The ring can cross itself at a round cap on a
+// short, sharply turning stroke, so it is filled by the non-zero rule — written in its style attribute (fill-rule:nonzero),
+// which a page's rule with no weight cannot override, so no even-odd rule cuts a hole where it crosses.
+//
+// WHY the whole stroke, and its time unplayed: a deck page is drawn at rest, whole — a stroke's `t` (when the pen is
+// at each point) is a film's to play (StoryReel), and the map's record says so (strokesDrawn, STROKE_TIMING).
+//
 // Numbers are written to one decimal, as every isometric page has been (0.1 px, no trailing zeros), and from the
 // piece's box: a point of the frame minus the box's corner.
 
 import {isometric, isoStyle, paintPiece} from 'footprint-story/isometric';
+import {strokeOutline} from 'footprint-story/human';
 
 /** A role, as the kit checks it (paint.js · checkPaint): written into a class, so nothing else is let through. */
 const ROLE = /^[a-z][a-z0-9-]{0,31}$/;
@@ -146,7 +161,48 @@ function pathData(segments, x, y) {
   return d;
 }
 
-/** One paint item as one SVG element, placed in the box whose corner is (x, y). */
+/**
+ * The colour the page outlines a face with, as ISO_CSS writes it on .iso-art (iso.js; a test pins the two equal): the
+ * ink of a hand-drawn stroke that carries no colour of its own, written in its style attribute because a stroke is
+ * drawn as a fill, and no rule of the page's fills by the line's colour.
+ */
+export const PAGE_LINE = 'var(--iso-line, var(--iso-ink, #14181f))';
+/** What a map's record says of the strokes it draws: their time is not played on a page. */
+export const STROKE_TIMING = 'drawn whole, at rest: a page does not play a stroke\'s timing (StoryReel plays it)';
+
+/**
+ * A hand-drawn stroke as one SVG path: footprint-story's ring round it, its ends capped as its stroke says
+ * (strokeOutline), filled in its ink by the non-zero rule. Each point
+ * is checked before the ring is asked for — [x, y, width, t], finite, its width from 0 to the stroke's — so a point
+ * that skipped the kit's check never bends the ring or writes a stray word; a stroke with no ink, or a fill, is
+ * refused (it would be drawn as nothing, or as a face).
+ */
+function strokeSvg(it, x, y) {
+  const stroke = strokeOf(it.stroke);
+  if (stroke === null || it.fill != null) throw new Error('isoPaint: a hand-drawn stroke\'s fill is null and its stroke names its colour, alpha and cap');
+  if (!Array.isArray(it.points) || it.points.length < 2) throw new Error(`isoPaint: a hand-drawn stroke has at least 2 points — not ${JSON.stringify(it.points?.length ?? it.points)}`);
+  for (const p of it.points) {
+    if (!Array.isArray(p) || p.length !== 4) throw new Error(`isoPaint: a hand-drawn stroke's point is [x, y, width, t] — not ${JSON.stringify(p)}`);
+    p.forEach(num);
+    if (!(p[2] >= 0 && p[2] <= it.stroke.width + 1e-9)) throw new Error(`isoPaint: a hand-drawn stroke's point is as wide as 0 to its stroke's ${stroke.width} px — not ${p[2]}`);
+  }
+  const ring = strokeOutline(it.points, {cap: stroke.cap});
+  const ink = [`fill:${stroke.colour == null ? PAGE_LINE : hex(stroke.colour)}`, ...(stroke.alpha === 1 ? [] : [`fill-opacity:${stroke.alpha}`]), 'fill-rule:nonzero'];
+  return `<path class="${roleClass(it.role)}" stroke="none" style="${ink.join(';')}" d="${ring.map(([px, py], i) => `${i ? 'L' : 'M'}${rel(px, x)} ${rel(py, y)}`).join('')}Z"/>`;
+}
+
+/**
+ * What a map's record says of its hand-drawn strokes: {strokes, bytes, timing} — how many its pieces' lists draw, the
+ * bytes the page carries them in (`defs`, isoArt's `strokes`: once for the whole page; ASCII, so a letter is a byte),
+ * and that their time is not played (STROKE_TIMING) — or null when they draw none, so a map with none records as before.
+ * Their points are not kept here: they are the steps' (built again from the map's spec and the deck's choices).
+ */
+export function strokesDrawn(lists, defs = new Map()) {
+  const strokes = lists.reduce((n, items) => n + items.filter((it) => it.item === 'stroke').length, 0);
+  return strokes ? {strokes, bytes: [...defs.values()].reduce((n, g) => n + g.length, 0), timing: STROKE_TIMING} : null;
+}
+
+/** One paint item but a stroke (isoArt writes strokes itself, a run at a time) as one SVG element, placed in the box whose corner is (x, y). */
 function itemSvg(it, x, y, styled) {
   const stroke = strokeOf(it.stroke), head = `class="${roleClass(it.role)}"${strokeApart(it.role, stroke, styled)}${colours(it, stroke)}`;
   switch (it.item) {
@@ -154,17 +210,66 @@ function itemSvg(it, x, y, styled) {
     case 'ellipse': return `<ellipse ${head} cx="${rel(it.cx, x)}" cy="${rel(it.cy, y)}" rx="${fixed(it.rx)}" ry="${fixed(it.ry)}"/>`;
     case 'lines': return `<path ${head} d="${it.segments.map(([x1, y1, x2, y2]) => `M${rel(x1, x)} ${rel(y1, y)}L${rel(x2, x)} ${rel(y2, y)}`).join('')}"/>`;
     case 'path': return `<path ${head} d="${pathData(it.segments, x, y)}"/>`;
-    // a hand-drawn stroke (footprint-story 0.30's `stroke` item) comes only from the sketch style choices a tool hands
-    // in (sketchyLine, hatchTexture), and a deck's data-style offers none of them: refused by name, never drawn as nothing
-    case 'stroke': throw new Error('isoPaint: a hand-drawn stroke item is painted by a tool that offers the sketch styles (footprint-story/human · sketchyLine, hatchTexture) — a deck\'s data-style offers none, so its paint list has no strokes');
     // a kind of item this painter does not know is refused: drawn as nothing, a piece would lose a face unseen
-    default: throw new Error(`isoPaint: a paint item is a polygon, an ellipse, a path or lines — not ${JSON.stringify(it.item)}`);
+    default: throw new Error(`isoPaint: a paint item is a polygon, an ellipse, a path, lines or a stroke — not ${JSON.stringify(it.item)}`);
   }
 }
 
-/** A piece's paint list as the SVG inside its box ({x, y}: the box's corner on the slide), in paint order. */
 /**
+ * A name for a run of strokes, from what it draws: FNV-1a over its markup, two 32-bit lanes (16 hex digits). WHY from
+ * the markup, not a counter: the same strokes are the same def wherever they are drawn (a map's every click, two maps
+ * alike), and a page's name for them never depends on the order the maps were built in.
+ */
+export function strokesId(markup) {
+  let a = 0x811c9dc5, b = 0x01000193 ^ markup.length;
+  for (let i = 0; i < markup.length; i += 1) {
+    const c = markup.charCodeAt(i);
+    a = Math.imul(a ^ c, 0x01000193) >>> 0;
+    b = Math.imul(b ^ c, 0x0100019d) >>> 0;
+  }
+  return `sd-st-${a.toString(16).padStart(8, '0')}${b.toString(16).padStart(8, '0')}`;
+}
+
+/**
+ * A piece's paint list as the SVG inside its box ({x, y}: the box's corner on the slide), in paint order.
  * `styled`: the map names a style (data-style), so every stroke value its style gives is written out (strokeApart);
  * left out, only what the page does not already draw.
+ * `strokes`: a Map the map's hand-drawn strokes are kept in, drawn ONCE for the whole page (id → `<g id>` of paths):
+ * each run of strokes in a row is written there and drawn here as one `<use href="#id"/>`, in its place in the paint
+ * order. WHY: a map is written again on every click of its part, and a hatched map's strokes are most of its bytes
+ * (64 hatched blocks: 1.6 MB a click) — drawn once, a click carries a few bytes for each run. Left out, the strokes are
+ * written in place, as one list's own SVG (a test, a caller with no page).
  */
-export const isoArt = (items, {x, y}, {styled = false} = {}) => items.map((it) => itemSvg(it, x, y, styled)).join('');
+export function isoArt(items, {x, y}, {styled = false, strokes = null} = {}) {
+  let out = '', run = '';
+  const flush = () => {
+    if (!run) return;
+    if (strokes) { const id = strokesId(run); strokes.set(id, `<g id="${id}">${run}</g>`); out += `<use href="#${id}"/>`; } else out += run;
+    run = '';
+  };
+  for (const it of items) {
+    if (it.item === 'stroke') { run += strokeSvg(it, x, y); continue; }
+    flush();
+    out += itemSvg(it, x, y, styled);
+  }
+  flush();
+  return out;
+}
+
+/** The hidden SVG a page draws its maps' strokes in, once (isoArt's `strokes`, as {id: `<g id>`}); '' when there are none. */
+export const strokesSvg = (defs) => {
+  const all = Object.values(defs ?? {});
+  return all.length ? `<svg data-sd-strokes aria-hidden="true" width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden"><defs>${all.join('')}</defs></svg>` : '';
+};
+
+/**
+ * A slide's HTML with each drawn-once stroke run written back in place (`defs`: {id: `<g id>`}): for HTML shown away from
+ * the page that holds the defs — the Read and Scroll lenses' deck-data.json, whose sections are each shown alone. An id
+ * the defs do not hold is refused: a stroke would vanish unseen.
+ */
+export function inlineStrokes(html, defs) {
+  return html.replace(/<use href="#(sd-st-[0-9a-f]{16})"\/>/g, (_, id) => {
+    if (!Object.hasOwn(defs ?? {}, id)) throw new Error(`isoPaint: a slide draws strokes "${id}", which the page's strokes do not hold`);
+    return defs[id].replace(/^<g id="[^"]*">/, '').replace(/<\/g>$/, '');
+  });
+}

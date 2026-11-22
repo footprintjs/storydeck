@@ -12,6 +12,7 @@ import {DIFFERS_CSS} from './differs.js';
 import {PACE_CSS} from './pace.js';
 import {CALLOUT_CSS} from './callouts.js';
 import {FLOOR_LABEL_CSS, ISO_CSS} from './iso.js';
+import {strokesSvg} from './isoPaint.js';
 import {RIDE_CSS} from './rides.js';
 import {LENS_CSS, LENS_FIRST, lensHtml, lensRuntime} from './lenses.js';
 import {EXPLORE_CSS, exploreData, exploreRuntime} from './explore.js';
@@ -82,7 +83,7 @@ ${config.description ? `<meta name="description" content="${esc(config.descripti
 ${config.lenses ? `${script}${LENS_FIRST}</script>\n` : ''}<style>${styleSafe(css)}</style>
 </head>
 <body>
-<deck-stage width="${config.canvas[0]}" height="${config.canvas[1]}" no-rail${compiled.explore ? ' data-explore' : ''}>
+${compiled.strokeDefs ? `${strokesSvg(compiled.strokeDefs)}\n` : ''}<deck-stage width="${config.canvas[0]}" height="${config.canvas[1]}" no-rail${compiled.explore ? ' data-explore' : ''}>
 ${slides.map((s) => s.html).join('\n')}
 </deck-stage>
 ${TOGGLE}
