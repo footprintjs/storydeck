@@ -1,5 +1,5 @@
 // check — what a deck asks to be fixed, each problem with its click and its fix. Pure (the browser's layout check
-// is layout.js). Errors stop a build; warnings and notes are worth a look.
+// is layout.js; name-ink reads the package's own stylesheets, nameInk.js). Errors stop a build; warnings and notes are worth a look.
 //
 //   words          a headline over deck.json "checks.maxWords" (12), a plain slide over "checks.maxSlideWords" (40): the rest belongs in the notes
 //   lit-on-entry   a click about some pieces brings others in lit too — they light just by coming in
@@ -14,6 +14,8 @@
 //   across-stages  a wire or a callout that joins pieces standing on different stages: when one stage's view moves, it is left behind
 //   wire-way       a wire between two blocks that does not lie well on the floor: it passes behind a block, lies on another, doubles back on itself (a hairpin), or is drawn straight — and why
 //   name-fit       a block's name that does not fit its top face (or a floor's label its front edge) even on two lines at the least size
+//   name-ink       a block's name or <small> line on its top face, or a floor's label on its ground, under 4.5 : 1 on the page light or dark
+//                  (footprint-story/isometric · readableInk, measured from the page's own CSS: nameInk.js)
 //   map-fit        a map of groups whose fitted picture runs past the slide even at the least tile
 //   strokes        a map whose hand-drawn strokes and texture marks (data-style "human:sketchy", "human:hatch", "human:grain") pass the note's size (isoRules.js · STROKES_NOTE)
 //   motion         what a critic found in a block's move (data-move): footprint-story's (jerk, arc, spacing, contact, …) and the
@@ -25,6 +27,7 @@ import {saidInNotes} from './differs.js';
 import {showsPiece} from './callouts.js';
 import {readWay} from './cable.js';
 import {drawnFix, drawnWords, mb, STROKES_NOTE} from './isoRules.js';
+import {inkMessage, inksFound} from './nameInk.js';
 
 const names = (pieces, idx) => [...new Set(idx.map((i) => pieces[i].keys[0]))];
 const problem = (level, rule, click, message) => ({level, rule, click: click?.n ?? null, label: click?.label ?? null, message});
@@ -192,6 +195,24 @@ function namesTight(compiled) {
   return out;
 }
 
+/**
+ * A block's name (or <small> line) or a floor's label that does not read on what it stands on, on the page light or
+ * dark (nameInk.js · inksFound: readableInk at 4.5 : 1, from the page's own CSS): said at the click that first shows
+ * the piece, with its ratio, its face and the fix. WHY a warn, and never left out: a name a reader cannot read is the
+ * picture failing, whatever else the check says.
+ */
+function namesInk(compiled) {
+  const out = [];
+  for (const found of inksFound(compiled)) {
+    const told = compiled.clicks.filter((c) => c.map === found.map);
+    if (!told.length) continue;   // a map no part is told on is not part of this deck
+    const {pieces} = compiled.maps[found.map], i = pieces.findIndex((p) => p.keys.includes(found.name));
+    // a colour the build cannot read is said as advice: it does not know the word fails, only that it cannot tell
+    out.push(problem(found.unmeasured ? 'info' : 'warn', 'name-ink', told.find((c) => i >= 0 && c.look.pieces[i]?.state !== 'gone') ?? told[0], inkMessage(found)));
+  }
+  return out;
+}
+
 /** A map of groups the build could not fit on the slide even at its least tile: said with how far it runs past, and the fix. */
 function mapsFit(compiled) {
   return Object.entries(compiled.maps).flatMap(([map, {made}]) => {
@@ -237,7 +258,7 @@ export function checkDeck(compiled) {
     out.push(...noChange(c, compiled.clicks[i - 1]));
     out.push(...farView(c));
   });
-  out.push(...neverShown(compiled), ...missingNotes(compiled), ...unstyledThemes(compiled), ...unsetLoops(compiled), ...unsaidDiffers(compiled), ...aloneCallouts(compiled), ...acrossStages(compiled), ...wireWaysSaid(compiled), ...namesTight(compiled), ...mapsFit(compiled), ...strokesSaid(compiled), ...motionFound(compiled));
+  out.push(...neverShown(compiled), ...missingNotes(compiled), ...unstyledThemes(compiled), ...unsetLoops(compiled), ...unsaidDiffers(compiled), ...aloneCallouts(compiled), ...acrossStages(compiled), ...wireWaysSaid(compiled), ...namesTight(compiled), ...namesInk(compiled), ...mapsFit(compiled), ...strokesSaid(compiled), ...motionFound(compiled));
   return out;
 }
 

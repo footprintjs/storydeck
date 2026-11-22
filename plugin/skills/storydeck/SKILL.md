@@ -146,7 +146,7 @@ data-size="2 2 1.6"><b>Server</b></div>` draws a block seen from a corner; also 
 width and depth) and `data-iso="floor" data-size="16 9"` (the tile lines; write it first). `data-at` is "col row" in
 tiles (a third number lifts it), `data-size` "wide deep high". The build places, sizes and levels each one, so give it no
 left/top/width/height; `<i data-iso-grid="150 at 1500 150"></i>` sets the tile's width and the floor's far corner.
-Colour one with `style="--iso-color:#bcd6f3"`. A map's look: `<i data-style="line: ink width 5"></i>` (or `"line: none"`; footprint-story's style columns as "column: choice option value", apart with ";"; drawn by hand: `<i data-style="line: human:sketchy; texture: human:hatch"></i>` — sketched edges, hatched sides, drawn whole and at rest; a named look: `<i data-style="look: line-art"></i>` — `outlined`, `line-art`, `paper-grain` or `duotone`, a column beside it replacing that part, kept readable on a dark page). It is a piece like any other: clicks, `fit`, routes, wires and callouts
+Colour one with `style="--iso-color:#bcd6f3"`. A map's look: `<i data-style="line: ink width 5"></i>` (or `"line: none"`; footprint-story's style columns as "column: choice option value", apart with ";"; drawn by hand: `<i data-style="line: human:sketchy; texture: human:hatch"></i>` — sketched edges, hatched sides, drawn whole and at rest; a named look: `<i data-style="look: line-art"></i>` — `outlined`, `line-art`, `paper-grain`, `duotone` or `sketchy` (drawn by hand), a column beside it replacing that part, kept readable on a dark page). It is a piece like any other: clicks, `fit`, routes, wires and callouts
 all work on it. A click can MOVE a block by intent — write what happens, never numbers: `<step data-move="box fall; crate slide to 4 4.5">`,
 `"ball throw to server wrap anticipate"`, `"lamp hang from 3 2 6"`, `"box settle to db model spring accept arc"` (do: fall, throw, settle,
 reach, hang, slide; roll and tumble are refused). footprint-story picks the model, the duration and the curve; the block rests where its
@@ -168,7 +168,7 @@ round it and plug into its `data-ports`; the floor beside it is written in numbe
 `data-keep-clear` on such a piece (a name, a note) keeps cables off the floor under its box where there is a way round;
 where there is none, `check` says which cable runs under it. A
 block's name (its first `<b>`, inside no other element) is fitted to its top face: broken onto two lines, then made
-smaller; rule `name-fit` warns when it still does not fit. `data-break="fill"` on a block puts as many words as fit on
+smaller; rule `name-fit` warns when it still does not fit, and `name-ink` when a name, a `<small>` line or a floor's label stands under 4.5 : 1 on its face, light or dark (footprint-story's `readableInk`; the base look's `bad` tone and every tone's `<small>` line on a light page), naming the ink or the lighter colour that fixes it. `data-break="fill"` on a block puts as many words as fit on
 the first line ("Logs to S3 / Archive"); `"even"` (the usual) makes the two lines alike; the run's `maps made` records it. A top is as wide across its middle as the block's SHORTER
 side, so a long thin block holds a short name only: shorten the name, or give the block a bigger top (`data-size`). The picture and a fitted floor hold
 the wires too. A floor is ground (`data-ground`): no camera frames it, so `fit` follows the pieces. A floor names its

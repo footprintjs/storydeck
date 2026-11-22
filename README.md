@@ -768,9 +768,10 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   refuses one past 20000 strokes or 16 MB (our numbers), naming the fix: a wider hatch spacing.
   A map can name one of footprint-story's **looks**, a style row under a name: `<i data-style="look: line-art"></i>`.
   `outlined` draws a bold contour round each piece over today's tones; `line-art` draws paper faces and ink lines;
-  `paper-grain` lays a fine, faint grain over every face; `duotone` prints every line in one ink. A column written
+  `paper-grain` lays a fine, faint grain over every face; `duotone` prints every line in one ink; `sketchy` is the
+  hand-drawn look as one name (white faces, every edge drawn by hand, the sides hatched 28 px apart). A column written
   beside a look replaces that part of it (`look: line-art; texture: human:hatch`). A look that is not one is refused,
-  naming the four; so is a look whose every part the row writes itself, since it would draw nothing. On a deck map,
+  naming the five; so is a look whose every part the row writes itself, since it would draw nothing. On a deck map,
   duotone leaves each face's colour to the page (the theme, `ok` / `warn` / `bad`), as footprint-story does for a map
   with no colours of its own. A page is light or dark when it is viewed (T, the saved choice, else the system), so a
   paper map (line-art, or `shading: paper` in any row) takes the page's own paper (`--bg-elev`) and ink (`--fg`) on a
@@ -854,6 +855,19 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
         the two blocks so there is floor to see between, or draw the wire straight (data-arrow="app to db 0")
   info  click 1 "Map · 1" · wire-way: "w5" (web to roof) is drawn straight, through the air, not along the floor:
         the two stand at different heights
+  ```
+
+  It warns when a map's words do not read on what they stand on (`name-ink`): a block's name or `<small>` line on its
+  top face, or a floor's label on its ground, under 4.5 : 1 on the page light or dark. The build measures the page's
+  own CSS (the look's tokens, the tokens `theme.css` sets on `:root` and `:root.dark`, the piece's own style and
+  class) with footprint-story's `readableInk`, the rule StoryReel names its blocks by, and names the fix: the ink that
+  reads, or a lighter face. On the base look, the `bad` tone's name and any tone's `<small>` line do not read on a
+  light page:
+
+  ```
+  warn  click 1 "Map · 1" · name-ink: "server": its name stands 4.4 : 1 on its block's top (#cd5b55, class "bad") on a
+        light page, under the 4.5 : 1 words need to read — write its ink beside it (style="--iso-ink:#000000"), or
+        give the block a lighter colour (--iso-color), or another class than "bad"
   ```
 
   It also warns when a cable doubles back on itself (a hairpin): out of a port that faces away from its other end,

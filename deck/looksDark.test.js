@@ -3,8 +3,10 @@
 // (iso.js · LOOK_CSS; isoPaint.js · pagePaper, inkOf). Every look and every combination of the columns a look writes
 // is measured here in both themes, from the built page's own CSS (test/pageColours.js · measure): a block's name and
 // the floor's label against what they stand on, a block's edge, a contour against the page, a wire's label on its
-// plate, and the highlight ring round a block and along a floor. Each must read; the four looks and the combinations a
-// review found lost are pinned to the tenth.
+// plate, and the highlight ring round a block and along a floor. Each must read; the five looks and the combinations a
+// review found lost are pinned to the tenth. (0.41.0: the sketchy look joins them; every colour is measured as the
+// screen holds it, a byte a channel, by footprint-story's contrastRatio — a line-art floor label reads 6.6 and 8 : 1,
+// where 0.40.0's unrounded mixes said 6.5 and 8.1.)
 // @vitest-environment node
 import {describe, it, expect} from 'vitest';
 import {buildIsoMap} from 'footprint-story/isometric';
@@ -30,7 +32,7 @@ const both = (style) => { const deck = deckOf(style); return {light: measure(dec
 /** Every row the look columns make: shading × line × palette × texture, less those the kit refuses (a texture beside a duotone). */
 const COMBINATIONS = ['tones', 'paper'].flatMap((shading) => ['ink', 'contour', 'human:sketchy'].flatMap((line) => ['theme', 'duotone'].flatMap((palette) => ['none', 'human:grain', 'human:hatch']
   .filter((texture) => palette === 'theme' || texture === 'none').map((texture) => `shading: ${shading}; line: ${line}; palette: ${palette}; texture: ${texture}`))));
-const LOOKS = ['look: outlined', 'look: line-art', 'look: paper-grain', 'look: duotone'];
+const LOOKS = ['look: outlined', 'look: line-art', 'look: paper-grain', 'look: duotone', 'look: sketchy'];
 /** The combinations a review found lost on a dark page before every look colour took the page's route. */
 const FOUND = ['look: line-art; palette: duotone', 'look: duotone; shading: paper', 'shading: paper; palette: duotone', 'look: outlined; palette: duotone'];
 
@@ -54,7 +56,7 @@ describe('looks on a dark page · LOOK_CSS, the one route', () => {
     expect(LOOK_CSS).toContain(':where(:root.dark section[data-label] [data-sd-iso]) { --sd-contour: var(--fg, #14181f); }');
     expect(LOOK_CSS).toContain(':where(:root.dark section[data-label] .iso-contour) { stroke: var(--fg, #14181f); }');
     const page = (style) => deckPage(deckOf(style), pageAssets());
-    for (const style of [...LOOKS.slice(0, 2), ...FOUND]) expect(page(style), style).toContain(LOOK_CSS);
+    for (const style of [...LOOKS.slice(0, 2), 'look: sketchy', ...FOUND]) expect(page(style), style).toContain(LOOK_CSS);
     expect(page('look: duotone')).not.toContain(LOOK_CSS);
     expect(page(null)).not.toContain(LOOK_CSS);
     expect(page(null)).not.toContain('data-sd-paper');
@@ -82,21 +84,22 @@ describe('looks on a dark page · LOOK_CSS, the one route', () => {
 });
 
 describe('looks on a dark page · every combination reads, in both themes', () => {
-  it(`all ${COMBINATIONS.length} rows of the look columns, the four looks and the combinations a review found: words, lines, contours, cable labels and rings`, () => {
+  it(`all ${COMBINATIONS.length} rows of the look columns, the five looks and the combinations a review found: words, lines, contours, cable labels and rings`, () => {
     for (const style of [...COMBINATIONS, ...LOOKS, ...FOUND]) reads(style, both(style));
   }, 60_000);
 
-  it('the four looks and the combinations a review found, pinned (measured; Chromium\'s computed styles on these built pages agree)', () => {
+  it('every look and the combinations a review found, pinned (measured from the page\'s CSS; Chromium\'s computed styles agreed on 0.40.0\'s four)', () => {
     const said = (c) => Object.entries(c).map(([k, v]) => `${k} ${v}`).join(', ');
     const got = Object.fromEntries([...LOOKS, ...FOUND].map((style) => { const {light, dark} = both(style); return [style, {light: said(light), dark: said(dark)}]; }));
     expect(got).toEqual({
       'look: outlined': {light: 'name 14.6, label 6.3, line 14.6, edge 16.6, cable 15.4, ring 3.5, floorRing 3.5', dark: 'name 14.6, label 8.6, line 14.6, edge 16, cable 16, ring 5, floorRing 5'},
-      'look: line-art': {light: 'name 17.8, label 6.5, line 17.8, edge 16.6, cable 15.4, ring 3.5, floorRing 3.8', dark: 'name 14.5, label 8.1, line 14.5, edge 16, cable 16, ring 5, floorRing 4.5'},
+      'look: line-art': {light: 'name 17.8, label 6.6, line 17.8, edge 16.6, cable 15.4, ring 3.5, floorRing 3.8', dark: 'name 14.5, label 8, line 14.5, edge 16, cable 16, ring 5, floorRing 4.5'},
       'look: paper-grain': {light: 'name 14.6, label 6.3, line 14.6, cable 15.4, ring 3.5, floorRing 3.5', dark: 'name 14.6, label 8.6, line 14.6, cable 16, ring 5, floorRing 5'},
+      'look: sketchy': {light: 'name 17.8, label 6.6, line 17.8, cable 15.4, ring 3.5, floorRing 3.8', dark: 'name 14.5, label 8, line 14.5, cable 16, ring 5, floorRing 4.5'},
       'look: duotone': {light: 'name 14.6, label 6.3, line 10.8, cable 15.4, ring 3.5, floorRing 3.5', dark: 'name 14.6, label 8.6, line 10.8, cable 16, ring 5, floorRing 5'},
-      'look: line-art; palette: duotone': {light: 'name 17.8, label 6.5, line 13.2, edge 12.3, cable 15.4, ring 3.5, floorRing 3.8', dark: 'name 14.5, label 8.1, line 14.5, edge 16, cable 16, ring 5, floorRing 4.5'},
-      'look: duotone; shading: paper': {light: 'name 17.8, label 6.5, line 13.2, cable 15.4, ring 3.5, floorRing 3.8', dark: 'name 14.5, label 8.1, line 14.5, cable 16, ring 5, floorRing 4.5'},
-      'shading: paper; palette: duotone': {light: 'name 17.8, label 6.5, line 13.2, cable 15.4, ring 3.5, floorRing 3.8', dark: 'name 14.5, label 8.1, line 14.5, cable 16, ring 5, floorRing 4.5'},
+      'look: line-art; palette: duotone': {light: 'name 17.8, label 6.6, line 13.2, edge 12.3, cable 15.4, ring 3.5, floorRing 3.8', dark: 'name 14.5, label 8, line 14.5, edge 16, cable 16, ring 5, floorRing 4.5'},
+      'look: duotone; shading: paper': {light: 'name 17.8, label 6.6, line 13.2, cable 15.4, ring 3.5, floorRing 3.8', dark: 'name 14.5, label 8, line 14.5, cable 16, ring 5, floorRing 4.5'},
+      'shading: paper; palette: duotone': {light: 'name 17.8, label 6.6, line 13.2, cable 15.4, ring 3.5, floorRing 3.8', dark: 'name 14.5, label 8, line 14.5, cable 16, ring 5, floorRing 4.5'},
       'look: outlined; palette: duotone': {light: 'name 14.6, label 6.3, line 10.8, edge 12.3, cable 15.4, ring 3.5, floorRing 3.5', dark: 'name 14.6, label 8.6, line 10.8, edge 16, cable 16, ring 5, floorRing 5'},
     });
   });
@@ -105,6 +108,8 @@ describe('looks on a dark page · every combination reads, in both themes', () =
     const before = (style) => measure(deckOf(style), 'dark', {withLook: false});
     expect(before('look: line-art')).toMatchObject({label: 1.1, edge: 1});
     expect(before('look: outlined')).toMatchObject({edge: 1});
+    // the sketchy look is a paper map too: its floor's label in the dark page's light ink on the white paper
+    expect(before('look: sketchy')).toMatchObject({label: 1.1});
   });
 
   it('why the duotone alone keeps its inks on a dark page: its faces are the page\'s, light on both, and the page\'s light ink on them would stand about 1 : 1', () => {

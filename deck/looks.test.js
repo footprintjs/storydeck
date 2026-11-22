@@ -1,5 +1,5 @@
 // A map names one of footprint-story's looks (0.40.0): `<i data-style="look: line-art">` — outlined, line-art,
-// paper-grain, duotone (footprint-story/isometric · ISO_LOOKS). Each is read in the deck's words, built by the kit's
+// paper-grain, duotone and (0.41.0, footprint-story 0.37.0) sketchy (footprint-story/isometric · ISO_LOOKS). Each is read in the deck's words, built by the kit's
 // steps with the human door's choices (HUMAN_STYLE_CHOICES), drawn, recorded by name, and kept readable on a dark page:
 // a paper map takes the page's paper and ink there (iso.js · LOOK_CSS), measured here against the page's own CSS. A
 // grain's marks are drawn once a page, as 0.39.0's strokes are. (A dark page's contrast, for every look and
@@ -9,10 +9,11 @@
 import {afterEach, describe, it, expect} from 'vitest';
 import {readFileSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
-import {ISO_LOOKS} from 'footprint-story/isometric';
+import {ISO_LOOKS, isoStyle} from 'footprint-story/isometric';
 import {isoDrawn, ISO_CSS, LOOK_CSS, PAPER_DARK} from './iso.js';
 import {parseStyle} from './isoStyle.js';
-import {inlineStrokes, strokesSvg, PAPER, paperOf} from './isoPaint.js';
+import {inlineStrokes, strokesSvg, PAPER, paperOf, STROKE_TIMING} from './isoPaint.js';
+import {STROKES_NOTE} from './isoRules.js';
 import {compileDeck} from './compile.js';
 import {checkDeck} from './check.js';
 import {deckPage} from './page.js';
@@ -25,7 +26,7 @@ import {sourceOf, tempDeck, tempDir, cleanDecks} from './test/helpers.js';
 afterEach(cleanDecks);
 
 const canvas = [1920, 1080];
-const LOOKS = ['outlined', 'line-art', 'paper-grain', 'duotone'];
+const LOOKS = ['outlined', 'line-art', 'paper-grain', 'duotone', 'sketchy'];
 /** A map with a labelled floor, a block and a cylinder, in a look: what each test draws. */
 const MAP = (style) => `<i data-iso-grid="120 at 960 240"></i>${style ? `<i data-style="${style}"></i>` : ''}
 <div data-k="floor" data-iso="floor" data-size="8 5" data-label="Production"></div>
@@ -43,7 +44,7 @@ describe('looks · read from the map\'s data-style, in the deck\'s words', () =>
 
   it('refuses, naming the fix: a look that is not one (with the ones there are), options, twice, none named — and the kit\'s own refusals', () => {
     const refused = (style) => () => deckOf(style);
-    expect(refused('look: sketch')).toThrow('map "m": data-style="look: sketch": there is no look "sketch" — there are "outlined", "line-art", "paper-grain", "duotone"');
+    expect(refused('look: sketch')).toThrow('map "m": data-style="look: sketch": there is no look "sketch" — there are "outlined", "line-art", "paper-grain", "duotone", "sketchy"');
     expect(refused('look: duotone ink #000000')).toThrow('data-style="look: duotone ink #000000": the look "duotone" takes no options — not "ink #000000"; to change a part of it, write that column beside it ("look: duotone; line: ink width 3")');
     expect(refused('look: duotone; look: outlined')).toThrow('the look is written twice — keep one');
     expect(refused('look:')).toThrow('the look names one — "look: outlined"');
@@ -52,6 +53,9 @@ describe('looks · read from the map\'s data-style, in the deck\'s words', () =>
     expect(refused('look: duotone; palette: theme')).toThrow('data-style="look: duotone; palette: theme": the look "duotone" sets palette, and the row writes it itself, so the look draws nothing — drop the look, or the palette written beside it');
     expect(refused('look: duotone; texture: human:grain')).toThrow('the texture "human:grain" cannot sit with palette "duotone" (from the look "duotone": write palette beside it to change it)');
     expect(refused('look: line-art; line: none')).toThrow('the shading "paper" (from the look "line-art": write shading beside it to change it) cannot sit with line "none"');
+    expect(refused('look: sketchy; shading: paper; line: human:sketchy; texture: human:hatch')).toThrow('the look "sketchy" sets shading and line and texture, and the row writes each itself, so the look draws nothing — drop the look, or the shading and line and texture written beside it');
+    expect(refused('look: sketchy; palette: duotone')).toThrow('the texture "human:hatch" (from the look "sketchy": write texture beside it to change it) cannot sit with palette "duotone"');
+    expect(refused('look: sketchy; line: none')).toThrow('the shading "paper" (from the look "sketchy": write shading beside it to change it) cannot sit with line "none"');
   });
 
   it('a look named and its row written out draw the same picture; the record keeps the name', () => {
@@ -119,6 +123,49 @@ describe('looks · each drawn on a page', () => {
     expect(html).not.toMatch(/fill:#/);
     expect(deck.looks).toBeUndefined();
   });
+});
+
+describe('looks · sketchy, the hand-drawn look (footprint-story 0.37.0)', () => {
+  it('paper faces, every edge drawn by hand and every side hatched, drawn once a page; a dark page gives it its paper and ink', () => {
+    const deck = deckOf('look: sketchy'), [one, two] = deck.slides;
+    // the faces: the page's paper, no outline of their own (the hand draws the edges)
+    const faces = one.html.match(/<(?:polygon|ellipse|path) class="iso-(?:top|left|right|side)"[^>]*>/g);
+    expect(faces.length).toBeGreaterThan(4);
+    for (const face of faces) expect(face).toMatch(new RegExp(`^<\\w+ class="iso-\\w+" stroke="none" style="fill:var\\(--iso-paper, ${PAPER}\\)"`));
+    expect(one.html.match(/ data-sd-paper/g)).toHaveLength(3);
+    expect(deck.maps.m.made.paper).toBe(PAPER_DARK);
+    expect(deck.looks).toBe(true);
+    // the edges and the hatch: in the page's ink (a dark page's LOOK_CSS sets it), drawn once, a <use> a piece a click
+    const defs = Object.values(deck.strokeDefs).join('');
+    expect(defs.match(/<path class="iso-ink" stroke="none" style="fill:var\(--iso-line, var\(--iso-ink, #14181f\)\);fill-rule:nonzero"/g).length).toBeGreaterThan(1);
+    expect(defs.match(/<path class="iso-hatch" stroke="none" style="fill:var\(--iso-line, var\(--iso-ink, #14181f\)\);fill-rule:nonzero"/g).length).toBeGreaterThan(10);
+    expect(defs).not.toMatch(/(?:fill|stroke):#/);
+    for (const slide of [one, two]) {
+      expect(slide.html.match(/<use href="#sd-st-/g)).toHaveLength(2);
+      expect(slide.html).not.toContain('class="iso-hatch"');
+    }
+    // the record keeps the look's name and its row: the kit's, the hatch 28 px apart
+    expect(deck.maps.m.made.style).toMatchObject({look: 'sketchy', row: {shading: 'paper', line: 'human:sketchy', texture: 'human:hatch'}, options: {texture: {spacing: 28}}});
+    const {strokes, bytes, timing} = deck.maps.m.made.strokes;
+    expect({strokes, bytes}).toEqual({strokes: 31, bytes: defs.length});
+    expect(timing).toBe(STROKE_TIMING);
+  });
+
+  it('named without the human door\'s choices it is refused, saying where they are: the deck hands in HUMAN_STYLE_CHOICES', () => {
+    expect(isoDrawn(MAP('look: sketchy'), {canvas}).made.style.look).toBe('sketchy');
+    expect(() => isoStyle({look: 'sketchy'})).toThrow('hand in HUMAN_STYLE_CHOICES');
+  });
+
+  it('within the stroke budget: the still\'s map and the kit\'s 64-block case draw under the note (2000 strokes, 2 MB), and no note fires', () => {
+    const small = deckOf('look: sketchy');
+    expect(small.maps.m.made.strokes.strokes).toBeLessThan(STROKES_NOTE.strokes);
+    expect(checkDeck(compileDeck(sourceOf({clicks: '<section data-label="S" data-map="m"><step data-in="*"><h2>A</h2><aside class="notes">Said.</aside></step></section>', maps: {m: MAP('look: sketchy')}})))).toEqual([]);
+    const deck = sixtyFour('look: sketchy'), {strokes, bytes} = deck.maps.m.made.strokes;
+    expect(strokes).toBe(1152);
+    expect(strokes).toBeLessThan(STROKES_NOTE.strokes);
+    expect(bytes).toBeLessThan(STROKES_NOTE.bytes);
+    expect(checkDeck(deck).filter((p) => p.rule === 'strokes')).toEqual([]);
+  }, 60_000);
 });
 
 // ─── size: a grain's marks drawn once a page ─────────────────────────────────────────────────────────────────────

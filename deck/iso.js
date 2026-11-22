@@ -53,7 +53,7 @@ import {mayHoldFootprint, paintFootprints, readFootprints} from './footprint.js'
 import {decodeEntities, esc} from './html.js';
 import {attrRule, ownAttribute, pieceTags, tagsWith} from '../pieceRules.js';
 import {closeOf} from './callouts.js';
-import {isoArt, paperOf, strokesDrawn} from './isoPaint.js';
+import {faceFill, isoArt, paperOf, strokesDrawn} from './isoPaint.js';
 import {MAYBE_STYLE, readStyle} from './isoStyle.js';
 
 const KINDS = ['block', 'cylinder', 'floor'];
@@ -221,7 +221,22 @@ const beyondArea = (points, [x0, y0, x1, y1]) => Math.max(0, ...points.flatMap((
  * the deck paints that list and builds no face of its own — a deck and a film draw one picture.
  */
 function artOf({box, centre}, paints, solid, styled, strokes, paper) {
-  return {box, art: isoArt(paints, box, {styled, strokes, paper}), say: solid ? {x: centre[0], y: centre[1]} : null, ...(paper ? {paper: true} : {})};
+  return {box, art: isoArt(paints, box, {styled, strokes, paper}), say: solid ? {x: centre[0], y: centre[1]} : null, face: faceFill(paints, solid ? 'top' : 'ground', paper), ...(paper ? {paper: true} : {})};
+}
+
+/** A piece's own custom properties, as its style attribute writes them: {'--iso-color': '#cfe1f7'}. */
+const ownVars = (style) => Object.fromEntries(style.split(';').map((d) => /^\s*(--[\w-]+)\s*:\s*([^]*?)\s*$/.exec(d)).filter(Boolean).map((m) => [m[1], m[2]]));
+
+/**
+ * What a piece's words stand in and on, for the build to measure (nameInk.js · inksFound, check · name-ink): which words
+ * it shows (a block's name and its <small> line on its top face, a floor's label on its ground), the face's fill as the
+ * page writes it (null: the page's CSS colours it), the piece's own custom properties and classes, and whether it is a
+ * paper map's. Collected as the piece is drawn, so the check reads what the page carries.
+ */
+function wordsOn(p, shape) {
+  const words = p.kind === 'floor' ? ['label'] : /<small[\s>]/i.test(p.inner) ? ['name', 'small'] : ['name'];
+  const classes = (ownAttribute(p.styleCut, 'class')?.value ?? '').split(/\s+/).filter(Boolean);
+  return {name: p.name, kind: p.kind, words, face: shape.face, vars: ownVars(p.style), classes, paper: Boolean(shape.paper)};
 }
 
 /** A block's small line (its first <small>), as plain words: what a name's box under it takes room for (footprint-story/isometric · nameBox). */
@@ -301,7 +316,7 @@ function nameFitted(inner, words, fit) {
  * (data-sd-say), and a block that moves carries it on its element (data-sd-moving) and has its faces and words in a
  * wrapper the move transforms (data-sd-mover), so a click's focus, which moves the element, is never replaced by it.
  */
-function draw(p, html, shape, level, tight, mark = null) {
+function draw(p, html, shape, level, tight, faces, mark = null) {
   const {box, art, say} = shape;
   const placed = [`left:${fixed(box.x)}px`, `top:${fixed(box.y)}px`, `width:${fixed(box.w)}px`, `height:${fixed(box.h)}px`, ...(level === null ? [] : [`z-index:${level}`])];
   const css = [...placed, p.style.trim()].filter(Boolean).join(';');
@@ -311,6 +326,7 @@ function draw(p, html, shape, level, tight, mark = null) {
   // its name as the steps fitted it to its top face
   const fitted = say && p.inner.trim() ? nameFitted(p.inner, shape.words, shape.fit) : null;
   if (fitted?.tight) tight.push({name: p.name, text: fitted.tight});
+  if (fitted || p.label) faces.push(wordsOn(p, shape));
   const words = fitted ? `<span class="iso-say"${mark ? ` data-sd-say="${mark.index}"` : ''} style="left:${fixed(say.x - box.x)}px;top:${fixed(say.y - box.y)}px">${fitted.inner}</span>` : '';
   const named = p.label ? floorLabelHtml(p, shape, box, tight) : '';
   // a floor is ground: a camera frames what stands on it, never the floor itself (focus.js) — unless it says otherwise
@@ -373,7 +389,7 @@ export const isoPieces = (html, options) => isoDrawn(html, options).html;
  * map with. Here: the HTML read, the deck's own refusals, and the page written from the built map.
  */
 export function isoDrawn(html, {canvas = null, area = null, links = [], floorWires = null, icons = {}, movers = null} = {}) {
-  const shapes = new Map(), solids = [], tight = [], levels = new Map();
+  const shapes = new Map(), solids = [], tight = [], faces = [], levels = new Map();
   if (!MAYBE.test(html) && !MAYBE_GRID.test(html) && !MAYBE_STYLE.test(html) && !mayHoldFootprint(html)) return {html, shapes, solids, tight};
   // the map's style first (isoStyle.js): its <i> taken out before the grid's is read, so one written beside the grid is
   // refused in the style's words, with its fix
@@ -443,7 +459,7 @@ export function isoDrawn(html, {canvas = null, area = null, links = [], floorWir
   let out = '', from = 0;
   for (const p of [...found, ...feet].sort((a, b) => a.start - b.start)) {
     if (p.kind === 'footprint') out += paintFootprints(map.slice(from, p.end), [{...p, start: p.start - from, end: p.end - from}], () => levelOf(p));
-    else out += map.slice(from, p.start) + draw(p, map, drawnOf.get(p), p.kind === 'floor' ? null : levelOf(p), tight, markOf(p));
+    else out += map.slice(from, p.start) + draw(p, map, drawnOf.get(p), p.kind === 'floor' ? null : levelOf(p), tight, faces, markOf(p));
     from = p.end;
   }
   const twice = new Set(standing.map((p) => p.name).filter((name, i, all) => all.indexOf(name) !== i));
@@ -472,11 +488,21 @@ export function isoDrawn(html, {canvas = null, area = null, links = [], floorWir
   const motion = movers?.size ? {grid, view: {tile: [...built.view.tile], origin: [...built.view.origin], rise: built.view.rise}, blocks: solid.map((p, i) => ({name: p.name, kind: p.kind, at: [built.at[i][0], built.at[i][1], built.at[i][2] ?? 0], size: [...p.size],
     box: built.shapes[i].box, outline: built.shapes[i].outline.map(([x, y]) => [x, y]), say: [...built.shapes[i].centre], fit: drawnOf.get(p).fit, small: smallOf(p.inner), level: levelOf(p),
     ...(twice.has(p.name) ? {twice: true} : {})})), obstacles: feet.map((f) => ({name: f.name, kind: 'footprint', at: [f.at[0], f.at[1], f.at[2] ?? 0], size: [...f.size], level: levelOf(f)}))} : null;
-  return {html: out + map.slice(from), shapes, solids, tight, levels, made, built: {spec, map: built}, routes, ...(defs.size ? {strokeDefs: Object.fromEntries(defs)} : {}), ...(motion ? {motion} : {}), floor: (col, row, lift = 0) => { const point = grid.at(col, row, lift); return [point.x, point.y]; }};
+  return {html: out + map.slice(from), shapes, solids, tight, ...(faces.length ? {faces} : {}), levels, made, built: {spec, map: built}, routes, ...(defs.size ? {strokeDefs: Object.fromEntries(defs)} : {}), ...(motion ? {motion} : {}), floor: (col, row, lift = 0) => { const point = grid.at(col, row, lift); return [point.x, point.y]; }};
 }
 
 const TONE = 'var(--iso-color, var(--sd-tone, #d9e4f3))';
 const INK = 'var(--iso-ink, #14181f)';
+/**
+ * The colours a map's words stand in and on, as the page's CSS writes them (ISO_CSS, FLOOR_LABEL_CSS): a block's top
+ * face and a floor's ground (when the kit gives the face no fill of its own), a block's name and its <small> line, a
+ * floor's label. WHY named once: the build measures each name against its face with these same expressions
+ * (nameInk.js · inksFound, check · name-ink), so what the check reads is what the page draws.
+ */
+export const WORDS_CSS = Object.freeze({
+  top: `color-mix(in srgb, ${TONE} 80%, #fff)`, ground: 'var(--iso-floor, transparent)',
+  name: INK, small: `color-mix(in srgb, ${INK} 68%, transparent)`, label: 'var(--iso-label, color-mix(in srgb, var(--fg, #14181f) 72%, transparent))',
+});
 const HOT = 'var(--sd-hot, #ef4444)', HOT_WIDTH = '5px';
 /** A piece with faces: a block or a cylinder (a floor is lines on the ground). */
 const SOLID = '[data-sd-iso="block"], [data-sd-iso="cylinder"]';
@@ -501,7 +527,7 @@ export const FLOOR_LABEL_CSS = `/* a floor's label (floorLabel.js): flat on the 
 :where(section[data-label] .iso-floor-label) {
   position: absolute; transform-origin: 0 0; white-space: nowrap; line-height: 1.15;
   font-family: var(--sans, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif); font-weight: 700; letter-spacing: .02em;
-  color: var(--iso-label, color-mix(in srgb, var(--fg, #14181f) 72%, transparent));
+  color: ${WORDS_CSS.label};
 }
 :where(section[data-label] .iso-floor-icon) { width: 1.15em; height: 1.15em; vertical-align: -0.2em; margin-right: .35em; color: currentColor; }`;
 
@@ -542,16 +568,16 @@ export const ISO_CSS = `/* isometric pieces: blocks on a floor seen from a corne
   position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none;
   stroke: var(--iso-line, ${INK}); stroke-width: var(--iso-line-width, 2.5px); stroke-linejoin: round;
 }
-:where(section[data-label] .iso-top) { fill: color-mix(in srgb, ${TONE} 80%, #fff); }
+:where(section[data-label] .iso-top) { fill: ${WORDS_CSS.top}; }
 :where(section[data-label] .iso-left) { fill: color-mix(in srgb, ${TONE} 94%, #000); }
 :where(section[data-label] :is(.iso-right, .iso-side)) { fill: color-mix(in srgb, ${TONE} 82%, #000); }
-:where(section[data-label] .iso-ground) { fill: var(--iso-floor, transparent); stroke: none; }
+:where(section[data-label] .iso-ground) { fill: ${WORDS_CSS.ground}; stroke: none; }
 :where(section[data-label] .iso-lines) { fill: none; stroke: var(--iso-grid, color-mix(in srgb, var(--fg, #14181f) 16%, transparent)); stroke-width: 1.5px; }
 :where(section[data-label] .iso-say) {
   position: absolute; translate: -50% -50%; display: grid; justify-items: center; gap: 2px; text-align: center; white-space: nowrap;
-  font: 700 26px/1.15 var(--sans, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif); color: ${INK};
+  font: 700 26px/1.15 var(--sans, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif); color: ${WORDS_CSS.name};
 }
-:where(section[data-label] .iso-say small) { font-size: 18px; font-weight: 500; color: color-mix(in srgb, ${INK} 68%, transparent); }
+:where(section[data-label] .iso-say small) { font-size: 18px; font-weight: 500; color: ${WORDS_CSS.small}; }
 :where(section[data-label] .iso-say svg.ic) { width: 40px; height: 40px; color: ${INK}; }
 /* a callout is words about the picture: over every block, whose levels end at ${2 * MOST_ISO_PIECES} (a lead into a port at one more) */
 :where(section[data-label] [data-sd-callout]) { z-index: ${2 * MOST_ISO_PIECES + 2}; }

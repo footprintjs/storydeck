@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.41.0 — a name's ink, by footprint-story's rule; the look `sketchy`
+
+footprint-story is now `^0.38.0`. Every page that drew before draws byte for byte as before: the 48 pages a test
+deck makes (six looks × no tone and the three tones × with and without the base look) and the example deck are equal
+to 0.40.0's.
+
+- **Whether a map's words read, measured at build by footprint-story's rule** (`deck/nameInk.js`, a new check rule
+  `name-ink`): a block's name and its `<small>` line on its top face, and a floor's label on its ground, on the page
+  light and dark. The ratio and the verdict are footprint-story's `readableInk` (4.5 : 1, WCAG's small text), the rule
+  StoryReel names its blocks by, so the two tools call the same name on the same face readable or not. The deck's
+  colours stay its CSS, chosen when the page is viewed, so the build does not pick the ink: it measures what the page
+  draws. It reads the page's own CSS (`iso.js` · `WORDS_CSS`, which ISO_CSS and FLOOR_LABEL_CSS are now written from,
+  byte for byte; `LOOK_CSS`; the look's tokens; the tokens `theme.css` sets on `:root` and `:root.dark`; the piece's
+  own style and class), and what each piece's words stand on is collected as the piece is drawn (`iso.js` ·
+  `wordsOn`, the map's `faces`). A word that does not read is a warn with its fix: the ink that reads everywhere the
+  piece is shown (`style="--iso-ink:#000000"`, a floor's `--iso-label`), else a lighter face. A colour the reader
+  does not know (`rgb()`, a named colour) is said as a note, never passed as if it read. Not read: a `theme.css` rule
+  on anything but the root, and a part's own `data-theme`.
+- **What it finds today.** Every look, and every map with no tone class, reads on both pages. On the base look a
+  `bad` block's name stands 4.4 : 1 on a light page (its top `#cd5b55`; fix: `--iso-ink:#000000`), and a `<small>`
+  line on any tone stands about 3 : 1 there (`ok` and `warn` 3.0, `bad` 2.9; no ink fixes it, only a lighter face).
+  These are findings now, not page changes: no page moved.
+- **The colour math moved to footprint-story.** StoryDeck had two copies of WCAG's luminance and ratio, both in tests
+  (`deck/test/pageColours.js` and `deck/look.test.js`, the second with WCAG 2.0's old 0.03928 step). Both now use
+  footprint-story's `contrastRatio`, and a test refuses any luminance formula of StoryDeck's own. The CSS colour reader
+  moved from the test helper into `deck/nameInk.js`, so the check and the tests read colours the same way. A colour is
+  measured as the screen holds it, a byte a channel, so a line-art floor label reads 6.6 : 1 light and 8 : 1 dark
+  where 0.40.0's unrounded mix said 6.5 and 8.1 (the label pins of the four paper rows moved by a tenth; all still read).
+- **The look `sketchy`** (footprint-story 0.37.0): `<i data-style="look: sketchy">` draws the hand-drawn look as one
+  name: paper faces, every edge drawn by hand, the sides hatched 28 px apart. The deck already hands its steps
+  `HUMAN_STYLE_CHOICES`, so it works as the other looks do: read in the deck's words (a look that is not one is now
+  refused naming five), drawn once a page, recorded by name, and given the page's paper and ink on a dark page
+  (`data-sd-paper`, LOOK_CSS). Measured on both pages and pinned: names 17.8 and 14.5 : 1, floor labels 6.6 and 8,
+  edges 17.8 and 14.5, cable labels 15.4 and 16, rings 3.5 / 3.8 and 5 / 4.5. Without LOOK_CSS its floor label would
+  stand 1.1 : 1 on a dark page (pinned). Its strokes stay under the stroke note (0.39.0): the still's map draws 31
+  strokes, the 64-block map at a 96 px tile 1,152 strokes in 1.40 MB, and no `strokes` note fires on either.
+- Tests: `deck/nameInk.test.js` (the collection, the CSS read, the findings and their fixes, the one-rule pin);
+  `deck/looks.test.js` (sketchy's page, refusals, budget, and its still, `deck/test/look-sketchy-still.html`, pinned
+  byte for byte); `deck/looksDark.test.js` (sketchy among the looks, both themes).
+
 ## 0.40.0 — maps in footprint-story's looks
 
 A map can now name one of footprint-story's looks (now `^0.35.0`). A look is a style row under a name, written as a

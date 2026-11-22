@@ -172,12 +172,25 @@ function strokeOf(stroke) {
  */
 function colours({fill, role}, stroke, paper) {
   const said = [];
-  if (fill?.colour != null) said.push(`fill:${fill.colour === paper ? pagePaper(hex(fill.colour)) : hex(fill.colour)}`);
+  if (fill?.colour != null) said.push(`fill:${fillOf(fill.colour, paper)}`);
   if (stroke?.colour != null) {
     said.push(`stroke:${inkOf(stroke.colour, role, paper)}`, `stroke-width:${stroke.width}px`, `stroke-linejoin:${stroke.join}`, `stroke-linecap:${stroke.cap}`);
     if (stroke.alpha !== 1) said.push(`stroke-opacity:${stroke.alpha}`);
   }
   return said.length ? ` style="${said.join(';')}"` : '';
+}
+
+/** A fill's colour as written: the map's paper is the page's paper (pagePaper), any other colour as the kit gave it. */
+const fillOf = (colour, paper) => (colour === paper ? pagePaper(hex(colour)) : hex(colour));
+
+/**
+ * The fill the page draws a piece's face in (`role`: 'top', a floor's 'ground'), as its style attribute writes it — or
+ * null when the kit gives that face no colour and the page's CSS colours it (iso.js · WORDS_CSS). What the build
+ * measures a name against (nameInk.js): the face of the piece's first item of that role, as colours() writes it.
+ */
+export function faceFill(items, role, paper) {
+  const face = items.find((it) => it.role === role);
+  return face?.fill?.colour != null ? fillOf(face.fill.colour, paper) : null;
 }
 
 /**
