@@ -7,7 +7,7 @@ import {isoDrawn} from './iso.js';
 import {readMoves} from './motionRead.js';
 import {planMotions} from './motionPlan.js';
 import {motionView, motionHtml, transformOf, keyTimes, KEYFRAME_RATE, KEYFRAMES_MOST, MOTION_CSS} from './motionDraw.js';
-import {footOf, topOf} from './motionPlace.js';
+import {footOf, topOf} from 'footprint-story/isometric';
 
 const CANVAS = [1920, 1080];
 const GRID = '<i data-iso-grid="120 at 960 300"></i><div data-k="floor" data-iso="floor" data-size="8 6"></div>';

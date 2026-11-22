@@ -224,7 +224,7 @@ function artOf({box, centre}, paints, solid, styled) {
   return {box, art: isoArt(paints, box, {styled}), say: solid ? {x: centre[0], y: centre[1]} : null};
 }
 
-/** A block's small line (its first <small>), as plain words: what a name's box under it takes room for (motionPlace · nameBox). */
+/** A block's small line (its first <small>), as plain words: what a name's box under it takes room for (footprint-story/isometric · nameBox). */
 const smallOf = (inner) => { const m = /<small\b[^>]*>([\s\S]*?)<\/small\s*>/i.exec(inner); return m ? decodeEntities(m[1].replace(/<[^>]*>/g, '')).replace(/\s+/g, ' ').trim() || null : null; };
 
 /** What a name-fit note shows of a name: enough to find it. */

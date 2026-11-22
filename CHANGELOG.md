@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.38.0 — the motion place rules, one copy
+
+Nothing an author sees changes: every page, keyframe, finding and refusal is the same as 0.37.0's.
+
+- **The number rules a moving block is placed and checked by now come from footprint-story** (now `^0.32.0`,
+  `footprint-story/isometric`): a block's foot and top, the top it lands on, the rider rule, a foot worked back from
+  the slide, the swept pass-through test and the moments a move is checked at, what of a drawing is off the slide, a
+  name's box, which resting block hides it, and the paint order at a moment. StoryDeck and StoryReel each held a copy;
+  now there is one. `deck/motionPlace.js` and `isoSpec.js · orderAt` are gone, with no stand-ins — the shared
+  `orderAt` is the same sort the map steps' `order` runs. StoryDeck keeps the drawing, the `deck:` prefix on its
+  critics (`deck:contact`, `deck:covers`) and each fix in its own words.
+- Tests: every page, golden and keyframe test passes unchanged. The deleted file's own unit tests went with it;
+  footprint-story tests those rules, with a differential against StoryDeck 0.37.0's copy.
+
 ## 0.37.0 — blocks on a map move by intent
 
 A click can now move an isometric block. The author writes what happens on the `<step>` — never a number for how —

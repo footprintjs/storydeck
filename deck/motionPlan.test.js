@@ -4,9 +4,9 @@ import {describe, it, expect} from 'vitest';
 import {sampleMove} from 'footprint-story/human';
 import {isoDrawn} from './iso.js';
 import {readMoves} from './motionRead.js';
-import {planMotions, checkTimes, INTENT_OF} from './motionPlan.js';
+import {planMotions, INTENT_OF} from './motionPlan.js';
 import {MOTION_DOS} from './motionRead.js';
-import {footOf, topOf} from './motionPlace.js';
+import {footOf, topOf, checkMoments} from 'footprint-story/isometric';
 
 const CANVAS = [1920, 1080];
 const GRID = '<i data-iso-grid="120 at 960 300"></i><div data-k="floor" data-iso="floor" data-size="8 6"></div>';
@@ -161,7 +161,7 @@ describe('motionPlan · each move, placed and decided by footprint-story', () =>
     const blocks = [block('a', '1 1 3'), block('b', '5 3')], clicks = ['a fall wrap anticipate; b settle to 2 4', 'a reach to 6 1'];
     const one = planOf(blocks, clicks).plan, two = planOf(blocks, clicks).plan;
     expect(two.record).toEqual(one.record);
-    for (const [k, m] of one.moves.entries()) for (const t of checkTimes(m)) expect(sampleMove(two.moves[k].move, t)).toEqual(sampleMove(m.move, t));
+    for (const [k, m] of one.moves.entries()) for (const t of checkMoments(m.seconds)) expect(sampleMove(two.moves[k].move, t)).toEqual(sampleMove(m.move, t));
   });
 
   it('runs the same intents through footprint-story\'s chart, for the record: the same plan', async () => {

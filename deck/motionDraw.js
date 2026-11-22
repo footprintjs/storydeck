@@ -21,13 +21,13 @@
 // · .sd-moved), and a move must never replace those; inside the element the move composes with them.
 //
 // THE PAINT LEVEL. A block that moves is drawn at the level its place gives it among the blocks that stand still
-// (the map steps' own `order`, asked again at each keyframe: isoSpec.js · orderAt), so landed behind a block it is
-// drawn behind it. The still ones
+// (the paint order of every piece, asked again at each keyframe: footprint-story/isometric · orderAt, the one sort the
+// map steps' `order` runs too), so landed behind a block it is drawn behind it. The still ones
 // keep their built order, spread `stride` apart (iso.js: stride = movers + 2), so between two of them there is a level
 // for the lead into a port (one above a block) and one for each block that moves.
 import {sampleMove} from 'footprint-story/human';
+import {orderAt} from 'footprint-story/isometric';
 import {placeAtOf} from './motionPlan.js';
-import {orderAt} from './isoSpec.js';
 
 /** Keyframes a second: linear between them, so a curve drawn from them is within a sixtieth of a second of its samples. */
 export const KEYFRAME_RATE = 60;
@@ -79,11 +79,15 @@ const ropeSvg = (links, id) => `<svg class="iso-rope" aria-hidden="true">${links
  */
 export function motionView(plan, map, {id}) {
   const placeAt = placeAtOf(plan.poseAt);
-  const movers = [...new Set(plan.moves.map((m) => m.piece))], still = [...map.blocks.filter((b) => !movers.includes(b)), ...map.obstacles];
-  /** Each mover's paint level at moment t of click ci: above the still block nearest in front of it, one apart from another mover in that gap. */
+  const movers = [...new Set(plan.moves.map((m) => m.piece))], still = map.blocks.filter((b) => !movers.includes(b));
+  /**
+   * Each mover's paint level at moment t of click ci: above the still block nearest in front of it, one apart from
+   * another mover in that gap. The pieces are handed in the order the map steps hand theirs — the blocks, then the
+   * footprints — since where no rule orders two pieces the sort keeps the order given.
+   */
   const levelsAt = (ci, t) => {
-    const items = [...still.map((b) => ({b, at: b.at, still: true})), ...movers.map((b) => ({b, at: placeAt(b, ci, t), still: false}))];
-    const order = orderAt(items.map((x) => ({kind: x.b.kind, at: x.at, size: x.b.size})), map.view).map((i) => items[i]), out = new Map(), taken = new Map();
+    const items = [...still.map((b) => ({b, at: b.at, still: true})), ...movers.map((b) => ({b, at: placeAt(b, ci, t), still: false})), ...map.obstacles.map((b) => ({b, at: b.at, still: true}))];
+    const order = orderAt(map.view, items.map((x) => ({at: x.at, size: x.b.size}))).map((i) => items[i]), out = new Map(), taken = new Map();
     let base = 0;
     for (const x of order) {
       // the highest still level drawn before it: never under a block it stands in front of
