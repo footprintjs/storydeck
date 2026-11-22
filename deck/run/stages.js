@@ -52,7 +52,8 @@ export function checkRules(scope, run) {
  * How each isometric map was made, as the compile noted it — on the run's record, so the log can answer "who placed
  * these blocks" and "why is that wire straight" without the page being looked at: {map: {placed: 'build' | 'hand',
  * tile, cables, footprints?: how many pieces stand on the floor by a footprint, said: [[wire, note], …], tight: [names],
- * breaks?: [[block, rule], …] — the break rule each block's writer picked for its name (data-break)}}.
+ * breaks?: [[block, rule], …] — the break rule each block's writer picked for its name (data-break), style?: {row,
+ * options} — the style choices it was drawn in, when it names some (data-style)}}.
  * A deck with no such map writes nothing, and runs nothing more. One that has one also builds each map again with the
  * map flow, for its own record (mapRecords).
  */
@@ -60,6 +61,8 @@ export function mapsMade(scope, run) {
   const made = Object.entries(run.loaded.compiled.maps).filter(([, map]) => map.made).map(([name, map]) => [name, {
     placed: map.made.placed, tile: map.made.tile, cables: map.cables?.length ?? 0, ...(map.made.footprints ? {footprints: map.made.footprints} : {}),
     ...(map.ways?.length ? {said: map.ways.map((w) => [w.name, w.way])} : {}), ...(map.tight?.length ? {tight: map.tight.map((t) => t.name)} : {}), ...(map.made.breaks ? {breaks: map.made.breaks} : {}),
+    // the style it was drawn in, as the steps read it ({row, options}): only on a map that names one (data-style), so a map that names none records as before
+    ...(map.made.style ? {style: map.made.style} : {}),
   }]);
   if (!made.length) return undefined;   // no isometric map: nothing more runs, and the stage stays as it was
   scope.maps = Object.fromEntries(made);

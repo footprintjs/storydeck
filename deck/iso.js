@@ -53,6 +53,7 @@ import {decodeEntities, esc} from './html.js';
 import {attrRule, ownAttribute, pieceTags, tagsWith} from '../pieceRules.js';
 import {closeOf} from './callouts.js';
 import {isoArt} from './isoPaint.js';
+import {MAYBE_STYLE, readStyle} from './isoStyle.js';
 
 const KINDS = ['block', 'cylinder', 'floor'];
 /** A tag that may carry the attribute: a cheap look, in any case. Whether it does is ownAttribute's to say (a mention inside another value is not it). */
@@ -346,7 +347,7 @@ export const isoPieces = (html, options) => isoDrawn(html, options).html;
  * points round what it draws, and the middle of that) and {kind, at: [col, row, lift], size} in tiles (where it
  * stands); `solids`: every block and cylinder so, those that share a name too (a wire cannot end at one of them, and
  * still must not run under it); `tight`: the names that do not fit their block's face even broken and shrunk,
- * [{name, text}]; `made`: how the map was made — {placed: 'build' | 'hand', tile, fitted}; `built`: {spec, map} — the
+ * [{name, text}]; `made`: how the map was made — {placed: 'build' | 'hand', tile, fitted, style?} (`style` the built map's {row, options}, only on a map that writes a data-style); `built`: {spec, map} — the
  * spec the steps were handed and the map they built, both frozen, for the run's map flow (run/maps.js);
  * `floor(col, row, lift)`: where a point of the floor is on the slide, [x, y] (absent when the map has no isometric
  * piece); `routes`: one entry a link — the way the steps laid that wire along the floor ({route, lift}, as cable.js ·
@@ -362,8 +363,13 @@ export const isoPieces = (html, options) => isoDrawn(html, options).html;
  */
 export function isoDrawn(html, {canvas = null, area = null, links = [], floorWires = null, icons = {}} = {}) {
   const shapes = new Map(), solids = [], tight = [], levels = new Map();
-  if (!MAYBE.test(html) && !MAYBE_GRID.test(html) && !mayHoldFootprint(html)) return {html, shapes, solids, tight};
-  const {html: map, grid: written, numbers: gridWritten, fit = false} = readGrid(html), found = readIso(map), feet = readFootprints(map);
+  if (!MAYBE.test(html) && !MAYBE_GRID.test(html) && !MAYBE_STYLE.test(html) && !mayHoldFootprint(html)) return {html, shapes, solids, tight};
+  // the map's style first (isoStyle.js): its <i> taken out before the grid's is read, so one written beside the grid is
+  // refused in the style's words, with its fix
+  const {html: unstyled, style} = readStyle(html);
+  const {html: map, grid: written, numbers: gridWritten, fit = false} = readGrid(unstyled), found = readIso(map), feet = readFootprints(map);
+  // a style paints the blocks, cylinders and floors: on a map with none it would say nothing, so it is refused, not dropped
+  if (style && !found.length) throw new Error('data-style: a map\'s style paints its isometric pieces (data-iso), and this map has none — take the style out, or add a block');
   if (!found.length && !feet.length) {
     if (fit) throw new Error('data-iso-grid="fit": the grid is fitted to the blocks, and this map has none — add a block, or take the grid out');
     return {html: map, shapes, solids, tight};
@@ -393,7 +399,7 @@ export function isoDrawn(html, {canvas = null, area = null, links = [], floorWir
     blocks: solid.map((p, i) => ({name: p.name, kind: p.kind, at: p.at, size: p.size, label: fittedPart(words[i]?.label ?? null), rule: words[i]?.label ? p.rule : null, group: p.group, ports: p.ports, who: p.where})),
     floors: floors.map((f) => ({name: f.name, at: f.at, size: f.size, label: f.label, icon: Boolean(f.icon), group: f.group, who: f.where})),
     obstacles: feet.map((f) => ({name: f.name, at: f.at, size: f.size, ports: f.ports, who: f.where})),
-    keep, links, ends, grid: gridWritten ?? (fit ? 'fit' : null), canvas, area: areaOf(solid, {fitted, canvas, area}),
+    keep, links, ends, grid: gridWritten ?? (fit ? 'fit' : null), canvas, area: areaOf(solid, {fitted, canvas, area}), style,
   });
   const grid = isometric({tile: built.view.tile, origin: built.view.origin, rise: built.view.rise});
   // each piece where the map put it, drawn — its name and its floor's label as the steps fitted them
@@ -435,7 +441,7 @@ export function isoDrawn(html, {canvas = null, area = null, links = [], floorWir
   const outside = fitted && areas.length ? beyondArea(areas.map(([c, r]) => grid.at(c, r)), area ?? [0, 0, ...(canvas ?? [1920, 1080])]) : 0;
   // the break rules its writer picked, by block (none written: nothing here, so a map that picks none records as before)
   const breaks = found.filter((p) => p.rule).map((p) => [p.name, p.rule]);
-  const made = {placed: built.placed, tile: built.view.tile[0], fitted: built.grid === 'fitted', ...(feet.length ? {footprints: feet.length} : {}), ...(outside > 0.5 ? {outside: Math.round(outside)} : {}), ...(breaks.length ? {breaks} : {})};
+  const made = {placed: built.placed, tile: built.view.tile[0], fitted: built.grid === 'fitted', ...(feet.length ? {footprints: feet.length} : {}), ...(outside > 0.5 ? {outside: Math.round(outside)} : {}), ...(breaks.length ? {breaks} : {}), ...(style ? {style: built.style} : {})};
   return {html: out + map.slice(from), shapes, solids, tight, levels, made, built: {spec, map: built}, routes, floor: (col, row, lift = 0) => { const point = grid.at(col, row, lift); return [point.x, point.y]; }};
 }
 

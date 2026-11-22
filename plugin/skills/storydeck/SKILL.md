@@ -145,7 +145,7 @@ data-size="2 2 1.6"><b>Server</b></div>` draws a block seen from a corner; also 
 width and depth) and `data-iso="floor" data-size="16 9"` (the tile lines; write it first). `data-at` is "col row" in
 tiles (a third number lifts it), `data-size` "wide deep high". The build places, sizes and levels each one, so give it no
 left/top/width/height; `<i data-iso-grid="150 at 1500 150"></i>` sets the tile's width and the floor's far corner.
-Colour one with `style="--iso-color:#bcd6f3"`. It is a piece like any other: clicks, `fit`, routes, wires and callouts
+Colour one with `style="--iso-color:#bcd6f3"`. A map's look: `<i data-style="line: ink width 5"></i>` (or `"line: none"`; footprint-story's style columns as "column: choice option value", apart with ";"). It is a piece like any other: clicks, `fit`, routes, wires and callouts
 all work on it. A wire between two blocks is laid along the floor: along the tile lines, round any block in its way,
 from a foot that is seen to a foot that is seen; a request and its answer lie in two lanes. You write only what is
 joined to what. Its `data-label` is written on the cable, so keep it short. After an edit, read `check` or `build`:

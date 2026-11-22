@@ -274,6 +274,10 @@ describe('run · how a map was made is on the record', () => {
     const picked = stageScope();
     await mapsMade(picked, runOf(deck(`${grid}<div data-k="a" data-iso="block" data-at="0 0" data-break="fill"><b>Logs to S3 Archive</b></div>`)));
     expect(picked.maps).toEqual({map: {placed: 'hand', tile: 120, cables: 0, breaks: [['a', 'fill']]}});
+    // a map that names its style (data-style): the choices that drew it, as the steps read them
+    const looked = stageScope();
+    await mapsMade(looked, runOf(deck(`${grid}<i data-style="line: none"></i><div data-k="a" data-iso="block" data-at="0 0"><b>A</b></div>`)));
+    expect(looked.maps).toEqual({map: {placed: 'hand', tile: 120, cables: 0, style: {row: {shape: 'box', shading: 'tones', line: 'none', palette: 'theme', texture: 'none', effects: []}, options: {}}}});
     // no isometric map: nothing written
     const flat = stageScope();
     await mapsMade(flat, runOf(deck('<div data-k="a" class="box" style="left:0px;top:0px;width:100px;height:50px">a</div>')));

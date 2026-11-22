@@ -129,13 +129,14 @@ function handedWires(links, ends, idOf, byBuild) {
  *   keep      [{at, size, name, piece}]   (floor kept clear, in tiles; `piece` the deck's name of the words over it)
  *   links, ends   the wires (handedWires)
  *   grid      {tile, origin, rise?} as written, 'fit', or null;   canvas, area   the slide and where a fitted picture goes
+ *   style     the map's row of style choices (isoStyle.js · readStyle), or null: today's look
  * Gives {map, spec, ids: {blocks, floors, obstacles}, routes}: `map` the built map (buildIsoMap: frozen plain data),
  * `spec` the very spec buildIsoMap was handed, frozen at every level — WHY kept: the run hands this spec to the map flow
  * (run/maps.js), so the record is of the map the page draws, never of one made again — `ids` the spec's name of each
  * piece, `routes` one entry a link — {route, lift} for a wire laid (or not: its why), else null, as cable.js · cablesOn
  * reads them, the deck's names back in the kit's words.
  */
-export function builtMap({blocks = [], floors = [], obstacles = [], keep = [], links = [], ends = links.map(() => null), grid = null, canvas = null, area = null}) {
+export function builtMap({blocks = [], floors = [], obstacles = [], keep = [], links = [], ends = links.map(() => null), grid = null, canvas = null, area = null, style = null}) {
   const names = specNames([...blocks, ...floors, ...obstacles].map((p) => p.name));
   const ids = {blocks: names.slice(0, blocks.length), floors: names.slice(blocks.length, blocks.length + floors.length), obstacles: names.slice(blocks.length + floors.length)};
   // a name a wire can end at: one standing piece's (two that share it are no end)
@@ -151,6 +152,9 @@ export function builtMap({blocks = [], floors = [], obstacles = [], keep = [], l
     floors: floors.map((f, i) => ({name: ids.floors[i], at: f.size ? (f.at ?? [0, 0]).slice(0, 2) : null, size: f.size, label: f.label ?? null, icon: Boolean(f.icon), group: f.group ?? null, who: whoOf(f.who)})),
     obstacles: obstacles.map((o, i) => ({name: ids.obstacles[i], at: o.at, size: o.size, ports: o.ports ?? [], who: whoOf(o.who)})),
     keep: keep.map(({at, size, name}) => ({at, size, name})), wires, grid, usualGrid: usualGrid(canvas), area,
+    // the map's style as its writer named it (isoStyle.js · readStyle): handed only when written, so the spec of a map
+    // with none — and the record of it — is as before
+    ...(style ? {style} : {}),
   }));
   let map;
   try { map = buildIsoMap(spec, DECK); } catch (e) {

@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.36.0 — a map takes a style
+
+An isometric map can now name its look: `<i data-style="line: ink width 5"></i>` in `map.html` draws every face with
+a 5 px outline, `<i data-style="line: none"></i>` with none. The words are footprint-story's style columns (`shape`,
+`shading`, `line`, `palette`, `texture`, `effects`), each `column: choice` with its options by name and value, columns
+apart with `;`. A map with no `data-style` is drawn byte for byte as before: every example page and every expected
+page in the tests is unchanged.
+
+- **New: `deck/isoStyle.js`** — reads a map's style from its own empty `<i data-style>` (taken out of the map, as
+  `data-iso-grid`'s is) and hands it to the map steps as the spec's `style`. Plain words, not JSON, because every map
+  attribute is written by hand or by a model. Refused in the deck's words, naming the map and the fix: a column, a
+  choice or an option it does not have (with the ones there are), an option with no value or said twice, a column
+  written twice, a style on a piece or beside `data-iso-grid` on one `<i>`, two styles, a style on a map with no
+  `data-iso` piece.
+- **Fixed: `deck/isoPaint.js` writes a stroke's width, join, cap and alpha apart from its colour.** Before, a stroke
+  with no colour (every stroke the deck's map steps make) wrote nothing, so a 5 px style drew at the CSS's 2.5 px and
+  a no-outline style drew the CSS's ink. Now what a stroke says that the page's CSS does not already draw for its role
+  is written as SVG presentation attributes (`stroke-width="5"`, `stroke="none"`): they beat what a face inherits,
+  and lose to any CSS rule that names the element — theme.css, a state, and the floor's focus ring (`isoRing` sets the
+  stroke on `.iso-ground`) all still win. What the page draws is read from the kit's usual style (`PAGE_STROKES`),
+  which a test pins to `ISO_CSS`. Every stroke is now checked, coloured or not.
+- **Record:** the run's `maps made` carries `style: {row, options}` for a map that names one (none for a map that
+  does not, so its record is as before), and the map flow's own record says the style of every map
+  (`storydeck log --run <id> --why style --map <map>`).
+
 ## 0.35.0 — isometric pieces are written from the map's paint list
 
 A block's, a cylinder's and a floor's SVG faces now come from the paint list footprint-story's map steps already make
