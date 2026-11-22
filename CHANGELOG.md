@@ -2,7 +2,7 @@
 
 ## 0.39.0 — maps drawn by hand
 
-A map can now be drawn by hand. footprint-story's sketched line and hatch (now `^0.33.0`) are style choices like any
+A map can now be drawn by hand. footprint-story's sketched line and hatch (now `^0.33.1`) are style choices like any
 other on a map's `data-style`:
 
 ```html
@@ -52,6 +52,8 @@ page that names no hand-drawn style is byte for byte as before.
   is built, drawn, compiled and built again by the run's map flow, which gives the same map. A still of that page
   (`deck/test/sketchy-still.html`, with no words, so no font of the host's) is pinned byte for byte. The 64-block
   case's sizes, the note and the refusal are pinned (`deck/strokes-once.test.js`).
+- **The run's map-flow record stays small** (footprint-story 0.33.1): it keeps a hand-drawn map's paint as counts and a
+  digest, not every stroke point — a 64-block hatched map's record was megabytes, and now is about 90 KB.
 
 ## 0.38.0 — the motion place rules, one copy
 
