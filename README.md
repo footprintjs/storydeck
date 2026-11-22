@@ -736,11 +736,35 @@ with how many problems, and one run in full (`--run 1`). The runs are kept with 
   groups side by side). Placed by hand, a group still fits its floor. A group's labelled floor is not ground: a view
   that frames it holds its words.
 
+  **A map's style.** The look of a whole map is a row of named choices — footprint-story's style columns: `shape`,
+  `shading`, `line`, `palette`, `texture`, `effects` — written on an empty `<i>` of its own in `map.html`, the way
+  `data-iso-grid` is:
+
+  ```html
+  <i data-style="line: ink width 5"></i>     <!-- an outlined look: every face drawn with a 5 px line -->
+  <i data-style="line: none"></i>            <!-- no outline round the faces; a floor keeps its tile lines -->
+  ```
+
+  Each column is `column: choice`, then each option the choice takes as its name and its value (`width 5`); columns
+  are apart with `;` (`line: ink width 4; shading: tones`), and the choices of `effects` with `,`. A column left out
+  is today's look, and a map with no `data-style` is drawn byte for byte as before. Why plain words and not JSON:
+  every map attribute is written by hand or by a model (`data-at="3 1"`, `data-iso-grid="120 at 960 240 rise 70"`),
+  and quotes inside an attribute are the first thing either gets wrong. The choices are footprint-story's
+  (`line`: `ink`, with `width` from 0.5 to 20 px, or `none`), so a film draws a map in the same style by the same
+  names. A column, a choice or an option it does not have is refused, naming the ones there are; so is a style on a
+  piece, a second one, or one on a map with no `data-iso` piece. A map with a style has every stroke value its style
+  gives written on its faces as SVG attributes (`stroke-width="5" stroke-linejoin="round" stroke-linecap="butt"`, or
+  `stroke="none"`), so the width it names wins over the `--iso-line-width` token; a map with none writes nothing and
+  the token still sets its outline. An SVG attribute loses to any CSS rule that names the element, so the colours stay
+  the tokens below, a rule of yours on `.iso-top` still wins, and a highlighted floor is still ringed. The run's record says which
+  style drew each map (`maps made` · `style`, and `storydeck log --why style --map <map>`).
+
   Why the build places it: where a block lands, how big it is and which block is painted over which all follow from
   the floor, so a left, top, width or height of its own is refused, with the fix. The nearer block is painted over the
   further by a level each; the map's own order never moves. Write the floor first: it and the wires share a level.
   The floor is ground (see below), so the view follows the pieces. One colour a piece (`--iso-color`): its top is drawn
-  lighter and its sides darker; `--iso-ink`, `--iso-line`, `--iso-grid` and `--iso-floor` are the other tokens, and
+  lighter and its sides darker; `--iso-ink`, `--iso-line`, `--iso-line-width` (the faces' outline, 2.5px; a map's
+  `data-style` that names a width wins over it), `--iso-grid` and `--iso-floor` are the other tokens, and
   class `ok`, `warn` or `bad` colours one. The numbers come from `footprint-story/isometric`, the grid a film can draw
   with too, and so does the map itself: since 0.33.0 the build hands the map's pieces to that package's map steps
   (`buildIsoMap`, with the deck's own numbers), which place the blocks, lay the wires, fit the floors, choose the tile,

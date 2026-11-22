@@ -90,6 +90,18 @@ describe('each isometric map built again by the map flow, its record kept for lo
     expect(handed).toBe(built.spec);
   });
 
+  it('the map flow\'s record says the style a map was drawn in: log --why style --map answers from the run, nothing run again', async () => {
+    const home = tempDir(), dir = oneMap(`<i data-style="line: ink width 5"></i>\n${HAND}`, 'a b');
+    const r = await runDeck(dir, {home});
+    expect(r.maps.runs[0].differs).toBeUndefined();
+    const said = await logTool(dir, {home, run: '1', why: 'style', map: 'map'});
+    expect(said.split('\n')[0]).toBe('style = {"row":{"shape":"box","shading":"tones","line":"ink","palette":"theme","texture":"none","effects":[]},"options":{"line":{"width":5}}}');
+    // a map that names none is drawn in the usual look, and its record says so
+    const plain = oneMap(HAND, 'a b'), home2 = tempDir();
+    await runDeck(plain, {home: home2});
+    expect((await logTool(plain, {home: home2, run: '1', why: 'style', map: 'map'})).split('\n')[0]).toBe('style = {"row":{"shape":"box","shading":"tones","line":"ink","palette":"theme","texture":"none","effects":[]},"options":{}}');
+  });
+
   it('a deck with no isometric map runs nothing new: no call, no map record, the reply as it was — and --map says what the deck has', async () => {
     const dir = oneMap(MAP, 'a', 'flat'), home = tempDir();
     let asked = 0;
